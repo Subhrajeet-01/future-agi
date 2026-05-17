@@ -27145,7 +27145,7 @@
                     "200": {
                         "description": "",
                         "schema": {
-                            "$ref": "#/definitions/ModelHubJSONResponse"
+                            "$ref": "#/definitions/EvalTemplateVersionListResponse"
                         }
                     },
                     "400": {
@@ -27211,7 +27211,7 @@
                     "200": {
                         "description": "",
                         "schema": {
-                            "$ref": "#/definitions/ModelHubJSONResponse"
+                            "$ref": "#/definitions/EvalTemplateVersionResponse"
                         }
                     },
                     "400": {
@@ -27277,7 +27277,7 @@
                     "200": {
                         "description": "",
                         "schema": {
-                            "$ref": "#/definitions/ModelHubJSONResponse"
+                            "$ref": "#/definitions/EvalTemplateVersionRestoreResponse"
                         }
                     },
                     "400": {
@@ -27349,7 +27349,7 @@
                     "200": {
                         "description": "",
                         "schema": {
-                            "$ref": "#/definitions/ModelHubJSONResponse"
+                            "$ref": "#/definitions/EvalTemplateVersionResponse"
                         }
                     },
                     "400": {
@@ -77727,6 +77727,90 @@
                 }
             }
         },
+        "EvalTemplateVersionItem": {
+            "required": [
+                "id",
+                "version_number",
+                "is_default"
+            ],
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "version_number": {
+                    "title": "Version number",
+                    "type": "integer"
+                },
+                "is_default": {
+                    "title": "Is default",
+                    "type": "boolean"
+                },
+                "criteria": {
+                    "title": "Criteria",
+                    "type": "string"
+                },
+                "model": {
+                    "title": "Model",
+                    "type": "string"
+                },
+                "config_snapshot": {
+                    "title": "Config snapshot",
+                    "type": "object"
+                },
+                "created_by_name": {
+                    "title": "Created by name",
+                    "type": "string"
+                },
+                "created_at": {
+                    "title": "Created at",
+                    "type": "string"
+                }
+            }
+        },
+        "EvalTemplateVersionListResponseResult": {
+            "required": [
+                "template_id",
+                "versions",
+                "total"
+            ],
+            "type": "object",
+            "properties": {
+                "template_id": {
+                    "title": "Template id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "versions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/EvalTemplateVersionItem"
+                    }
+                },
+                "total": {
+                    "title": "Total",
+                    "type": "integer"
+                }
+            }
+        },
+        "EvalTemplateVersionListResponse": {
+            "required": [
+                "status",
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean"
+                },
+                "result": {
+                    "$ref": "#/definitions/EvalTemplateVersionListResponseResult"
+                }
+            }
+        },
         "EvalTemplateVersionCreateRequest": {
             "type": "object",
             "properties": {
@@ -77744,6 +77828,89 @@
                     "title": "Config snapshot",
                     "type": "object",
                     "x-nullable": true
+                }
+            }
+        },
+        "EvalTemplateVersionResponseResult": {
+            "required": [
+                "id",
+                "version_number",
+                "is_default"
+            ],
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "version_number": {
+                    "title": "Version number",
+                    "type": "integer"
+                },
+                "is_default": {
+                    "title": "Is default",
+                    "type": "boolean"
+                }
+            }
+        },
+        "EvalTemplateVersionResponse": {
+            "required": [
+                "status",
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean"
+                },
+                "result": {
+                    "$ref": "#/definitions/EvalTemplateVersionResponseResult"
+                }
+            }
+        },
+        "EvalTemplateVersionRestoreResponseResult": {
+            "required": [
+                "id",
+                "version_number",
+                "is_default",
+                "restored_from"
+            ],
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "version_number": {
+                    "title": "Version number",
+                    "type": "integer"
+                },
+                "is_default": {
+                    "title": "Is default",
+                    "type": "boolean"
+                },
+                "restored_from": {
+                    "title": "Restored from",
+                    "type": "integer"
+                }
+            }
+        },
+        "EvalTemplateVersionRestoreResponse": {
+            "required": [
+                "status",
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean"
+                },
+                "result": {
+                    "$ref": "#/definitions/EvalTemplateVersionRestoreResponseResult"
                 }
             }
         },

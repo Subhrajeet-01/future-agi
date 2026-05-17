@@ -14058,7 +14058,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "queryParameters": {},
         "responses": {
           "200": {
-            "$ref": "#/definitions/ModelHubJSONResponse"
+            "$ref": "#/definitions/EvalTemplateVersionListResponse"
           },
           "400": {
             "$ref": "#/definitions/ModelHubErrorResponse"
@@ -14087,7 +14087,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "queryParameters": {},
         "responses": {
           "200": {
-            "$ref": "#/definitions/ModelHubJSONResponse"
+            "$ref": "#/definitions/EvalTemplateVersionResponse"
           },
           "400": {
             "$ref": "#/definitions/ModelHubErrorResponse"
@@ -14116,7 +14116,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "queryParameters": {},
         "responses": {
           "200": {
-            "$ref": "#/definitions/ModelHubJSONResponse"
+            "$ref": "#/definitions/EvalTemplateVersionRestoreResponse"
           },
           "400": {
             "$ref": "#/definitions/ModelHubErrorResponse"
@@ -14145,7 +14145,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "queryParameters": {},
         "responses": {
           "200": {
-            "$ref": "#/definitions/ModelHubJSONResponse"
+            "$ref": "#/definitions/EvalTemplateVersionResponse"
           },
           "400": {
             "$ref": "#/definitions/ModelHubErrorResponse"
@@ -42905,6 +42905,54 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "EvalTemplateVersionListResponse": {
+      "required": [
+        "status",
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean"
+        },
+        "result": {
+          "$ref": "#/definitions/EvalTemplateVersionListResponseResult"
+        }
+      }
+    },
+    "EvalTemplateVersionResponse": {
+      "required": [
+        "status",
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean"
+        },
+        "result": {
+          "$ref": "#/definitions/EvalTemplateVersionResponseResult"
+        }
+      }
+    },
+    "EvalTemplateVersionRestoreResponse": {
+      "required": [
+        "status",
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean"
+        },
+        "result": {
+          "$ref": "#/definitions/EvalTemplateVersionRestoreResponseResult"
+        }
+      }
+    },
     "EvalUserTemplate": {
       "required": [
         "name",
@@ -60965,6 +61013,82 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "EvalTemplateVersionListResponseResult": {
+      "required": [
+        "template_id",
+        "versions",
+        "total"
+      ],
+      "type": "object",
+      "properties": {
+        "template_id": {
+          "title": "Template id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvalTemplateVersionItem"
+          }
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        }
+      }
+    },
+    "EvalTemplateVersionResponseResult": {
+      "required": [
+        "id",
+        "version_number",
+        "is_default"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "version_number": {
+          "title": "Version number",
+          "type": "integer"
+        },
+        "is_default": {
+          "title": "Is default",
+          "type": "boolean"
+        }
+      }
+    },
+    "EvalTemplateVersionRestoreResponseResult": {
+      "required": [
+        "id",
+        "version_number",
+        "is_default",
+        "restored_from"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "version_number": {
+          "title": "Version number",
+          "type": "integer"
+        },
+        "is_default": {
+          "title": "Is default",
+          "type": "boolean"
+        },
+        "restored_from": {
+          "title": "Restored from",
+          "type": "integer"
+        }
+      }
+    },
     "ExecutePromptSimulationResult": {
       "required": [
         "scenario_ids"
@@ -67505,6 +67629,49 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Api key available",
           "type": "boolean",
           "readOnly": true
+        }
+      }
+    },
+    "EvalTemplateVersionItem": {
+      "required": [
+        "id",
+        "version_number",
+        "is_default"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "version_number": {
+          "title": "Version number",
+          "type": "integer"
+        },
+        "is_default": {
+          "title": "Is default",
+          "type": "boolean"
+        },
+        "criteria": {
+          "title": "Criteria",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "config_snapshot": {
+          "title": "Config snapshot",
+          "type": "object"
+        },
+        "created_by_name": {
+          "title": "Created by name",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created at",
+          "type": "string"
         }
       }
     },

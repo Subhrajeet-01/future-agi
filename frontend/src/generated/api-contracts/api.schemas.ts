@@ -6881,12 +6881,59 @@ export interface EvalTemplateUpdateV2RequestApi {
   template_format?: EvalTemplateUpdateV2RequestApiTemplateFormat;
 }
 
+export type EvalTemplateVersionItemApiConfigSnapshot = { [key: string]: unknown };
+
+export interface EvalTemplateVersionItemApi {
+  id: string;
+  version_number: number;
+  is_default: boolean;
+  criteria?: string;
+  model?: string;
+  config_snapshot?: EvalTemplateVersionItemApiConfigSnapshot;
+  created_by_name?: string;
+  created_at?: string;
+}
+
+export interface EvalTemplateVersionListResponseResultApi {
+  template_id: string;
+  versions: EvalTemplateVersionItemApi[];
+  total: number;
+}
+
+export interface EvalTemplateVersionListResponseApi {
+  status: boolean;
+  result: EvalTemplateVersionListResponseResultApi;
+}
+
 export type EvalTemplateVersionCreateRequestApiConfigSnapshot = { [key: string]: unknown };
 
 export interface EvalTemplateVersionCreateRequestApi {
   criteria?: string;
   model?: string;
   config_snapshot?: EvalTemplateVersionCreateRequestApiConfigSnapshot;
+}
+
+export interface EvalTemplateVersionResponseResultApi {
+  id: string;
+  version_number: number;
+  is_default: boolean;
+}
+
+export interface EvalTemplateVersionResponseApi {
+  status: boolean;
+  result: EvalTemplateVersionResponseResultApi;
+}
+
+export interface EvalTemplateVersionRestoreResponseResultApi {
+  id: string;
+  version_number: number;
+  is_default: boolean;
+  restored_from: number;
+}
+
+export interface EvalTemplateVersionRestoreResponseApi {
+  status: boolean;
+  result: EvalTemplateVersionRestoreResponseResultApi;
 }
 
 export type EvalUserTemplateApiConfig = { [key: string]: unknown };

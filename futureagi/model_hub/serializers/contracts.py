@@ -988,6 +988,50 @@ class EvalTemplateVersionCreateRequestSerializer(serializers.Serializer):
     config_snapshot = serializers.JSONField(required=False, allow_null=True)
 
 
+class EvalTemplateVersionItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    version_number = serializers.IntegerField()
+    is_default = serializers.BooleanField()
+    criteria = serializers.CharField(required=False, allow_blank=True)
+    model = serializers.CharField(required=False, allow_blank=True)
+    config_snapshot = serializers.JSONField(required=False)
+    created_by_name = serializers.CharField(required=False, allow_blank=True)
+    created_at = serializers.CharField(required=False, allow_blank=True)
+
+
+class EvalTemplateVersionListResponseResultSerializer(serializers.Serializer):
+    template_id = serializers.UUIDField()
+    versions = EvalTemplateVersionItemSerializer(many=True)
+    total = serializers.IntegerField()
+
+
+class EvalTemplateVersionListResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField()
+    result = EvalTemplateVersionListResponseResultSerializer()
+
+
+class EvalTemplateVersionResponseResultSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    version_number = serializers.IntegerField()
+    is_default = serializers.BooleanField()
+
+
+class EvalTemplateVersionResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField()
+    result = EvalTemplateVersionResponseResultSerializer()
+
+
+class EvalTemplateVersionRestoreResponseResultSerializer(
+    EvalTemplateVersionResponseResultSerializer
+):
+    restored_from = serializers.IntegerField()
+
+
+class EvalTemplateVersionRestoreResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField()
+    result = EvalTemplateVersionRestoreResponseResultSerializer()
+
+
 class CompositeEvalCreateRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     description = serializers.CharField(required=False, allow_null=True, allow_blank=True)

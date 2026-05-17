@@ -338,6 +338,9 @@ import type {
   EvalTemplateNamesRequestApi,
   EvalTemplateUpdateV2RequestApi,
   EvalTemplateVersionCreateRequestApi,
+  EvalTemplateVersionListResponseApi,
+  EvalTemplateVersionResponseApi,
+  EvalTemplateVersionRestoreResponseApi,
   EvalUserTemplateApi,
   ExecutePromptSimulationRequestApi,
   ExecutePromptSimulationResponseApi,
@@ -30759,7 +30762,7 @@ export const modelHubEvalTemplatesUsageList = async (templateId: string, options
 
 
 export type modelHubEvalTemplatesVersionsListResponse200 = {
-  data: ModelHubJSONResponseApi
+  data: EvalTemplateVersionListResponseApi
   status: 200
 }
 
@@ -30823,7 +30826,7 @@ export const modelHubEvalTemplatesVersionsList = async (templateId: string, opti
 
 
 export type modelHubEvalTemplatesVersionsCreateCreateResponse200 = {
-  data: ModelHubJSONResponseApi
+  data: EvalTemplateVersionResponseApi
   status: 200
 }
 
@@ -30889,7 +30892,7 @@ export const modelHubEvalTemplatesVersionsCreateCreate = async (templateId: stri
 
 
 export type modelHubEvalTemplatesVersionsRestoreCreateResponse200 = {
-  data: ModelHubJSONResponseApi
+  data: EvalTemplateVersionRestoreResponseApi
   status: 200
 }
 
@@ -30958,7 +30961,7 @@ export const modelHubEvalTemplatesVersionsRestoreCreate = async (templateId: str
 
 
 export type modelHubEvalTemplatesVersionsSetDefaultUpdateResponse200 = {
-  data: ModelHubJSONResponseApi
+  data: EvalTemplateVersionResponseApi
   status: 200
 }
 

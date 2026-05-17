@@ -49,6 +49,9 @@ from model_hub.serializers.contracts import (
     EvalTemplateListChartsRequestSerializer,
     EvalTemplateUpdateV2RequestSerializer,
     EvalTemplateVersionCreateRequestSerializer,
+    EvalTemplateVersionListResponseSerializer,
+    EvalTemplateVersionResponseSerializer,
+    EvalTemplateVersionRestoreResponseSerializer,
     EvalMetricRequestSerializer,
     EvalTemplateNamesRequestSerializer,
     GroundTruthConfigResponseSerializer,
@@ -2468,7 +2471,10 @@ class EvalTemplateVersionListView(APIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+        responses={
+            200: EvalTemplateVersionListResponseSerializer,
+            **MODEL_HUB_ERROR_RESPONSES,
+        }
     )
     def get(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
@@ -2547,7 +2553,10 @@ class EvalTemplateVersionCreateView(APIView):
 
     @swagger_auto_schema(
         request_body=EvalTemplateVersionCreateRequestSerializer,
-        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+        responses={
+            200: EvalTemplateVersionResponseSerializer,
+            **MODEL_HUB_ERROR_RESPONSES,
+        },
     )
     def post(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
@@ -2678,7 +2687,10 @@ class SetDefaultVersionView(APIView):
 
     @swagger_auto_schema(
         request_body=ModelHubEmptyRequestSerializer,
-        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+        responses={
+            200: EvalTemplateVersionResponseSerializer,
+            **MODEL_HUB_ERROR_RESPONSES,
+        },
     )
     def put(self, request, template_id, version_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
@@ -2745,7 +2757,10 @@ class RestoreVersionView(APIView):
 
     @swagger_auto_schema(
         request_body=ModelHubEmptyRequestSerializer,
-        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+        responses={
+            200: EvalTemplateVersionRestoreResponseSerializer,
+            **MODEL_HUB_ERROR_RESPONSES,
+        },
     )
     def post(self, request, template_id, version_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion

@@ -822,19 +822,19 @@ def test_model_hub_ai_writer_and_custom_model_endpoints_have_response_contracts(
             "ModelHubJSONResponse"
         ),
         ("GET", "/model-hub/eval-templates/{template_id}/versions/"): (
-            "ModelHubJSONResponse"
+            "EvalTemplateVersionListResponse"
         ),
         ("POST", "/model-hub/eval-templates/{template_id}/versions/create/"): (
-            "ModelHubJSONResponse"
+            "EvalTemplateVersionResponse"
         ),
         (
             "POST",
             "/model-hub/eval-templates/{template_id}/versions/{version_id}/restore/",
-        ): "ModelHubJSONResponse",
+        ): "EvalTemplateVersionRestoreResponse",
         (
             "PUT",
             "/model-hub/eval-templates/{template_id}/versions/{version_id}/set-default/",
-        ): "ModelHubJSONResponse",
+        ): "EvalTemplateVersionResponse",
         ("POST", "/model-hub/eval-template/create/"): (
             "ModelHubStringResultResponse"
         ),

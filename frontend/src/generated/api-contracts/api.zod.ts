@@ -19258,22 +19258,23 @@ export const ModelHubEvalTemplatesVersionsListParams = zod.object({
 })
 
 export const ModelHubEvalTemplatesVersionsListResponse = zod.object({
-  "status": zod.object({
-
-}).passthrough().optional(),
-  "message": zod.string().optional(),
+  "status": zod.boolean(),
   "result": zod.object({
+  "template_id": zod.string().uuid(),
+  "versions": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "version_number": zod.number(),
+  "is_default": zod.boolean(),
+  "criteria": zod.string().optional(),
+  "model": zod.string().optional(),
+  "config_snapshot": zod.object({
 
 }).passthrough().optional(),
-  "data": zod.object({
-
-}).passthrough().optional(),
-  "error": zod.object({
-
-}).passthrough().optional(),
-  "detail": zod.object({
-
-}).passthrough().optional()
+  "created_by_name": zod.string().optional(),
+  "created_at": zod.string().optional()
+})),
+  "total": zod.number()
+})
 })
 
 
@@ -19294,22 +19295,12 @@ export const ModelHubEvalTemplatesVersionsCreateCreateBody = zod.object({
 })
 
 export const ModelHubEvalTemplatesVersionsCreateCreateResponse = zod.object({
-  "status": zod.object({
-
-}).passthrough().optional(),
-  "message": zod.string().optional(),
+  "status": zod.boolean(),
   "result": zod.object({
-
-}).passthrough().optional(),
-  "data": zod.object({
-
-}).passthrough().optional(),
-  "error": zod.object({
-
-}).passthrough().optional(),
-  "detail": zod.object({
-
-}).passthrough().optional()
+  "id": zod.string().uuid(),
+  "version_number": zod.number(),
+  "is_default": zod.boolean()
+})
 })
 
 
@@ -19328,22 +19319,13 @@ export const ModelHubEvalTemplatesVersionsRestoreCreateBody = zod.object({
 }).passthrough()
 
 export const ModelHubEvalTemplatesVersionsRestoreCreateResponse = zod.object({
-  "status": zod.object({
-
-}).passthrough().optional(),
-  "message": zod.string().optional(),
+  "status": zod.boolean(),
   "result": zod.object({
-
-}).passthrough().optional(),
-  "data": zod.object({
-
-}).passthrough().optional(),
-  "error": zod.object({
-
-}).passthrough().optional(),
-  "detail": zod.object({
-
-}).passthrough().optional()
+  "id": zod.string().uuid(),
+  "version_number": zod.number(),
+  "is_default": zod.boolean(),
+  "restored_from": zod.number()
+})
 })
 
 
@@ -19361,22 +19343,12 @@ export const ModelHubEvalTemplatesVersionsSetDefaultUpdateBody = zod.object({
 }).passthrough()
 
 export const ModelHubEvalTemplatesVersionsSetDefaultUpdateResponse = zod.object({
-  "status": zod.object({
-
-}).passthrough().optional(),
-  "message": zod.string().optional(),
+  "status": zod.boolean(),
   "result": zod.object({
-
-}).passthrough().optional(),
-  "data": zod.object({
-
-}).passthrough().optional(),
-  "error": zod.object({
-
-}).passthrough().optional(),
-  "detail": zod.object({
-
-}).passthrough().optional()
+  "id": zod.string().uuid(),
+  "version_number": zod.number(),
+  "is_default": zod.boolean()
+})
 })
 
 
