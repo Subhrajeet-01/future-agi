@@ -64,9 +64,7 @@ export default function JwtLoginView() {
 
   const { mutate: acceptInvitation } = useMutation({
     mutationFn: () =>
-      axiosInstance.get(
-        `${endpoints.invite.accept_invitation}${uuid}/${token}/`,
-      ),
+      axiosInstance.get(endpoints.invite.accept_invitation(uuid, token)),
     onSuccess: (response) => {
       navigate(`/auth/jwt/invitation/set-password/${uuid}/${token}`, {
         state: {

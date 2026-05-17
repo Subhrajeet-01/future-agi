@@ -21,3 +21,22 @@ export const apiPath = (template, params = {}) => {
     return encodeURIComponent(String(value));
   });
 };
+
+export const legacyApiPath = (template, params = {}, reason = "") => {
+  if (typeof params === "string") {
+    reason = params;
+    params = {};
+  }
+
+  if (!reason) {
+    throw new Error(`Legacy API path needs a deprecation reason: ${template}`);
+  }
+
+  return template.replace(PARAM_RE, (_, key) => {
+    const value = params[key];
+    if (value === undefined || value === null || value === "") {
+      throw new Error(`Missing legacy API path param "${key}" for ${template}`);
+    }
+    return encodeURIComponent(String(value));
+  });
+};

@@ -8,6 +8,7 @@ import {
   apiPath,
   getContractedApiMethods,
   isContractedApiPath,
+  legacyApiPath,
 } from "../api-surface";
 
 describe("api surface contract", () => {
@@ -99,6 +100,26 @@ describe("api surface contract", () => {
     expect(() => apiPath("/tracer/trace/{id}/tags/")).toThrow(
       'Missing API path param "id"',
     );
+  });
+
+  it("requires explicit reasons for legacy paths", () => {
+    expect(
+      legacyApiPath(
+        "/model-hub/legacy/{id}/",
+        { id: "item/1" },
+        "Not exposed in Swagger yet.",
+      ),
+    ).toBe("/model-hub/legacy/item%2F1/");
+    expect(() => legacyApiPath("/model-hub/legacy/")).toThrow(
+      "Legacy API path needs a deprecation reason",
+    );
+    expect(() =>
+      legacyApiPath(
+        "/model-hub/legacy/{id}/",
+        {},
+        "Not exposed in Swagger yet.",
+      ),
+    ).toThrow('Missing legacy API path param "id"');
   });
 
   it("does not let generated Management API coverage accidentally shrink", () => {

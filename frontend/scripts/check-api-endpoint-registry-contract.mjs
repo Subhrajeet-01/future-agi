@@ -22,7 +22,8 @@ const endpointRegistryPath = path.join(
   "utils",
   "axios.js",
 );
-const MAX_UNCONTRACTED_REGISTRY_PATHS = 77;
+const MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS = 0;
+const MAX_LEGACY_REGISTRY_PATHS = 51;
 const MANAGEMENT_API_GROUPS = Object.keys(API_SURFACE_CONTRACT.groups)
   .filter((groupName) => groupName !== "root")
   .sort();
@@ -59,12 +60,23 @@ function rawPathValue(node) {
     .join("");
 }
 
-function isInApiPathCall(nodePath) {
+function isInEndpointRegistry(nodePath) {
+  return Boolean(
+    nodePath.findParent(
+      (parentPath) =>
+        parentPath.isVariableDeclarator() &&
+        parentPath.node.id?.type === "Identifier" &&
+        parentPath.node.id.name === "endpoints",
+    ),
+  );
+}
+
+function isPathRegistryCall(nodePath, calleeNames) {
   const parent = nodePath.parentPath;
   return (
     parent?.isCallExpression() &&
     parent.node.callee?.type === "Identifier" &&
-    parent.node.callee.name === "apiPath" &&
+    calleeNames.has(parent.node.callee.name) &&
     parent.node.arguments[0] === nodePath.node
   );
 }
@@ -85,14 +97,18 @@ function collectRawRegistryPaths() {
   const rawPaths = [];
   traverse(ast, {
     StringLiteral(nodePath) {
-      if (isInApiPathCall(nodePath)) return;
+      if (!isInEndpointRegistry(nodePath)) return;
+      if (isPathRegistryCall(nodePath, new Set(["apiPath", "legacyApiPath"])))
+        return;
       const value = rawPathValue(nodePath.node);
       if (value && API_PATH_RE.test(value)) {
         rawPaths.push({ value, line: nodePath.node.loc?.start?.line || 1 });
       }
     },
     TemplateLiteral(nodePath) {
-      if (isInApiPathCall(nodePath)) return;
+      if (!isInEndpointRegistry(nodePath)) return;
+      if (isPathRegistryCall(nodePath, new Set(["apiPath", "legacyApiPath"])))
+        return;
       const value = rawPathValue(nodePath.node);
       if (value && API_PATH_RE.test(value)) {
         rawPaths.push({ value, line: nodePath.node.loc?.start?.line || 1 });
@@ -100,6 +116,37 @@ function collectRawRegistryPaths() {
     },
   });
   return rawPaths;
+}
+
+function staticStringValue(node) {
+  if (node?.type === "StringLiteral") return node.value;
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return node.quasis[0]?.value?.cooked || node.quasis[0]?.value?.raw || "";
+  }
+  return "";
+}
+
+function collectLegacyRegistryPaths() {
+  const legacyPaths = [];
+  traverse(ast, {
+    CallExpression(nodePath) {
+      if (!isInEndpointRegistry(nodePath)) return;
+      if (nodePath.node.callee?.type !== "Identifier") return;
+      if (nodePath.node.callee.name !== "legacyApiPath") return;
+
+      const [templateArg, secondArg, thirdArg] = nodePath.node.arguments;
+      const value = staticStringValue(templateArg);
+      const reasonArg = thirdArg || secondArg;
+      const reason = staticStringValue(reasonArg);
+      legacyPaths.push({
+        value,
+        reason,
+        line:
+          templateArg?.loc?.start?.line || nodePath.node.loc?.start?.line || 1,
+      });
+    },
+  });
+  return legacyPaths;
 }
 
 const rawPathsByValue = new Map();
@@ -115,15 +162,35 @@ const registryPaths = [...rawPathsByValue.values()].map((rawPath) => ({
 const uncontracted = registryPaths.filter(
   (rawPath) => !rawPath.contractTemplate,
 );
+const legacyPaths = collectLegacyRegistryPaths();
+const invalidLegacyPaths = legacyPaths.filter(
+  (rawPath) =>
+    !rawPath.value ||
+    !rawPath.reason ||
+    !API_PATH_RE.test(rawPath.value) ||
+    matchedContractTemplate(rawPath.value),
+);
 
-if (uncontracted.length > MAX_UNCONTRACTED_REGISTRY_PATHS) {
+if (
+  uncontracted.length > MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS ||
+  legacyPaths.length > MAX_LEGACY_REGISTRY_PATHS ||
+  invalidLegacyPaths.length
+) {
   console.error(
     [
-      `Endpoint registry uncontracted paths increased from ${MAX_UNCONTRACTED_REGISTRY_PATHS} to ${uncontracted.length}.`,
-      "Add the missing backend Swagger serializer/path first, then switch the frontend endpoint to apiPath().",
+      "Endpoint registry contract coverage failed.",
+      `Unmarked uncontracted paths: ${uncontracted.length}/${MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS}`,
+      `Marked legacy paths: ${legacyPaths.length}/${MAX_LEGACY_REGISTRY_PATHS}`,
+      "Add the missing backend Swagger serializer/path first, switch contracted endpoints to apiPath(), or mark genuinely deprecated endpoints with legacyApiPath(path, reason).",
       ...uncontracted
         .slice(0, 80)
         .map(({ line, value }) => `  - src/utils/axios.js:${line}: ${value}`),
+      ...invalidLegacyPaths
+        .slice(0, 80)
+        .map(
+          ({ line, value, reason }) =>
+            `  - invalid legacy src/utils/axios.js:${line}: ${value || "<dynamic>"} (${reason || "missing reason or now contracted"})`,
+        ),
     ].join("\n"),
   );
   process.exit(1);
@@ -134,6 +201,7 @@ console.log(
     "Endpoint registry contract coverage:",
     `  raw registry paths: ${registryPaths.length}`,
     `  contracted by Swagger: ${registryPaths.length - uncontracted.length}`,
-    `  uncontracted legacy paths: ${uncontracted.length}/${MAX_UNCONTRACTED_REGISTRY_PATHS}`,
+    `  unmarked uncontracted paths: ${uncontracted.length}/${MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS}`,
+    `  marked legacy paths: ${legacyPaths.length}/${MAX_LEGACY_REGISTRY_PATHS}`,
   ].join("\n"),
 );
