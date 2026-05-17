@@ -1,6 +1,13 @@
 from rest_framework import serializers
 
 
+class ApiSuccessResponseSerializer(serializers.Serializer):
+    """Common GeneralMethods success response envelope."""
+
+    status = serializers.BooleanField(default=True)
+    result = serializers.JSONField(required=False, allow_null=True)
+
+
 class ApiErrorResponseSerializer(serializers.Serializer):
     """Common GeneralMethods error response envelope."""
 
@@ -17,3 +24,45 @@ class ApiSelectionTooLargeErrorSerializer(serializers.Serializer):
     message = serializers.JSONField(required=False, allow_null=True)
     code = serializers.IntegerField(default=400)
     error = serializers.JSONField(required=False)
+
+
+class HealthCheckResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField(default=True)
+    result = serializers.CharField()
+
+
+class DeploymentInfoResultSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(choices=("oss", "ee", "cloud"))
+
+
+class DeploymentInfoResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField(default=True)
+    result = DeploymentInfoResultSerializer()
+
+
+class LangfuseHealthResponseSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("OK",))
+    version = serializers.CharField()
+
+
+class LangfuseTracesMetaSerializer(serializers.Serializer):
+    page = serializers.IntegerField()
+    limit = serializers.IntegerField()
+    total_items = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+
+
+class LangfuseTracesResponseSerializer(serializers.Serializer):
+    data = serializers.ListField(child=serializers.JSONField())
+    meta = LangfuseTracesMetaSerializer()
+
+
+class CallWebsocketRequestSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    send_to_uuid = serializers.BooleanField(required=False, default=False)
+    uuid = serializers.CharField(required=False, allow_blank=True)
+
+
+class CallWebsocketResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField(default=True)
+    result = serializers.CharField()

@@ -1019,6 +1019,51 @@ export interface AgentccWebhookApi {
   readonly updated_at?: string;
 }
 
+export type DeploymentInfoResultApiMode = typeof DeploymentInfoResultApiMode[keyof typeof DeploymentInfoResultApiMode];
+
+
+export const DeploymentInfoResultApiMode = {
+  oss: 'oss',
+  ee: 'ee',
+  cloud: 'cloud',
+} as const;
+
+export interface DeploymentInfoResultApi {
+  mode: DeploymentInfoResultApiMode;
+}
+
+export interface DeploymentInfoResponseApi {
+  status?: boolean;
+  result: DeploymentInfoResultApi;
+}
+
+export type LangfuseHealthResponseApiStatus = typeof LangfuseHealthResponseApiStatus[keyof typeof LangfuseHealthResponseApiStatus];
+
+
+export const LangfuseHealthResponseApiStatus = {
+  OK: 'OK',
+} as const;
+
+export interface LangfuseHealthResponseApi {
+  status: LangfuseHealthResponseApiStatus;
+  /** @minLength 1 */
+  version: string;
+}
+
+export type LangfuseTracesResponseApiDataItem = { [key: string]: unknown };
+
+export interface LangfuseTracesMetaApi {
+  page: number;
+  limit: number;
+  total_items: number;
+  total_pages: number;
+}
+
+export interface LangfuseTracesResponseApi {
+  data: LangfuseTracesResponseApiDataItem[];
+  meta: LangfuseTracesMetaApi;
+}
+
 export type SpanAttributeDetailResponseApiType = typeof SpanAttributeDetailResponseApiType[keyof typeof SpanAttributeDetailResponseApiType];
 
 
@@ -1089,6 +1134,25 @@ export interface SpanAttributeValueApi {
 
 export interface SpanAttributeValuesResponseApi {
   result: SpanAttributeValueApi[];
+}
+
+export interface CallWebsocketRequestApi {
+  /** @minLength 1 */
+  message: string;
+  send_to_uuid?: boolean;
+  uuid?: string;
+}
+
+export interface CallWebsocketResponseApi {
+  status?: boolean;
+  /** @minLength 1 */
+  result: string;
+}
+
+export interface HealthCheckResponseApi {
+  status?: boolean;
+  /** @minLength 1 */
+  result: string;
 }
 
 export type IntegrationConnectionListApiPlatform = typeof IntegrationConnectionListApiPlatform[keyof typeof IntegrationConnectionListApiPlatform];

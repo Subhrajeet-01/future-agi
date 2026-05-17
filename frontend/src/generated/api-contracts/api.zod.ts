@@ -6038,6 +6038,58 @@ export const AgentccWebhooksTestBody = zod.object({
 
 
 /**
+ * Returns ``{"mode": "oss"|"ee"|"cloud"}``. No auth — public config.
+ * @summary Public deployment-mode probe used by the frontend to gate UI.
+ */
+export const apiDeploymentInfoListResponseStatusDefault = true;
+
+export const ApiDeploymentInfoListResponse = zod.object({
+  "status": zod.boolean().default(apiDeploymentInfoListResponseStatusDefault),
+  "result": zod.object({
+  "mode": zod.enum(['oss', 'ee', 'cloud'])
+})
+})
+
+
+/**
+ * Returns the same JSON shape as Langfuse::
+
+    {"status": "OK", "version": "1.0.0"}
+
+When called with valid credentials (Basic Auth or API key headers)
+it returns 200.  Invalid / missing credentials return 401 via DRF's
+authentication layer.
+ * @summary Langfuse-compatible ``GET /api/public/health`` with authentication.
+ */
+
+
+
+export const ApiPublicHealthListResponse = zod.object({
+  "status": zod.enum(['OK']),
+  "version": zod.string().min(1)
+})
+
+
+/**
+ * Vapi validates Langfuse credentials by calling this endpoint with
+``?limit=1``.      Returns an empty list with standard pagination
+metadata so the credential check passes.
+ * @summary Langfuse-compatible ``GET /api/public/traces``.
+ */
+export const ApiPublicTracesListResponse = zod.object({
+  "data": zod.array(zod.object({
+
+}).passthrough()),
+  "meta": zod.object({
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total_items": zod.number(),
+  "total_pages": zod.number()
+})
+})
+
+
+/**
  * Determines the attribute type by probing which map contains the key, then
 returns type-appropriate statistics:
   - string: top values with percentages
@@ -6127,6 +6179,24 @@ export const ApiTracesSpanAttributeValuesListResponse = zod.object({
 }).passthrough(),
   "count": zod.number()
 }))
+})
+
+
+
+export const callWebsocketCreateBodySendToUuidDefault = false;
+
+export const CallWebsocketCreateBody = zod.object({
+  "message": zod.string().min(1),
+  "send_to_uuid": zod.boolean().default(callWebsocketCreateBodySendToUuidDefault),
+  "uuid": zod.string().optional()
+})
+
+export const callWebsocketCreateResponseStatusDefault = true;
+
+
+export const CallWebsocketCreateResponse = zod.object({
+  "status": zod.boolean().default(callWebsocketCreateResponseStatusDefault),
+  "result": zod.string().min(1)
 })
 
 
@@ -6271,6 +6341,19 @@ export const FalconAiSkillsPartialUpdateParams = zod.object({
  */
 export const FalconAiSkillsDeleteParams = zod.object({
   "skill_id": zod.string()
+})
+
+
+/**
+ * GET method for health check.
+Returns 200 OK with a simple status message.
+ */
+export const healthListResponseStatusDefault = true;
+
+
+export const HealthListResponse = zod.object({
+  "status": zod.boolean().default(healthListResponseStatusDefault),
+  "result": zod.string().min(1)
 })
 
 

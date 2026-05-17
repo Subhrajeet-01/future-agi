@@ -143,6 +143,8 @@ import type {
   CallExecutionLogsResponseApi,
   CallExecutionRerunApi,
   CallExecutionStatusUpdateApi,
+  CallWebsocketRequestApi,
+  CallWebsocketResponseApi,
   CancelTestExecutionResponseApi,
   CellUpdateApi,
   CreateNodeApi,
@@ -160,6 +162,7 @@ import type {
   DatasetOptimizationCreateApi,
   DatasetOptimizationDetailApi,
   DeleteEvalConfigResponseApi,
+  DeploymentInfoResponseApi,
   DevelopAnnotationsUserApi,
   DiscussionCommentRequestApi,
   DiscussionReactionRequestApi,
@@ -189,6 +192,7 @@ import type {
   GraphDetailApi,
   GraphListApi,
   GraphUpdateApi,
+  HealthCheckResponseApi,
   ImportAnnotationsApi,
   IntegrationConnectionDetailApi,
   IntegrationConnectionListApi,
@@ -198,6 +202,8 @@ import type {
   IntegrationsSyncLogsListParams,
   KnowledgeBaseApi,
   KnowledgeBaseCreateApi,
+  LangfuseHealthResponseApi,
+  LangfuseTracesResponseApi,
   ModelHubAnnotationQueuesAutomationRulesList200,
   ModelHubAnnotationQueuesAutomationRulesListParams,
   ModelHubAnnotationQueuesExportAnnotationsParams,
@@ -10945,7 +10951,7 @@ export const aiToolsToolsList = async ( options?: RequestInit): Promise<aiToolsT
 
 
 export type apiDeploymentInfoListResponse200 = {
-  data: void
+  data: DeploymentInfoResponseApi
   status: 200
 }
 
@@ -11025,7 +11031,7 @@ export const apiHealthClickhouseList = async ( options?: RequestInit): Promise<a
 
 
 export type apiPublicHealthListResponse200 = {
-  data: void
+  data: LangfuseHealthResponseApi
   status: 200
 }
 
@@ -11145,7 +11151,7 @@ export const apiPublicOtelV1TracesCreate = async ( options?: RequestInit): Promi
 
 
 export type apiPublicTracesListResponse200 = {
-  data: void
+  data: LangfuseTracesResponseApi
   status: 200
 }
 
@@ -11393,17 +11399,24 @@ export const apiTracesSpanAttributeValuesList = async (params: ApiTracesSpanAttr
 
 
 
-export type callWebsocketCreateResponse201 = {
-  data: void
-  status: 201
+export type callWebsocketCreateResponse200 = {
+  data: CallWebsocketResponseApi
+  status: 200
 }
 
-export type callWebsocketCreateResponseSuccess = (callWebsocketCreateResponse201) & {
+export type callWebsocketCreateResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type callWebsocketCreateResponseSuccess = (callWebsocketCreateResponse200) & {
   headers: Headers;
 };
-;
+export type callWebsocketCreateResponseError = (callWebsocketCreateResponse400) & {
+  headers: Headers;
+};
 
-export type callWebsocketCreateResponse = (callWebsocketCreateResponseSuccess)
+export type callWebsocketCreateResponse = (callWebsocketCreateResponseSuccess | callWebsocketCreateResponseError)
 
 export const getCallWebsocketCreateUrl = () => {
 
@@ -11413,14 +11426,15 @@ export const getCallWebsocketCreateUrl = () => {
   return `/call-websocket/`
 }
 
-export const callWebsocketCreate = async ( options?: RequestInit): Promise<callWebsocketCreateResponse> => {
+export const callWebsocketCreate = async (callWebsocketRequestApi: CallWebsocketRequestApi, options?: RequestInit): Promise<callWebsocketCreateResponse> => {
 
   return apiMutator<callWebsocketCreateResponse>(getCallWebsocketCreateUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      callWebsocketRequestApi,)
   }
 );}
 
@@ -12404,7 +12418,7 @@ export const falconAiSkillsDelete = async (skillId: string, options?: RequestIni
 
 
 export type healthListResponse200 = {
-  data: void
+  data: HealthCheckResponseApi
   status: 200
 }
 

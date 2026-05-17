@@ -7697,7 +7697,10 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/DeploymentInfoResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -7731,7 +7734,10 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/LangfuseHealthResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -7785,7 +7791,10 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/LangfuseTracesResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -7982,10 +7991,28 @@
             "post": {
                 "operationId": "call-websocket_create",
                 "description": "",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CallWebsocketRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/CallWebsocketResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -8485,7 +8512,10 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/HealthCheckResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -39833,6 +39863,105 @@
                 }
             }
         },
+        "DeploymentInfoResult": {
+            "required": [
+                "mode"
+            ],
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "title": "Mode",
+                    "type": "string",
+                    "enum": [
+                        "oss",
+                        "ee",
+                        "cloud"
+                    ]
+                }
+            }
+        },
+        "DeploymentInfoResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "$ref": "#/definitions/DeploymentInfoResult"
+                }
+            }
+        },
+        "LangfuseHealthResponse": {
+            "required": [
+                "status",
+                "version"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "string",
+                    "enum": [
+                        "OK"
+                    ]
+                },
+                "version": {
+                    "title": "Version",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "LangfuseTracesMeta": {
+            "required": [
+                "page",
+                "limit",
+                "total_items",
+                "total_pages"
+            ],
+            "type": "object",
+            "properties": {
+                "page": {
+                    "title": "Page",
+                    "type": "integer"
+                },
+                "limit": {
+                    "title": "Limit",
+                    "type": "integer"
+                },
+                "total_items": {
+                    "title": "Total items",
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "title": "Total pages",
+                    "type": "integer"
+                }
+            }
+        },
+        "LangfuseTracesResponse": {
+            "required": [
+                "data",
+                "meta"
+            ],
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/LangfuseTracesMeta"
+                }
+            }
+        },
         "SpanAttributeTopValue": {
             "required": [
                 "value",
@@ -40008,6 +40137,64 @@
                     "items": {
                         "$ref": "#/definitions/SpanAttributeValue"
                     }
+                }
+            }
+        },
+        "CallWebsocketRequest": {
+            "required": [
+                "message"
+            ],
+            "type": "object",
+            "properties": {
+                "message": {
+                    "title": "Message",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "send_to_uuid": {
+                    "title": "Send to uuid",
+                    "type": "boolean",
+                    "default": false
+                },
+                "uuid": {
+                    "title": "Uuid",
+                    "type": "string"
+                }
+            }
+        },
+        "CallWebsocketResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "title": "Result",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "HealthCheckResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "title": "Result",
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },

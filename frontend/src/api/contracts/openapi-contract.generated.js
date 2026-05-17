@@ -4171,7 +4171,11 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "api_deployment-info_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/DeploymentInfoResponse"
+          }
+        }
       }
     },
     "/api/health/clickhouse/": {
@@ -4187,7 +4191,11 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "api_public_health_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/LangfuseHealthResponse"
+          }
+        }
       }
     },
     "/api/public/ingestion": {
@@ -4211,7 +4219,11 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "api_public_traces_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/LangfuseTracesResponse"
+          }
+        }
       }
     },
     "/api/traces/span-attribute-detail/": {
@@ -4341,9 +4353,18 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/call-websocket/": {
       "post": {
         "operationId": "call-websocket_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/CallWebsocketRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/CallWebsocketResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
       }
     },
     "/falcon-ai/conversations/": {
@@ -4547,7 +4568,11 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "health_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/HealthCheckResponse"
+          }
+        }
       }
     },
     "/integrations/connections/": {
@@ -24792,6 +24817,46 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "CallWebsocketRequest": {
+      "required": [
+        "message"
+      ],
+      "type": "object",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string",
+          "minLength": 1
+        },
+        "send_to_uuid": {
+          "title": "Send to uuid",
+          "type": "boolean",
+          "default": false
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      }
+    },
+    "CallWebsocketResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "title": "Result",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "CancelTestExecutionResponse": {
       "required": [
         "success",
@@ -25789,6 +25854,22 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Message",
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "DeploymentInfoResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/DeploymentInfoResult"
         }
       }
     },
@@ -27122,6 +27203,24 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "HealthCheckResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "title": "Result",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "ImportAnnotations": {
       "required": [
         "annotations"
@@ -27510,6 +27609,45 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "type": "string",
           "format": "date-time",
           "readOnly": true
+        }
+      }
+    },
+    "LangfuseHealthResponse": {
+      "required": [
+        "status",
+        "version"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string",
+          "enum": [
+            "OK"
+          ]
+        },
+        "version": {
+          "title": "Version",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "LangfuseTracesResponse": {
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "meta": {
+          "$ref": "#/definitions/LangfuseTracesMeta"
         }
       }
     },
@@ -34277,6 +34415,23 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "DeploymentInfoResult": {
+      "required": [
+        "mode"
+      ],
+      "type": "object",
+      "properties": {
+        "mode": {
+          "title": "Mode",
+          "type": "string",
+          "enum": [
+            "oss",
+            "ee",
+            "cloud"
+          ]
+        }
+      }
+    },
     "EELicenseCreateResult": {
       "required": [
         "grant_id",
@@ -34470,6 +34625,33 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "score_source": {
           "title": "Score source",
           "type": "string"
+        }
+      }
+    },
+    "LangfuseTracesMeta": {
+      "required": [
+        "page",
+        "limit",
+        "total_items",
+        "total_pages"
+      ],
+      "type": "object",
+      "properties": {
+        "page": {
+          "title": "Page",
+          "type": "integer"
+        },
+        "limit": {
+          "title": "Limit",
+          "type": "integer"
+        },
+        "total_items": {
+          "title": "Total items",
+          "type": "integer"
+        },
+        "total_pages": {
+          "title": "Total pages",
+          "type": "integer"
         }
       }
     },

@@ -2,6 +2,8 @@ import os
 
 from rest_framework.views import APIView
 
+from tfc.utils.api_contracts import validated_request
+from tfc.utils.api_serializers import DeploymentInfoResponseSerializer
 from tfc.utils.general_methods import GeneralMethods
 
 
@@ -14,6 +16,7 @@ class DeploymentInfoView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @validated_request(responses={200: DeploymentInfoResponseSerializer})
     def get(self, request, *args, **kwargs):
         if os.environ.get("CLOUD_DEPLOYMENT", "") in ("US", "EU", "DEV"):
             mode = "cloud"
