@@ -22,6 +22,7 @@ import {
   useItemDiscussion,
   useNextItem,
   useOrgMembersInfinite,
+  useQueueItems,
   useQueueItemsForSource,
   useSkipItem,
   useReopenDiscussionThread,
@@ -180,6 +181,30 @@ describe("Annotation Queues API", () => {
         "list",
         filters,
       ]);
+    });
+  });
+
+  describe("useQueueItems", () => {
+    it("serializes multi-select filters as repeated query params", async () => {
+      axios.get.mockResolvedValueOnce({
+        data: { results: [], count: 0, current_page: 1, total_pages: 1 },
+      });
+
+      renderHook(
+        () =>
+          useQueueItems("q-1", {
+            status: ["pending", "completed"],
+            source_type: ["dataset_row", "trace"],
+          }),
+        { wrapper: createQueryWrapper() },
+      );
+
+      await waitFor(() => expect(axios.get).toHaveBeenCalled());
+
+      const requestConfig = axios.get.mock.calls[0][1];
+      expect(requestConfig.paramsSerializer.serialize(requestConfig.params)).toBe(
+        "status=pending&status=completed&source_type=dataset_row&source_type=trace&page=1&limit=25",
+      );
     });
   });
 
@@ -779,7 +804,7 @@ describe("Annotation Queues API", () => {
       result.current.mutate({
         queueId: "queue-1",
         itemId: "item-1",
-        exclude: "item-1",
+        exclude: ["item-1"],
         excludeReviewStatus: "pending_review",
       });
 
@@ -787,7 +812,7 @@ describe("Annotation Queues API", () => {
         expect(axios.post).toHaveBeenCalledWith(
           "/model-hub/annotation-queues/queue-1/items/item-1/complete/",
           {
-            exclude: "item-1",
+            exclude: ["item-1"],
             exclude_review_status: "pending_review",
           },
         );
@@ -866,14 +891,14 @@ describe("Annotation Queues API", () => {
       result.current.mutate({
         queueId: "queue-1",
         itemId: "item-1",
-        exclude: "item-1",
+        exclude: ["item-1"],
         includeCompleted: true,
       });
 
       await waitFor(() => {
         expect(axios.post).toHaveBeenCalledWith(
           "/model-hub/annotation-queues/queue-1/items/item-1/skip/",
-          { exclude: "item-1", include_completed: true },
+          { exclude: ["item-1"], include_completed: true },
         );
       });
     });

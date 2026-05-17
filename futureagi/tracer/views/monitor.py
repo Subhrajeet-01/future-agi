@@ -5,28 +5,39 @@ from datetime import datetime, timedelta
 import structlog
 from django.db.models import Count, Exists, Max, OuterRef, Q
 from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
-logger = structlog.get_logger(__name__)
+from tfc.utils.api_serializers import (
+    ApiErrorResponseSerializer,
+    ApiSuccessResponseSerializer,
+)
 from tfc.utils.base_viewset import (
     BaseModelViewSetMixin,
     BaseModelViewSetMixinWithUserOrg,
 )
 from tfc.utils.error_codes import get_error_message
 from tfc.utils.general_methods import GeneralMethods
+from tracer.models.custom_eval_config import CustomEvalConfig
 from tracer.models.monitor import (
+    MonitorMetricTypeChoices,
     UserAlertMonitor,
     UserAlertMonitorLog,
 )
+from tracer.models.project import Project
 from tracer.serializers.monitor import (
     UserAlertMonitorDetailSerializer,
+    UserAlertMonitorDuplicateSerializer,
     UserAlertMonitorLogSerializer,
+    UserAlertMonitorMetricOptionsResponseSerializer,
     UserAlertMonitorSerializer,
 )
 from tracer.utils.helper import get_sort_query
 from tracer.utils.monitor_graphs import get_graph_data
+
+logger = structlog.get_logger(__name__)
 
 
 class UserAlertMonitorView(BaseModelViewSetMixinWithUserOrg, ModelViewSet):
@@ -378,8 +389,8 @@ class UserAlertMonitorView(BaseModelViewSetMixinWithUserOrg, ModelViewSet):
             return self._gm.bad_request(f"error fetching the monitors list {str(e)}")
 
     def create(self, request, *args, **kwargs):
-        from tracer.models.monitor import UserAlertMonitor
         from tfc.ee_gating import EEResource, check_ee_can_create
+        from tracer.models.monitor import UserAlertMonitor
 
         org = getattr(request, "organization", None) or request.user.organization
         current_count = UserAlertMonitor.objects.filter(
@@ -416,6 +427,135 @@ class UserAlertMonitorView(BaseModelViewSetMixinWithUserOrg, ModelViewSet):
                 return self._gm.bad_request(serializer.errors)
         except Exception as e:
             return self._gm.internal_server_error_response(str(e))
+
+    @swagger_auto_schema(
+        request_body=UserAlertMonitorDuplicateSerializer,
+        responses={
+            200: ApiSuccessResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
+    @action(detail=False, methods=["post"], url_path="duplicate")
+    def duplicate(self, request, *args, **kwargs):
+        serializer = UserAlertMonitorDuplicateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return self._gm.bad_request(serializer.errors)
+
+        org = getattr(request, "organization", None) or request.user.organization
+        try:
+            monitor = UserAlertMonitor.objects.get(
+                id=serializer.validated_data["id"],
+                organization=org,
+                deleted=False,
+            )
+        except UserAlertMonitor.DoesNotExist:
+            return self._gm.not_found(get_error_message("MONITOR_NOT_FOUND"))
+
+        new_name = serializer.validated_data["name"]
+        if UserAlertMonitor.objects.filter(
+            organization=org,
+            project=monitor.project,
+            name=new_name,
+            deleted=False,
+        ).exists():
+            return self._gm.bad_request(
+                {"name": f"An alert with the name '{new_name}' already exists."}
+            )
+
+        duplicated_monitor = UserAlertMonitor.objects.create(
+            organization=org,
+            workspace=monitor.workspace,
+            project=monitor.project,
+            created_by=request.user,
+            name=new_name,
+            metric_type=monitor.metric_type,
+            metric=monitor.metric,
+            threshold_operator=monitor.threshold_operator,
+            threshold_type=monitor.threshold_type,
+            threshold_metric_value=monitor.threshold_metric_value,
+            critical_threshold_value=monitor.critical_threshold_value,
+            warning_threshold_value=monitor.warning_threshold_value,
+            alert_frequency=monitor.alert_frequency,
+            auto_threshold_time_window=monitor.auto_threshold_time_window,
+            notification_emails=monitor.notification_emails,
+            slack_webhook_url=monitor.slack_webhook_url,
+            slack_notes=monitor.slack_notes,
+            is_mute=False,
+            filters=monitor.filters,
+            logs=[
+                {
+                    "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    "message": f"Monitor {new_name} has been duplicated from {monitor.name}",
+                    "type": "INFO",
+                }
+            ],
+        )
+        return self._gm.success_response(
+            {
+                "id": str(duplicated_monitor.id),
+                "message": f"{duplicated_monitor.name} duplicated successfully",
+            }
+        )
+
+    @swagger_auto_schema(
+        responses={
+            200: UserAlertMonitorMetricOptionsResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
+    @action(detail=False, methods=["get"], url_path="metric-options")
+    def metric_options(self, request, *args, **kwargs):
+        try:
+            org = getattr(request, "organization", None) or request.user.organization
+            project_id = request.query_params.get("project_id")
+            if not project_id:
+                return self._gm.bad_request({"project_id": "This field is required."})
+            if not Project.objects.filter(
+                id=project_id,
+                organization=org,
+                trace_type="observe",
+                deleted=False,
+            ).exists():
+                return self._gm.not_found("Project not found")
+
+            system_options = [
+                {
+                    "id": value,
+                    "name": label,
+                    "metric_type": value,
+                    "output_type": "system_metric",
+                }
+                for value, label in MonitorMetricTypeChoices.choices
+                if value != MonitorMetricTypeChoices.EVALUATION_METRICS.value
+            ]
+
+            eval_options = [
+                {
+                    "id": str(eval_config.id),
+                    "name": eval_config.name or str(eval_config.id),
+                    "metric_type": MonitorMetricTypeChoices.EVALUATION_METRICS.value,
+                    "output_type": (eval_config.eval_template.config or {}).get(
+                        "output", ""
+                    ),
+                }
+                for eval_config in CustomEvalConfig.objects.select_related(
+                    "eval_template"
+                ).filter(
+                    project_id=project_id,
+                    project__organization=org,
+                    deleted=False,
+                    eval_template__deleted=False,
+                )
+            ]
+
+            return self._gm.success_response(system_options + eval_options)
+        except Exception as e:
+            logger.error(f"Failed to get monitor metric options: {e}", exc_info=True)
+            return self._gm.bad_request(get_error_message("FAILED_TO_GET_MONITOR"))
 
     @action(detail=False, methods=["post"], url_path="preview-graph")
     def preview_graph(self, request, *args, **kwargs):

@@ -58,27 +58,13 @@ import {
   canOpenSubmissionWorkspace,
   resolveQueueItemWorkspaceMode,
 } from "../annotate/annotation-view-mode";
-
-const STATUS_OPTIONS = [
-  { value: "", label: "All Statuses" },
-  { value: "pending", label: "Pending" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "in_review", label: "In Review" },
-  { value: "needs_changes", label: "Needs Changes" },
-  { value: "resubmitted", label: "Resubmitted" },
-  { value: "completed", label: "Completed" },
-  { value: "skipped", label: "Skipped" },
-];
-
-const SOURCE_OPTIONS = [
-  { value: "", label: "All Sources" },
-  { value: "dataset_row", label: "Dataset Row" },
-  { value: "trace", label: "Trace" },
-  { value: "observation_span", label: "Span" },
-  { value: "trace_session", label: "Session" },
-  { value: "prototype_run", label: "Prototype" },
-  { value: "call_execution", label: "Simulation" },
-];
+import {
+  ALL_SOURCE_VALUES,
+  ALL_STATUS_VALUES,
+  ITEM_SOURCE_FILTER_OPTIONS,
+  ITEM_STATUS_FILTER_OPTIONS,
+  buildQueueItemQueryFilters,
+} from "./queue-item-filters";
 
 const REVIEW_STATUS_OPTIONS = [
   { value: "", label: "All Reviews" },
@@ -94,8 +80,8 @@ export default function QueueDetailView() {
   const theme = useTheme();
   const { user } = useAuthContext();
   const [filters, setFilters] = useState({
-    status: "",
-    source_type: "",
+    status: ALL_STATUS_VALUES,
+    source_type: ALL_SOURCE_VALUES,
     assigned_to: "",
     review_status: "",
   });
@@ -110,6 +96,10 @@ export default function QueueDetailView() {
   const gridRef = useRef(null);
 
   const { data: queue } = useAnnotationQueueDetail(queueId);
+  const itemQueryFilters = useMemo(
+    () => buildQueueItemQueryFilters(filters),
+    [filters],
+  );
   const {
     data: itemsData,
     isLoading,
@@ -117,7 +107,7 @@ export default function QueueDetailView() {
     hasNextPage,
     isFetchingNextPage,
   } = useQueueItems(queueId, {
-    ...filters,
+    ...itemQueryFilters,
     ordering: itemOrdering,
     limit: 25,
   });
@@ -196,6 +186,14 @@ export default function QueueDetailView() {
 
   const handleFilterChange = useCallback((field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value, page: 0 }));
+  }, []);
+
+  const handleMultiFilterChange = useCallback((field, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: Array.isArray(value) ? value : [],
+      page: 0,
+    }));
   }, []);
 
   const handleSelectToggle = useCallback((id) => {
@@ -323,8 +321,8 @@ export default function QueueDetailView() {
   const isEmpty =
     !isLoading &&
     items.length === 0 &&
-    !filters.status &&
-    !filters.source_type &&
+    filters.status.length === ALL_STATUS_VALUES.length &&
+    filters.source_type.length === ALL_SOURCE_VALUES.length &&
     !filters.assigned_to &&
     !filters.review_status;
 
@@ -550,28 +548,38 @@ export default function QueueDetailView() {
                 <FormSearchSelectFieldState
                   size="small"
                   value={filters.status}
-                  onChange={(e) => handleFilterChange("status", e.target.value)}
-                  options={STATUS_OPTIONS.map((o) => ({
+                  onChange={(e) =>
+                    handleMultiFilterChange("status", e.target.value)
+                  }
+                  options={ITEM_STATUS_FILTER_OPTIONS.map((o) => ({
                     label: o.label,
                     value: o.value,
                   }))}
                   placeholder="All Statuses"
-                  showClear={!!filters.status}
-                  sx={{ minWidth: 140, flex: "1 1 150px" }}
+                  multiple
+                  checkbox
+                  selectAll
+                  multipleAllLabel="All Statuses"
+                  showClear={false}
+                  sx={{ minWidth: 160, flex: "1 1 170px" }}
                 />
                 <FormSearchSelectFieldState
                   size="small"
                   value={filters.source_type}
                   onChange={(e) =>
-                    handleFilterChange("source_type", e.target.value)
+                    handleMultiFilterChange("source_type", e.target.value)
                   }
-                  options={SOURCE_OPTIONS.map((o) => ({
+                  options={ITEM_SOURCE_FILTER_OPTIONS.map((o) => ({
                     label: o.label,
                     value: o.value,
                   }))}
                   placeholder="All Sources"
-                  showClear={!!filters.source_type}
-                  sx={{ minWidth: 140, flex: "1 1 150px" }}
+                  multiple
+                  checkbox
+                  selectAll
+                  multipleAllLabel="All Sources"
+                  showClear={false}
+                  sx={{ minWidth: 160, flex: "1 1 170px" }}
                 />
                 {queue?.requires_review && (
                   <FormSearchSelectFieldState

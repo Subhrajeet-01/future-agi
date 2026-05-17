@@ -59,6 +59,50 @@ class CallTranscriptSerializer(serializers.ModelSerializer):
         return None
 
 
+class CallTranscriptResponseSerializer(serializers.Serializer):
+    """Response serializer for transcripts under one call execution."""
+
+    call_execution_id = serializers.UUIDField(read_only=True)
+    phone_number = serializers.CharField(read_only=True, allow_null=True)
+    status = serializers.CharField(read_only=True)
+    transcripts = CallTranscriptSerializer(many=True, read_only=True)
+    total_transcripts = serializers.IntegerField(read_only=True)
+
+
+class TestExecutionTranscriptCallSerializer(CallTranscriptResponseSerializer):
+    """Transcript bundle for one call inside a test execution."""
+
+    scenario_name = serializers.CharField(read_only=True, allow_null=True)
+
+
+class TestExecutionTranscriptsResponseSerializer(serializers.Serializer):
+    """Response serializer for all transcripts inside a test execution."""
+
+    test_execution_id = serializers.UUIDField(read_only=True)
+    calls = TestExecutionTranscriptCallSerializer(many=True, read_only=True)
+    total_calls = serializers.IntegerField(read_only=True)
+    total_transcripts = serializers.IntegerField(read_only=True)
+
+
+class CallBranchAnalysisResponseSerializer(serializers.Serializer):
+    """Response serializer for branch-analysis inspection."""
+
+    call_execution_id = serializers.UUIDField(read_only=True)
+    scenario_id = serializers.UUIDField(read_only=True, allow_null=True)
+    scenario_name = serializers.CharField(read_only=True, allow_null=True)
+    analysis = serializers.DictField(read_only=True)
+    analyzed_at = serializers.DateTimeField(read_only=True)
+
+
+class CallBranchDeviationCreateResponseSerializer(serializers.Serializer):
+    """Response serializer for creating branch deviation graph objects."""
+
+    call_execution_id = serializers.UUIDField(read_only=True)
+    scenario_graph_id = serializers.UUIDField(read_only=True)
+    deviation_data = serializers.DictField(read_only=True)
+    message = serializers.CharField(read_only=True)
+
+
 class CallExecutionSnapshotSerializer(serializers.ModelSerializer):
     """Serializer for CallExecutionSnapshot model"""
 
@@ -1318,6 +1362,13 @@ class TestExecutionColumnOrderSerializer(serializers.Serializer):
     column_order = ColumnOrderSerializer(many=True)
 
 
+class TestExecutionColumnOrderResponseSerializer(serializers.Serializer):
+    """Response serializer for persisted test-execution column order."""
+
+    message = serializers.CharField(read_only=True)
+    column_order = ColumnOrderSerializer(many=True, read_only=True)
+
+
 class PerformanceSummarySerializer(serializers.Serializer):
     """Serializer for Performance Summary data"""
 
@@ -1347,6 +1398,24 @@ class TestExecutionAnalyticsSerializer(serializers.Serializer):
     )
 
     metadata = serializers.DictField(help_text="Metadata about the analytics data")
+
+
+class RunTestAnalyticsSerializer(serializers.Serializer):
+    """Serializer for run-test analytics across multiple test executions."""
+
+    run_test_info = serializers.DictField(help_text="Run test metadata")
+    fail_rate_trends = serializers.ListField(
+        child=serializers.DictField(), help_text="Fail-rate trend points"
+    )
+    evaluation_score_trends = serializers.ListField(
+        child=serializers.DictField(), help_text="Evaluation score trend points"
+    )
+    performance_comparison = serializers.ListField(
+        child=serializers.DictField(), help_text="Per-execution performance rows"
+    )
+    summary_stats = serializers.DictField(
+        required=False, help_text="Aggregate performance summary"
+    )
 
 
 class TestExecutionRerunSerializer(serializers.Serializer):
@@ -1401,6 +1470,41 @@ class TestExecutionBulkDeleteSerializer(serializers.Serializer):
                 "Either 'select_all' must be True or 'test_execution_ids' must be provided"
             )
         return data
+
+
+class TestExecutionBulkDeleteResponseSerializer(serializers.Serializer):
+    """Response serializer for bulk deleting test executions from a run test."""
+
+    message = serializers.CharField(read_only=True)
+    run_test_id = serializers.UUIDField(read_only=True)
+    deleted_count = serializers.IntegerField(read_only=True)
+    deleted_ids = serializers.ListField(child=serializers.UUIDField(), read_only=True)
+
+
+class TestExecutionRerunResultSerializer(serializers.Serializer):
+    """Per-test-execution result in the bulk rerun response."""
+
+    test_execution_id = serializers.UUIDField(read_only=True)
+    success_count = serializers.IntegerField(read_only=True)
+    failure_count = serializers.IntegerField(read_only=True)
+    successful_reruns = serializers.ListField(
+        child=serializers.UUIDField(), read_only=True
+    )
+    failed_reruns = serializers.ListField(child=serializers.DictField(), read_only=True)
+    skipped = serializers.BooleanField(required=False, read_only=True)
+    reason = serializers.CharField(required=False, read_only=True)
+
+
+class TestExecutionRerunResponseSerializer(serializers.Serializer):
+    """Response serializer for bulk rerun of test executions."""
+
+    message = serializers.CharField(read_only=True)
+    run_test_id = serializers.UUIDField(read_only=True)
+    rerun_type = serializers.CharField(read_only=True)
+    total_test_executions = serializers.IntegerField(read_only=True)
+    results = TestExecutionRerunResultSerializer(many=True, read_only=True)
+    overall_success_count = serializers.IntegerField(read_only=True)
+    overall_failure_count = serializers.IntegerField(read_only=True)
 
 
 # Migrated to simulate/serializers/requests/run_test_evals.py

@@ -3,12 +3,19 @@ API endpoints for managing derived variables from JSON/structured outputs.
 """
 
 import structlog
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from model_hub.models.run_prompt import PromptVersion
+from model_hub.serializers.contracts import (
+    DerivedVariableExtractRequestSerializer,
+    DerivedVariablePreviewRequestSerializer,
+    MODEL_HUB_ERROR_RESPONSES,
+    ModelHubJSONResponseSerializer,
+)
 from model_hub.services.derived_variable_service import (
     extract_derived_variables_from_output,
     get_all_derived_variables,
@@ -23,6 +30,10 @@ logger = structlog.get_logger(__name__)
 _gm = GeneralMethods()
 
 
+@swagger_auto_schema(
+    method="get",
+    responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_prompt_derived_variables(request, prompt_id):
@@ -93,6 +104,10 @@ def get_prompt_derived_variables(request, prompt_id):
         )
 
 
+@swagger_auto_schema(
+    method="get",
+    responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_derived_variable_schema_view(request, prompt_id, column_name):
@@ -152,6 +167,11 @@ def get_derived_variable_schema_view(request, prompt_id, column_name):
         )
 
 
+@swagger_auto_schema(
+    method="post",
+    request_body=DerivedVariableExtractRequestSerializer,
+    responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def extract_derived_variables(request, prompt_id):
@@ -214,6 +234,11 @@ def extract_derived_variables(request, prompt_id):
         return _gm.internal_server_error_response("Failed to extract derived variables")
 
 
+@swagger_auto_schema(
+    method="post",
+    request_body=DerivedVariablePreviewRequestSerializer,
+    responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def preview_derived_variables(request):
@@ -252,6 +277,10 @@ def preview_derived_variables(request):
         return _gm.internal_server_error_response("Failed to preview derived variables")
 
 
+@swagger_auto_schema(
+    method="get",
+    responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_dataset_derived_variables_view(request, dataset_id):

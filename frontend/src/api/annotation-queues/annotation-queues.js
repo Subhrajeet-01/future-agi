@@ -9,6 +9,7 @@ import axios from "src/utils/axios";
 import { enqueueSnackbar } from "notistack";
 import { apiPath } from "src/api/contracts/api-surface";
 import { scoreKeys } from "src/api/scores/scores";
+import { paramsSerializer } from "src/utils/utils";
 
 // ---------------------------------------------------------------------------
 // Helper – extract response payload consistently across endpoints that may
@@ -378,6 +379,7 @@ export const useQueueItems = (queueId, filters = {}, options = {}) => {
     queryFn: ({ pageParam = 1 }) =>
       axios.get(annotationQueueEndpoints.items(queueId), {
         params: { ...restFilters, page: pageParam, limit: limit || 25 },
+        paramsSerializer: paramsSerializer(),
       }),
     getNextPageParam: (lastPage) => {
       const data = lastPage.data;
@@ -1334,7 +1336,12 @@ export const useItemAnnotations = (queueId, itemId, options = {}) => {
 export const useOrgMembers = (orgId, options = {}) => {
   return useQuery({
     queryKey: ["org-members", orgId],
-    queryFn: () => axios.get(`/model-hub/organizations/${orgId}/users/`),
+    queryFn: () =>
+      axios.get(
+        apiPath("/model-hub/organizations/{organization_id}/users/", {
+          organization_id: orgId,
+        }),
+      ),
     select: (d) => extractData(d, []),
     enabled: !!orgId,
     staleTime: 0,
@@ -1347,9 +1354,14 @@ export const useOrgMembersInfinite = (orgId, search = "", options = {}) => {
   return useInfiniteQuery({
     queryKey: ["org-members-infinite", orgId, search],
     queryFn: ({ pageParam }) =>
-      axios.get(`/model-hub/organizations/${orgId}/users/`, {
-        params: { page: pageParam, limit: 30, ...(search && { search }) },
-      }),
+      axios.get(
+        apiPath("/model-hub/organizations/{organization_id}/users/", {
+          organization_id: orgId,
+        }),
+        {
+          params: { page: pageParam, limit: 30, ...(search && { search }) },
+        },
+      ),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {
       const data = lastPage?.data;

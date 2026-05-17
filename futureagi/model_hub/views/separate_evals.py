@@ -13,6 +13,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -36,6 +37,29 @@ from model_hub.models.run_prompt import PromptEvalConfig
 from model_hub.serializers.develop_dataset import (
     EvalPlayGroundFeedbackSerializer,
 )
+from model_hub.serializers.contracts import (
+    CompositeEvalAdhocExecuteRequestSerializer,
+    CompositeEvalCreateRequestSerializer,
+    CompositeEvalExecuteRequestSerializer,
+    CompositeEvalUpdateRequestSerializer,
+    EvalTemplateBulkDeleteRequestSerializer,
+    EvalTemplateCreateV2RequestSerializer,
+    EvalTemplateListChartsRequestSerializer,
+    EvalTemplateUpdateV2RequestSerializer,
+    EvalTemplateVersionCreateRequestSerializer,
+    EvalMetricRequestSerializer,
+    EvalTemplateNamesRequestSerializer,
+    GroundTruthConfigRequestSerializer,
+    GroundTruthMappingRequestSerializer,
+    GroundTruthRoleMappingRequestSerializer,
+    GroundTruthSearchRequestSerializer,
+    GroundTruthUploadRequestSerializer,
+    LegacyEvalTemplatesRequestSerializer,
+    MODEL_HUB_ERROR_RESPONSES,
+    ModelHubEmptyRequestSerializer,
+    ModelHubJSONResponseSerializer,
+)
+from model_hub.serializers.eval_list import EvalListRequestSerializer
 from model_hub.serializers.eval_runner import (
     DeleteEvalTemplateSerializer,
     DuplicateEvalTemplateSerializer,
@@ -286,6 +310,9 @@ class GetAPICallLogDetailsView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             eval_template_id = request.query_params.get(
@@ -433,6 +460,9 @@ class GetAPICallLogView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             log_id = request.query_params.get("log_id", None)
@@ -548,6 +578,10 @@ class GetAPICallLogView(APIView):
             logger.exception("Error fetching log row")
             return self._gm.bad_request(get_error_message("LOG_ROW_FETCHING_FAILED"))
 
+    @swagger_auto_schema(
+        request_body=UpdateColumnConfigSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def patch(self, request, *args, **kwargs):
         try:
             serializer = UpdateColumnConfigSerializer(data=request.data)
@@ -631,6 +665,10 @@ class CellErrorLocalizerView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=ModelHubEmptyRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, cell_id=None, *args, **kwargs):
         try:
             from model_hub.models.develop_dataset import Cell
@@ -793,6 +831,9 @@ class CellErrorLocalizerView(APIView):
             logger.exception(f"Error in CellErrorLocalizerView: {str(e)}")
             return self._gm.bad_request(f"Failed to start error localization: {str(e)}")
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, cell_id=None, *args, **kwargs):
         """
         Poll endpoint — returns the current state of the localizer task
@@ -895,6 +936,9 @@ class EvalMetricView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             eval_template_id = request.query_params.get("eval_template_id", None)
@@ -924,6 +968,10 @@ class EvalMetricView(APIView):
             logger.exception(f"Error in EvalMetricView.get: {str(e)}")
             return self._gm.bad_request(str(e))
 
+    @swagger_auto_schema(
+        request_body=EvalMetricRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             eval_template_id = request.data.get("eval_template_id", None)
@@ -953,6 +1001,10 @@ class GetEvalTemplateNameView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalTemplateNamesRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request):
         try:
             logs = APICallLog.objects.filter(
@@ -1122,6 +1174,10 @@ class GetEvalTemplates(APIView):
 
         return template_data
 
+    @swagger_auto_schema(
+        request_body=LegacyEvalTemplatesRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             page_size = request.data.get("page_size", 10)
@@ -1268,6 +1324,10 @@ class EvalTemplateListView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalListRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from model_hub.serializers.eval_list import EvalListRequestSerializer
         from model_hub.types import EvalListItem, EvalListResponse
@@ -1434,6 +1494,10 @@ class EvalTemplateListChartsView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalTemplateListChartsRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             template_ids = request.data.get("template_ids", [])
@@ -1553,6 +1617,10 @@ class EvalTemplateBulkDeleteView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalTemplateBulkDeleteRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from model_hub.types import BulkDeleteRequest, BulkDeleteResponse
 
@@ -1596,6 +1664,10 @@ class EvalTemplateCreateV2View(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalTemplateCreateV2RequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         import re
 
@@ -1946,6 +2018,9 @@ class EvalTemplateDetailView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         from model_hub.types import EvalDetailResponse
         from model_hub.utils.eval_list import (
@@ -2084,6 +2159,10 @@ class EvalTemplateUpdateView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalTemplateUpdateV2RequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def put(self, request, template_id, *args, **kwargs):
         import re
 
@@ -2370,6 +2449,9 @@ class EvalTemplateVersionListView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
         from model_hub.types import EvalVersionItem, EvalVersionListResponse
@@ -2445,6 +2527,10 @@ class EvalTemplateVersionCreateView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalTemplateVersionCreateRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
         from model_hub.types import CreateVersionRequest, CreateVersionResponse
@@ -2572,6 +2658,10 @@ class SetDefaultVersionView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=ModelHubEmptyRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def put(self, request, template_id, version_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
 
@@ -2635,6 +2725,10 @@ class RestoreVersionView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=ModelHubEmptyRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, template_id, version_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalTemplateVersion
 
@@ -2790,6 +2884,10 @@ class CompositeEvalCreateView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=CompositeEvalCreateRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         import re
 
@@ -2966,6 +3064,9 @@ class CompositeEvalDetailView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import CompositeEvalChild
         from model_hub.types import CompositeChildItem, CompositeDetailResponse
@@ -3030,6 +3131,10 @@ class CompositeEvalDetailView(APIView):
             )
             return self._gm.bad_request(str(e))
 
+    @swagger_auto_schema(
+        request_body=CompositeEvalUpdateRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def patch(self, request, template_id, *args, **kwargs):
         """PATCH — partial update of a composite eval.
 
@@ -3403,6 +3508,10 @@ class CompositeEvalExecuteView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=CompositeEvalExecuteRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import CompositeEvalChild
         from model_hub.types import CompositeExecuteRequest, CompositeExecuteResponse
@@ -3527,6 +3636,10 @@ class CompositeEvalAdhocExecuteView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=CompositeEvalAdhocExecuteRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from model_hub.models.evals_metric import CompositeEvalChild
         from model_hub.types import (
@@ -3667,6 +3780,9 @@ class GroundTruthListView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import GroundTruthItem, GroundTruthListResponse
@@ -3725,6 +3841,10 @@ class GroundTruthUploadView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=GroundTruthUploadRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import GroundTruthUploadResponse
@@ -3844,6 +3964,10 @@ class GroundTruthMappingView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=GroundTruthMappingRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def put(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import VariableMappingRequest
@@ -3881,6 +4005,10 @@ class GroundTruthRoleMappingView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=GroundTruthRoleMappingRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def put(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import RoleMappingRequest
@@ -3936,6 +4064,9 @@ class GroundTruthDataView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import GroundTruthDataResponse
@@ -3979,6 +4110,9 @@ class GroundTruthStatusView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import GroundTruthStatusResponse
@@ -4015,6 +4149,9 @@ class GroundTruthDeleteView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def delete(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
 
@@ -4049,6 +4186,9 @@ class GroundTruthConfigView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         try:
             try:
@@ -4079,6 +4219,10 @@ class GroundTruthConfigView(APIView):
             )
             return self._gm.bad_request(str(e))
 
+    @swagger_auto_schema(
+        request_body=GroundTruthConfigRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def put(self, request, template_id, *args, **kwargs):
         from model_hub.types import GroundTruthConfigRequest
 
@@ -4135,6 +4279,10 @@ class GroundTruthSearchView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=GroundTruthSearchRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
         from model_hub.types import GroundTruthSearchRequest
@@ -4192,6 +4340,10 @@ class GroundTruthTriggerEmbeddingView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=ModelHubEmptyRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, ground_truth_id, *args, **kwargs):
         from model_hub.models.evals_metric import EvalGroundTruth
 
@@ -4270,6 +4422,9 @@ class EvalUsageStatsView(APIView):
         "365d": timedelta(days=365),
     }
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         try:
             try:
@@ -4655,6 +4810,9 @@ class EvalFeedbackListView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, template_id, *args, **kwargs):
         from model_hub.models.evals_metric import Feedback
 
@@ -5077,6 +5235,10 @@ class EvalPlayGroundAPIView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalPlayGroundSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from tfc.ee_gates import turing_oss_gate_for_template
 
@@ -5489,6 +5651,9 @@ class EvalCodeSnippetAPIView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             org = getattr(request, "organization", None) or request.user.organization
@@ -5560,6 +5725,10 @@ class EvalPlayGroundFeedbackAPIView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EvalPlayGroundFeedbackSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             serializer = EvalPlayGroundFeedbackSerializer(data=request.data)
@@ -5705,6 +5874,10 @@ class UpdateEvalTemplateView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=UpdateEvalTemplateSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             org = getattr(request, "organization", None) or request.user.organization
@@ -5807,6 +5980,10 @@ class DeleteEvalTemplateView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=DeleteEvalTemplateSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             org = getattr(request, "organization", None) or request.user.organization
@@ -5869,6 +6046,10 @@ class DuplicateEvalTemplateView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=DuplicateEvalTemplateSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             org = getattr(request, "organization", None) or request.user.organization
@@ -5928,6 +6109,10 @@ class TestEvaluationTemplateAPIView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=TestEvalTemplateSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from tfc.ee_gates import turing_oss_gate_for_template
 

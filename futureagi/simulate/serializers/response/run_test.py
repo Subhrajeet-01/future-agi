@@ -162,6 +162,29 @@ class RunTestMessageResponseSerializer(serializers.Serializer):
     message = serializers.CharField(read_only=True)
 
 
+class RunTestExecutionResponseSerializer(serializers.Serializer):
+    """Response for POST /run-tests/{run_test_id}/execute/."""
+
+    message = serializers.CharField(read_only=True)
+    execution_id = serializers.UUIDField(read_only=True)
+    run_test_id = serializers.UUIDField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    total_scenarios = serializers.IntegerField(read_only=True)
+    total_calls = serializers.IntegerField(read_only=True)
+    scenario_ids = serializers.ListField(child=serializers.UUIDField(), read_only=True)
+
+
+class RunTestCallExecutionsResponseSerializer(serializers.Serializer):
+    """Paginated response for call executions attached to a run test."""
+
+    count = serializers.IntegerField(read_only=True)
+    next = serializers.CharField(read_only=True, allow_null=True)
+    previous = serializers.CharField(read_only=True, allow_null=True)
+    results = serializers.ListField(child=serializers.DictField(), read_only=True)
+    total_pages = serializers.IntegerField(read_only=True)
+    current_page = serializers.IntegerField(read_only=True)
+
+
 class RunTestErrorResponseSerializer(serializers.Serializer):
     """
     Standard error response shape for all run-test endpoints.

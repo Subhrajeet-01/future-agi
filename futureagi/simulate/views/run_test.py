@@ -27,7 +27,6 @@ from simulate.utils.test_execution import (
     DEFAULT_VOICE_SIM_COL,
     LEGACY_SIM_COLUMN_ID_MAP,
 )
-from tracer.models.observation_span import ObservationSpan
 from tracer.models.replay_session import ReplaySession, ReplaySessionStep
 from tracer.models.trace import Trace
 from tracer.services.clickhouse.span_attribute_lookups import (
@@ -47,7 +46,6 @@ def _empty_call_log_summary(reason: str) -> dict:
     }
 
 
-from drf_yasg.utils import swagger_auto_schema
 
 from model_hub.models.api_key import ApiKey
 from model_hub.models.develop_dataset import Cell, Column, Row
@@ -85,6 +83,8 @@ from simulate.serializers.requests.call_execution import (
 )
 from simulate.serializers.requests.run_test import (
     CreateRunTestSerializer,
+    ExecuteRunTestSerializer,
+    RunTestComponentsUpdateSerializer,
     RunTestFilterSerializer,
     UpdateRunTestSerializer,
 )
@@ -100,12 +100,14 @@ from simulate.serializers.requests.test_execution import (
 )
 from simulate.serializers.response.call_execution import (
     CallExecutionDeleteResponseSerializer,
+    CallExecutionErrorLocalizerTasksResponseSerializer,
     CallExecutionErrorResponseSerializer,
     CallExecutionLogsResponseSerializer,
 )
 from simulate.serializers.response.run_test import (
-    AddEvalConfigResponseSerializer,
+    RunTestCallExecutionsResponseSerializer,
     RunTestErrorResponseSerializer,
+    RunTestExecutionResponseSerializer,
     RunTestExecutionsResponseSerializer,
     RunTestMessageResponseSerializer,
     RunTestResponseSerializer,
@@ -115,7 +117,7 @@ from simulate.serializers.response.run_test import (
 from simulate.serializers.response.run_test_evals import (
     AddEvalConfigsResponseSerializer,
     DeleteEvalConfigResponseSerializer,
-    EvalConfigResponseSerializer,
+    EvalConfigStructureResponseSerializer,
     EvalConfigUpdateResponseSerializer,
     EvalErrorResponseSerializer,
     EvalSummaryComparisonResponseSerializer,
@@ -131,15 +133,21 @@ from simulate.serializers.run_test import (
     RunTestSerializer,
 )
 from simulate.serializers.test_execution import (
+    AllActiveTestsSerializer,
     CallExecutionDetailSerializer,
     CallExecutionSerializer,
     CallExecutionSnapshotSerializer,
     PerformanceSummarySerializer,
+    RunTestAnalyticsSerializer,
     TestExecutionAnalyticsSerializer,
+    TestExecutionBulkDeleteResponseSerializer,
     TestExecutionBulkDeleteSerializer,
+    TestExecutionColumnOrderResponseSerializer,
     TestExecutionColumnOrderSerializer,
+    TestExecutionRerunResponseSerializer,
     TestExecutionRerunSerializer,
     TestExecutionSerializer,
+    TestExecutionStatusSerializer,
 )
 
 # Import Temporal activities (using @temporal_activity drop-in decorator)
@@ -171,6 +179,11 @@ from simulate.utils.test_execution_utils import TestExecutionUtils
 from tfc.ee_gates import strip_turing_from_config_options
 from tfc.settings import settings as app_settings
 from tfc.settings.settings import VAPI_INDIAN_PHONE_NUMBER_ID
+from tfc.utils.api_serializers import (
+    ApiErrorResponseSerializer,
+    ApiSuccessResponseSerializer,
+    EmptyRequestSerializer,
+)
 from tfc.utils.error_codes import get_error_message
 from tfc.utils.general_methods import GeneralMethods
 from tfc.utils.pagination import ExtendedPageNumberPagination
@@ -682,8 +695,23 @@ class RunTestExecutionView(APIView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
-        self.test_executor = TestExecutor()
+        self._test_executor = None
 
+    @property
+    def test_executor(self):
+        if self._test_executor is None:
+            self._test_executor = TestExecutor()
+        return self._test_executor
+
+    @swagger_auto_schema(
+        request_body=ExecuteRunTestSerializer,
+        responses={
+            200: RunTestExecutionResponseSerializer,
+            400: RunTestErrorResponseSerializer,
+            404: RunTestErrorResponseSerializer,
+            500: RunTestErrorResponseSerializer,
+        },
+    )
     def post(self, request, run_test_id, *args, **kwargs):
         """Execute a test run"""
         try:
@@ -854,6 +882,13 @@ class TestExecutionStatusView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: TestExecutionStatusSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def get(self, request, run_test_id, *args, **kwargs):
         """Get test execution status"""
         try:
@@ -899,6 +934,7 @@ class TestExecutionCancelView(APIView):
         self.gm = GeneralMethods()
 
     @swagger_auto_schema(
+        request_body=EmptyRequestSerializer,
         responses={
             200: CancelTestExecutionResponseSerializer,
             400: ErrorResponseSerializer,
@@ -1048,6 +1084,13 @@ class AllActiveTestsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: AllActiveTestsSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def get(self, request, *args, **kwargs):
         """Get all active tests"""
         try:
@@ -1634,6 +1677,13 @@ class RunTestCallExecutionsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: RunTestCallExecutionsResponseSerializer,
+            404: CallExecutionErrorResponseSerializer,
+            500: CallExecutionErrorResponseSerializer,
+        },
+    )
     def get(self, request, run_test_id, *args, **kwargs):
         """
         Get all call executions for a specific run test with pagination and search
@@ -2622,9 +2672,9 @@ class PerformanceSummaryView(APIView):
 
                 # Get overall score if available
                 if call_execution.overall_score is not None:
-                    scenario_performance[scenario_id][
-                        "total_score"
-                    ] += call_execution.overall_score
+                    scenario_performance[scenario_id]["total_score"] += (
+                        call_execution.overall_score
+                    )
                     scenario_performance[scenario_id]["scores"].append(
                         call_execution.overall_score
                     )
@@ -2723,6 +2773,13 @@ class TestExecutionAnalyticsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: TestExecutionAnalyticsSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def get(self, request, test_execution_id, *args, **kwargs):
         """
         Get analytics data for a specific test execution
@@ -2981,6 +3038,13 @@ class RunTestAnalyticsView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: RunTestAnalyticsSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def get(self, request, run_test_id, *args, **kwargs):
         """
         Get analytics data for a specific run test across multiple test executions
@@ -3597,6 +3661,15 @@ class TestExecutionColumnOrderView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=TestExecutionColumnOrderSerializer,
+        responses={
+            200: TestExecutionColumnOrderResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def put(self, request, test_execution_id, *args, **kwargs):
         """Update column order for a test execution"""
         try:
@@ -3710,6 +3783,15 @@ class TestExecutionBulkDeleteView(APIView):
         super().__init__(**kwargs)
         self._gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=TestExecutionBulkDeleteSerializer,
+        responses={
+            200: TestExecutionBulkDeleteResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def post(self, request, run_test_id):
         """
         Delete multiple test executions within a run test.
@@ -3927,6 +4009,15 @@ class RunTestComponentsUpdateView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=RunTestComponentsUpdateSerializer,
+        responses={
+            200: RunTestResponseSerializer,
+            400: RunTestErrorResponseSerializer,
+            404: RunTestErrorResponseSerializer,
+            500: RunTestErrorResponseSerializer,
+        },
+    )
     def patch(self, request, run_test_id, *args, **kwargs):
         """Update components of a specific RunTest"""
         try:
@@ -4109,6 +4200,13 @@ class CallExecutionErrorLocalizerTasksView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: CallExecutionErrorLocalizerTasksResponseSerializer,
+            404: CallExecutionErrorResponseSerializer,
+            500: CallExecutionErrorResponseSerializer,
+        },
+    )
     def get(self, request, call_execution_id, *args, **kwargs):
         """Get error localizer tasks for a specific call execution"""
         try:
@@ -4547,6 +4645,13 @@ class GetEvalConfigStructureView(APIView):
         super().__init__(**kwargs)
         self._gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={
+            200: EvalConfigStructureResponseSerializer,
+            404: EvalErrorResponseSerializer,
+            500: EvalErrorResponseSerializer,
+        },
+    )
     def get(self, request, run_test_id, eval_config_id, *args, **kwargs):
         """
         Get the structure of an evaluation config
@@ -5237,6 +5342,41 @@ class CSVExportView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                "type",
+                openapi.IN_QUERY,
+                description="Export source type.",
+                type=openapi.TYPE_STRING,
+                enum=["runtest", "testexecution"],
+                required=True,
+            ),
+            openapi.Parameter(
+                "search",
+                openapi.IN_QUERY,
+                description="Optional call-execution search term.",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+            openapi.Parameter(
+                "status",
+                openapi.IN_QUERY,
+                description="Optional call-execution status filter.",
+                type=openapi.TYPE_STRING,
+                required=False,
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                "CSV export",
+                schema=openapi.Schema(type=openapi.TYPE_FILE),
+            ),
+            400: ApiErrorResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def get(self, request, item_id, *args, **kwargs):
         """
         Export data as CSV based on type parameter
@@ -5498,7 +5638,7 @@ class RunTestEvalSummaryView(APIView):
             eval_configs = _get_eval_configs_with_template(run_test)
 
             if not eval_configs:
-                return Response([], status=status.HTTP_200_OK)
+                return self._gm.success_response([])
 
             call_executions = _get_completed_call_executions(run_test, execution_id)
             template_stats = _build_template_statistics(eval_configs, call_executions)
@@ -5643,6 +5783,14 @@ class RunTestEvalExplanationSummaryRefreshView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=EmptyRequestSerializer,
+        responses={
+            200: ApiSuccessResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def post(self, request, test_execution_id, *args, **kwargs):
         """
         Refresh the evaluation explanation summary by recalculating it.
@@ -5686,6 +5834,13 @@ class TestExecutionOptimiserAnalysisView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={
+            200: ApiSuccessResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def get(self, request, test_execution_id, *args, **kwargs):
         """
         Fetch the agent optimiser analysis for a test execution.
@@ -5726,6 +5881,15 @@ class TestExecutionOptimiserAnalysisRefreshView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=EmptyRequestSerializer,
+        responses={
+            200: ApiSuccessResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def post(self, request, test_execution_id, *args, **kwargs):
         """
         Trigger a new agent optimiser analysis run.
@@ -6495,6 +6659,15 @@ class TestExecutionRerunView(APIView):
 
         return successful_reruns, failed_reruns
 
+    @swagger_auto_schema(
+        request_body=TestExecutionRerunSerializer,
+        responses={
+            200: TestExecutionRerunResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    )
     def post(self, request, run_test_id):
         """
         Rerun multiple test executions (either evaluation only or call + evaluation).
@@ -6975,9 +7148,7 @@ def add_trace_details_to_call_executions(call_executions):
     # (``tracer_obse_eval_attr_gin``) was dropped in migration 0074. The
     # equivalent containment check now goes to ClickHouse, which has the
     # same data and is much cheaper for this access pattern.
-    spans_by_call_exec = spans_by_eval_attribute_call_execution_ids(
-        call_execution_ids
-    )
+    spans_by_call_exec = spans_by_eval_attribute_call_execution_ids(call_execution_ids)
 
     # Collect trace IDs and build trace_details
     trace_ids = set()
@@ -6990,7 +7161,11 @@ def add_trace_details_to_call_executions(call_executions):
         # original PG version also took whichever row came first).
         span = spans[0]
         try:
-            eval_attrs = json.loads(span["eval_attributes"]) if span.get("eval_attributes") else {}
+            eval_attrs = (
+                json.loads(span["eval_attributes"])
+                if span.get("eval_attributes")
+                else {}
+            )
         except (TypeError, ValueError):
             eval_attrs = {}
         trace_id_str = span["trace_id"]

@@ -2,10 +2,15 @@ import json
 import traceback
 
 import structlog
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 logger = structlog.get_logger(__name__)
+from model_hub.serializers.contracts import (
+    MODEL_HUB_ERROR_RESPONSES,
+    ModelHubJSONResponseSerializer,
+)
 from model_hub.schema.prompt.prompt_metrics import FetchPromptMetricsRequest
 from model_hub.services.prompt_metrics import (
     fetch_prompt_metrics,
@@ -19,6 +24,9 @@ class FetchPromptObserveMetricsView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request):
         try:
             filters = request.query_params.get(
@@ -67,6 +75,9 @@ class FetchPromptMetricsSpanView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request):
         try:
             filters = request.query_params.get("filters", [])
@@ -118,6 +129,9 @@ class FetchPromptMetricsNullView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request):
         try:
             response = {

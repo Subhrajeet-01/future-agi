@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q
 from django.db.models.functions import Coalesce, Lower, TruncDate
 from django.utils import timezone
-from drf_yasg.utils import no_body, swagger_auto_schema
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -51,8 +51,8 @@ from model_hub.models.develop_annotations import AnnotationsLabels
 from model_hub.models.score import SCORE_SOURCE_FK_MAP, Score
 from model_hub.serializers.annotation_queues import (
     AddItemsSerializer,
-    AnnotationQueueListQuerySerializer,
     AnnotateDetailSerializer,
+    AnnotationQueueListQuerySerializer,
     AnnotationQueueSerializer,
     AssignItemsSerializer,
     AutomationRuleEvaluateAcceptedResponseSerializer,
@@ -72,21 +72,21 @@ from model_hub.serializers.annotation_queues import (
     QueueDiscussionResponseSerializer,
     QueueExportAnnotationsResponseSerializer,
     QueueExportQuerySerializer,
-    QueueExportToDatasetResponseSerializer,
     QueueExportToDatasetRequestSerializer,
+    QueueExportToDatasetResponseSerializer,
     QueueForSourceQuerySerializer,
     QueueHardDeleteRequestSerializer,
     QueueHardDeleteResponseSerializer,
     QueueImportAnnotationsResponseSerializer,
-    QueueItemAnnotationsResponseSerializer,
     QueueItemAnnotateDetailQuerySerializer,
+    QueueItemAnnotationsResponseSerializer,
     QueueItemListQuerySerializer,
     QueueItemNavigationRequestSerializer,
     QueueItemNextQuerySerializer,
-    QueueJsonResponseSerializer,
     QueueItemReviewCommentSerializer,
     QueueItemReviewThreadSerializer,
     QueueItemSerializer,
+    QueueJsonResponseSerializer,
     QueueLabelRequestSerializer,
     QueueNavigationResponseSerializer,
     QueueNextItemResponseSerializer,
@@ -116,11 +116,13 @@ from model_hub.utils.annotation_queue_helpers import (
     resolve_source_object,
 )
 from model_hub.utils.utils import send_message_to_channel
-from tfc.utils.base_viewset import BaseModelViewSetMixinWithUserOrg
+from tfc.utils.api_contracts import validated_request
 from tfc.utils.api_serializers import (
     ApiErrorResponseSerializer,
     ApiSelectionTooLargeErrorSerializer,
+    EmptyRequestSerializer,
 )
+from tfc.utils.base_viewset import BaseModelViewSetMixinWithUserOrg
 from tfc.utils.email import email_helper
 from tfc.utils.general_methods import GeneralMethods
 from tfc.utils.pagination import ExtendedPageNumberPagination
@@ -1233,13 +1235,25 @@ def _latest_item_notes_for_queue_items(items):
     return notes_by_item
 
 
-def _normalize_export_status_filter(status_filter):
-    if status_filter is None:
+def _normalize_query_filter_value(filter_value):
+    if filter_value is None:
         return None
-    normalized = str(status_filter).strip()
+    normalized = str(filter_value).strip()
     if not normalized or normalized.lower() == "all":
         return None
     return normalized
+
+
+def _normalize_repeated_query_filter_values(query_params, key):
+    values = []
+    for raw_value in query_params.getlist(key):
+        if raw_value is None:
+            continue
+        for part in str(raw_value).split(","):
+            normalized = _normalize_query_filter_value(part)
+            if normalized and normalized not in values:
+                values.append(normalized)
+    return values
 
 
 def _scores_for_queue_items(items, queue_label_ids):
@@ -2603,7 +2617,7 @@ def _check_annotation_queue_create_limit(org, workspace=None):
                 code=getattr(exc, "error_code", None),
                 upgrade_cta=getattr(exc, "upgrade_cta", None),
                 metadata=metadata,
-            )
+            ) from exc
         raise
 
 
@@ -2795,8 +2809,8 @@ class AnnotationQueueViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelVie
             {"deleted": True, "archived": True, "queue_id": str(instance.pk)}
         )
 
-    @swagger_auto_schema(
-        request_body=no_body,
+    @validated_request(
+        request_serializer=EmptyRequestSerializer,
         responses={200: QueueStatusResponseSerializer, **ERROR_RESPONSES},
     )
     @action(detail=True, methods=["post"], url_path="restore")
@@ -3028,7 +3042,7 @@ class AnnotationQueueViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelVie
             )
         )
 
-        status_filter = _normalize_export_status_filter(
+        status_filter = _normalize_query_filter_value(
             request.query_params.get("status")
         )
         if status_filter:
@@ -3255,7 +3269,7 @@ class AnnotationQueueViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelVie
         data = serializer.validated_data
         dataset_id = data.get("dataset_id")
         dataset_name = data.get("dataset_name")
-        status_filter = _normalize_export_status_filter(
+        status_filter = _normalize_query_filter_value(
             data.get("status_filter", "completed")
         )
 
@@ -4208,42 +4222,50 @@ class QueueItemViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelViewSet):
             ):
                 queryset = _scope_targeted_rework_items(queryset, self.request.user)
 
-        status = _normalize_export_status_filter(
-            self.request.query_params.get("status")
+        statuses = _normalize_repeated_query_filter_values(
+            self.request.query_params, "status"
         )
-        source_type = self.request.query_params.get("source_type")
+        source_types = _normalize_repeated_query_filter_values(
+            self.request.query_params, "source_type"
+        )
         assigned_to = self.request.query_params.get("assigned_to")
 
-        if status == "in_review":
+        if statuses:
+            status_q = Q()
             addressed_threads = QueueItemReviewThread.objects.filter(
                 queue_item_id=OuterRef("pk"),
                 blocking=True,
                 status=QueueItemReviewThread.STATUS_ADDRESSED,
                 deleted=False,
             )
-            queryset = (
-                queryset.filter(review_status="pending_review")
-                .annotate(_has_addressed_review=Exists(addressed_threads))
-                .filter(_has_addressed_review=False)
-            )
-        elif status == "resubmitted":
-            addressed_threads = QueueItemReviewThread.objects.filter(
-                queue_item_id=OuterRef("pk"),
-                blocking=True,
-                status=QueueItemReviewThread.STATUS_ADDRESSED,
-                deleted=False,
-            )
-            queryset = (
-                queryset.filter(review_status="pending_review")
-                .annotate(_has_addressed_review=Exists(addressed_threads))
-                .filter(_has_addressed_review=True)
-            )
-        elif status == "needs_changes":
-            queryset = queryset.filter(review_status="rejected")
-        elif status:
-            queryset = queryset.filter(status=status)
-        if source_type:
-            queryset = queryset.filter(source_type=source_type)
+            if any(
+                workflow_status in statuses
+                for workflow_status in ("in_review", "resubmitted")
+            ):
+                queryset = queryset.annotate(
+                    _has_addressed_review=Exists(addressed_threads)
+                )
+
+            for item_status in statuses:
+                if item_status == "in_review":
+                    status_q |= Q(
+                        review_status="pending_review",
+                        _has_addressed_review=False,
+                    )
+                elif item_status == "resubmitted":
+                    status_q |= Q(
+                        review_status="pending_review",
+                        _has_addressed_review=True,
+                    )
+                elif item_status == "needs_changes":
+                    status_q |= Q(review_status="rejected")
+                else:
+                    status_q |= Q(status=item_status)
+
+            queryset = queryset.filter(status_q)
+
+        if source_types:
+            queryset = queryset.filter(source_type__in=source_types)
         if assigned_to == "me":
             queryset = _queue_item_user_scope(
                 queryset,
@@ -4251,7 +4273,7 @@ class QueueItemViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelViewSet):
                 include_unassigned=False,
             )
 
-        review_status = _normalize_export_status_filter(
+        review_status = _normalize_query_filter_value(
             self.request.query_params.get("review_status")
         )
         if review_status:
@@ -5562,8 +5584,8 @@ class QueueItemViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelViewSet):
 
         return self._gm.success_response({"assigned": len(item_pks) * len(user_ids)})
 
-    @swagger_auto_schema(
-        request_body=no_body,
+    @validated_request(
+        request_serializer=EmptyRequestSerializer,
         responses={200: QueueReleaseReservationResponseSerializer, **ERROR_RESPONSES},
     )
     @action(detail=True, methods=["post"], url_path="release")
@@ -6553,8 +6575,8 @@ class AutomationRuleViewSet(BaseModelViewSetMixinWithUserOrg, viewsets.ModelView
             created_by=self.request.user,
         )
 
-    @swagger_auto_schema(
-        request_body=no_body,
+    @validated_request(
+        request_serializer=EmptyRequestSerializer,
         responses={
             200: QueueJsonResponseSerializer,
             202: AutomationRuleEvaluateAcceptedResponseSerializer,

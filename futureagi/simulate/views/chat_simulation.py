@@ -1,6 +1,7 @@
 import structlog
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
 from pydantic import ValidationError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -17,10 +18,19 @@ from simulate.models import (
     TestExecution,
 )
 from simulate.pydantic_schemas.chat import ChatSendMessageViewResponse, SendChatRequest
+from simulate.serializers.chat_simulation import (
+    ChatSDKCodeResponseSerializer,
+    ChatSendMessageResponseSerializer,
+    RunTestChatExecutionResponseSerializer,
+    RunTestNameResponseSerializer,
+    SendChatRequestSerializer,
+    TestExecutionChatBatchResponseSerializer,
+)
 from simulate.services.chat_sim import initiate_chat, send_message_to_chat
 from simulate.services.test_executor import TestExecutor
 from simulate.utils.scenario_completeness import check_scenarios_incomplete
 from simulate.utils.test_execution_utils import generate_simulator_agent_prompt
+from tfc.utils.api_serializers import ApiErrorResponseSerializer, EmptyRequestSerializer
 from tfc.utils.general_methods import GeneralMethods
 
 logger = structlog.get_logger(__name__)
@@ -37,6 +47,13 @@ class RunTestNameView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={
+            200: RunTestNameResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def get(self, request, run_test_name, *args, **kwargs):
         try:
             # Get the organization from the authenticated user
@@ -83,6 +100,15 @@ class RunTestChatExecutionView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=EmptyRequestSerializer,
+        responses={
+            200: RunTestChatExecutionResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            404: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def post(self, request, run_test_id, *args, **kwargs):
         """Execute a test run"""
         try:
@@ -160,6 +186,14 @@ class TestExecutionChatBatchView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=EmptyRequestSerializer,
+        responses={
+            200: TestExecutionChatBatchResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def post(self, request, test_execution_id, *args, **kwargs):
         """
         Create a batch of CallExecution records for chat execution (exactly 10 per API call).
@@ -437,6 +471,14 @@ class ChatSendMessageView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=SendChatRequestSerializer,
+        responses={
+            200: ChatSendMessageResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def post(self, request, call_execution_id, *args, **kwargs):
         """Send a message to a chat execution"""
         try:
@@ -573,6 +615,13 @@ class ChatSDKCodeView(APIView):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={
+            200: ChatSDKCodeResponseSerializer,
+            400: ApiErrorResponseSerializer,
+            500: ApiErrorResponseSerializer,
+        },
+    )
     def get(self, request, run_test_id, *args, **kwargs):
         """Get the SDK code with placeholders filled"""
         try:

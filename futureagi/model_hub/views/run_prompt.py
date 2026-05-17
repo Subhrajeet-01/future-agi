@@ -17,6 +17,7 @@ from django.db import close_old_connections
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from drf_yasg.utils import swagger_auto_schema
 from jinja2.sandbox import SandboxedEnvironment
 from rest_framework import viewsets
 from rest_framework.generics import CreateAPIView
@@ -44,6 +45,12 @@ from model_hub.models.develop_dataset import Cell, Column, Dataset, Row
 from model_hub.models.openai_tools import Tools
 from model_hub.models.run_prompt import RunPrompter, UserResponseSchema
 from model_hub.queries.tts_voices import get_custom_voices
+from model_hub.serializers.contracts import (
+    MODEL_HUB_ERROR_RESPONSES,
+    ModelHubJSONResponseSerializer,
+    ModelHubPaginatedResponseSerializer,
+    RunPromptForRowsRequestSerializer,
+)
 from model_hub.serializers.run_prompt import (
     AddRunPromptSerializer,
     ApiKeySerializer,
@@ -846,6 +853,10 @@ class LitellmAPIView(CreateAPIView):
             },
         )
 
+    @swagger_auto_schema(
+        request_body=LitellmSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from django.db import transaction
 
@@ -1475,6 +1486,10 @@ class AddRunPromptColumnView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=AddRunPromptSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from django.db import transaction
 
@@ -1607,6 +1622,10 @@ class PreviewRunPromptColumnView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=PreviewRunPromptSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         try:
             # Validate incoming data
@@ -1744,6 +1763,10 @@ class EditRunPromptColumnView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        request_body=EditRunPromptColumnSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request, *args, **kwargs):
         from django.db import transaction
 
@@ -1907,6 +1930,9 @@ class RetrieveRunPromptColumnConfigView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request):
         try:
             # Get the column and verify it's a run prompt column
@@ -2056,6 +2082,9 @@ class RetrieveRunPromptOptionsView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             # Get available models from LiteLLM model manager
@@ -2146,6 +2175,9 @@ class DatasetRunPromptStatsView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, dataset_id):
         try:
             # Enforce organization isolation - verify dataset belongs to user's org
@@ -2190,6 +2222,12 @@ class DatasetRunPromptStatsView(APIView):
 class LiteLLMModelListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        responses={
+            200: ModelHubPaginatedResponseSerializer,
+            **MODEL_HUB_ERROR_RESPONSES,
+        }
+    )
     def get(self, request, *args, **kwargs):
         # Get the organization from the request
         organization = (
@@ -2331,6 +2369,9 @@ class LiteLLMModelVoicesView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             model_name = request.query_params.get("model", None)
@@ -2418,6 +2459,9 @@ class ModelParametersView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES}
+    )
     def get(self, request, *args, **kwargs):
         try:
             model_name = request.query_params.get("model")
@@ -2442,6 +2486,10 @@ class RunPromptForRowsView(APIView):
     permission_classes = [IsAuthenticated]
     _gm = GeneralMethods()
 
+    @swagger_auto_schema(
+        request_body=RunPromptForRowsRequestSerializer,
+        responses={200: ModelHubJSONResponseSerializer, **MODEL_HUB_ERROR_RESPONSES},
+    )
     def post(self, request):
         try:
             # Extract the run_prompt_ids and row_ids from the request data
