@@ -4404,6 +4404,15 @@ export interface ModelHubJSONResponseApi {
   detail?: ModelHubJSONResponseApiDetail;
 }
 
+export type ModelHubPaginatedResponseApiResultsItem = { [key: string]: unknown };
+
+export interface ModelHubPaginatedResponseApi {
+  count: number;
+  next?: string;
+  previous?: string;
+  results: ModelHubPaginatedResponseApiResultsItem[];
+}
+
 export type RerunOperationRequestApiConfig = { [key: string]: unknown };
 
 export interface RerunOperationRequestApi {
@@ -4454,15 +4463,6 @@ export interface CustomMetricTestResponseApi {
   /** @minLength 1 */
   status: string;
   prompts?: CustomMetricTestResponseApiPrompts;
-}
-
-export type ModelHubPaginatedResponseApiResultsItem = { [key: string]: unknown };
-
-export interface ModelHubPaginatedResponseApi {
-  count: number;
-  next?: string;
-  previous?: string;
-  results: ModelHubPaginatedResponseApiResultsItem[];
 }
 
 export interface CustomAIModelApi {
@@ -5605,6 +5605,23 @@ export interface PromptTemplateApi {
   created_by?: string;
 }
 
+export type DerivedVariablePreviewRequestApiContent = { [key: string]: unknown };
+
+export interface DerivedVariablePreviewRequestApi {
+  content: DerivedVariablePreviewRequestApiContent;
+  /** @minLength 1 */
+  column_name?: string;
+}
+
+export interface DerivedVariableExtractRequestApi {
+  /** @minLength 1 */
+  version: string;
+  /** @minLength 1 */
+  column_name?: string;
+  output_index?: number;
+  response_format_type?: string;
+}
+
 export type UserResponseSchemaApiSchema = { [key: string]: unknown };
 
 export type UserResponseSchemaApiSchemaType = typeof UserResponseSchemaApiSchemaType[keyof typeof UserResponseSchemaApiSchemaType];
@@ -5626,6 +5643,106 @@ export interface UserResponseSchemaApi {
   schema?: UserResponseSchemaApiSchema;
   readonly organization?: string;
   schema_type?: UserResponseSchemaApiSchemaType;
+}
+
+export interface RunPromptForRowsRequestApi {
+  run_prompt_ids: string[];
+  row_ids?: string[];
+  selected_all_rows?: boolean;
+}
+
+export type LitellmApiMessagesItem = {[key: string]: string};
+
+/**
+ * Output format type. Defaults to 'string'.
+ */
+export type LitellmApiOutputFormat = typeof LitellmApiOutputFormat[keyof typeof LitellmApiOutputFormat];
+
+
+export const LitellmApiOutputFormat = {
+  array: 'array',
+  string: 'string',
+  number: 'number',
+  object: 'object',
+  audio: 'audio',
+  image: 'image',
+} as const;
+
+/**
+ * JSON schema for response format if required. Defaults to None.
+ */
+export type LitellmApiResponseFormat = { [key: string]: unknown };
+
+/**
+ * Tool selection mode: 'auto' or 'required'.
+ */
+export type LitellmApiToolChoice = typeof LitellmApiToolChoice[keyof typeof LitellmApiToolChoice];
+
+
+export const LitellmApiToolChoice = {
+  auto: 'auto',
+  required: 'required',
+} as const;
+
+export type LitellmApiToolsItem = {[key: string]: string};
+
+export interface LitellmApi {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  dataset_id: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  model: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  concurrency?: number;
+  /** List of messages with format [{'role': 'user/assistant', 'content': 'text'}] */
+  messages: LitellmApiMessagesItem[];
+  /** Output format type. Defaults to 'string'. */
+  output_format?: LitellmApiOutputFormat;
+  /**
+     * Controls the randomness. Value between 0 and 1.
+     * @minimum 0
+     * @maximum 1
+     */
+  temperature?: number;
+  /**
+     * Penalty for word repetition. Value between -2 and 2.
+     * @minimum -2
+     * @maximum 2
+     */
+  frequency_penalty?: number;
+  /**
+     * Penalty for new word usage. Value between -2 and 2.
+     * @minimum -2
+     * @maximum 2
+     */
+  presence_penalty?: number;
+  /**
+     * Maximum number of tokens to generate. Null = use provider default.
+     * @minimum 1
+     * @maximum 65536
+     */
+  max_tokens?: number;
+  /**
+     * Controls diversity via nucleus sampling. Value between 0 and 1.
+     * @minimum 0
+     * @maximum 1
+     */
+  top_p?: number;
+  /** JSON schema for response format if required. Defaults to None. */
+  response_format?: LitellmApiResponseFormat;
+  /** Tool selection mode: 'auto' or 'required'. */
+  tool_choice?: LitellmApiToolChoice;
+  /** List of tools with tool properties if available. */
+  tools?: LitellmApiToolsItem[];
 }
 
 export type CreateScoreApiSourceType = typeof CreateScoreApiSourceType[keyof typeof CreateScoreApiSourceType];

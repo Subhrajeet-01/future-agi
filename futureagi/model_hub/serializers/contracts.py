@@ -364,3 +364,25 @@ class ExperimentFeedbackSubmitRequestSerializer(serializers.Serializer):
     user_eval_metric_id = serializers.UUIDField()
     value = serializers.JSONField(required=False)
     explanation = serializers.CharField(required=False, allow_blank=True)
+
+
+class RunPromptForRowsRequestSerializer(serializers.Serializer):
+    run_prompt_ids = serializers.ListField(child=serializers.UUIDField())
+    row_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
+    selected_all_rows = serializers.BooleanField(required=False, default=False)
+
+
+class DerivedVariableExtractRequestSerializer(serializers.Serializer):
+    version = serializers.CharField()
+    column_name = serializers.CharField(required=False, default="output")
+    output_index = serializers.IntegerField(required=False, default=0)
+    response_format_type = serializers.CharField(required=False, allow_blank=True)
+
+
+class DerivedVariablePreviewRequestSerializer(serializers.Serializer):
+    content = serializers.JSONField()
+    column_name = serializers.CharField(required=False, default="output")

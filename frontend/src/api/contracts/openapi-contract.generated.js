@@ -9871,7 +9871,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_api_model_parameters_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/api/model_voices/": {
@@ -9879,7 +9898,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_api_model_voices_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/api/models_list/": {
@@ -9887,7 +9925,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_api_models_list_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubPaginatedResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/cells/{cell_id}/run-error-localizer/": {
@@ -10615,7 +10672,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_dataset_run-prompt-stats_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/datasets/compare/get-evals-list/": {
@@ -10863,7 +10939,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_datasets_derived-variables_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/datasets/{dataset_id}/duplicate-rows/": {
@@ -15167,9 +15262,30 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/model-hub/prompt-templates/derived-variables/preview/": {
       "post": {
         "operationId": "model-hub_prompt-templates_derived-variables_preview_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/DerivedVariablePreviewRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/prompt-templates/generate-prompt/": {
@@ -15571,15 +15687,55 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_prompt-templates_derived-variables_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/prompt-templates/{prompt_id}/derived-variables/extract/": {
       "post": {
         "operationId": "model-hub_prompt-templates_derived-variables_extract_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/DerivedVariableExtractRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/prompt-templates/{prompt_id}/derived-variables/{column_name}/schema/": {
@@ -15587,7 +15743,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_prompt-templates_derived-variables_schema_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/prompt/metrics/": {
@@ -15595,7 +15770,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_prompt_metrics_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/prompt/metrics/empty-screen": {
@@ -15603,7 +15797,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_prompt_metrics_empty-screen_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/prompt/span-metrics/": {
@@ -15611,7 +15824,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "model-hub_prompt_span-metrics_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/response_schema/": {
@@ -15721,17 +15953,59 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/model-hub/run-prompt-for-rows/": {
       "post": {
         "operationId": "model-hub_run-prompt-for-rows_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/RunPromptForRowsRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/run-prompt/": {
       "post": {
         "operationId": "model-hub_run-prompt_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/Litellm"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ModelHubJSONResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "409": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ModelHubErrorResponse"
+          }
+        }
       }
     },
     "/model-hub/scores/": {
@@ -36016,6 +36290,52 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "DerivedVariableExtractRequest": {
+      "required": [
+        "version"
+      ],
+      "type": "object",
+      "properties": {
+        "version": {
+          "title": "Version",
+          "type": "string",
+          "minLength": 1
+        },
+        "column_name": {
+          "title": "Column name",
+          "type": "string",
+          "default": "output",
+          "minLength": 1
+        },
+        "output_index": {
+          "title": "Output index",
+          "type": "integer",
+          "default": 0
+        },
+        "response_format_type": {
+          "title": "Response format type",
+          "type": "string"
+        }
+      }
+    },
+    "DerivedVariablePreviewRequest": {
+      "required": [
+        "content"
+      ],
+      "type": "object",
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "object"
+        },
+        "column_name": {
+          "title": "Column name",
+          "type": "string",
+          "default": "output",
+          "minLength": 1
+        }
+      }
+    },
     "DevelopAnnotationsUser": {
       "required": [
         "email",
@@ -38883,6 +39203,131 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "result": {
           "$ref": "#/definitions/LinearTeamsResult"
+        }
+      }
+    },
+    "Litellm": {
+      "required": [
+        "dataset_id",
+        "model",
+        "name",
+        "messages"
+      ],
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "title": "Dataset id",
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        },
+        "model": {
+          "title": "Model",
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        },
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        },
+        "concurrency": {
+          "title": "Concurrency",
+          "type": "integer",
+          "default": 5
+        },
+        "messages": {
+          "description": "List of messages with format [{'role': 'user/assistant', 'content': 'text'}]",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "output_format": {
+          "title": "Output format",
+          "description": "Output format type. Defaults to 'string'.",
+          "type": "string",
+          "enum": [
+            "array",
+            "string",
+            "number",
+            "object",
+            "audio",
+            "image"
+          ],
+          "default": "string"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "description": "Controls the randomness. Value between 0 and 1.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0,
+          "x-nullable": true
+        },
+        "frequency_penalty": {
+          "title": "Frequency penalty",
+          "description": "Penalty for word repetition. Value between -2 and 2.",
+          "type": "number",
+          "maximum": 2,
+          "minimum": -2,
+          "x-nullable": true
+        },
+        "presence_penalty": {
+          "title": "Presence penalty",
+          "description": "Penalty for new word usage. Value between -2 and 2.",
+          "type": "number",
+          "maximum": 2,
+          "minimum": -2,
+          "x-nullable": true
+        },
+        "max_tokens": {
+          "title": "Max tokens",
+          "description": "Maximum number of tokens to generate. Null = use provider default.",
+          "type": "integer",
+          "maximum": 65536,
+          "minimum": 1,
+          "x-nullable": true
+        },
+        "top_p": {
+          "title": "Top p",
+          "description": "Controls diversity via nucleus sampling. Value between 0 and 1.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0,
+          "x-nullable": true
+        },
+        "response_format": {
+          "title": "Response format",
+          "description": "JSON schema for response format if required. Defaults to None.",
+          "type": "object"
+        },
+        "tool_choice": {
+          "title": "Tool choice",
+          "description": "Tool selection mode: 'auto' or 'required'.",
+          "type": "string",
+          "enum": [
+            "auto",
+            "required",
+            null
+          ]
+        },
+        "tools": {
+          "description": "List of tools with tool properties if available.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "x-nullable": true
+            }
+          }
         }
       }
     },
@@ -44303,6 +44748,34 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "call_execution_count": {
           "title": "Call execution count",
           "type": "integer"
+        }
+      }
+    },
+    "RunPromptForRowsRequest": {
+      "required": [
+        "run_prompt_ids"
+      ],
+      "type": "object",
+      "properties": {
+        "run_prompt_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "row_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "default": []
+        },
+        "selected_all_rows": {
+          "title": "Selected all rows",
+          "type": "boolean",
+          "default": false
         }
       }
     },

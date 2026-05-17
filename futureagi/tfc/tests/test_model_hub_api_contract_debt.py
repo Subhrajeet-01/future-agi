@@ -59,6 +59,9 @@ def test_model_hub_ai_writer_and_custom_model_apis_stay_out_of_contract_debt():
     report = _debt_report()
     protected_paths = {
         "/model-hub/ai-eval-writer/",
+        "/model-hub/api/model_parameters/",
+        "/model-hub/api/model_voices/",
+        "/model-hub/api/models_list/",
         "/model-hub/columns/{column_id}/operation-config/",
         "/model-hub/columns/{column_id}/rerun-operation/",
         "/model-hub/custom-models/",
@@ -79,6 +82,7 @@ def test_model_hub_ai_writer_and_custom_model_apis_stay_out_of_contract_debt():
         "/model-hub/datasets/{dataset_id}/conditional-column/",
         "/model-hub/datasets/{dataset_id}/extract-entities/",
         "/model-hub/datasets/{dataset_id}/preview/{operation_type}/",
+        "/model-hub/dataset/{dataset_id}/run-prompt-stats/",
         "/model-hub/develops/{dataset_id}/extract-json-column/",
         "/model-hub/experiments/v2/{experiment_id}/feedback/",
         "/model-hub/experiments/v2/{experiment_id}/feedback/get-feedback-details/",
@@ -111,6 +115,15 @@ def test_model_hub_ai_writer_and_custom_model_apis_stay_out_of_contract_debt():
         "/model-hub/performance/report/{model_id}/{report_id}/",
         "/model-hub/performance/tag-distribution/{model_id}/",
         "/model-hub/performance/{id}/",
+        "/model-hub/prompt/metrics/",
+        "/model-hub/prompt/metrics/empty-screen",
+        "/model-hub/prompt/span-metrics/",
+        "/model-hub/prompt-templates/derived-variables/preview/",
+        "/model-hub/prompt-templates/{prompt_id}/derived-variables/",
+        "/model-hub/prompt-templates/{prompt_id}/derived-variables/extract/",
+        "/model-hub/prompt-templates/{prompt_id}/derived-variables/{column_name}/schema/",
+        "/model-hub/run-prompt-for-rows/",
+        "/model-hub/run-prompt/",
     }
 
     body_gaps = {
@@ -234,6 +247,15 @@ def test_model_hub_ai_writer_and_custom_model_mutations_have_request_contracts()
             "PerformanceTagDistributionRequest"
         ),
         ("POST", "/model-hub/performance/{id}/"): "PerformanceQueryRequest",
+        ("POST", "/model-hub/prompt-templates/derived-variables/preview/"): (
+            "DerivedVariablePreviewRequest"
+        ),
+        (
+            "POST",
+            "/model-hub/prompt-templates/{prompt_id}/derived-variables/extract/",
+        ): "DerivedVariableExtractRequest",
+        ("POST", "/model-hub/run-prompt-for-rows/"): "RunPromptForRowsRequest",
+        ("POST", "/model-hub/run-prompt/"): "Litellm",
     }
 
     for (method, path), definition_name in expected.items():
@@ -243,6 +265,9 @@ def test_model_hub_ai_writer_and_custom_model_mutations_have_request_contracts()
 def test_model_hub_ai_writer_and_custom_model_endpoints_have_response_contracts():
     expected = {
         ("POST", "/model-hub/ai-eval-writer/"): "AIEvalWriterResponse",
+        ("GET", "/model-hub/api/model_parameters/"): "ModelHubJSONResponse",
+        ("GET", "/model-hub/api/model_voices/"): "ModelHubJSONResponse",
+        ("GET", "/model-hub/api/models_list/"): "ModelHubPaginatedResponse",
         ("GET", "/model-hub/columns/{column_id}/operation-config/"): (
             "ModelHubJSONResponse"
         ),
@@ -287,6 +312,9 @@ def test_model_hub_ai_writer_and_custom_model_endpoints_have_response_contracts(
             "ModelHubJSONResponse"
         ),
         ("POST", "/model-hub/datasets/{dataset_id}/preview/{operation_type}/"): (
+            "ModelHubJSONResponse"
+        ),
+        ("GET", "/model-hub/dataset/{dataset_id}/run-prompt-stats/"): (
             "ModelHubJSONResponse"
         ),
         ("POST", "/model-hub/develops/{dataset_id}/extract-json-column/"): (
@@ -390,6 +418,25 @@ def test_model_hub_ai_writer_and_custom_model_endpoints_have_response_contracts(
         ("POST", "/model-hub/performance/tag-distribution/{model_id}/"): (
             "ModelHubJSONResponse"
         ),
+        ("GET", "/model-hub/prompt/metrics/"): "ModelHubJSONResponse",
+        ("GET", "/model-hub/prompt/metrics/empty-screen"): "ModelHubJSONResponse",
+        ("GET", "/model-hub/prompt/span-metrics/"): "ModelHubJSONResponse",
+        ("POST", "/model-hub/prompt-templates/derived-variables/preview/"): (
+            "ModelHubJSONResponse"
+        ),
+        ("GET", "/model-hub/prompt-templates/{prompt_id}/derived-variables/"): (
+            "ModelHubJSONResponse"
+        ),
+        (
+            "POST",
+            "/model-hub/prompt-templates/{prompt_id}/derived-variables/extract/",
+        ): "ModelHubJSONResponse",
+        (
+            "GET",
+            "/model-hub/prompt-templates/{prompt_id}/derived-variables/{column_name}/schema/",
+        ): "ModelHubJSONResponse",
+        ("POST", "/model-hub/run-prompt-for-rows/"): "ModelHubJSONResponse",
+        ("POST", "/model-hub/run-prompt/"): "ModelHubJSONResponse",
     }
 
     for (method, path), definition_name in expected.items():

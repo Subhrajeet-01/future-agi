@@ -18386,7 +18386,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -18402,7 +18435,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -18418,7 +18484,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubPaginatedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -19946,7 +20045,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -20549,7 +20681,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -29021,10 +29186,52 @@
                 "operationId": "model-hub_prompt-templates_derived-variables_preview_create",
                 "summary": "Preview derived variables from JSON content without saving.",
                 "description": "Useful for showing what variables would be extracted before running.\n\nRequest body:\n    - content: JSON string or object to analyze\n    - column_name: Name for the variable prefix",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DerivedVariablePreviewRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -29901,7 +30108,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -29922,10 +30162,52 @@
                 "operationId": "model-hub_prompt-templates_derived-variables_extract_create",
                 "summary": "Manually trigger extraction of derived variables from outputs.",
                 "description": "This is useful when you want to re-extract variables or extract from\nexisting outputs that weren't processed.\n\nRequest body:\n    - version: Version to extract from\n    - column_name: Name for the output column\n    - output_index: Optional specific output index (default: 0)\n    - response_format_type: Optional response format hint",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DerivedVariableExtractRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -29949,7 +30231,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -29978,7 +30293,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -29994,7 +30342,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -30010,7 +30391,40 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -30196,10 +30610,52 @@
             "post": {
                 "operationId": "model-hub_run-prompt-for-rows_create",
                 "description": "",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/RunPromptForRowsRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -30212,10 +30668,52 @@
             "post": {
                 "operationId": "model-hub_run-prompt_create",
                 "description": "",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Litellm"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubJSONResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ModelHubErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -63440,6 +63938,35 @@
                 }
             }
         },
+        "ModelHubPaginatedResponse": {
+            "required": [
+                "count",
+                "results"
+            ],
+            "type": "object",
+            "properties": {
+                "count": {
+                    "title": "Count",
+                    "type": "integer"
+                },
+                "next": {
+                    "title": "Next",
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "previous": {
+                    "title": "Previous",
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                }
+            }
+        },
         "RerunOperationRequest": {
             "required": [
                 "operation_type"
@@ -63577,35 +64104,6 @@
                 "prompts": {
                     "title": "Prompts",
                     "type": "object"
-                }
-            }
-        },
-        "ModelHubPaginatedResponse": {
-            "required": [
-                "count",
-                "results"
-            ],
-            "type": "object",
-            "properties": {
-                "count": {
-                    "title": "Count",
-                    "type": "integer"
-                },
-                "next": {
-                    "title": "Next",
-                    "type": "string",
-                    "x-nullable": true
-                },
-                "previous": {
-                    "title": "Previous",
-                    "type": "string",
-                    "x-nullable": true
-                },
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "type": "object"
-                    }
                 }
             }
         },
@@ -66336,6 +66834,52 @@
                 }
             }
         },
+        "DerivedVariablePreviewRequest": {
+            "required": [
+                "content"
+            ],
+            "type": "object",
+            "properties": {
+                "content": {
+                    "title": "Content",
+                    "type": "object"
+                },
+                "column_name": {
+                    "title": "Column name",
+                    "type": "string",
+                    "default": "output",
+                    "minLength": 1
+                }
+            }
+        },
+        "DerivedVariableExtractRequest": {
+            "required": [
+                "version"
+            ],
+            "type": "object",
+            "properties": {
+                "version": {
+                    "title": "Version",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "column_name": {
+                    "title": "Column name",
+                    "type": "string",
+                    "default": "output",
+                    "minLength": 1
+                },
+                "output_index": {
+                    "title": "Output index",
+                    "type": "integer",
+                    "default": 0
+                },
+                "response_format_type": {
+                    "title": "Response format type",
+                    "type": "string"
+                }
+            }
+        },
         "UserResponseSchema": {
             "required": [
                 "name"
@@ -66378,6 +66922,159 @@
                         "yaml"
                     ],
                     "x-nullable": true
+                }
+            }
+        },
+        "RunPromptForRowsRequest": {
+            "required": [
+                "run_prompt_ids"
+            ],
+            "type": "object",
+            "properties": {
+                "run_prompt_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "row_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "default": []
+                },
+                "selected_all_rows": {
+                    "title": "Selected all rows",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "Litellm": {
+            "required": [
+                "dataset_id",
+                "model",
+                "name",
+                "messages"
+            ],
+            "type": "object",
+            "properties": {
+                "dataset_id": {
+                    "title": "Dataset id",
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                },
+                "model": {
+                    "title": "Model",
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                },
+                "concurrency": {
+                    "title": "Concurrency",
+                    "type": "integer",
+                    "default": 5
+                },
+                "messages": {
+                    "description": "List of messages with format [{'role': 'user/assistant', 'content': 'text'}]",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    }
+                },
+                "output_format": {
+                    "title": "Output format",
+                    "description": "Output format type. Defaults to 'string'.",
+                    "type": "string",
+                    "enum": [
+                        "array",
+                        "string",
+                        "number",
+                        "object",
+                        "audio",
+                        "image"
+                    ],
+                    "default": "string"
+                },
+                "temperature": {
+                    "title": "Temperature",
+                    "description": "Controls the randomness. Value between 0 and 1.",
+                    "type": "number",
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "x-nullable": true
+                },
+                "frequency_penalty": {
+                    "title": "Frequency penalty",
+                    "description": "Penalty for word repetition. Value between -2 and 2.",
+                    "type": "number",
+                    "maximum": 2.0,
+                    "minimum": -2.0,
+                    "x-nullable": true
+                },
+                "presence_penalty": {
+                    "title": "Presence penalty",
+                    "description": "Penalty for new word usage. Value between -2 and 2.",
+                    "type": "number",
+                    "maximum": 2.0,
+                    "minimum": -2.0,
+                    "x-nullable": true
+                },
+                "max_tokens": {
+                    "title": "Max tokens",
+                    "description": "Maximum number of tokens to generate. Null = use provider default.",
+                    "type": "integer",
+                    "maximum": 65536,
+                    "minimum": 1,
+                    "x-nullable": true
+                },
+                "top_p": {
+                    "title": "Top p",
+                    "description": "Controls diversity via nucleus sampling. Value between 0 and 1.",
+                    "type": "number",
+                    "maximum": 1.0,
+                    "minimum": 0.0,
+                    "x-nullable": true
+                },
+                "response_format": {
+                    "title": "Response format",
+                    "description": "JSON schema for response format if required. Defaults to None.",
+                    "type": "object"
+                },
+                "tool_choice": {
+                    "title": "Tool choice",
+                    "description": "Tool selection mode: 'auto' or 'required'.",
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "required",
+                        null
+                    ]
+                },
+                "tools": {
+                    "description": "List of tools with tool properties if available.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "x-nullable": true
+                        }
+                    }
                 }
             }
         },

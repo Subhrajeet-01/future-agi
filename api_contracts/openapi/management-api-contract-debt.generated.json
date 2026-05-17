@@ -3,8 +3,8 @@
   "summary": {
     "paths": 964,
     "operations": 1323,
-    "mutation_endpoints_without_body_schema": 105,
-    "operations_without_response_schema": 176
+    "mutation_endpoints_without_body_schema": 101,
+    "operations_without_response_schema": 162
   },
   "by_group": {
     "accounts": {
@@ -70,8 +70,8 @@
     "model-hub": {
       "paths": 365,
       "operations": 475,
-      "mutation_endpoints_without_body_schema": 105,
-      "operations_without_response_schema": 176
+      "mutation_endpoints_without_body_schema": 101,
+      "operations_without_response_schema": 162
     },
     "saml2_auth": {
       "paths": 12,
@@ -996,42 +996,6 @@
     {
       "group": "model-hub",
       "method": "POST",
-      "path": "/model-hub/prompt-templates/derived-variables/preview/",
-      "operation_id": "model-hub_prompt-templates_derived-variables_preview_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/prompt-templates/{prompt_id}/derived-variables/extract/",
-      "operation_id": "model-hub_prompt-templates_derived-variables_extract_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/run-prompt-for-rows/",
-      "operation_id": "model-hub_run-prompt-for-rows_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/run-prompt/",
-      "operation_id": "model-hub_run-prompt_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
       "path": "/model-hub/test-evaluation/",
       "operation_id": "model-hub_test-evaluation_create",
       "tags": [
@@ -1058,33 +1022,6 @@
     }
   ],
   "operations_without_response_schema": [
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/api/model_parameters/",
-      "operation_id": "model-hub_api_model_parameters_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/api/model_voices/",
-      "operation_id": "model-hub_api_model_voices_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/api/models_list/",
-      "operation_id": "model-hub_api_models_list_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
     {
       "group": "model-hub",
       "method": "GET",
@@ -1144,15 +1081,6 @@
       "method": "GET",
       "path": "/model-hub/dataset/{dataset_id}/json-schema/",
       "operation_id": "model-hub_dataset_json-schema_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/dataset/{dataset_id}/run-prompt-stats/",
-      "operation_id": "model-hub_dataset_run-prompt-stats_list",
       "tags": [
         "model-hub"
       ]
@@ -1279,15 +1207,6 @@
       "method": "POST",
       "path": "/model-hub/datasets/{dataset_id}/compare-stats/",
       "operation_id": "model-hub_datasets_compare-stats_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/datasets/{dataset_id}/derived-variables/",
-      "operation_id": "model-hub_datasets_derived-variables_list",
       "tags": [
         "model-hub"
       ]
@@ -2530,87 +2449,6 @@
       "method": "GET",
       "path": "/model-hub/overview/",
       "operation_id": "model-hub_overview_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/prompt-templates/derived-variables/preview/",
-      "operation_id": "model-hub_prompt-templates_derived-variables_preview_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/prompt-templates/{prompt_id}/derived-variables/",
-      "operation_id": "model-hub_prompt-templates_derived-variables_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/prompt-templates/{prompt_id}/derived-variables/extract/",
-      "operation_id": "model-hub_prompt-templates_derived-variables_extract_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/prompt-templates/{prompt_id}/derived-variables/{column_name}/schema/",
-      "operation_id": "model-hub_prompt-templates_derived-variables_schema_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/prompt/metrics/",
-      "operation_id": "model-hub_prompt_metrics_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/prompt/metrics/empty-screen",
-      "operation_id": "model-hub_prompt_metrics_empty-screen_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "GET",
-      "path": "/model-hub/prompt/span-metrics/",
-      "operation_id": "model-hub_prompt_span-metrics_list",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/run-prompt-for-rows/",
-      "operation_id": "model-hub_run-prompt-for-rows_create",
-      "tags": [
-        "model-hub"
-      ]
-    },
-    {
-      "group": "model-hub",
-      "method": "POST",
-      "path": "/model-hub/run-prompt/",
-      "operation_id": "model-hub_run-prompt_create",
       "tags": [
         "model-hub"
       ]

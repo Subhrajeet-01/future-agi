@@ -248,6 +248,8 @@ import type {
   DeleteEvalConfigResponseApi,
   DeleteUserApi,
   DeploymentInfoResponseApi,
+  DerivedVariableExtractRequestApi,
+  DerivedVariablePreviewRequestApi,
   DevelopAnnotationsUserApi,
   DiscussionCommentRequestApi,
   DiscussionReactionRequestApi,
@@ -342,6 +344,7 @@ import type {
   LegacyKnowledgeBaseFilesRequestApi,
   LegacyKnowledgeBaseMutationRequestApi,
   LinearTeamsResponseApi,
+  LitellmApi,
   LiveKitCallExecutionUpdateRequestApi,
   LiveKitErrorResponseApi,
   LiveKitListenerTokenResponseApi,
@@ -580,6 +583,7 @@ import type {
   ReviewItemRequestApi,
   RunNewEvalsOnTestExecutionApi,
   RunNewEvalsResponseApi,
+  RunPromptForRowsRequestApi,
   RunTestAnalyticsApi,
   RunTestCallExecutionsResponseApi,
   RunTestChatExecutionResponseApi,
@@ -21154,16 +21158,43 @@ export const modelHubApiKeysDelete = async (id: string, options?: RequestInit): 
 
 
 export type modelHubApiModelParametersListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubApiModelParametersListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubApiModelParametersListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubApiModelParametersListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubApiModelParametersListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubApiModelParametersListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubApiModelParametersListResponseSuccess = (modelHubApiModelParametersListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubApiModelParametersListResponseError = (modelHubApiModelParametersListResponse400 | modelHubApiModelParametersListResponse403 | modelHubApiModelParametersListResponse404 | modelHubApiModelParametersListResponse409 | modelHubApiModelParametersListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubApiModelParametersListResponse = (modelHubApiModelParametersListResponseSuccess)
+export type modelHubApiModelParametersListResponse = (modelHubApiModelParametersListResponseSuccess | modelHubApiModelParametersListResponseError)
 
 export const getModelHubApiModelParametersListUrl = () => {
 
@@ -21187,16 +21218,43 @@ export const modelHubApiModelParametersList = async ( options?: RequestInit): Pr
 
 
 export type modelHubApiModelVoicesListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubApiModelVoicesListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubApiModelVoicesListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubApiModelVoicesListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubApiModelVoicesListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubApiModelVoicesListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubApiModelVoicesListResponseSuccess = (modelHubApiModelVoicesListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubApiModelVoicesListResponseError = (modelHubApiModelVoicesListResponse400 | modelHubApiModelVoicesListResponse403 | modelHubApiModelVoicesListResponse404 | modelHubApiModelVoicesListResponse409 | modelHubApiModelVoicesListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubApiModelVoicesListResponse = (modelHubApiModelVoicesListResponseSuccess)
+export type modelHubApiModelVoicesListResponse = (modelHubApiModelVoicesListResponseSuccess | modelHubApiModelVoicesListResponseError)
 
 export const getModelHubApiModelVoicesListUrl = () => {
 
@@ -21225,16 +21283,43 @@ export const modelHubApiModelVoicesList = async ( options?: RequestInit): Promis
 
 
 export type modelHubApiModelsListListResponse200 = {
-  data: void
+  data: ModelHubPaginatedResponseApi
   status: 200
+}
+
+export type modelHubApiModelsListListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubApiModelsListListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubApiModelsListListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubApiModelsListListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubApiModelsListListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubApiModelsListListResponseSuccess = (modelHubApiModelsListListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubApiModelsListListResponseError = (modelHubApiModelsListListResponse400 | modelHubApiModelsListListResponse403 | modelHubApiModelsListListResponse404 | modelHubApiModelsListListResponse409 | modelHubApiModelsListListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubApiModelsListListResponse = (modelHubApiModelsListListResponseSuccess)
+export type modelHubApiModelsListListResponse = (modelHubApiModelsListListResponseSuccess | modelHubApiModelsListListResponseError)
 
 export const getModelHubApiModelsListListUrl = () => {
 
@@ -23082,16 +23167,43 @@ export const modelHubDatasetJsonSchemaList = async (datasetId: string, options?:
 
 
 export type modelHubDatasetRunPromptStatsListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubDatasetRunPromptStatsListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubDatasetRunPromptStatsListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubDatasetRunPromptStatsListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubDatasetRunPromptStatsListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubDatasetRunPromptStatsListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubDatasetRunPromptStatsListResponseSuccess = (modelHubDatasetRunPromptStatsListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubDatasetRunPromptStatsListResponseError = (modelHubDatasetRunPromptStatsListResponse400 | modelHubDatasetRunPromptStatsListResponse403 | modelHubDatasetRunPromptStatsListResponse404 | modelHubDatasetRunPromptStatsListResponse409 | modelHubDatasetRunPromptStatsListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubDatasetRunPromptStatsListResponse = (modelHubDatasetRunPromptStatsListResponseSuccess)
+export type modelHubDatasetRunPromptStatsListResponse = (modelHubDatasetRunPromptStatsListResponseSuccess | modelHubDatasetRunPromptStatsListResponseError)
 
 export const getModelHubDatasetRunPromptStatsListUrl = (datasetId: string,) => {
 
@@ -23895,16 +24007,43 @@ export const modelHubDatasetsConditionalColumnCreate = async (datasetId: string,
 
 
 export type modelHubDatasetsDerivedVariablesListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubDatasetsDerivedVariablesListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubDatasetsDerivedVariablesListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubDatasetsDerivedVariablesListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubDatasetsDerivedVariablesListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubDatasetsDerivedVariablesListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubDatasetsDerivedVariablesListResponseSuccess = (modelHubDatasetsDerivedVariablesListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubDatasetsDerivedVariablesListResponseError = (modelHubDatasetsDerivedVariablesListResponse400 | modelHubDatasetsDerivedVariablesListResponse403 | modelHubDatasetsDerivedVariablesListResponse404 | modelHubDatasetsDerivedVariablesListResponse409 | modelHubDatasetsDerivedVariablesListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubDatasetsDerivedVariablesListResponse = (modelHubDatasetsDerivedVariablesListResponseSuccess)
+export type modelHubDatasetsDerivedVariablesListResponse = (modelHubDatasetsDerivedVariablesListResponseSuccess | modelHubDatasetsDerivedVariablesListResponseError)
 
 export const getModelHubDatasetsDerivedVariablesListUrl = (datasetId: string,) => {
 
@@ -34364,17 +34503,44 @@ export const modelHubPromptTemplatesCreateDraft = async (promptTemplateApi: NonR
 
 
 
-export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse201 = {
-  data: void
-  status: 201
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse200 = {
+  data: ModelHubJSONResponseApi
+  status: 200
 }
 
-export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponseSuccess = (modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse201) & {
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
+}
+
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponseSuccess = (modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponseError = (modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse400 | modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse403 | modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse404 | modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse409 | modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse = (modelHubPromptTemplatesDerivedVariablesPreviewCreateResponseSuccess)
+export type modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse = (modelHubPromptTemplatesDerivedVariablesPreviewCreateResponseSuccess | modelHubPromptTemplatesDerivedVariablesPreviewCreateResponseError)
 
 export const getModelHubPromptTemplatesDerivedVariablesPreviewCreateUrl = () => {
 
@@ -34392,14 +34558,15 @@ Request body:
     - column_name: Name for the variable prefix
  * @summary Preview derived variables from JSON content without saving.
  */
-export const modelHubPromptTemplatesDerivedVariablesPreviewCreate = async ( options?: RequestInit): Promise<modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse> => {
+export const modelHubPromptTemplatesDerivedVariablesPreviewCreate = async (derivedVariablePreviewRequestApi: DerivedVariablePreviewRequestApi, options?: RequestInit): Promise<modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse> => {
 
   return apiMutator<modelHubPromptTemplatesDerivedVariablesPreviewCreateResponse>(getModelHubPromptTemplatesDerivedVariablesPreviewCreateUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      derivedVariablePreviewRequestApi,)
   }
 );}
 
@@ -35360,16 +35527,43 @@ export const modelHubPromptTemplatesVersions = async (id: string, options?: Requ
 
 
 export type modelHubPromptTemplatesDerivedVariablesListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubPromptTemplatesDerivedVariablesListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptTemplatesDerivedVariablesListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptTemplatesDerivedVariablesListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptTemplatesDerivedVariablesListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptTemplatesDerivedVariablesListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubPromptTemplatesDerivedVariablesListResponseSuccess = (modelHubPromptTemplatesDerivedVariablesListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptTemplatesDerivedVariablesListResponseError = (modelHubPromptTemplatesDerivedVariablesListResponse400 | modelHubPromptTemplatesDerivedVariablesListResponse403 | modelHubPromptTemplatesDerivedVariablesListResponse404 | modelHubPromptTemplatesDerivedVariablesListResponse409 | modelHubPromptTemplatesDerivedVariablesListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptTemplatesDerivedVariablesListResponse = (modelHubPromptTemplatesDerivedVariablesListResponseSuccess)
+export type modelHubPromptTemplatesDerivedVariablesListResponse = (modelHubPromptTemplatesDerivedVariablesListResponseSuccess | modelHubPromptTemplatesDerivedVariablesListResponseError)
 
 export const getModelHubPromptTemplatesDerivedVariablesListUrl = (promptId: string,) => {
 
@@ -35400,17 +35594,44 @@ export const modelHubPromptTemplatesDerivedVariablesList = async (promptId: stri
 
 
 
-export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse201 = {
-  data: void
-  status: 201
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse200 = {
+  data: ModelHubJSONResponseApi
+  status: 200
 }
 
-export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponseSuccess = (modelHubPromptTemplatesDerivedVariablesExtractCreateResponse201) & {
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
+}
+
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponseSuccess = (modelHubPromptTemplatesDerivedVariablesExtractCreateResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponseError = (modelHubPromptTemplatesDerivedVariablesExtractCreateResponse400 | modelHubPromptTemplatesDerivedVariablesExtractCreateResponse403 | modelHubPromptTemplatesDerivedVariablesExtractCreateResponse404 | modelHubPromptTemplatesDerivedVariablesExtractCreateResponse409 | modelHubPromptTemplatesDerivedVariablesExtractCreateResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse = (modelHubPromptTemplatesDerivedVariablesExtractCreateResponseSuccess)
+export type modelHubPromptTemplatesDerivedVariablesExtractCreateResponse = (modelHubPromptTemplatesDerivedVariablesExtractCreateResponseSuccess | modelHubPromptTemplatesDerivedVariablesExtractCreateResponseError)
 
 export const getModelHubPromptTemplatesDerivedVariablesExtractCreateUrl = (promptId: string,) => {
 
@@ -35431,30 +35652,59 @@ Request body:
     - response_format_type: Optional response format hint
  * @summary Manually trigger extraction of derived variables from outputs.
  */
-export const modelHubPromptTemplatesDerivedVariablesExtractCreate = async (promptId: string, options?: RequestInit): Promise<modelHubPromptTemplatesDerivedVariablesExtractCreateResponse> => {
+export const modelHubPromptTemplatesDerivedVariablesExtractCreate = async (promptId: string,
+    derivedVariableExtractRequestApi: DerivedVariableExtractRequestApi, options?: RequestInit): Promise<modelHubPromptTemplatesDerivedVariablesExtractCreateResponse> => {
 
   return apiMutator<modelHubPromptTemplatesDerivedVariablesExtractCreateResponse>(getModelHubPromptTemplatesDerivedVariablesExtractCreateUrl(promptId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      derivedVariableExtractRequestApi,)
   }
 );}
 
 
 
 export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubPromptTemplatesDerivedVariablesSchemaListResponseSuccess = (modelHubPromptTemplatesDerivedVariablesSchemaListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponseError = (modelHubPromptTemplatesDerivedVariablesSchemaListResponse400 | modelHubPromptTemplatesDerivedVariablesSchemaListResponse403 | modelHubPromptTemplatesDerivedVariablesSchemaListResponse404 | modelHubPromptTemplatesDerivedVariablesSchemaListResponse409 | modelHubPromptTemplatesDerivedVariablesSchemaListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse = (modelHubPromptTemplatesDerivedVariablesSchemaListResponseSuccess)
+export type modelHubPromptTemplatesDerivedVariablesSchemaListResponse = (modelHubPromptTemplatesDerivedVariablesSchemaListResponseSuccess | modelHubPromptTemplatesDerivedVariablesSchemaListResponseError)
 
 export const getModelHubPromptTemplatesDerivedVariablesSchemaListUrl = (promptId: string,
     columnName: string,) => {
@@ -35491,16 +35741,43 @@ export const modelHubPromptTemplatesDerivedVariablesSchemaList = async (promptId
 
 
 export type modelHubPromptMetricsListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubPromptMetricsListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptMetricsListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptMetricsListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptMetricsListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptMetricsListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubPromptMetricsListResponseSuccess = (modelHubPromptMetricsListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptMetricsListResponseError = (modelHubPromptMetricsListResponse400 | modelHubPromptMetricsListResponse403 | modelHubPromptMetricsListResponse404 | modelHubPromptMetricsListResponse409 | modelHubPromptMetricsListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptMetricsListResponse = (modelHubPromptMetricsListResponseSuccess)
+export type modelHubPromptMetricsListResponse = (modelHubPromptMetricsListResponseSuccess | modelHubPromptMetricsListResponseError)
 
 export const getModelHubPromptMetricsListUrl = () => {
 
@@ -35524,16 +35801,43 @@ export const modelHubPromptMetricsList = async ( options?: RequestInit): Promise
 
 
 export type modelHubPromptMetricsEmptyScreenListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubPromptMetricsEmptyScreenListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptMetricsEmptyScreenListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptMetricsEmptyScreenListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptMetricsEmptyScreenListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptMetricsEmptyScreenListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubPromptMetricsEmptyScreenListResponseSuccess = (modelHubPromptMetricsEmptyScreenListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptMetricsEmptyScreenListResponseError = (modelHubPromptMetricsEmptyScreenListResponse400 | modelHubPromptMetricsEmptyScreenListResponse403 | modelHubPromptMetricsEmptyScreenListResponse404 | modelHubPromptMetricsEmptyScreenListResponse409 | modelHubPromptMetricsEmptyScreenListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptMetricsEmptyScreenListResponse = (modelHubPromptMetricsEmptyScreenListResponseSuccess)
+export type modelHubPromptMetricsEmptyScreenListResponse = (modelHubPromptMetricsEmptyScreenListResponseSuccess | modelHubPromptMetricsEmptyScreenListResponseError)
 
 export const getModelHubPromptMetricsEmptyScreenListUrl = () => {
 
@@ -35557,16 +35861,43 @@ export const modelHubPromptMetricsEmptyScreenList = async ( options?: RequestIni
 
 
 export type modelHubPromptSpanMetricsListResponse200 = {
-  data: void
+  data: ModelHubJSONResponseApi
   status: 200
+}
+
+export type modelHubPromptSpanMetricsListResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubPromptSpanMetricsListResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubPromptSpanMetricsListResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubPromptSpanMetricsListResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubPromptSpanMetricsListResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
 }
 
 export type modelHubPromptSpanMetricsListResponseSuccess = (modelHubPromptSpanMetricsListResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubPromptSpanMetricsListResponseError = (modelHubPromptSpanMetricsListResponse400 | modelHubPromptSpanMetricsListResponse403 | modelHubPromptSpanMetricsListResponse404 | modelHubPromptSpanMetricsListResponse409 | modelHubPromptSpanMetricsListResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubPromptSpanMetricsListResponse = (modelHubPromptSpanMetricsListResponseSuccess)
+export type modelHubPromptSpanMetricsListResponse = (modelHubPromptSpanMetricsListResponseSuccess | modelHubPromptSpanMetricsListResponseError)
 
 export const getModelHubPromptSpanMetricsListUrl = () => {
 
@@ -35799,17 +36130,44 @@ export const modelHubResponseSchemaDelete = async (id: string, options?: Request
 
 
 
-export type modelHubRunPromptForRowsCreateResponse201 = {
-  data: void
-  status: 201
+export type modelHubRunPromptForRowsCreateResponse200 = {
+  data: ModelHubJSONResponseApi
+  status: 200
 }
 
-export type modelHubRunPromptForRowsCreateResponseSuccess = (modelHubRunPromptForRowsCreateResponse201) & {
+export type modelHubRunPromptForRowsCreateResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubRunPromptForRowsCreateResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubRunPromptForRowsCreateResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubRunPromptForRowsCreateResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubRunPromptForRowsCreateResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
+}
+
+export type modelHubRunPromptForRowsCreateResponseSuccess = (modelHubRunPromptForRowsCreateResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubRunPromptForRowsCreateResponseError = (modelHubRunPromptForRowsCreateResponse400 | modelHubRunPromptForRowsCreateResponse403 | modelHubRunPromptForRowsCreateResponse404 | modelHubRunPromptForRowsCreateResponse409 | modelHubRunPromptForRowsCreateResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubRunPromptForRowsCreateResponse = (modelHubRunPromptForRowsCreateResponseSuccess)
+export type modelHubRunPromptForRowsCreateResponse = (modelHubRunPromptForRowsCreateResponseSuccess | modelHubRunPromptForRowsCreateResponseError)
 
 export const getModelHubRunPromptForRowsCreateUrl = () => {
 
@@ -35819,30 +36177,58 @@ export const getModelHubRunPromptForRowsCreateUrl = () => {
   return `/model-hub/run-prompt-for-rows/`
 }
 
-export const modelHubRunPromptForRowsCreate = async ( options?: RequestInit): Promise<modelHubRunPromptForRowsCreateResponse> => {
+export const modelHubRunPromptForRowsCreate = async (runPromptForRowsRequestApi: RunPromptForRowsRequestApi, options?: RequestInit): Promise<modelHubRunPromptForRowsCreateResponse> => {
 
   return apiMutator<modelHubRunPromptForRowsCreateResponse>(getModelHubRunPromptForRowsCreateUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      runPromptForRowsRequestApi,)
   }
 );}
 
 
 
-export type modelHubRunPromptCreateResponse201 = {
-  data: void
-  status: 201
+export type modelHubRunPromptCreateResponse200 = {
+  data: ModelHubJSONResponseApi
+  status: 200
 }
 
-export type modelHubRunPromptCreateResponseSuccess = (modelHubRunPromptCreateResponse201) & {
+export type modelHubRunPromptCreateResponse400 = {
+  data: ModelHubErrorResponseApi
+  status: 400
+}
+
+export type modelHubRunPromptCreateResponse403 = {
+  data: ModelHubErrorResponseApi
+  status: 403
+}
+
+export type modelHubRunPromptCreateResponse404 = {
+  data: ModelHubErrorResponseApi
+  status: 404
+}
+
+export type modelHubRunPromptCreateResponse409 = {
+  data: ModelHubErrorResponseApi
+  status: 409
+}
+
+export type modelHubRunPromptCreateResponse500 = {
+  data: ModelHubErrorResponseApi
+  status: 500
+}
+
+export type modelHubRunPromptCreateResponseSuccess = (modelHubRunPromptCreateResponse200) & {
   headers: Headers;
 };
-;
+export type modelHubRunPromptCreateResponseError = (modelHubRunPromptCreateResponse400 | modelHubRunPromptCreateResponse403 | modelHubRunPromptCreateResponse404 | modelHubRunPromptCreateResponse409 | modelHubRunPromptCreateResponse500) & {
+  headers: Headers;
+};
 
-export type modelHubRunPromptCreateResponse = (modelHubRunPromptCreateResponseSuccess)
+export type modelHubRunPromptCreateResponse = (modelHubRunPromptCreateResponseSuccess | modelHubRunPromptCreateResponseError)
 
 export const getModelHubRunPromptCreateUrl = () => {
 
@@ -35852,14 +36238,15 @@ export const getModelHubRunPromptCreateUrl = () => {
   return `/model-hub/run-prompt/`
 }
 
-export const modelHubRunPromptCreate = async ( options?: RequestInit): Promise<modelHubRunPromptCreateResponse> => {
+export const modelHubRunPromptCreate = async (litellmApi: LitellmApi, options?: RequestInit): Promise<modelHubRunPromptCreateResponse> => {
 
   return apiMutator<modelHubRunPromptCreateResponse>(getModelHubRunPromptCreateUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      litellmApi,)
   }
 );}
 

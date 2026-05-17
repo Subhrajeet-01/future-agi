@@ -14073,6 +14073,61 @@ export const ModelHubApiKeysDeleteParams = zod.object({
 })
 
 
+export const ModelHubApiModelParametersListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
+/**
+ * API endpoint to get available voices and formats for a specific TTS model.
+Query params:
+    - model: Model name (required)
+ */
+export const ModelHubApiModelVoicesListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
+export const ModelHubApiModelsListListResponse = zod.object({
+  "count": zod.number(),
+  "next": zod.string().optional(),
+  "previous": zod.string().optional(),
+  "results": zod.array(zod.object({
+
+}).passthrough())
+})
+
+
 /**
  * Poll endpoint — returns the current state of the localizer task
 for a given cell, including the analysis once completed.
@@ -14983,6 +15038,25 @@ export const ModelHubDatasetRunPromptStatsListParams = zod.object({
   "dataset_id": zod.string()
 })
 
+export const ModelHubDatasetRunPromptStatsListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
 
 export const ModelHubDatasetsDeleteCompareReadParams = zod.object({
   "compare_id": zod.string()
@@ -15208,6 +15282,25 @@ Path params:
  */
 export const ModelHubDatasetsDerivedVariablesListParams = zod.object({
   "dataset_id": zod.string()
+})
+
+export const ModelHubDatasetsDerivedVariablesListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
 })
 
 
@@ -19108,6 +19201,45 @@ export const ModelHubPromptTemplatesCreateDraftBody = zod.object({
 })
 
 
+/**
+ * Useful for showing what variables would be extracted before running.
+
+Request body:
+    - content: JSON string or object to analyze
+    - column_name: Name for the variable prefix
+ * @summary Preview derived variables from JSON content without saving.
+ */
+export const modelHubPromptTemplatesDerivedVariablesPreviewCreateBodyColumnNameDefault = `output`;
+
+
+
+export const ModelHubPromptTemplatesDerivedVariablesPreviewCreateBody = zod.object({
+  "content": zod.object({
+
+}).passthrough(),
+  "column_name": zod.string().min(1).default(modelHubPromptTemplatesDerivedVariablesPreviewCreateBodyColumnNameDefault)
+})
+
+export const ModelHubPromptTemplatesDerivedVariablesPreviewCreateResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
 export const modelHubPromptTemplatesGeneratePromptBodyNameMax = 2000;
 
 
@@ -19792,6 +19924,25 @@ export const ModelHubPromptTemplatesDerivedVariablesListParams = zod.object({
   "prompt_id": zod.string()
 })
 
+export const ModelHubPromptTemplatesDerivedVariablesListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
 
 /**
  * This is useful when you want to re-extract variables or extract from
@@ -19809,6 +19960,37 @@ export const ModelHubPromptTemplatesDerivedVariablesExtractCreateParams = zod.ob
 })
 
 
+export const modelHubPromptTemplatesDerivedVariablesExtractCreateBodyColumnNameDefault = `output`;
+
+export const modelHubPromptTemplatesDerivedVariablesExtractCreateBodyOutputIndexDefault = 0;
+
+export const ModelHubPromptTemplatesDerivedVariablesExtractCreateBody = zod.object({
+  "version": zod.string().min(1),
+  "column_name": zod.string().min(1).default(modelHubPromptTemplatesDerivedVariablesExtractCreateBodyColumnNameDefault),
+  "output_index": zod.number().default(modelHubPromptTemplatesDerivedVariablesExtractCreateBodyOutputIndexDefault),
+  "response_format_type": zod.string().optional()
+})
+
+export const ModelHubPromptTemplatesDerivedVariablesExtractCreateResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
 /**
  * Returns detailed schema information including types and sample values.
 
@@ -19823,6 +20005,85 @@ Query params:
 export const ModelHubPromptTemplatesDerivedVariablesSchemaListParams = zod.object({
   "prompt_id": zod.string(),
   "column_name": zod.string()
+})
+
+export const ModelHubPromptTemplatesDerivedVariablesSchemaListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
+export const ModelHubPromptMetricsListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
+export const ModelHubPromptMetricsEmptyScreenListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
+export const ModelHubPromptSpanMetricsListResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
 })
 
 
@@ -19954,6 +20215,98 @@ export const ModelHubResponseSchemaPartialUpdateResponse = zod.object({
 
 export const ModelHubResponseSchemaDeleteParams = zod.object({
   "id": zod.string()
+})
+
+
+export const modelHubRunPromptForRowsCreateBodyRowIdsDefault = [];
+export const modelHubRunPromptForRowsCreateBodySelectedAllRowsDefault = false;
+
+export const ModelHubRunPromptForRowsCreateBody = zod.object({
+  "run_prompt_ids": zod.array(zod.string().uuid()),
+  "row_ids": zod.array(zod.string().uuid()).default(modelHubRunPromptForRowsCreateBodyRowIdsDefault),
+  "selected_all_rows": zod.boolean().default(modelHubRunPromptForRowsCreateBodySelectedAllRowsDefault)
+})
+
+export const ModelHubRunPromptForRowsCreateResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
+})
+
+
+export const modelHubRunPromptCreateBodyDatasetIdMax = 255;
+
+export const modelHubRunPromptCreateBodyModelMax = 255;
+
+export const modelHubRunPromptCreateBodyNameMax = 255;
+
+export const modelHubRunPromptCreateBodyConcurrencyDefault = 5;
+export const modelHubRunPromptCreateBodyOutputFormatDefault = `string`;
+export const modelHubRunPromptCreateBodyTemperatureMin = 0;
+export const modelHubRunPromptCreateBodyTemperatureMax = 1;
+
+export const modelHubRunPromptCreateBodyFrequencyPenaltyMin = -2;
+export const modelHubRunPromptCreateBodyFrequencyPenaltyMax = 2;
+
+export const modelHubRunPromptCreateBodyPresencePenaltyMin = -2;
+export const modelHubRunPromptCreateBodyPresencePenaltyMax = 2;
+
+export const modelHubRunPromptCreateBodyMaxTokensMax = 65536;
+
+export const modelHubRunPromptCreateBodyTopPMin = 0;
+export const modelHubRunPromptCreateBodyTopPMax = 1;
+
+
+
+export const ModelHubRunPromptCreateBody = zod.object({
+  "dataset_id": zod.string().min(1).max(modelHubRunPromptCreateBodyDatasetIdMax),
+  "model": zod.string().min(1).max(modelHubRunPromptCreateBodyModelMax),
+  "name": zod.string().min(1).max(modelHubRunPromptCreateBodyNameMax),
+  "concurrency": zod.number().default(modelHubRunPromptCreateBodyConcurrencyDefault),
+  "messages": zod.array(zod.record(zod.string(), zod.string().min(1))).describe('List of messages with format [{\'role\': \'user\/assistant\', \'content\': \'text\'}]'),
+  "output_format": zod.enum(['array', 'string', 'number', 'object', 'audio', 'image']).default(modelHubRunPromptCreateBodyOutputFormatDefault).describe('Output format type. Defaults to \'string\'.'),
+  "temperature": zod.number().min(modelHubRunPromptCreateBodyTemperatureMin).max(modelHubRunPromptCreateBodyTemperatureMax).optional().describe('Controls the randomness. Value between 0 and 1.'),
+  "frequency_penalty": zod.number().min(modelHubRunPromptCreateBodyFrequencyPenaltyMin).max(modelHubRunPromptCreateBodyFrequencyPenaltyMax).optional().describe('Penalty for word repetition. Value between -2 and 2.'),
+  "presence_penalty": zod.number().min(modelHubRunPromptCreateBodyPresencePenaltyMin).max(modelHubRunPromptCreateBodyPresencePenaltyMax).optional().describe('Penalty for new word usage. Value between -2 and 2.'),
+  "max_tokens": zod.number().min(1).max(modelHubRunPromptCreateBodyMaxTokensMax).optional().describe('Maximum number of tokens to generate. Null = use provider default.'),
+  "top_p": zod.number().min(modelHubRunPromptCreateBodyTopPMin).max(modelHubRunPromptCreateBodyTopPMax).optional().describe('Controls diversity via nucleus sampling. Value between 0 and 1.'),
+  "response_format": zod.object({
+
+}).passthrough().optional().describe('JSON schema for response format if required. Defaults to None.'),
+  "tool_choice": zod.union([zod.literal('auto'),zod.literal('required'),zod.literal(null)]).optional().describe('Tool selection mode: \'auto\' or \'required\'.'),
+  "tools": zod.array(zod.record(zod.string(), zod.string())).optional().describe('List of tools with tool properties if available.')
+})
+
+export const ModelHubRunPromptCreateResponse = zod.object({
+  "status": zod.object({
+
+}).passthrough().optional(),
+  "message": zod.string().optional(),
+  "result": zod.object({
+
+}).passthrough().optional(),
+  "data": zod.object({
+
+}).passthrough().optional(),
+  "error": zod.object({
+
+}).passthrough().optional(),
+  "detail": zod.object({
+
+}).passthrough().optional()
 })
 
 
