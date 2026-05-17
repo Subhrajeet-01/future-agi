@@ -5,7 +5,7 @@
 export const OPENAPI_CONTRACT = Object.freeze({
   "generatedFrom": "api_contracts/openapi/swagger.json",
   "swaggerVersion": "2.0",
-  "endpointCount": 964,
+  "endpointCount": 967,
   "endpoints": {
     "/accounts/2fa/recovery-codes/": {
       "get": {
@@ -22341,6 +22341,29 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "/simulate/run-tests/{run_test_id}/execute/": {
+      "post": {
+        "operationId": "simulate_run-tests_execute_create",
+        "requestBody": {
+          "$ref": "#/definitions/ExecuteRunTest"
+        },
+        "queryParameters": {},
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/RunTestExecutionResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/RunTestErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/RunTestErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/RunTestErrorResponse"
+          }
+        }
+      }
+    },
     "/simulate/run-tests/{run_test_id}/executions/": {
       "get": {
         "operationId": "simulate_run-tests_executions_list",
@@ -28393,6 +28416,29 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "/tracer/user-alerts/duplicate/": {
+      "post": {
+        "operationId": "tracer_user-alerts_duplicate",
+        "requestBody": {
+          "$ref": "#/definitions/UserAlertMonitorDuplicate"
+        },
+        "queryParameters": {},
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ApiSuccessResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
+      }
+    },
     "/tracer/user-alerts/list_monitors/": {
       "get": {
         "operationId": "tracer_user-alerts_list_monitors",
@@ -28439,6 +28485,40 @@ export const OPENAPI_CONTRACT = Object.freeze({
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/tracer/user-alerts/metric-options/": {
+      "get": {
+        "operationId": "tracer_user-alerts_metric_options",
+        "requestBody": null,
+        "queryParameters": {
+          "page": {
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "limit": {
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/UserAlertMonitorMetricOptionsResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
           }
         }
       }
@@ -42147,6 +42227,30 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ExecuteRunTest": {
+      "type": "object",
+      "properties": {
+        "scenario_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "default": []
+        },
+        "simulator_id": {
+          "title": "Simulator id",
+          "type": "string",
+          "format": "uuid",
+          "x-nullable": true
+        },
+        "select_all": {
+          "title": "Select all",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
     "ExperimentAdditionalEvaluationsRequest": {
       "required": [
         "eval_template_ids"
@@ -50614,6 +50718,53 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "RunTestExecutionResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string",
+          "readOnly": true,
+          "minLength": 1
+        },
+        "execution_id": {
+          "title": "Execution id",
+          "type": "string",
+          "format": "uuid",
+          "readOnly": true
+        },
+        "run_test_id": {
+          "title": "Run test id",
+          "type": "string",
+          "format": "uuid",
+          "readOnly": true
+        },
+        "status": {
+          "title": "Status",
+          "type": "string",
+          "readOnly": true,
+          "minLength": 1
+        },
+        "total_scenarios": {
+          "title": "Total scenarios",
+          "type": "integer",
+          "readOnly": true
+        },
+        "total_calls": {
+          "title": "Total calls",
+          "type": "integer",
+          "readOnly": true
+        },
+        "scenario_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readOnly": true
+        }
+      }
+    },
     "RunTestMessageResponse": {
       "type": "object",
       "properties": {
@@ -55662,6 +55813,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "UserAlertMonitorDuplicate": {
+      "required": [
+        "id",
+        "name"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        }
+      }
+    },
     "UserAlertMonitorLog": {
       "required": [
         "type",
@@ -55725,6 +55896,23 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "type": "string",
           "format": "date-time",
           "x-nullable": true
+        }
+      }
+    },
+    "UserAlertMonitorMetricOptionsResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserAlertMonitorMetricOption"
+          },
+          "readOnly": true
         }
       }
     },
@@ -63025,6 +63213,34 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Message",
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "UserAlertMonitorMetricOption": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "readOnly": true,
+          "minLength": 1
+        },
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "readOnly": true,
+          "minLength": 1
+        },
+        "metric_type": {
+          "title": "Metric type",
+          "type": "string",
+          "readOnly": true,
+          "minLength": 1
+        },
+        "output_type": {
+          "title": "Output type",
+          "type": "string",
+          "readOnly": true
         }
       }
     },

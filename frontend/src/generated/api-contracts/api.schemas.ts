@@ -10330,6 +10330,24 @@ export interface EvalConfigUpdateResponseApi {
 
 export interface EvalSummaryComparisonResponseApi { [key: string]: unknown }
 
+export interface ExecuteRunTestApi {
+  scenario_ids?: string[];
+  simulator_id?: string;
+  select_all?: boolean;
+}
+
+export interface RunTestExecutionResponseApi {
+  /** @minLength 1 */
+  readonly message?: string;
+  readonly execution_id?: string;
+  readonly run_test_id?: string;
+  /** @minLength 1 */
+  readonly status?: string;
+  readonly total_scenarios?: number;
+  readonly total_calls?: number;
+  readonly scenario_ids?: readonly string[];
+}
+
 export interface TestExecutionItemResponseApi {
   /** @minLength 1 */
   readonly id?: string;
@@ -12841,6 +12859,30 @@ export interface UserAlertMonitorApi {
   organization: string;
   workspace?: string;
   created_by?: string;
+}
+
+export interface UserAlertMonitorDuplicateApi {
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+}
+
+export interface UserAlertMonitorMetricOptionApi {
+  /** @minLength 1 */
+  readonly id?: string;
+  /** @minLength 1 */
+  readonly name?: string;
+  /** @minLength 1 */
+  readonly metric_type?: string;
+  readonly output_type?: string;
+}
+
+export interface UserAlertMonitorMetricOptionsResponseApi {
+  status?: boolean;
+  readonly result?: readonly UserAlertMonitorMetricOptionApi[];
 }
 
 export type UsersResultApiTableItem = { [key: string]: unknown };
@@ -17377,6 +17419,17 @@ export type TracerUserAlertsListMonitors200 = {
   next?: string;
   previous?: string;
   results: UserAlertMonitorApi[];
+};
+
+export type TracerUserAlertsMetricOptionsParams = {
+/**
+ * A page number within the paginated result set.
+ */
+page?: number;
+/**
+ * Number of results to return per page.
+ */
+limit?: number;
 };
 
 export type TracerUsersListParams = {

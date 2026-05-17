@@ -7,9 +7,7 @@ def _repo_root():
 
 
 def _swagger():
-    with (
-        _repo_root() / "api_contracts" / "openapi" / "swagger.json"
-    ).open() as f:
+    with (_repo_root() / "api_contracts" / "openapi" / "swagger.json").open() as f:
         return json.load(f)
 
 
@@ -37,10 +35,7 @@ def _body_ref(operation):
 
 
 def _response_ref(operation, status_code="200"):
-    return (
-        operation["responses"][status_code]["schema"]["$ref"]
-        .rsplit("/", 1)[-1]
-    )
+    return operation["responses"][status_code]["schema"]["$ref"].rsplit("/", 1)[-1]
 
 
 def test_test_execution_mutations_have_body_contracts():
@@ -65,6 +60,7 @@ def test_test_execution_mutations_have_body_contracts():
         ("POST", "/simulate/run-tests/{run_test_id}/rerun-test-executions/"): (
             "TestExecutionRerun"
         ),
+        ("POST", "/simulate/run-tests/{run_test_id}/execute/"): ("ExecuteRunTest"),
     }
 
     for (method, path), definition_name in expected.items():
@@ -96,16 +92,15 @@ def test_test_execution_endpoints_have_response_contracts():
         ("POST", "/simulate/run-tests/{run_test_id}/rerun-test-executions/"): (
             "TestExecutionRerunResponse"
         ),
-        ("GET", "/simulate/run-tests/active/"): "AllActiveTests",
-        ("GET", "/simulate/run-tests/{run_test_id}/status/"): (
-            "TestExecutionStatus"
+        ("POST", "/simulate/run-tests/{run_test_id}/execute/"): (
+            "RunTestExecutionResponse"
         ),
+        ("GET", "/simulate/run-tests/active/"): "AllActiveTests",
+        ("GET", "/simulate/run-tests/{run_test_id}/status/"): ("TestExecutionStatus"),
         ("GET", "/simulate/test-executions/{test_execution_id}/analytics/"): (
             "TestExecutionAnalytics"
         ),
-        ("GET", "/simulate/run-tests/{run_test_id}/analytics/"): (
-            "RunTestAnalytics"
-        ),
+        ("GET", "/simulate/run-tests/{run_test_id}/analytics/"): ("RunTestAnalytics"),
     }
 
     for (method, path), definition_name in expected.items():
@@ -121,6 +116,7 @@ def test_test_execution_contract_debt_stays_burned_down():
         "/simulate/test-executions/{test_execution_id}/optimiser-analysis/refresh/",
         "/simulate/run-tests/{run_test_id}/delete-test-executions/",
         "/simulate/run-tests/{run_test_id}/rerun-test-executions/",
+        "/simulate/run-tests/{run_test_id}/execute/",
         "/simulate/run-tests/active/",
         "/simulate/run-tests/{run_test_id}/status/",
         "/simulate/test-executions/{test_execution_id}/analytics/",

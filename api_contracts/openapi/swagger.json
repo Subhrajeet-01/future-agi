@@ -42536,6 +42536,59 @@
                 }
             ]
         },
+        "/simulate/run-tests/{run_test_id}/execute/": {
+            "post": {
+                "operationId": "simulate_run-tests_execute_create",
+                "description": "Execute a test run",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ExecuteRunTest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RunTestExecutionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RunTestErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RunTestErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RunTestErrorResponse"
+                        }
+                    }
+                },
+                "tags": [
+                    "simulate"
+                ]
+            },
+            "parameters": [
+                {
+                    "name": "run_test_id",
+                    "in": "path",
+                    "required": true,
+                    "type": "string"
+                }
+            ]
+        },
         "/simulate/run-tests/{run_test_id}/executions/": {
             "get": {
                 "operationId": "simulate_run-tests_executions_list",
@@ -52245,6 +52298,52 @@
             },
             "parameters": []
         },
+        "/tracer/user-alerts/duplicate/": {
+            "post": {
+                "operationId": "tracer_user-alerts_duplicate",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UserAlertMonitorDuplicate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiSuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    }
+                },
+                "tags": [
+                    "tracer"
+                ]
+            },
+            "parameters": []
+        },
         "/tracer/user-alerts/list_monitors/": {
             "get": {
                 "operationId": "tracer_user-alerts_list_monitors",
@@ -52295,6 +52394,58 @@
                                     }
                                 }
                             }
+                        }
+                    }
+                },
+                "tags": [
+                    "tracer"
+                ]
+            },
+            "parameters": []
+        },
+        "/tracer/user-alerts/metric-options/": {
+            "get": {
+                "operationId": "tracer_user-alerts_metric_options",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "required": false,
+                        "type": "integer"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "required": false,
+                        "type": "integer"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/UserAlertMonitorMetricOptionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
                         }
                     }
                 },
@@ -83451,6 +83602,77 @@
             "type": "object",
             "properties": {}
         },
+        "ExecuteRunTest": {
+            "type": "object",
+            "properties": {
+                "scenario_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "default": []
+                },
+                "simulator_id": {
+                    "title": "Simulator id",
+                    "type": "string",
+                    "format": "uuid",
+                    "x-nullable": true
+                },
+                "select_all": {
+                    "title": "Select all",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "RunTestExecutionResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "title": "Message",
+                    "type": "string",
+                    "readOnly": true,
+                    "minLength": 1
+                },
+                "execution_id": {
+                    "title": "Execution id",
+                    "type": "string",
+                    "format": "uuid",
+                    "readOnly": true
+                },
+                "run_test_id": {
+                    "title": "Run test id",
+                    "type": "string",
+                    "format": "uuid",
+                    "readOnly": true
+                },
+                "status": {
+                    "title": "Status",
+                    "type": "string",
+                    "readOnly": true,
+                    "minLength": 1
+                },
+                "total_scenarios": {
+                    "title": "Total scenarios",
+                    "type": "integer",
+                    "readOnly": true
+                },
+                "total_calls": {
+                    "title": "Total calls",
+                    "type": "integer",
+                    "readOnly": true
+                },
+                "scenario_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "readOnly": true
+                }
+            }
+        },
         "TestExecutionItemResponse": {
             "type": "object",
             "properties": {
@@ -89626,6 +89848,71 @@
                     "type": "string",
                     "format": "uuid",
                     "x-nullable": true
+                }
+            }
+        },
+        "UserAlertMonitorDuplicate": {
+            "required": [
+                "id",
+                "name"
+            ],
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                }
+            }
+        },
+        "UserAlertMonitorMetricOption": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "readOnly": true,
+                    "minLength": 1
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string",
+                    "readOnly": true,
+                    "minLength": 1
+                },
+                "metric_type": {
+                    "title": "Metric type",
+                    "type": "string",
+                    "readOnly": true,
+                    "minLength": 1
+                },
+                "output_type": {
+                    "title": "Output type",
+                    "type": "string",
+                    "readOnly": true
+                }
+            }
+        },
+        "UserAlertMonitorMetricOptionsResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/UserAlertMonitorMetricOption"
+                    },
+                    "readOnly": true
                 }
             }
         },

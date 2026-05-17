@@ -142,6 +142,16 @@ class RunTestComponentsUpdateSerializer(serializers.Serializer):
     enable_tool_evaluation = serializers.BooleanField(required=False)
 
 
+class ExecuteRunTestSerializer(serializers.Serializer):
+    """Serializer for POST /run-tests/{run_test_id}/execute/."""
+
+    scenario_ids = serializers.ListField(
+        child=serializers.UUIDField(), allow_empty=True, required=False, default=list
+    )
+    simulator_id = serializers.UUIDField(required=False, allow_null=True)
+    select_all = serializers.BooleanField(required=False, default=False)
+
+
 class CreatePromptSimulationSerializer(serializers.Serializer):
     """Serializer for creating a new prompt-based simulation run"""
 

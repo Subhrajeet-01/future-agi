@@ -167,6 +167,52 @@ class TestUserAlertMonitorUpdateAPI:
         assert user_alert_monitor.name == "Updated Alert Name"
         assert user_alert_monitor.critical_threshold_value == 0.2
 
+    def test_update_eval_monitor_to_system_metric_clears_eval_fields(
+        self,
+        auth_client,
+        organization,
+        workspace,
+        observe_project,
+        custom_eval_config,
+    ):
+        """Changing metric types should not retain stale eval-only fields."""
+        monitor = UserAlertMonitor.objects.create(
+            organization=organization,
+            workspace=workspace,
+            project=observe_project,
+            name="Eval Alert",
+            metric_type="evaluation_metrics",
+            metric=str(custom_eval_config.id),
+            threshold_operator="greater_than",
+            threshold_type="static",
+            threshold_metric_value=None,
+            critical_threshold_value=0.1,
+            alert_frequency=60,
+        )
+
+        response = auth_client.patch(
+            f"/tracer/user-alerts/{monitor.id}/",
+            {
+                "project": str(observe_project.id),
+                "name": "System Alert",
+                "metric_type": "span_response_time",
+                "metric": None,
+                "threshold_metric_value": None,
+                "threshold_operator": "greater_than",
+                "threshold_type": "static",
+                "critical_threshold_value": 5000,
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        monitor.refresh_from_db()
+        assert monitor.name == "System Alert"
+        assert monitor.metric_type == "span_response_time"
+        assert monitor.metric is None
+        assert monitor.threshold_metric_value is None
+        assert monitor.critical_threshold_value == 5000
+
 
 @pytest.mark.integration
 @pytest.mark.api
@@ -227,6 +273,91 @@ class TestUserAlertMonitorBulkMuteAPI:
 
         user_alert_monitor.refresh_from_db()
         assert user_alert_monitor.is_mute is True
+
+
+@pytest.mark.integration
+@pytest.mark.api
+class TestUserAlertMonitorDuplicateAPI:
+    """Tests for POST /tracer/user-alerts/duplicate/ endpoint."""
+
+    def test_duplicate_monitor_unauthenticated(self, api_client, user_alert_monitor):
+        response = api_client.post(
+            "/tracer/user-alerts/duplicate/",
+            {"id": str(user_alert_monitor.id), "name": "Copy Alert"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_duplicate_monitor_success(self, auth_client, user_alert_monitor):
+        response = auth_client.post(
+            "/tracer/user-alerts/duplicate/",
+            {"id": str(user_alert_monitor.id), "name": "Copy Alert"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        copied_monitor = UserAlertMonitor.objects.get(name="Copy Alert")
+        assert copied_monitor.id != user_alert_monitor.id
+        assert copied_monitor.project == user_alert_monitor.project
+        assert copied_monitor.metric_type == user_alert_monitor.metric_type
+        assert (
+            copied_monitor.threshold_operator == user_alert_monitor.threshold_operator
+        )
+        assert copied_monitor.is_mute is False
+
+    def test_duplicate_monitor_rejects_duplicate_name(
+        self, auth_client, user_alert_monitor
+    ):
+        response = auth_client.post(
+            "/tracer/user-alerts/duplicate/",
+            {"id": str(user_alert_monitor.id), "name": user_alert_monitor.name},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_duplicate_monitor_not_found(self, auth_client):
+        response = auth_client.post(
+            "/tracer/user-alerts/duplicate/",
+            {"id": str(uuid.uuid4()), "name": "Copy Alert"},
+            format="json",
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.integration
+@pytest.mark.api
+class TestUserAlertMonitorMetricOptionsAPI:
+    """Tests for GET /tracer/user-alerts/metric-options/ endpoint."""
+
+    def test_metric_options_unauthenticated(self, api_client, observe_project):
+        response = api_client.get(
+            "/tracer/user-alerts/metric-options/",
+            {"project_id": str(observe_project.id)},
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_metric_options_success(self, auth_client, observe_project):
+        response = auth_client.get(
+            "/tracer/user-alerts/metric-options/",
+            {"project_id": str(observe_project.id)},
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        options = get_result(response)
+        span_response_time = next(
+            option for option in options if option["id"] == "span_response_time"
+        )
+        assert span_response_time == {
+            "id": "span_response_time",
+            "name": "Span response time",
+            "metric_type": "span_response_time",
+            "output_type": "system_metric",
+        }
+        assert all(option["metric_type"] != "system_metric" for option in options)
+
+    def test_metric_options_requires_project_id(self, auth_client):
+        response = auth_client.get("/tracer/user-alerts/metric-options/")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.integration

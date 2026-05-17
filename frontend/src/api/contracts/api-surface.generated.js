@@ -5,7 +5,7 @@
 export const API_SURFACE_CONTRACT = Object.freeze({
   "generatedFrom": "api_contracts/openapi/swagger.json",
   "swaggerVersion": "2.0",
-  "endpointCount": 964,
+  "endpointCount": 967,
   "groups": {
     "accounts": {
       "/accounts/2fa/recovery-codes/": [
@@ -2403,6 +2403,9 @@ export const API_SURFACE_CONTRACT = Object.freeze({
       "/simulate/run-tests/{run_test_id}/eval-summary/": [
         "get"
       ],
+      "/simulate/run-tests/{run_test_id}/execute/": [
+        "post"
+      ],
       "/simulate/run-tests/{run_test_id}/executions/": [
         "get"
       ],
@@ -3020,7 +3023,13 @@ export const API_SURFACE_CONTRACT = Object.freeze({
       "/tracer/user-alerts/bulk-mute/": [
         "post"
       ],
+      "/tracer/user-alerts/duplicate/": [
+        "post"
+      ],
       "/tracer/user-alerts/list_monitors/": [
+        "get"
+      ],
+      "/tracer/user-alerts/metric-options/": [
         "get"
       ],
       "/tracer/user-alerts/preview-graph/": [
@@ -5662,6 +5671,9 @@ export const API_SURFACE_PATHS = Object.freeze({
   "/simulate/run-tests/{run_test_id}/eval-summary/": [
     "get"
   ],
+  "/simulate/run-tests/{run_test_id}/execute/": [
+    "post"
+  ],
   "/simulate/run-tests/{run_test_id}/executions/": [
     "get"
   ],
@@ -6277,7 +6289,13 @@ export const API_SURFACE_PATHS = Object.freeze({
   "/tracer/user-alerts/bulk-mute/": [
     "post"
   ],
+  "/tracer/user-alerts/duplicate/": [
+    "post"
+  ],
   "/tracer/user-alerts/list_monitors/": [
+    "get"
+  ],
+  "/tracer/user-alerts/metric-options/": [
     "get"
   ],
   "/tracer/user-alerts/preview-graph/": [

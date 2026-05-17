@@ -27,7 +27,6 @@ from simulate.utils.test_execution import (
     DEFAULT_VOICE_SIM_COL,
     LEGACY_SIM_COLUMN_ID_MAP,
 )
-from tracer.models.observation_span import ObservationSpan
 from tracer.models.replay_session import ReplaySession, ReplaySessionStep
 from tracer.models.trace import Trace
 from tracer.services.clickhouse.span_attribute_lookups import (
@@ -47,7 +46,6 @@ def _empty_call_log_summary(reason: str) -> dict:
     }
 
 
-from drf_yasg.utils import swagger_auto_schema
 
 from model_hub.models.api_key import ApiKey
 from model_hub.models.develop_dataset import Cell, Column, Row
@@ -85,6 +83,7 @@ from simulate.serializers.requests.call_execution import (
 )
 from simulate.serializers.requests.run_test import (
     CreateRunTestSerializer,
+    ExecuteRunTestSerializer,
     RunTestComponentsUpdateSerializer,
     RunTestFilterSerializer,
     UpdateRunTestSerializer,
@@ -100,15 +99,15 @@ from simulate.serializers.requests.test_execution import (
     CallExecutionRerunSerializer,
 )
 from simulate.serializers.response.call_execution import (
-    CallExecutionErrorLocalizerTasksResponseSerializer,
     CallExecutionDeleteResponseSerializer,
+    CallExecutionErrorLocalizerTasksResponseSerializer,
     CallExecutionErrorResponseSerializer,
     CallExecutionLogsResponseSerializer,
 )
 from simulate.serializers.response.run_test import (
-    AddEvalConfigResponseSerializer,
     RunTestCallExecutionsResponseSerializer,
     RunTestErrorResponseSerializer,
+    RunTestExecutionResponseSerializer,
     RunTestExecutionsResponseSerializer,
     RunTestMessageResponseSerializer,
     RunTestResponseSerializer,
@@ -119,7 +118,6 @@ from simulate.serializers.response.run_test_evals import (
     AddEvalConfigsResponseSerializer,
     DeleteEvalConfigResponseSerializer,
     EvalConfigStructureResponseSerializer,
-    EvalConfigResponseSerializer,
     EvalConfigUpdateResponseSerializer,
     EvalErrorResponseSerializer,
     EvalSummaryComparisonResponseSerializer,
@@ -142,14 +140,14 @@ from simulate.serializers.test_execution import (
     PerformanceSummarySerializer,
     RunTestAnalyticsSerializer,
     TestExecutionAnalyticsSerializer,
-    TestExecutionBulkDeleteSerializer,
     TestExecutionBulkDeleteResponseSerializer,
-    TestExecutionColumnOrderSerializer,
+    TestExecutionBulkDeleteSerializer,
     TestExecutionColumnOrderResponseSerializer,
-    TestExecutionRerunSerializer,
+    TestExecutionColumnOrderSerializer,
     TestExecutionRerunResponseSerializer,
-    TestExecutionStatusSerializer,
+    TestExecutionRerunSerializer,
     TestExecutionSerializer,
+    TestExecutionStatusSerializer,
 )
 
 # Import Temporal activities (using @temporal_activity drop-in decorator)
@@ -697,8 +695,23 @@ class RunTestExecutionView(APIView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.gm = GeneralMethods()
-        self.test_executor = TestExecutor()
+        self._test_executor = None
 
+    @property
+    def test_executor(self):
+        if self._test_executor is None:
+            self._test_executor = TestExecutor()
+        return self._test_executor
+
+    @swagger_auto_schema(
+        request_body=ExecuteRunTestSerializer,
+        responses={
+            200: RunTestExecutionResponseSerializer,
+            400: RunTestErrorResponseSerializer,
+            404: RunTestErrorResponseSerializer,
+            500: RunTestErrorResponseSerializer,
+        },
+    )
     def post(self, request, run_test_id, *args, **kwargs):
         """Execute a test run"""
         try:
@@ -2659,9 +2672,9 @@ class PerformanceSummaryView(APIView):
 
                 # Get overall score if available
                 if call_execution.overall_score is not None:
-                    scenario_performance[scenario_id][
-                        "total_score"
-                    ] += call_execution.overall_score
+                    scenario_performance[scenario_id]["total_score"] += (
+                        call_execution.overall_score
+                    )
                     scenario_performance[scenario_id]["scores"].append(
                         call_execution.overall_score
                     )
@@ -7135,9 +7148,7 @@ def add_trace_details_to_call_executions(call_executions):
     # (``tracer_obse_eval_attr_gin``) was dropped in migration 0074. The
     # equivalent containment check now goes to ClickHouse, which has the
     # same data and is much cheaper for this access pattern.
-    spans_by_call_exec = spans_by_eval_attribute_call_execution_ids(
-        call_execution_ids
-    )
+    spans_by_call_exec = spans_by_eval_attribute_call_execution_ids(call_execution_ids)
 
     # Collect trace IDs and build trace_details
     trace_ids = set()
@@ -7150,7 +7161,11 @@ def add_trace_details_to_call_executions(call_executions):
         # original PG version also took whichever row came first).
         span = spans[0]
         try:
-            eval_attrs = json.loads(span["eval_attributes"]) if span.get("eval_attributes") else {}
+            eval_attrs = (
+                json.loads(span["eval_attributes"])
+                if span.get("eval_attributes")
+                else {}
+            )
         except (TypeError, ValueError):
             eval_attrs = {}
         trace_id_str = span["trace_id"]

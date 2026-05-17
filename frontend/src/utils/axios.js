@@ -1538,13 +1538,8 @@ export const endpoints = {
     listProjects: () => apiPath("/tracer/project/list_project_ids/"),
     showCharts: () => apiPath("/tracer/project/get_graph_data/"),
     getMonitorList: () => apiPath("/tracer/user-alerts/list_monitors/"),
-    getMonitorLogs: (id) =>
-      legacyApiPath("/tracer/user-alerts/{id}/fetch_logs/", { id }),
-    getMonitorMetricList: () =>
-      legacyApiPath("/tracer/user-alerts/get_metric_details/"),
-    duplicateMonitorList: () => legacyApiPath("/tracer/user-alerts/duplicate/"),
+    duplicateMonitorList: () => apiPath("/tracer/user-alerts/duplicate/"),
     createMonitor: apiPath("/tracer/user-alerts/"),
-    getMonitorGraph: () => legacyApiPath("/tracer/user-alerts/create_graph/"),
     getEvalAttributeList: () =>
       apiPath("/tracer/observation-span/get_eval_attributes_list/"),
     submitFeedback: apiPath("/tracer/observation-span/submit_feedback/"),
@@ -1589,6 +1584,7 @@ export const endpoints = {
     getCodeBlockTracer: apiPath("/tracer/project/project_sdk_code/"),
     getEvalGraph: apiPath("/tracer/charts/fetch_graph/"),
     getSystemMetricList: apiPath("/tracer/project/fetch_system_metrics/"),
+    getMonitorMetricOptions: apiPath("/tracer/user-alerts/metric-options/"),
     muteAlerts: apiPath("/tracer/user-alerts/bulk-mute/"),
     resolveAlerts: apiPath("/tracer/user-alert-logs/resolve/"),
     getAlertDetails: (alertId) =>
@@ -1606,9 +1602,6 @@ export const endpoints = {
     getVoiceCallDetail: apiPath("/tracer/trace/voice_call_detail/"),
 
     // replay sessions
-    prefetchAgentData: legacyApiPath(
-      "/tracer/replay-session/prefetch-agent-data/",
-    ),
     getEvalConfigs: apiPath("/tracer/replay-session/eval-configs/"),
     replaySession: apiPath("/tracer/replay-session/"),
     generateReplayScenarios: (id) =>
@@ -1717,7 +1710,10 @@ export const endpoints = {
       apiPath("/simulate/run-tests/{run_test_id}/scenarios/", {
         run_test_id: id,
       }),
-    runTest: (id) => legacyApiPath("/simulate/run-tests/{id}/execute/", { id }),
+    runTest: (id) =>
+      apiPath("/simulate/run-tests/{run_test_id}/execute/", {
+        run_test_id: id,
+      }),
     callExecutionDetail: (id) =>
       apiPath("/simulate/call-executions/{call_execution_id}/", {
         call_execution_id: id,

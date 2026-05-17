@@ -188,48 +188,6 @@ export const LEGACY_API_SURFACE = Object.freeze({
       "Legacy model unique-property endpoint is still referenced by old model screens.",
     next: "Contract the old event metadata API or migrate the old model screens.",
   },
-  "/simulate/run-tests/{id}/execute/": {
-    group: "simulate",
-    status: LEGACY_API_STATUSES.ACTIVE_UNCONTRACTED,
-    reason:
-      "Run-test execute action is still used by the simulation UI but is not exposed in Swagger.",
-    next: "Add serializers/OpenAPI coverage for run-test execution, then move this path to apiPath(...).",
-  },
-  "/tracer/replay-session/prefetch-agent-data/": {
-    group: "tracer",
-    status: LEGACY_API_STATUSES.ACTIVE_UNCONTRACTED,
-    reason:
-      "Replay-session prefetch action is still used by replay UI but is not exposed in Swagger.",
-    next: "Add serializers/OpenAPI coverage for replay prefetch, then move this path to apiPath(...).",
-  },
-  "/tracer/user-alerts/{id}/fetch_logs/": {
-    group: "tracer",
-    status: LEGACY_API_STATUSES.ACTIVE_UNCONTRACTED,
-    reason:
-      "Monitor log action is still used by alert UI but is not exposed in Swagger.",
-    next: "Add serializers/OpenAPI coverage for monitor log actions, then move this path to apiPath(...).",
-  },
-  "/tracer/user-alerts/create_graph/": {
-    group: "tracer",
-    status: LEGACY_API_STATUSES.ACTIVE_UNCONTRACTED,
-    reason:
-      "Monitor graph action is still used by alert UI but is not exposed in Swagger.",
-    next: "Add serializers/OpenAPI coverage for monitor graph actions, then move this path to apiPath(...).",
-  },
-  "/tracer/user-alerts/duplicate/": {
-    group: "tracer",
-    status: LEGACY_API_STATUSES.ACTIVE_UNCONTRACTED,
-    reason:
-      "Monitor duplicate action is still used by alert UI but is not exposed in Swagger.",
-    next: "Add serializers/OpenAPI coverage for monitor duplicate actions, then move this path to apiPath(...).",
-  },
-  "/tracer/user-alerts/get_metric_details/": {
-    group: "tracer",
-    status: LEGACY_API_STATUSES.ACTIVE_UNCONTRACTED,
-    reason:
-      "Monitor metric metadata action is still used by alert UI but is not exposed in Swagger.",
-    next: "Add serializers/OpenAPI coverage for monitor metric metadata, then move this path to apiPath(...).",
-  },
   "/usage/available-months/": {
     group: "usage",
     status: LEGACY_API_STATUSES.EE_UNCONTRACTED,

@@ -30499,6 +30499,37 @@ export const SimulateRunTestsEvalSummaryListResponse = zod.object({
 
 
 /**
+ * Execute a test run
+ */
+export const SimulateRunTestsExecuteCreateParams = zod.object({
+  "run_test_id": zod.string()
+})
+
+export const simulateRunTestsExecuteCreateBodyScenarioIdsDefault = [];
+export const simulateRunTestsExecuteCreateBodySelectAllDefault = false;
+
+export const SimulateRunTestsExecuteCreateBody = zod.object({
+  "scenario_ids": zod.array(zod.string().uuid()).default(simulateRunTestsExecuteCreateBodyScenarioIdsDefault),
+  "simulator_id": zod.string().uuid().optional(),
+  "select_all": zod.boolean().default(simulateRunTestsExecuteCreateBodySelectAllDefault)
+})
+
+
+
+
+
+export const SimulateRunTestsExecuteCreateResponse = zod.object({
+  "message": zod.string().min(1).optional(),
+  "execution_id": zod.string().uuid().optional(),
+  "run_test_id": zod.string().uuid().optional(),
+  "status": zod.string().min(1).optional(),
+  "total_scenarios": zod.number().optional(),
+  "total_calls": zod.number().optional(),
+  "scenario_ids": zod.array(zod.string().uuid()).optional()
+})
+
+
+/**
  * Get test execution data for a specific run test
 Query Parameters:
 - search: search string to filter test executions by status or scenario name
@@ -41112,6 +41143,25 @@ export const TracerUserAlertsBulkMuteBody = zod.object({
 })
 
 
+export const tracerUserAlertsDuplicateBodyNameMax = 255;
+
+
+
+export const TracerUserAlertsDuplicateBody = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string().min(1).max(tracerUserAlertsDuplicateBodyNameMax)
+})
+
+export const tracerUserAlertsDuplicateResponseStatusDefault = true;
+
+export const TracerUserAlertsDuplicateResponse = zod.object({
+  "status": zod.boolean().default(tracerUserAlertsDuplicateResponseStatusDefault),
+  "result": zod.object({
+
+}).passthrough().optional()
+})
+
+
 export const TracerUserAlertsListMonitorsQueryParams = zod.object({
   "page": zod.number().optional().describe('A page number within the paginated result set.'),
   "limit": zod.number().optional().describe('Number of results to return per page.')
@@ -41175,6 +41225,27 @@ export const TracerUserAlertsListMonitorsResponse = zod.object({
   "workspace": zod.string().uuid().optional(),
   "created_by": zod.string().uuid().optional()
 }))
+})
+
+
+export const TracerUserAlertsMetricOptionsQueryParams = zod.object({
+  "page": zod.number().optional().describe('A page number within the paginated result set.'),
+  "limit": zod.number().optional().describe('Number of results to return per page.')
+})
+
+export const tracerUserAlertsMetricOptionsResponseStatusDefault = true;
+
+
+
+
+export const TracerUserAlertsMetricOptionsResponse = zod.object({
+  "status": zod.boolean().default(tracerUserAlertsMetricOptionsResponseStatusDefault),
+  "result": zod.array(zod.object({
+  "id": zod.string().min(1).optional(),
+  "name": zod.string().min(1).optional(),
+  "metric_type": zod.string().min(1).optional(),
+  "output_type": zod.string().optional()
+})).optional()
 })
 
 

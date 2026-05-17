@@ -325,6 +325,7 @@ import type {
   ExecutePromptSimulationRequestApi,
   ExecutePromptSimulationResponseApi,
   ExecuteRequestApi,
+  ExecuteRunTestApi,
   ExperimentAdditionalEvaluationsRequestApi,
   ExperimentComparisonWeightsRequestApi,
   ExperimentCreateV2Api,
@@ -663,6 +664,7 @@ import type {
   RunTestChatExecutionResponseApi,
   RunTestComponentsUpdateApi,
   RunTestErrorResponseApi,
+  RunTestExecutionResponseApi,
   RunTestMessageResponseApi,
   RunTestNameResponseApi,
   RunTestResponseApi,
@@ -957,6 +959,7 @@ import type {
   TracerUserAlertsListMonitors200,
   TracerUserAlertsListMonitorsParams,
   TracerUserAlertsListParams,
+  TracerUserAlertsMetricOptionsParams,
   TracerUsersListParams,
   TracesTabApiResponseApi,
   TrendsTabApiResponseApi,
@@ -997,7 +1000,9 @@ import type {
   UsageWorkspaceEvalSummaryListParams,
   UsageWorkspaceUsageSummaryListParams,
   UserAlertMonitorApi,
+  UserAlertMonitorDuplicateApi,
   UserAlertMonitorLogApi,
+  UserAlertMonitorMetricOptionsResponseApi,
   UserCodeExampleResponseApi,
   UserCreateApi,
   UserEvalApi,
@@ -47331,6 +47336,61 @@ export const simulateRunTestsEvalSummaryList = async (runTestId: string,
 
 
 
+export type simulateRunTestsExecuteCreateResponse200 = {
+  data: RunTestExecutionResponseApi
+  status: 200
+}
+
+export type simulateRunTestsExecuteCreateResponse400 = {
+  data: RunTestErrorResponseApi
+  status: 400
+}
+
+export type simulateRunTestsExecuteCreateResponse404 = {
+  data: RunTestErrorResponseApi
+  status: 404
+}
+
+export type simulateRunTestsExecuteCreateResponse500 = {
+  data: RunTestErrorResponseApi
+  status: 500
+}
+
+export type simulateRunTestsExecuteCreateResponseSuccess = (simulateRunTestsExecuteCreateResponse200) & {
+  headers: Headers;
+};
+export type simulateRunTestsExecuteCreateResponseError = (simulateRunTestsExecuteCreateResponse400 | simulateRunTestsExecuteCreateResponse404 | simulateRunTestsExecuteCreateResponse500) & {
+  headers: Headers;
+};
+
+export type simulateRunTestsExecuteCreateResponse = (simulateRunTestsExecuteCreateResponseSuccess | simulateRunTestsExecuteCreateResponseError)
+
+export const getSimulateRunTestsExecuteCreateUrl = (runTestId: string,) => {
+
+
+
+
+  return `/simulate/run-tests/${runTestId}/execute/`
+}
+
+/**
+ * Execute a test run
+ */
+export const simulateRunTestsExecuteCreate = async (runTestId: string,
+    executeRunTestApi: ExecuteRunTestApi, options?: RequestInit): Promise<simulateRunTestsExecuteCreateResponse> => {
+
+  return apiMutator<simulateRunTestsExecuteCreateResponse>(getSimulateRunTestsExecuteCreateUrl(runTestId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      executeRunTestApi,)
+  }
+);}
+
+
+
 export type simulateRunTestsExecutionsListResponse200 = {
   data: TestExecutionItemResponseApi[]
   status: 200
@@ -57676,6 +57736,57 @@ export const tracerUserAlertsBulkMute = async (userAlertMonitorApi: NonReadonly<
 
 
 
+export type tracerUserAlertsDuplicateResponse200 = {
+  data: ApiSuccessResponseApi
+  status: 200
+}
+
+export type tracerUserAlertsDuplicateResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type tracerUserAlertsDuplicateResponse404 = {
+  data: ApiErrorResponseApi
+  status: 404
+}
+
+export type tracerUserAlertsDuplicateResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
+}
+
+export type tracerUserAlertsDuplicateResponseSuccess = (tracerUserAlertsDuplicateResponse200) & {
+  headers: Headers;
+};
+export type tracerUserAlertsDuplicateResponseError = (tracerUserAlertsDuplicateResponse400 | tracerUserAlertsDuplicateResponse404 | tracerUserAlertsDuplicateResponse500) & {
+  headers: Headers;
+};
+
+export type tracerUserAlertsDuplicateResponse = (tracerUserAlertsDuplicateResponseSuccess | tracerUserAlertsDuplicateResponseError)
+
+export const getTracerUserAlertsDuplicateUrl = () => {
+
+
+
+
+  return `/tracer/user-alerts/duplicate/`
+}
+
+export const tracerUserAlertsDuplicate = async (userAlertMonitorDuplicateApi: UserAlertMonitorDuplicateApi, options?: RequestInit): Promise<tracerUserAlertsDuplicateResponse> => {
+
+  return apiMutator<tracerUserAlertsDuplicateResponse>(getTracerUserAlertsDuplicateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      userAlertMonitorDuplicateApi,)
+  }
+);}
+
+
+
 export type tracerUserAlertsListMonitorsResponse200 = {
   data: TracerUserAlertsListMonitors200
   status: 200
@@ -57706,6 +57817,63 @@ export const getTracerUserAlertsListMonitorsUrl = (params?: TracerUserAlertsList
 export const tracerUserAlertsListMonitors = async (params?: TracerUserAlertsListMonitorsParams, options?: RequestInit): Promise<tracerUserAlertsListMonitorsResponse> => {
 
   return apiMutator<tracerUserAlertsListMonitorsResponse>(getTracerUserAlertsListMonitorsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type tracerUserAlertsMetricOptionsResponse200 = {
+  data: UserAlertMonitorMetricOptionsResponseApi
+  status: 200
+}
+
+export type tracerUserAlertsMetricOptionsResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type tracerUserAlertsMetricOptionsResponse404 = {
+  data: ApiErrorResponseApi
+  status: 404
+}
+
+export type tracerUserAlertsMetricOptionsResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
+}
+
+export type tracerUserAlertsMetricOptionsResponseSuccess = (tracerUserAlertsMetricOptionsResponse200) & {
+  headers: Headers;
+};
+export type tracerUserAlertsMetricOptionsResponseError = (tracerUserAlertsMetricOptionsResponse400 | tracerUserAlertsMetricOptionsResponse404 | tracerUserAlertsMetricOptionsResponse500) & {
+  headers: Headers;
+};
+
+export type tracerUserAlertsMetricOptionsResponse = (tracerUserAlertsMetricOptionsResponseSuccess | tracerUserAlertsMetricOptionsResponseError)
+
+export const getTracerUserAlertsMetricOptionsUrl = (params?: TracerUserAlertsMetricOptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/tracer/user-alerts/metric-options/?${stringifiedParams}` : `/tracer/user-alerts/metric-options/`
+}
+
+export const tracerUserAlertsMetricOptions = async (params?: TracerUserAlertsMetricOptionsParams, options?: RequestInit): Promise<tracerUserAlertsMetricOptionsResponse> => {
+
+  return apiMutator<tracerUserAlertsMetricOptionsResponse>(getTracerUserAlertsMetricOptionsUrl(params),
   {
     ...options,
     method: 'GET'

@@ -224,6 +224,23 @@ class UserAlertMonitorLogSerializer(serializers.ModelSerializer):
         exclude = ["deleted_at", "deleted", "alert", "updated_at"]
 
 
+class UserAlertMonitorDuplicateSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField(max_length=255)
+
+
+class UserAlertMonitorMetricOptionSerializer(serializers.Serializer):
+    id = serializers.CharField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    metric_type = serializers.CharField(read_only=True)
+    output_type = serializers.CharField(read_only=True, allow_blank=True)
+
+
+class UserAlertMonitorMetricOptionsResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField(default=True)
+    result = UserAlertMonitorMetricOptionSerializer(many=True, read_only=True)
+
+
 class UserAlertMonitorDetailSerializer(serializers.ModelSerializer):
     metric_name = serializers.SerializerMethodField()
     created_by = UserSerializer(read_only=True)
