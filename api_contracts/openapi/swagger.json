@@ -25893,10 +25893,34 @@
             "post": {
                 "operationId": "simulate_call-executions_chat_send-message_create",
                 "description": "Send a message to a chat execution",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SendChatRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ChatSendMessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -26389,7 +26413,22 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RunTestNameResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -26579,10 +26618,40 @@
             "post": {
                 "operationId": "simulate_run-tests_chat-execute_create",
                 "description": "Execute a test run",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/EmptyRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/RunTestChatExecutionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -27208,7 +27277,22 @@
                 "parameters": [],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ChatSDKCodeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -28016,10 +28100,34 @@
                 "operationId": "simulate_test-executions_chat_call-executions_batch_create",
                 "summary": "Create a batch of CallExecution records for chat execution (exactly 10 per API call).",
                 "description": "This follows the same flow as inbound/outbound calls:\n1. Resolve SimulatorAgent (scenario > run_test > fallback)\n2. Extract base_prompt from SimulatorAgent\n3. Handle dataset scenarios (create one CallExecution per row)\n4. Enhance prompt with row data if applicable\n5. Store proper metadata in CallExecution\n\nReturns exactly 10 CallExecution objects per API call.\nhasMore is true until ALL row_ids of ALL scenarios have CallExecution objects created.",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/EmptyRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "201": {
-                        "description": ""
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/TestExecutionChatBatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/ApiErrorResponse"
+                        }
                     }
                 },
                 "tags": [
@@ -50949,6 +51057,173 @@
                 }
             }
         },
+        "ChatToolCallFunction": {
+            "required": [
+                "name",
+                "arguments"
+            ],
+            "type": "object",
+            "properties": {
+                "name": {
+                    "title": "Name",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "arguments": {
+                    "title": "Arguments",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "ChatToolCall": {
+            "required": [
+                "id",
+                "type",
+                "function"
+            ],
+            "type": "object",
+            "properties": {
+                "id": {
+                    "title": "Id",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "type": {
+                    "title": "Type",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "function": {
+                    "$ref": "#/definitions/ChatToolCallFunction"
+                }
+            },
+            "x-nullable": true
+        },
+        "ChatMessageContract": {
+            "required": [
+                "role"
+            ],
+            "type": "object",
+            "properties": {
+                "role": {
+                    "title": "Role",
+                    "type": "string",
+                    "enum": [
+                        "user",
+                        "assistant",
+                        "tool"
+                    ]
+                },
+                "content": {
+                    "title": "Content",
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "tool_call_id": {
+                    "title": "Tool call id",
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "metadata": {
+                    "title": "Metadata",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                        "x-nullable": true
+                    },
+                    "x-nullable": true
+                },
+                "tool_calls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ChatToolCall"
+                    },
+                    "x-nullable": true
+                }
+            },
+            "x-nullable": true
+        },
+        "SendChatRequest": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ChatMessageContract"
+                    },
+                    "x-nullable": true
+                },
+                "metrics": {
+                    "title": "Metrics",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                        "x-nullable": true
+                    },
+                    "x-nullable": true
+                },
+                "initiate_chat": {
+                    "title": "Initiate chat",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "ChatSendMessageResult": {
+            "required": [
+                "message_history"
+            ],
+            "type": "object",
+            "properties": {
+                "input_message": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ChatMessageContract"
+                    },
+                    "x-nullable": true
+                },
+                "output_message": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ChatMessageContract"
+                    },
+                    "x-nullable": true
+                },
+                "message_history": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ChatMessageContract"
+                    }
+                },
+                "chat_ended": {
+                    "title": "Chat ended",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "ChatSendMessageResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "$ref": "#/definitions/ChatSendMessageResult"
+                }
+            }
+        },
         "CallExecutionDeleteResponse": {
             "type": "object",
             "properties": {
@@ -51247,6 +51522,41 @@
                 }
             }
         },
+        "RunTestNameResult": {
+            "required": [
+                "run_test_id",
+                "run_test_name"
+            ],
+            "type": "object",
+            "properties": {
+                "run_test_id": {
+                    "title": "Run test id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "run_test_name": {
+                    "title": "Run test name",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "RunTestNameResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "$ref": "#/definitions/RunTestNameResult"
+                }
+            }
+        },
         "UpdateRunTest": {
             "type": "object",
             "properties": {
@@ -51359,6 +51669,61 @@
                         "type": "string",
                         "x-nullable": true
                     }
+                }
+            }
+        },
+        "RunTestChatExecutionResult": {
+            "required": [
+                "message",
+                "execution_id",
+                "run_test_id",
+                "status",
+                "total_scenarios"
+            ],
+            "type": "object",
+            "properties": {
+                "message": {
+                    "title": "Message",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "execution_id": {
+                    "title": "Execution id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "run_test_id": {
+                    "title": "Run test id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "status": {
+                    "title": "Status",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "total_scenarios": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            }
+        },
+        "RunTestChatExecutionResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "$ref": "#/definitions/RunTestChatExecutionResult"
                 }
             }
         },
@@ -52107,6 +52472,53 @@
                     "title": "Row count",
                     "type": "integer",
                     "readOnly": true
+                }
+            }
+        },
+        "ChatSDKCodeResult": {
+            "required": [
+                "installation_guide",
+                "sdk_code",
+                "run_test_id",
+                "run_test_name"
+            ],
+            "type": "object",
+            "properties": {
+                "installation_guide": {
+                    "title": "Installation guide",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "sdk_code": {
+                    "title": "Sdk code",
+                    "type": "string",
+                    "minLength": 1
+                },
+                "run_test_id": {
+                    "title": "Run test id",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "run_test_name": {
+                    "title": "Run test name",
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "ChatSDKCodeResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "$ref": "#/definitions/ChatSDKCodeResult"
                 }
             }
         },
@@ -53230,6 +53642,50 @@
                     "type": "string",
                     "format": "uuid",
                     "x-nullable": true
+                }
+            }
+        },
+        "TestExecutionChatBatchResult": {
+            "required": [
+                "call_execution_ids",
+                "has_more",
+                "batched_scenarios"
+            ],
+            "type": "object",
+            "properties": {
+                "call_execution_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "has_more": {
+                    "title": "Has more",
+                    "type": "boolean"
+                },
+                "batched_scenarios": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            }
+        },
+        "TestExecutionChatBatchResponse": {
+            "required": [
+                "result"
+            ],
+            "type": "object",
+            "properties": {
+                "status": {
+                    "title": "Status",
+                    "type": "boolean",
+                    "default": true
+                },
+                "result": {
+                    "$ref": "#/definitions/TestExecutionChatBatchResult"
                 }
             }
         },

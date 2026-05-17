@@ -155,6 +155,8 @@ import type {
   CallWebsocketResponseApi,
   CancelTestExecutionResponseApi,
   CellUpdateApi,
+  ChatSDKCodeResponseApi,
+  ChatSendMessageResponseApi,
   CreateLinearIssueApi,
   CreateLinearIssueResponseApi,
   CreateNodeApi,
@@ -367,8 +369,10 @@ import type {
   RunNewEvalsOnTestExecutionApi,
   RunNewEvalsResponseApi,
   RunTestAnalyticsApi,
+  RunTestChatExecutionResponseApi,
   RunTestErrorResponseApi,
   RunTestMessageResponseApi,
+  RunTestNameResponseApi,
   RunTestResponseApi,
   RunTestScenarioItemResponseApi,
   Saml2AuthIdpUploadsList200,
@@ -395,6 +399,7 @@ import type {
   ScoreForSourceResponseApi,
   ScoreResponseApi,
   SecretApi,
+  SendChatRequestApi,
   SharedLinkDetailApi,
   SharedLinkListApi,
   SharedLinkResolveErrorApi,
@@ -439,6 +444,7 @@ import type {
   TestExecutionApi,
   TestExecutionBulkDeleteApi,
   TestExecutionBulkDeleteResponseApi,
+  TestExecutionChatBatchResponseApi,
   TestExecutionColumnOrderApi,
   TestExecutionColumnOrderResponseApi,
   TestExecutionItemResponseApi,
@@ -34855,17 +34861,29 @@ export const simulateCallExecutionsBranchAnalysisCreate = async (callExecutionId
 
 
 
-export type simulateCallExecutionsChatSendMessageCreateResponse201 = {
-  data: void
-  status: 201
+export type simulateCallExecutionsChatSendMessageCreateResponse200 = {
+  data: ChatSendMessageResponseApi
+  status: 200
 }
 
-export type simulateCallExecutionsChatSendMessageCreateResponseSuccess = (simulateCallExecutionsChatSendMessageCreateResponse201) & {
+export type simulateCallExecutionsChatSendMessageCreateResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type simulateCallExecutionsChatSendMessageCreateResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
+}
+
+export type simulateCallExecutionsChatSendMessageCreateResponseSuccess = (simulateCallExecutionsChatSendMessageCreateResponse200) & {
   headers: Headers;
 };
-;
+export type simulateCallExecutionsChatSendMessageCreateResponseError = (simulateCallExecutionsChatSendMessageCreateResponse400 | simulateCallExecutionsChatSendMessageCreateResponse500) & {
+  headers: Headers;
+};
 
-export type simulateCallExecutionsChatSendMessageCreateResponse = (simulateCallExecutionsChatSendMessageCreateResponseSuccess)
+export type simulateCallExecutionsChatSendMessageCreateResponse = (simulateCallExecutionsChatSendMessageCreateResponseSuccess | simulateCallExecutionsChatSendMessageCreateResponseError)
 
 export const getSimulateCallExecutionsChatSendMessageCreateUrl = (callExecutionId: string,) => {
 
@@ -34878,14 +34896,16 @@ export const getSimulateCallExecutionsChatSendMessageCreateUrl = (callExecutionI
 /**
  * Send a message to a chat execution
  */
-export const simulateCallExecutionsChatSendMessageCreate = async (callExecutionId: string, options?: RequestInit): Promise<simulateCallExecutionsChatSendMessageCreateResponse> => {
+export const simulateCallExecutionsChatSendMessageCreate = async (callExecutionId: string,
+    sendChatRequestApi: SendChatRequestApi, options?: RequestInit): Promise<simulateCallExecutionsChatSendMessageCreateResponse> => {
 
   return apiMutator<simulateCallExecutionsChatSendMessageCreateResponse>(getSimulateCallExecutionsChatSendMessageCreateUrl(callExecutionId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sendChatRequestApi,)
   }
 );}
 
@@ -35587,16 +35607,28 @@ export const simulateRunTestsCreateCreate = async (createRunTestApi: CreateRunTe
 
 
 export type simulateRunTestsGetIdByNameReadResponse200 = {
-  data: void
+  data: RunTestNameResponseApi
   status: 200
+}
+
+export type simulateRunTestsGetIdByNameReadResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type simulateRunTestsGetIdByNameReadResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
 }
 
 export type simulateRunTestsGetIdByNameReadResponseSuccess = (simulateRunTestsGetIdByNameReadResponse200) & {
   headers: Headers;
 };
-;
+export type simulateRunTestsGetIdByNameReadResponseError = (simulateRunTestsGetIdByNameReadResponse400 | simulateRunTestsGetIdByNameReadResponse500) & {
+  headers: Headers;
+};
 
-export type simulateRunTestsGetIdByNameReadResponse = (simulateRunTestsGetIdByNameReadResponseSuccess)
+export type simulateRunTestsGetIdByNameReadResponse = (simulateRunTestsGetIdByNameReadResponseSuccess | simulateRunTestsGetIdByNameReadResponseError)
 
 export const getSimulateRunTestsGetIdByNameReadUrl = (runTestName: string,) => {
 
@@ -35862,17 +35894,34 @@ export const simulateRunTestsCallExecutionsList = async (runTestId: string, opti
 
 
 
-export type simulateRunTestsChatExecuteCreateResponse201 = {
-  data: void
-  status: 201
+export type simulateRunTestsChatExecuteCreateResponse200 = {
+  data: RunTestChatExecutionResponseApi
+  status: 200
 }
 
-export type simulateRunTestsChatExecuteCreateResponseSuccess = (simulateRunTestsChatExecuteCreateResponse201) & {
+export type simulateRunTestsChatExecuteCreateResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type simulateRunTestsChatExecuteCreateResponse404 = {
+  data: ApiErrorResponseApi
+  status: 404
+}
+
+export type simulateRunTestsChatExecuteCreateResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
+}
+
+export type simulateRunTestsChatExecuteCreateResponseSuccess = (simulateRunTestsChatExecuteCreateResponse200) & {
   headers: Headers;
 };
-;
+export type simulateRunTestsChatExecuteCreateResponseError = (simulateRunTestsChatExecuteCreateResponse400 | simulateRunTestsChatExecuteCreateResponse404 | simulateRunTestsChatExecuteCreateResponse500) & {
+  headers: Headers;
+};
 
-export type simulateRunTestsChatExecuteCreateResponse = (simulateRunTestsChatExecuteCreateResponseSuccess)
+export type simulateRunTestsChatExecuteCreateResponse = (simulateRunTestsChatExecuteCreateResponseSuccess | simulateRunTestsChatExecuteCreateResponseError)
 
 export const getSimulateRunTestsChatExecuteCreateUrl = (runTestId: string,) => {
 
@@ -35885,14 +35934,16 @@ export const getSimulateRunTestsChatExecuteCreateUrl = (runTestId: string,) => {
 /**
  * Execute a test run
  */
-export const simulateRunTestsChatExecuteCreate = async (runTestId: string, options?: RequestInit): Promise<simulateRunTestsChatExecuteCreateResponse> => {
+export const simulateRunTestsChatExecuteCreate = async (runTestId: string,
+    emptyRequestApi: EmptyRequestApi, options?: RequestInit): Promise<simulateRunTestsChatExecuteCreateResponse> => {
 
   return apiMutator<simulateRunTestsChatExecuteCreateResponse>(getSimulateRunTestsChatExecuteCreateUrl(runTestId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emptyRequestApi,)
   }
 );}
 
@@ -36602,16 +36653,28 @@ export const simulateRunTestsScenariosList = async (runTestId: string, options?:
 
 
 export type simulateRunTestsSdkCodeListResponse200 = {
-  data: void
+  data: ChatSDKCodeResponseApi
   status: 200
+}
+
+export type simulateRunTestsSdkCodeListResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type simulateRunTestsSdkCodeListResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
 }
 
 export type simulateRunTestsSdkCodeListResponseSuccess = (simulateRunTestsSdkCodeListResponse200) & {
   headers: Headers;
 };
-;
+export type simulateRunTestsSdkCodeListResponseError = (simulateRunTestsSdkCodeListResponse400 | simulateRunTestsSdkCodeListResponse500) & {
+  headers: Headers;
+};
 
-export type simulateRunTestsSdkCodeListResponse = (simulateRunTestsSdkCodeListResponseSuccess)
+export type simulateRunTestsSdkCodeListResponse = (simulateRunTestsSdkCodeListResponseSuccess | simulateRunTestsSdkCodeListResponseError)
 
 export const getSimulateRunTestsSdkCodeListUrl = (runTestId: string,) => {
 
@@ -37523,17 +37586,29 @@ export const simulateTestExecutionsCancelCreate = async (testExecutionId: string
 
 
 
-export type simulateTestExecutionsChatCallExecutionsBatchCreateResponse201 = {
-  data: void
-  status: 201
+export type simulateTestExecutionsChatCallExecutionsBatchCreateResponse200 = {
+  data: TestExecutionChatBatchResponseApi
+  status: 200
 }
 
-export type simulateTestExecutionsChatCallExecutionsBatchCreateResponseSuccess = (simulateTestExecutionsChatCallExecutionsBatchCreateResponse201) & {
+export type simulateTestExecutionsChatCallExecutionsBatchCreateResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type simulateTestExecutionsChatCallExecutionsBatchCreateResponse500 = {
+  data: ApiErrorResponseApi
+  status: 500
+}
+
+export type simulateTestExecutionsChatCallExecutionsBatchCreateResponseSuccess = (simulateTestExecutionsChatCallExecutionsBatchCreateResponse200) & {
   headers: Headers;
 };
-;
+export type simulateTestExecutionsChatCallExecutionsBatchCreateResponseError = (simulateTestExecutionsChatCallExecutionsBatchCreateResponse400 | simulateTestExecutionsChatCallExecutionsBatchCreateResponse500) & {
+  headers: Headers;
+};
 
-export type simulateTestExecutionsChatCallExecutionsBatchCreateResponse = (simulateTestExecutionsChatCallExecutionsBatchCreateResponseSuccess)
+export type simulateTestExecutionsChatCallExecutionsBatchCreateResponse = (simulateTestExecutionsChatCallExecutionsBatchCreateResponseSuccess | simulateTestExecutionsChatCallExecutionsBatchCreateResponseError)
 
 export const getSimulateTestExecutionsChatCallExecutionsBatchCreateUrl = (testExecutionId: string,) => {
 
@@ -37555,14 +37630,16 @@ Returns exactly 10 CallExecution objects per API call.
 hasMore is true until ALL row_ids of ALL scenarios have CallExecution objects created.
  * @summary Create a batch of CallExecution records for chat execution (exactly 10 per API call).
  */
-export const simulateTestExecutionsChatCallExecutionsBatchCreate = async (testExecutionId: string, options?: RequestInit): Promise<simulateTestExecutionsChatCallExecutionsBatchCreateResponse> => {
+export const simulateTestExecutionsChatCallExecutionsBatchCreate = async (testExecutionId: string,
+    emptyRequestApi: EmptyRequestApi, options?: RequestInit): Promise<simulateTestExecutionsChatCallExecutionsBatchCreateResponse> => {
 
   return apiMutator<simulateTestExecutionsChatCallExecutionsBatchCreateResponse>(getSimulateTestExecutionsChatCallExecutionsBatchCreateUrl(testExecutionId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      emptyRequestApi,)
   }
 );}
 

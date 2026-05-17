@@ -3,8 +3,8 @@
   "summary": {
     "paths": 964,
     "operations": 1326,
-    "mutation_endpoints_without_body_schema": 315,
-    "operations_without_response_schema": 541
+    "mutation_endpoints_without_body_schema": 312,
+    "operations_without_response_schema": 536
   },
   "by_group": {
     "accounts": {
@@ -88,8 +88,8 @@
     "simulate": {
       "paths": 105,
       "operations": 125,
-      "mutation_endpoints_without_body_schema": 7,
-      "operations_without_response_schema": 18
+      "mutation_endpoints_without_body_schema": 4,
+      "operations_without_response_schema": 13
     },
     "tracer": {
       "paths": 159,
@@ -2382,15 +2382,6 @@
     {
       "group": "simulate",
       "method": "POST",
-      "path": "/simulate/call-executions/{call_execution_id}/chat/send-message/",
-      "operation_id": "simulate_call-executions_chat_send-message_create",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
-      "method": "POST",
       "path": "/simulate/prompt-templates/{prompt_template_id}/simulations/",
       "operation_id": "simulate_prompt-templates_simulations_create",
       "tags": [
@@ -2417,27 +2408,9 @@
     },
     {
       "group": "simulate",
-      "method": "POST",
-      "path": "/simulate/run-tests/{run_test_id}/chat-execute/",
-      "operation_id": "simulate_run-tests_chat-execute_create",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
       "method": "PATCH",
       "path": "/simulate/run-tests/{run_test_id}/components/",
       "operation_id": "simulate_run-tests_components_partial_update",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
-      "method": "POST",
-      "path": "/simulate/test-executions/{test_execution_id}/chat/call-executions/batch/",
-      "operation_id": "simulate_test-executions_chat_call-executions_batch_create",
       "tags": [
         "simulate"
       ]
@@ -6865,15 +6838,6 @@
     },
     {
       "group": "simulate",
-      "method": "POST",
-      "path": "/simulate/call-executions/{call_execution_id}/chat/send-message/",
-      "operation_id": "simulate_call-executions_chat_send-message_create",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
       "method": "GET",
       "path": "/simulate/call-executions/{call_execution_id}/error-localizer-tasks/",
       "operation_id": "simulate_call-executions_error-localizer-tasks_list",
@@ -6956,26 +6920,8 @@
     {
       "group": "simulate",
       "method": "GET",
-      "path": "/simulate/run-tests/get-id-by-name/{run_test_name}/",
-      "operation_id": "simulate_run-tests_get-id-by-name_read",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
-      "method": "GET",
       "path": "/simulate/run-tests/{run_test_id}/call-executions/",
       "operation_id": "simulate_run-tests_call-executions_list",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
-      "method": "POST",
-      "path": "/simulate/run-tests/{run_test_id}/chat-execute/",
-      "operation_id": "simulate_run-tests_chat-execute_create",
       "tags": [
         "simulate"
       ]
@@ -6994,24 +6940,6 @@
       "method": "GET",
       "path": "/simulate/run-tests/{run_test_id}/eval-configs/{eval_config_id}/get-structure/",
       "operation_id": "simulate_run-tests_eval-configs_get-structure_list",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
-      "method": "GET",
-      "path": "/simulate/run-tests/{run_test_id}/sdk-code/",
-      "operation_id": "simulate_run-tests_sdk-code_list",
-      "tags": [
-        "simulate"
-      ]
-    },
-    {
-      "group": "simulate",
-      "method": "POST",
-      "path": "/simulate/test-executions/{test_execution_id}/chat/call-executions/batch/",
-      "operation_id": "simulate_test-executions_chat_call-executions_batch_create",
       "tags": [
         "simulate"
       ]

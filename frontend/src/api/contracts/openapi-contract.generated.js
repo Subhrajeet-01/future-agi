@@ -13407,9 +13407,21 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/simulate/call-executions/{call_execution_id}/chat/send-message/": {
       "post": {
         "operationId": "simulate_call-executions_chat_send-message_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/SendChatRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ChatSendMessageResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
       }
     },
     "/simulate/call-executions/{call_execution_id}/delete/": {
@@ -13645,7 +13657,17 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "simulate_run-tests_get-id-by-name_read",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/RunTestNameResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
       }
     },
     "/simulate/run-tests/{run_test_id}/": {
@@ -13732,9 +13754,24 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/simulate/run-tests/{run_test_id}/chat-execute/": {
       "post": {
         "operationId": "simulate_run-tests_chat-execute_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/EmptyRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/RunTestChatExecutionResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
       }
     },
     "/simulate/run-tests/{run_test_id}/components/": {
@@ -13999,7 +14036,17 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "operationId": "simulate_run-tests_sdk-code_list",
         "requestBody": null,
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ChatSDKCodeResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
       }
     },
     "/simulate/run-tests/{run_test_id}/status/": {
@@ -14406,9 +14453,21 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/simulate/test-executions/{test_execution_id}/chat/call-executions/batch/": {
       "post": {
         "operationId": "simulate_test-executions_chat_call-executions_batch_create",
-        "requestBody": null,
+        "requestBody": {
+          "$ref": "#/definitions/EmptyRequest"
+        },
         "queryParameters": {},
-        "responses": {}
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/TestExecutionChatBatchResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
       }
     },
     "/simulate/test-executions/{test_execution_id}/column-order/": {
@@ -25945,6 +26004,38 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ChatSDKCodeResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/ChatSDKCodeResult"
+        }
+      }
+    },
+    "ChatSendMessageResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/ChatSendMessageResult"
+        }
+      }
+    },
     "CreateLinearIssue": {
       "required": [
         "team_id"
@@ -32365,6 +32456,22 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "RunTestChatExecutionResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/RunTestChatExecutionResult"
+        }
+      }
+    },
     "RunTestErrorResponse": {
       "type": "object",
       "properties": {
@@ -32393,6 +32500,22 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "type": "string",
           "readOnly": true,
           "minLength": 1
+        }
+      }
+    },
+    "RunTestNameResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/RunTestNameResult"
         }
       }
     },
@@ -33628,6 +33751,32 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "SendChatRequest": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChatMessageContract"
+          },
+          "x-nullable": true
+        },
+        "metrics": {
+          "title": "Metrics",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "x-nullable": true
+          },
+          "x-nullable": true
+        },
+        "initiate_chat": {
+          "title": "Initiate chat",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
     "SharedLinkDetail": {
       "type": "object",
       "properties": {
@@ -34546,6 +34695,22 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "format": "uuid"
           },
           "readOnly": true
+        }
+      }
+    },
+    "TestExecutionChatBatchResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/TestExecutionChatBatchResult"
         }
       }
     },
@@ -36513,6 +36678,70 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ChatSDKCodeResult": {
+      "required": [
+        "installation_guide",
+        "sdk_code",
+        "run_test_id",
+        "run_test_name"
+      ],
+      "type": "object",
+      "properties": {
+        "installation_guide": {
+          "title": "Installation guide",
+          "type": "string",
+          "minLength": 1
+        },
+        "sdk_code": {
+          "title": "Sdk code",
+          "type": "string",
+          "minLength": 1
+        },
+        "run_test_id": {
+          "title": "Run test id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "run_test_name": {
+          "title": "Run test name",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ChatSendMessageResult": {
+      "required": [
+        "message_history"
+      ],
+      "type": "object",
+      "properties": {
+        "input_message": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChatMessageContract"
+          },
+          "x-nullable": true
+        },
+        "output_message": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChatMessageContract"
+          },
+          "x-nullable": true
+        },
+        "message_history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChatMessageContract"
+          }
+        },
+        "chat_ended": {
+          "title": "Chat ended",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
     "CreateLinearIssueResult": {
       "type": "object",
       "properties": {
@@ -37918,6 +38147,64 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "default": {}
     },
+    "RunTestChatExecutionResult": {
+      "required": [
+        "message",
+        "execution_id",
+        "run_test_id",
+        "status",
+        "total_scenarios"
+      ],
+      "type": "object",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string",
+          "minLength": 1
+        },
+        "execution_id": {
+          "title": "Execution id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "run_test_id": {
+          "title": "Run test id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string",
+          "minLength": 1
+        },
+        "total_scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    },
+    "RunTestNameResult": {
+      "required": [
+        "run_test_id",
+        "run_test_name"
+      ],
+      "type": "object",
+      "properties": {
+        "run_test_id": {
+          "title": "Run test id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "run_test_name": {
+          "title": "Run test name",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "SimulateEvalConfigResponse": {
       "type": "object",
       "properties": {
@@ -38261,6 +38548,55 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ChatMessageContract": {
+      "required": [
+        "role"
+      ],
+      "type": "object",
+      "properties": {
+        "role": {
+          "title": "Role",
+          "type": "string",
+          "enum": [
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "content": {
+          "title": "Content",
+          "type": "string",
+          "x-nullable": true
+        },
+        "tool_call_id": {
+          "title": "Tool call id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "x-nullable": true
+        },
+        "metadata": {
+          "title": "Metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "x-nullable": true
+          },
+          "x-nullable": true
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChatToolCall"
+          },
+          "x-nullable": true
+        }
+      },
+      "x-nullable": true
+    },
     "SharedLinkAccess": {
       "required": [
         "email"
@@ -38366,6 +38702,34 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "count": {
           "title": "Count",
           "type": "integer"
+        }
+      }
+    },
+    "TestExecutionChatBatchResult": {
+      "required": [
+        "call_execution_ids",
+        "has_more",
+        "batched_scenarios"
+      ],
+      "type": "object",
+      "properties": {
+        "call_execution_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "has_more": {
+          "title": "Has more",
+          "type": "boolean"
+        },
+        "batched_scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
         }
       }
     },
@@ -39938,6 +40302,30 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ChatToolCall": {
+      "required": [
+        "id",
+        "type",
+        "function"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "title": "Type",
+          "type": "string",
+          "minLength": 1
+        },
+        "function": {
+          "$ref": "#/definitions/ChatToolCallFunction"
+        }
+      },
+      "x-nullable": true
+    },
     "TracesAggregates": {
       "required": [
         "total_traces",
@@ -40355,6 +40743,25 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Output tokens",
           "type": "integer",
           "x-nullable": true
+        }
+      }
+    },
+    "ChatToolCallFunction": {
+      "required": [
+        "name",
+        "arguments"
+      ],
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "minLength": 1
+        },
+        "arguments": {
+          "title": "Arguments",
+          "type": "string",
+          "minLength": 1
         }
       }
     }

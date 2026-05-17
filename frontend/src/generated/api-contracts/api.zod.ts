@@ -17889,6 +17889,98 @@ export const SimulateCallExecutionsChatSendMessageCreateParams = zod.object({
 })
 
 
+
+
+
+export const simulateCallExecutionsChatSendMessageCreateBodyInitiateChatDefault = false;
+
+export const SimulateCallExecutionsChatSendMessageCreateBody = zod.object({
+  "messages": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant', 'tool']),
+  "content": zod.string().optional(),
+  "tool_call_id": zod.string().optional(),
+  "name": zod.string().optional(),
+  "metadata": zod.record(zod.string(), zod.string()).optional(),
+  "tool_calls": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "type": zod.string().min(1),
+  "function": zod.object({
+  "name": zod.string().min(1),
+  "arguments": zod.string().min(1)
+})
+})).optional()
+})).optional(),
+  "metrics": zod.record(zod.string(), zod.string()).optional(),
+  "initiate_chat": zod.boolean().default(simulateCallExecutionsChatSendMessageCreateBodyInitiateChatDefault)
+})
+
+export const simulateCallExecutionsChatSendMessageCreateResponseStatusDefault = true;
+
+
+
+
+
+
+
+
+
+
+
+export const simulateCallExecutionsChatSendMessageCreateResponseResultChatEndedDefault = false;
+
+export const SimulateCallExecutionsChatSendMessageCreateResponse = zod.object({
+  "status": zod.boolean().default(simulateCallExecutionsChatSendMessageCreateResponseStatusDefault),
+  "result": zod.object({
+  "input_message": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant', 'tool']),
+  "content": zod.string().optional(),
+  "tool_call_id": zod.string().optional(),
+  "name": zod.string().optional(),
+  "metadata": zod.record(zod.string(), zod.string()).optional(),
+  "tool_calls": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "type": zod.string().min(1),
+  "function": zod.object({
+  "name": zod.string().min(1),
+  "arguments": zod.string().min(1)
+})
+})).optional()
+})).optional(),
+  "output_message": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant', 'tool']),
+  "content": zod.string().optional(),
+  "tool_call_id": zod.string().optional(),
+  "name": zod.string().optional(),
+  "metadata": zod.record(zod.string(), zod.string()).optional(),
+  "tool_calls": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "type": zod.string().min(1),
+  "function": zod.object({
+  "name": zod.string().min(1),
+  "arguments": zod.string().min(1)
+})
+})).optional()
+})).optional(),
+  "message_history": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant', 'tool']),
+  "content": zod.string().optional(),
+  "tool_call_id": zod.string().optional(),
+  "name": zod.string().optional(),
+  "metadata": zod.record(zod.string(), zod.string()).optional(),
+  "tool_calls": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "type": zod.string().min(1),
+  "function": zod.object({
+  "name": zod.string().min(1),
+  "arguments": zod.string().min(1)
+})
+})).optional()
+})),
+  "chat_ended": zod.boolean().default(simulateCallExecutionsChatSendMessageCreateResponseResultChatEndedDefault)
+})
+})
+
+
 /**
  * Delete a specific call execution
  */
@@ -18196,6 +18288,17 @@ export const SimulateRunTestsGetIdByNameReadParams = zod.object({
   "run_test_name": zod.string()
 })
 
+export const simulateRunTestsGetIdByNameReadResponseStatusDefault = true;
+
+
+export const SimulateRunTestsGetIdByNameReadResponse = zod.object({
+  "status": zod.boolean().default(simulateRunTestsGetIdByNameReadResponseStatusDefault),
+  "result": zod.object({
+  "run_test_id": zod.string().uuid(),
+  "run_test_name": zod.string().min(1)
+})
+})
+
 
 /**
  * Retrieve a specific RunTest
@@ -18411,6 +18514,25 @@ export const SimulateRunTestsCallExecutionsListParams = zod.object({
  */
 export const SimulateRunTestsChatExecuteCreateParams = zod.object({
   "run_test_id": zod.string()
+})
+
+export const SimulateRunTestsChatExecuteCreateBody = zod.object({
+
+})
+
+export const simulateRunTestsChatExecuteCreateResponseStatusDefault = true;
+
+
+
+export const SimulateRunTestsChatExecuteCreateResponse = zod.object({
+  "status": zod.boolean().default(simulateRunTestsChatExecuteCreateResponseStatusDefault),
+  "result": zod.object({
+  "message": zod.string().min(1),
+  "execution_id": zod.string().uuid(),
+  "run_test_id": zod.string().uuid(),
+  "status": zod.string().min(1),
+  "total_scenarios": zod.array(zod.string().uuid())
+})
 })
 
 
@@ -18734,6 +18856,21 @@ export const SimulateRunTestsScenariosListResponse = zod.array(SimulateRunTestsS
  */
 export const SimulateRunTestsSdkCodeListParams = zod.object({
   "run_test_id": zod.string()
+})
+
+export const simulateRunTestsSdkCodeListResponseStatusDefault = true;
+
+
+
+
+export const SimulateRunTestsSdkCodeListResponse = zod.object({
+  "status": zod.boolean().default(simulateRunTestsSdkCodeListResponseStatusDefault),
+  "result": zod.object({
+  "installation_guide": zod.string().min(1),
+  "sdk_code": zod.string().min(1),
+  "run_test_id": zod.string().uuid(),
+  "run_test_name": zod.string().min(1)
+})
 })
 
 
@@ -19495,6 +19632,21 @@ hasMore is true until ALL row_ids of ALL scenarios have CallExecution objects cr
  */
 export const SimulateTestExecutionsChatCallExecutionsBatchCreateParams = zod.object({
   "test_execution_id": zod.string()
+})
+
+export const SimulateTestExecutionsChatCallExecutionsBatchCreateBody = zod.object({
+
+})
+
+export const simulateTestExecutionsChatCallExecutionsBatchCreateResponseStatusDefault = true;
+
+export const SimulateTestExecutionsChatCallExecutionsBatchCreateResponse = zod.object({
+  "status": zod.boolean().default(simulateTestExecutionsChatCallExecutionsBatchCreateResponseStatusDefault),
+  "result": zod.object({
+  "call_execution_ids": zod.array(zod.string().uuid()),
+  "has_more": zod.boolean(),
+  "batched_scenarios": zod.array(zod.string().uuid())
+})
 })
 
 

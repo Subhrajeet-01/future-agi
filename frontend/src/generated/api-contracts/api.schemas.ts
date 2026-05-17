@@ -5460,6 +5460,61 @@ export interface CallBranchDeviationCreateResponseApi {
   readonly message?: string;
 }
 
+export type SendChatRequestApiMetrics = {[key: string]: string};
+
+export type ChatMessageContractApiRole = typeof ChatMessageContractApiRole[keyof typeof ChatMessageContractApiRole];
+
+
+export const ChatMessageContractApiRole = {
+  user: 'user',
+  assistant: 'assistant',
+  tool: 'tool',
+} as const;
+
+export interface ChatToolCallFunctionApi {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  arguments: string;
+}
+
+export interface ChatToolCallApi {
+  /** @minLength 1 */
+  id: string;
+  /** @minLength 1 */
+  type: string;
+  function: ChatToolCallFunctionApi;
+}
+
+export type ChatMessageContractApiMetadata = {[key: string]: string};
+
+export interface ChatMessageContractApi {
+  role: ChatMessageContractApiRole;
+  content?: string;
+  tool_call_id?: string;
+  name?: string;
+  metadata?: ChatMessageContractApiMetadata;
+  tool_calls?: ChatToolCallApi[];
+}
+
+export interface SendChatRequestApi {
+  messages?: ChatMessageContractApi[];
+  metrics?: SendChatRequestApiMetrics;
+  initiate_chat?: boolean;
+}
+
+export interface ChatSendMessageResultApi {
+  input_message?: ChatMessageContractApi[];
+  output_message?: ChatMessageContractApi[];
+  message_history: ChatMessageContractApi[];
+  chat_ended?: boolean;
+}
+
+export interface ChatSendMessageResponseApi {
+  status?: boolean;
+  result: ChatSendMessageResultApi;
+}
+
 export interface CallExecutionDeleteResponseApi {
   /** @minLength 1 */
   readonly message?: string;
@@ -5574,6 +5629,17 @@ export interface CreateRunTestApi {
   replay_session_id?: string;
 }
 
+export interface RunTestNameResultApi {
+  run_test_id: string;
+  /** @minLength 1 */
+  run_test_name: string;
+}
+
+export interface RunTestNameResponseApi {
+  status?: boolean;
+  result: RunTestNameResultApi;
+}
+
 export interface UpdateRunTestApi {
   /**
      * @minLength 1
@@ -5619,6 +5685,21 @@ export interface RunTestAnalyticsApi {
   performance_comparison: RunTestAnalyticsApiPerformanceComparisonItem[];
   /** Aggregate performance summary */
   summary_stats?: RunTestAnalyticsApiSummaryStats;
+}
+
+export interface RunTestChatExecutionResultApi {
+  /** @minLength 1 */
+  message: string;
+  execution_id: string;
+  run_test_id: string;
+  /** @minLength 1 */
+  status: string;
+  total_scenarios: string[];
+}
+
+export interface RunTestChatExecutionResponseApi {
+  status?: boolean;
+  result: RunTestChatExecutionResultApi;
 }
 
 export interface TestExecutionBulkDeleteApi {
@@ -5915,6 +5996,21 @@ export interface RunTestScenarioItemResponseApi {
   /** @minLength 1 */
   readonly name?: string;
   readonly row_count?: number;
+}
+
+export interface ChatSDKCodeResultApi {
+  /** @minLength 1 */
+  installation_guide: string;
+  /** @minLength 1 */
+  sdk_code: string;
+  run_test_id: string;
+  /** @minLength 1 */
+  run_test_name: string;
+}
+
+export interface ChatSDKCodeResponseApi {
+  status?: boolean;
+  result: ChatSDKCodeResultApi;
 }
 
 export type TestExecutionStatusApiScenariosItem = {[key: string]: string};
@@ -6432,6 +6528,17 @@ export interface CancelTestExecutionResponseApi {
   /** @minLength 1 */
   message: string;
   test_execution_id: string;
+}
+
+export interface TestExecutionChatBatchResultApi {
+  call_execution_ids: string[];
+  has_more: boolean;
+  batched_scenarios: string[];
+}
+
+export interface TestExecutionChatBatchResponseApi {
+  status?: boolean;
+  result: TestExecutionChatBatchResultApi;
 }
 
 export interface ColumnOrderApi {
