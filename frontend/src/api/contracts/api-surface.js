@@ -1,5 +1,5 @@
 import { API_SURFACE_PATHS } from "./api-surface.generated.js";
-import { LEGACY_API_SURFACE } from "./legacy-api-surface.js";
+import { API_CONTRACT_EXCEPTIONS } from "./api-contract-exceptions.js";
 
 const PARAM_RE = /\{([^}]+)\}/g;
 
@@ -9,10 +9,11 @@ export const isContractedApiPath = (template) =>
 export const getContractedApiMethods = (template) =>
   API_SURFACE_PATHS[template] || [];
 
-export const isLegacyApiPath = (template) =>
-  Object.prototype.hasOwnProperty.call(LEGACY_API_SURFACE, template);
+export const isApiContractExceptionPath = (template) =>
+  Object.prototype.hasOwnProperty.call(API_CONTRACT_EXCEPTIONS, template);
 
-export const getLegacyApiPathMeta = (template) => LEGACY_API_SURFACE[template];
+export const getApiContractExceptionMeta = (template) =>
+  API_CONTRACT_EXCEPTIONS[template];
 
 export const apiPath = (template, params = {}) => {
   if (!isContractedApiPath(template)) {
@@ -28,21 +29,25 @@ export const apiPath = (template, params = {}) => {
   });
 };
 
-export const legacyApiPath = (template, params = {}) => {
+export const uncontractedApiPath = (template, params = {}) => {
   if (typeof params === "string") {
     throw new Error(
-      `Legacy API path metadata belongs in legacy-api-surface.js: ${template}`,
+      `Uncontracted API path metadata belongs in api-contract-exceptions.js: ${template}`,
     );
   }
 
-  if (!isLegacyApiPath(template)) {
-    throw new Error(`Legacy API path is not registered: ${template}`);
+  if (!isApiContractExceptionPath(template)) {
+    throw new Error(
+      `API contract exception path is not registered: ${template}`,
+    );
   }
 
   return template.replace(PARAM_RE, (_, key) => {
     const value = params[key];
     if (value === undefined || value === null || value === "") {
-      throw new Error(`Missing legacy API path param "${key}" for ${template}`);
+      throw new Error(
+        `Missing uncontracted API path param "${key}" for ${template}`,
+      );
     }
     return encodeURIComponent(String(value));
   });

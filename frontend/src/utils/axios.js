@@ -12,7 +12,7 @@ import {
   setSession,
 } from "src/auth/context/jwt/utils";
 import { HOST_API } from "src/config-global";
-import { apiPath, legacyApiPath } from "src/api/contracts/api-surface";
+import { apiPath, uncontractedApiPath } from "src/api/contracts/api-surface";
 import {
   assertContractedRequestConfig,
   assertContractedResponse,
@@ -503,30 +503,30 @@ export const endpoints = {
       }),
   },
   model: {
-    list: legacyApiPath("/model-hub/ai-models/"),
-    details: legacyApiPath("/model-hub/ai-models/"),
-    updateMetric: legacyApiPath("/model-hub/ai-models/update-metric/"),
-    performance: legacyApiPath("/model-hub/ai-models/performance"),
-    create: legacyApiPath("/model-hub/ai_models/create/"),
-    updateDefaultDataset: legacyApiPath(
+    list: uncontractedApiPath("/model-hub/ai-models/"),
+    details: uncontractedApiPath("/model-hub/ai-models/"),
+    updateMetric: uncontractedApiPath("/model-hub/ai-models/update-metric/"),
+    performance: uncontractedApiPath("/model-hub/ai-models/performance"),
+    create: uncontractedApiPath("/model-hub/ai_models/create/"),
+    updateDefaultDataset: uncontractedApiPath(
       "/model-hub/ai_models/update-baseline/",
     ),
-    modelList: legacyApiPath("/model-hub/ai-models/list/"),
+    modelList: uncontractedApiPath("/model-hub/ai-models/list/"),
     deleteModel: (id) =>
-      legacyApiPath("/model-hub/ai_models/delete/{id}/", { id }),
-    getModelDetail: legacyApiPath("/model-hub/get-model-details/"),
+      uncontractedApiPath("/model-hub/ai_models/delete/{id}/", { id }),
+    getModelDetail: uncontractedApiPath("/model-hub/get-model-details/"),
   },
   dataset: {
-    list: legacyApiPath("/model-hub/dataset/"),
-    summary: legacyApiPath("/model-hub/dataset/summary"),
-    options: legacyApiPath("/model-hub/dataset/options/"),
-    getColumns: legacyApiPath("/model-hub/dataset/column-config/"),
-    updateColumns: legacyApiPath("/model-hub/dataset/column-config/"),
-    createDataset: legacyApiPath("/model-hub/dataset/create/"),
-    propertyList: legacyApiPath("/model-hub/dataset/properties/"),
+    list: uncontractedApiPath("/model-hub/dataset/"),
+    summary: uncontractedApiPath("/model-hub/dataset/summary"),
+    options: uncontractedApiPath("/model-hub/dataset/options/"),
+    getColumns: uncontractedApiPath("/model-hub/dataset/column-config/"),
+    updateColumns: uncontractedApiPath("/model-hub/dataset/column-config/"),
+    createDataset: uncontractedApiPath("/model-hub/dataset/create/"),
+    propertyList: uncontractedApiPath("/model-hub/dataset/properties/"),
     propertyDetail: (id) =>
-      legacyApiPath("/model-hub/dataset/properties/{id}/", { id }),
-    createProperty: legacyApiPath("/model-hub/dataset/properties/"),
+      uncontractedApiPath("/model-hub/dataset/properties/{id}/", { id }),
+    createProperty: uncontractedApiPath("/model-hub/dataset/properties/"),
     promptSummary: (id) =>
       apiPath("/model-hub/dataset/{dataset_id}/run-prompt-stats/", {
         dataset_id: id,
@@ -571,11 +571,11 @@ export const endpoints = {
       }),
   },
   dataPoints: {
-    getColumns: legacyApiPath("/model-hub/data-points/column-config/"),
-    updateColumns: legacyApiPath("/model-hub/data-points/column-config/"),
-    list: legacyApiPath("/model-hub/data-points/"),
-    create: legacyApiPath("/model-hub/data-points/create/"),
-    metrics: legacyApiPath("/model-hub/data-points/metrics/"),
+    getColumns: uncontractedApiPath("/model-hub/data-points/column-config/"),
+    updateColumns: uncontractedApiPath("/model-hub/data-points/column-config/"),
+    list: uncontractedApiPath("/model-hub/data-points/"),
+    create: uncontractedApiPath("/model-hub/data-points/create/"),
+    metrics: uncontractedApiPath("/model-hub/data-points/metrics/"),
   },
   annotation: {
     list: apiPath("/model-hub/annotation-tasks/"),
@@ -736,23 +736,25 @@ export const endpoints = {
       deleteModel: apiPath("/model-hub/custom_models/delete/"),
     },
     getLatestPrices: apiPath("/usage/get_latest_prices/"),
-    getAvailableMonths: legacyApiPath("/usage/available-months/"),
+    getAvailableMonths: uncontractedApiPath("/usage/available-months/"),
     usageTotals: apiPath("/usage/workspace-usage-summary/"),
     workspaceUsage: apiPath("/usage/workspace-eval-summary/"),
     usageMetrics: apiPath("/usage/usage-summary/"),
     v2: {
-      usageOverview: legacyApiPath("/usage/v2/usage-overview/"),
-      usageTimeSeries: legacyApiPath("/usage/v2/usage-time-series/"),
-      usageWorkspaceBreakdown: legacyApiPath(
+      usageOverview: uncontractedApiPath("/usage/v2/usage-overview/"),
+      usageTimeSeries: uncontractedApiPath("/usage/v2/usage-time-series/"),
+      usageWorkspaceBreakdown: uncontractedApiPath(
         "/usage/v2/usage-workspace-breakdown/",
       ),
-      plansAndAddons: legacyApiPath("/usage/v2/plans-and-addons/"),
-      billingOverview: legacyApiPath("/usage/v2/billing-overview/"),
-      invoices: legacyApiPath("/usage/v2/invoices/"),
-      invoiceDetail: (id) => legacyApiPath("/usage/v2/invoices/{id}/", { id }),
-      notifications: legacyApiPath("/usage/v2/notifications/"),
-      budgets: legacyApiPath("/usage/v2/budgets/"),
-      budgetDetail: (id) => legacyApiPath("/usage/v2/budgets/{id}/", { id }),
+      plansAndAddons: uncontractedApiPath("/usage/v2/plans-and-addons/"),
+      billingOverview: uncontractedApiPath("/usage/v2/billing-overview/"),
+      invoices: uncontractedApiPath("/usage/v2/invoices/"),
+      invoiceDetail: (id) =>
+        uncontractedApiPath("/usage/v2/invoices/{id}/", { id }),
+      notifications: uncontractedApiPath("/usage/v2/notifications/"),
+      budgets: uncontractedApiPath("/usage/v2/budgets/"),
+      budgetDetail: (id) =>
+        uncontractedApiPath("/usage/v2/budgets/{id}/", { id }),
       upgradeToPayg: apiPath("/usage/v2/upgrade-to-payg/"),
       downgradeToFree: apiPath("/usage/v2/downgrade-to-free/"),
       addAddon: apiPath("/usage/v2/add-addon/"),
@@ -1441,7 +1443,7 @@ export const endpoints = {
       "/usage/create-billing-portal-session/",
     ),
     createAutoRechargeSession: apiPath("/usage/create-auto-recharge-session/"),
-    createTopupSession: legacyApiPath("/usage/create-topup-session/"),
+    createTopupSession: uncontractedApiPath("/usage/create-topup-session/"),
     getLast4Digits: apiPath("/usage/get-last-four-digits/"),
     updateAutoReloadSettings: apiPath("/usage/update-auto-reload-settings/"),
     getAutoReloadSettings: apiPath("/usage/get-auto-reload-settings/"),

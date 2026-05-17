@@ -6,11 +6,11 @@ import {
 } from "../api-surface.generated";
 import {
   apiPath,
+  getApiContractExceptionMeta,
   getContractedApiMethods,
-  getLegacyApiPathMeta,
   isContractedApiPath,
-  isLegacyApiPath,
-  legacyApiPath,
+  isApiContractExceptionPath,
+  uncontractedApiPath,
 } from "../api-surface";
 
 describe("api surface contract", () => {
@@ -104,24 +104,37 @@ describe("api surface contract", () => {
     );
   });
 
-  it("allows only manifest-registered legacy paths", () => {
+  it("allows only manifest-registered contract exception paths", () => {
     expect(
-      legacyApiPath("/model-hub/ai_models/delete/{id}/", { id: "item/1" }),
+      uncontractedApiPath("/model-hub/ai_models/delete/{id}/", {
+        id: "item/1",
+      }),
     ).toBe("/model-hub/ai_models/delete/item%2F1/");
-    expect(isLegacyApiPath("/model-hub/ai-models/")).toBe(true);
-    expect(getLegacyApiPathMeta("/model-hub/ai-models/")).toMatchObject({
+    expect(isApiContractExceptionPath("/model-hub/ai-models/")).toBe(true);
+    expect(getApiContractExceptionMeta("/model-hub/ai-models/")).toMatchObject({
       group: "model-management",
       status: "active_uncontracted",
     });
-    expect(() => legacyApiPath("/model-hub/legacy/")).toThrow(
-      "Legacy API path is not registered",
+    expect(
+      getApiContractExceptionMeta("/usage/v2/usage-overview/"),
+    ).toMatchObject({
+      group: "usage",
+      status: "enterprise_contract_pending",
+    });
+    expect(() => uncontractedApiPath("/model-hub/legacy/")).toThrow(
+      "API contract exception path is not registered",
     );
     expect(() =>
-      legacyApiPath("/model-hub/ai-models/", "Not exposed in Swagger yet."),
-    ).toThrow("Legacy API path metadata belongs in legacy-api-surface.js");
+      uncontractedApiPath(
+        "/model-hub/ai-models/",
+        "Not exposed in Swagger yet.",
+      ),
+    ).toThrow(
+      "Uncontracted API path metadata belongs in api-contract-exceptions.js",
+    );
     expect(() =>
-      legacyApiPath("/model-hub/ai_models/delete/{id}/", {}),
-    ).toThrow('Missing legacy API path param "id"');
+      uncontractedApiPath("/model-hub/ai_models/delete/{id}/", {}),
+    ).toThrow('Missing uncontracted API path param "id"');
   });
 
   it("does not let generated Management API coverage accidentally shrink", () => {

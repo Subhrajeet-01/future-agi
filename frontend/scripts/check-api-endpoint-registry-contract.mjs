@@ -12,9 +12,9 @@ import {
   API_SURFACE_PATHS,
 } from "../src/api/contracts/api-surface.generated.js";
 import {
-  LEGACY_API_STATUSES,
-  LEGACY_API_SURFACE,
-} from "../src/api/contracts/legacy-api-surface.js";
+  API_CONTRACT_EXCEPTION_STATUSES,
+  API_CONTRACT_EXCEPTIONS,
+} from "../src/api/contracts/api-contract-exceptions.js";
 
 const traverse = traverseModule.default;
 
@@ -28,8 +28,8 @@ const endpointRegistryPath = path.join(
 );
 const MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS = 0;
 const MAX_RAW_REGISTRY_PATHS = 0;
-const MAX_LEGACY_REGISTRY_PATHS = 35;
-const MAX_LEGACY_SURFACE_PATHS = 31;
+const MAX_CONTRACT_EXCEPTION_REGISTRY_PATHS = 35;
+const MAX_CONTRACT_EXCEPTION_SURFACE_PATHS = 31;
 const MANAGEMENT_API_GROUPS = Object.keys(API_SURFACE_CONTRACT.groups)
   .filter((groupName) => groupName !== "root")
   .sort();
@@ -107,7 +107,12 @@ function collectRawRegistryPaths() {
   traverse(ast, {
     StringLiteral(nodePath) {
       if (!isInEndpointRegistry(nodePath)) return;
-      if (isPathRegistryCall(nodePath, new Set(["apiPath", "legacyApiPath"])))
+      if (
+        isPathRegistryCall(
+          nodePath,
+          new Set(["apiPath", "uncontractedApiPath"]),
+        )
+      )
         return;
       const value = rawPathValue(nodePath.node);
       if (value && API_PATH_RE.test(value)) {
@@ -116,7 +121,12 @@ function collectRawRegistryPaths() {
     },
     TemplateLiteral(nodePath) {
       if (!isInEndpointRegistry(nodePath)) return;
-      if (isPathRegistryCall(nodePath, new Set(["apiPath", "legacyApiPath"])))
+      if (
+        isPathRegistryCall(
+          nodePath,
+          new Set(["apiPath", "uncontractedApiPath"]),
+        )
+      )
         return;
       const value = rawPathValue(nodePath.node);
       if (value && API_PATH_RE.test(value)) {
@@ -135,18 +145,18 @@ function staticStringValue(node) {
   return "";
 }
 
-function collectLegacyRegistryPaths() {
-  const legacyPaths = [];
+function collectContractExceptionRegistryPaths() {
+  const contractExceptionPaths = [];
   traverse(ast, {
     CallExpression(nodePath) {
       if (!isInEndpointRegistry(nodePath)) return;
       if (nodePath.node.callee?.type !== "Identifier") return;
-      if (nodePath.node.callee.name !== "legacyApiPath") return;
+      if (nodePath.node.callee.name !== "uncontractedApiPath") return;
 
       const [templateArg, secondArg, thirdArg] = nodePath.node.arguments;
       const value = staticStringValue(templateArg);
       const inlineReason = Boolean(staticStringValue(thirdArg || secondArg));
-      legacyPaths.push({
+      contractExceptionPaths.push({
         value,
         inlineReason,
         line:
@@ -154,7 +164,7 @@ function collectLegacyRegistryPaths() {
       });
     },
   });
-  return legacyPaths;
+  return contractExceptionPaths;
 }
 
 function collectApiPathRegistryPaths() {
@@ -196,44 +206,57 @@ const invalidApiPaths = apiPathPaths.filter(
     !API_PATH_RE.test(rawPath.value) ||
     !matchedContractTemplate(rawPath.value),
 );
-const legacyPaths = collectLegacyRegistryPaths();
-const legacySurfacePaths = Object.keys(LEGACY_API_SURFACE);
-const usedLegacySurfacePaths = new Set(legacyPaths.map(({ value }) => value));
-const unusedLegacySurfacePaths = legacySurfacePaths.filter(
-  (value) => !usedLegacySurfacePaths.has(value),
+const contractExceptionPaths = collectContractExceptionRegistryPaths();
+const contractExceptionSurfacePaths = Object.keys(API_CONTRACT_EXCEPTIONS);
+const usedContractExceptionSurfacePaths = new Set(
+  contractExceptionPaths.map(({ value }) => value),
 );
-const missingLegacyMetadata = legacySurfacePaths.filter((value) => {
-  const meta = LEGACY_API_SURFACE[value];
-  return !meta?.group || !meta?.status || !meta?.reason || !meta?.next;
-});
-const validLegacyStatuses = new Set(Object.values(LEGACY_API_STATUSES));
-const invalidLegacyStatuses = legacySurfacePaths.filter((value) => {
-  const status = LEGACY_API_SURFACE[value]?.status;
-  return status && !validLegacyStatuses.has(status);
-});
-const contractedLegacySurfacePaths = legacySurfacePaths.filter((value) =>
-  matchedContractTemplate(value),
+const unusedContractExceptionSurfacePaths =
+  contractExceptionSurfacePaths.filter(
+    (value) => !usedContractExceptionSurfacePaths.has(value),
+  );
+const missingContractExceptionMetadata = contractExceptionSurfacePaths.filter(
+  (value) => {
+    const meta = API_CONTRACT_EXCEPTIONS[value];
+    return !meta?.group || !meta?.status || !meta?.reason || !meta?.next;
+  },
 );
-const invalidLegacyPaths = legacyPaths.filter(
+const validContractExceptionStatuses = new Set(
+  Object.values(API_CONTRACT_EXCEPTION_STATUSES),
+);
+const invalidContractExceptionStatuses = contractExceptionSurfacePaths.filter(
+  (value) => {
+    const status = API_CONTRACT_EXCEPTIONS[value]?.status;
+    return status && !validContractExceptionStatuses.has(status);
+  },
+);
+const contractedContractExceptionSurfacePaths =
+  contractExceptionSurfacePaths.filter((value) =>
+    matchedContractTemplate(value),
+  );
+const invalidContractExceptionPaths = contractExceptionPaths.filter(
   (rawPath) =>
     !rawPath.value ||
     rawPath.inlineReason ||
     !API_PATH_RE.test(rawPath.value) ||
     matchedContractTemplate(rawPath.value) ||
-    !Object.prototype.hasOwnProperty.call(LEGACY_API_SURFACE, rawPath.value),
+    !Object.prototype.hasOwnProperty.call(
+      API_CONTRACT_EXCEPTIONS,
+      rawPath.value,
+    ),
 );
 
 if (
   registryPaths.length > MAX_RAW_REGISTRY_PATHS ||
   uncontracted.length > MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS ||
   invalidApiPaths.length ||
-  legacyPaths.length > MAX_LEGACY_REGISTRY_PATHS ||
-  legacySurfacePaths.length > MAX_LEGACY_SURFACE_PATHS ||
-  invalidLegacyPaths.length ||
-  unusedLegacySurfacePaths.length ||
-  missingLegacyMetadata.length ||
-  invalidLegacyStatuses.length ||
-  contractedLegacySurfacePaths.length
+  contractExceptionPaths.length > MAX_CONTRACT_EXCEPTION_REGISTRY_PATHS ||
+  contractExceptionSurfacePaths.length > MAX_CONTRACT_EXCEPTION_SURFACE_PATHS ||
+  invalidContractExceptionPaths.length ||
+  unusedContractExceptionSurfacePaths.length ||
+  missingContractExceptionMetadata.length ||
+  invalidContractExceptionStatuses.length ||
+  contractedContractExceptionSurfacePaths.length
 ) {
   console.error(
     [
@@ -241,9 +264,9 @@ if (
       `Raw registry paths: ${registryPaths.length}/${MAX_RAW_REGISTRY_PATHS}`,
       `Invalid apiPath(...) calls: ${invalidApiPaths.length}`,
       `Unmarked uncontracted paths: ${uncontracted.length}/${MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS}`,
-      `Marked legacy paths: ${legacyPaths.length}/${MAX_LEGACY_REGISTRY_PATHS}`,
-      `Legacy surface manifest paths: ${legacySurfacePaths.length}/${MAX_LEGACY_SURFACE_PATHS}`,
-      "Add the missing backend Swagger serializer/path first, switch contracted endpoints to apiPath(), or register genuinely deprecated endpoints in legacy-api-surface.js and use legacyApiPath(path).",
+      `Contract exception paths: ${contractExceptionPaths.length}/${MAX_CONTRACT_EXCEPTION_REGISTRY_PATHS}`,
+      `Contract exception manifest paths: ${contractExceptionSurfacePaths.length}/${MAX_CONTRACT_EXCEPTION_SURFACE_PATHS}`,
+      "Add the missing backend Swagger serializer/path first, switch contracted endpoints to apiPath(), or register intentional exceptions in api-contract-exceptions.js and use uncontractedApiPath(path).",
       ...uncontracted
         .slice(0, 80)
         .map(({ line, value }) => `  - src/utils/axios.js:${line}: ${value}`),
@@ -253,27 +276,34 @@ if (
           ({ line, value }) =>
             `  - invalid apiPath src/utils/axios.js:${line}: ${value || "<dynamic>"} (missing generated backend contract)`,
         ),
-      ...invalidLegacyPaths
+      ...invalidContractExceptionPaths
         .slice(0, 80)
         .map(
           ({ line, value, inlineReason }) =>
-            `  - invalid legacy src/utils/axios.js:${line}: ${value || "<dynamic>"} (${inlineReason ? "inline reason should move to legacy-api-surface.js" : "missing manifest entry or now contracted"})`,
+            `  - invalid contract exception src/utils/axios.js:${line}: ${value || "<dynamic>"} (${inlineReason ? "inline reason should move to api-contract-exceptions.js" : "missing manifest entry or now contracted"})`,
         ),
-      ...unusedLegacySurfacePaths
+      ...unusedContractExceptionSurfacePaths
         .slice(0, 80)
-        .map((value) => `  - unused legacy manifest path: ${value}`),
-      ...missingLegacyMetadata
-        .slice(0, 80)
-        .map((value) => `  - incomplete legacy manifest metadata: ${value}`),
-      ...invalidLegacyStatuses
+        .map(
+          (value) => `  - unused contract exception manifest path: ${value}`,
+        ),
+      ...missingContractExceptionMetadata
         .slice(0, 80)
         .map(
           (value) =>
-            `  - invalid legacy manifest status: ${value} (${LEGACY_API_SURFACE[value]?.status})`,
+            `  - incomplete contract exception manifest metadata: ${value}`,
         ),
-      ...contractedLegacySurfacePaths
+      ...invalidContractExceptionStatuses
         .slice(0, 80)
-        .map((value) => `  - legacy manifest path is now contracted: ${value}`),
+        .map(
+          (value) =>
+            `  - invalid contract exception manifest status: ${value} (${API_CONTRACT_EXCEPTIONS[value]?.status})`,
+        ),
+      ...contractedContractExceptionSurfacePaths
+        .slice(0, 80)
+        .map(
+          (value) => `  - contract exception path is now contracted: ${value}`,
+        ),
     ].join("\n"),
   );
   process.exit(1);
@@ -286,7 +316,7 @@ console.log(
     `  raw registry paths: ${registryPaths.length}/${MAX_RAW_REGISTRY_PATHS}`,
     `  contracted by Swagger: ${registryPaths.length - uncontracted.length}`,
     `  unmarked uncontracted paths: ${uncontracted.length}/${MAX_UNMARKED_UNCONTRACTED_REGISTRY_PATHS}`,
-    `  marked legacy paths: ${legacyPaths.length}/${MAX_LEGACY_REGISTRY_PATHS}`,
-    `  legacy surface manifest paths: ${legacySurfacePaths.length}/${MAX_LEGACY_SURFACE_PATHS}`,
+    `  contract exception paths: ${contractExceptionPaths.length}/${MAX_CONTRACT_EXCEPTION_REGISTRY_PATHS}`,
+    `  contract exception manifest paths: ${contractExceptionSurfacePaths.length}/${MAX_CONTRACT_EXCEPTION_SURFACE_PATHS}`,
   ].join("\n"),
 );
