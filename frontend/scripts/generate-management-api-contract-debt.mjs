@@ -24,6 +24,7 @@ const MUTATION_METHODS = new Set(["post", "put", "patch"]);
 const NON_RESPONSE_OPTIONAL_METHODS = new Set(["delete"]);
 const NO_BODY_RESPONSE_STATUS = /^(204|205|304|3\d\d)$/;
 const SUCCESS_RESPONSE_STATUS = /^2\d\d$/;
+const ERROR_RESPONSE_STATUS = /^[45]\d\d$/;
 const HTTP_METHODS = new Set([
   "get",
   "post",
@@ -125,6 +126,18 @@ function responseSchemaEntries(operation) {
     }));
 }
 
+function errorResponseSchemaEntries(operation) {
+  return Object.entries(operation.responses || {})
+    .filter(
+      ([statusCode, response]) =>
+        ERROR_RESPONSE_STATUS.test(statusCode) && response?.schema,
+    )
+    .map(([statusCode, response]) => ({
+      statusCode,
+      schema: response.schema,
+    }));
+}
+
 function refName(schema) {
   return schema?.$ref?.replace("#/definitions/", "") || null;
 }
@@ -207,6 +220,50 @@ const broadSuccessResponseSchemas = operations.flatMap((record) => {
   });
 });
 
+const operationsWithoutErrorResponseSchema = operations.filter((record) => {
+  const { operation } = operationsByKey.get(`${record.method} ${record.path}`);
+  return errorResponseSchemaEntries(operation).length === 0;
+});
+
+function broadErrorResponseReason(schema) {
+  const schemaName = refName(schema);
+  const resolved = dereference(schema);
+
+  if (isUnshapedObject(resolved)) {
+    return schemaName
+      ? `${schemaName} is an unshaped object response`
+      : "inline error response is an unshaped object";
+  }
+
+  for (const key of ["error", "message", "detail", "result", "data"]) {
+    if (isUnshapedObject(resolved.properties?.[key])) {
+      return schemaName
+        ? `${schemaName}.${key} is an unshaped object`
+        : `inline error response ${key} is an unshaped object`;
+    }
+  }
+
+  return null;
+}
+
+const broadErrorResponseSchemas = operations.flatMap((record) => {
+  const { operation } = operationsByKey.get(`${record.method} ${record.path}`);
+  return errorResponseSchemaEntries(operation).flatMap(
+    ({ statusCode, schema }) => {
+      const reason = broadErrorResponseReason(schema);
+      if (!reason) return [];
+      return [
+        {
+          ...record,
+          status_code: statusCode,
+          schema: refName(schema) || "inline",
+          reason,
+        },
+      ];
+    },
+  );
+});
+
 const byGroup = {};
 for (const pathName of Object.keys(paths).sort()) {
   const group = groupForPath(pathName);
@@ -216,6 +273,8 @@ for (const pathName of Object.keys(paths).sort()) {
     mutation_endpoints_without_body_schema: 0,
     operations_without_response_schema: 0,
     broad_success_response_schemas: 0,
+    operations_without_error_response_schema: 0,
+    broad_error_response_schemas: 0,
   };
   byGroup[group].paths += 1;
 }
@@ -232,6 +291,12 @@ for (const record of operationsWithoutResponseSchema) {
 for (const record of broadSuccessResponseSchemas) {
   byGroup[record.group].broad_success_response_schemas += 1;
 }
+for (const record of operationsWithoutErrorResponseSchema) {
+  byGroup[record.group].operations_without_error_response_schema += 1;
+}
+for (const record of broadErrorResponseSchemas) {
+  byGroup[record.group].broad_error_response_schemas += 1;
+}
 
 const report = {
   generated_from: path.relative(repoRoot, swaggerPath),
@@ -242,6 +307,9 @@ const report = {
       mutationEndpointsWithoutBodySchema.length,
     operations_without_response_schema: operationsWithoutResponseSchema.length,
     broad_success_response_schemas: broadSuccessResponseSchemas.length,
+    operations_without_error_response_schema:
+      operationsWithoutErrorResponseSchema.length,
+    broad_error_response_schemas: broadErrorResponseSchemas.length,
   },
   by_group: Object.fromEntries(Object.entries(byGroup).sort()),
   mutation_endpoints_without_body_schema: mutationEndpointsWithoutBodySchema,
@@ -281,6 +349,10 @@ if (process.argv.includes("--check")) {
       report.summary.operations_without_response_schema
     } response-schema gaps and ${
       report.summary.broad_success_response_schemas
-    } broad success response schemas.`,
+    } broad success response schemas and ${
+      report.summary.operations_without_error_response_schema
+    } missing error response schemas and ${
+      report.summary.broad_error_response_schemas
+    } broad error response schemas.`,
   );
 }
