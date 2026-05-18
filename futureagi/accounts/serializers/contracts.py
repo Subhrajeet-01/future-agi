@@ -21,6 +21,19 @@ class AccountsJSONRequestSerializer(serializers.Serializer):
         }
 
 
+class SignupRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    full_name = serializers.CharField()
+    company_name = serializers.CharField(required=False, allow_blank=True)
+    password = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    allow_email = serializers.BooleanField(required=False, default=False)
+    recaptcha_response = serializers.CharField(required=False, allow_blank=True)
+
+
+class LogoutRequestSerializer(serializers.Serializer):
+    refresh = serializers.CharField(required=False, allow_blank=True)
+
+
 class AccountsJSONResponseSerializer(serializers.Serializer):
     status = serializers.JSONField(required=False)
     result = serializers.JSONField(required=False, allow_null=True)

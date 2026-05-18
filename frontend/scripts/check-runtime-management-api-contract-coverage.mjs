@@ -14,10 +14,10 @@ const reportPath = path.join(
   "runtime-management-api-contract-debt.generated.json",
 );
 
-const MIN_RUNTIME_BACKED_VALIDATED_REQUEST_DECORATORS = 46;
+const MIN_RUNTIME_BACKED_VALIDATED_REQUEST_DECORATORS = 48;
 const MAX_DIRECT_SWAGGER_AUTO_SCHEMA_DECORATORS = 386;
-const MAX_DOC_ONLY_INPUT_CONTRACT_DECORATORS = 261;
-const MAX_BROAD_REQUEST_CONTRACT_DECORATORS = 2;
+const MAX_DOC_ONLY_INPUT_CONTRACT_DECORATORS = 259;
+const MAX_BROAD_REQUEST_CONTRACT_DECORATORS = 0;
 
 const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
 const summary = report.summary || {};

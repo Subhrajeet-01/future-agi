@@ -20,7 +20,7 @@ const FOCUS_DIRS = [
   path.join(repoRoot, "futureagi", "tracer", "views"),
 ];
 const HTTP_DECORATOR_RE =
-  /^\s*@(swagger_auto_schema|validated_request)\s*\((?<inline>.*)$/;
+  /^\s*@(swagger_auto_schema|validated_request|validated_api_request)\s*\((?<inline>.*)$/;
 const DEF_RE = /^\s*def\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(/;
 const BROAD_REQUEST_SERIALIZERS = new Set(["AccountsJSONRequestSerializer"]);
 
@@ -93,7 +93,17 @@ function nextFunctionName(lines, startIndex) {
   for (let i = startIndex; i < lines.length; i += 1) {
     const match = lines[i].match(DEF_RE);
     if (match) return match.groups.name;
-    if (lines[i].trim() && !lines[i].trim().startsWith("@")) return null;
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("@")) {
+      let parenDepth = countParenDelta(lines[i]);
+      while (parenDepth > 0 && i + 1 < lines.length) {
+        i += 1;
+        parenDepth += countParenDelta(lines[i]);
+      }
+      continue;
+    }
+    return null;
   }
   return null;
 }
@@ -114,7 +124,9 @@ function serializerNames(text) {
 }
 
 function decoratorUsesRuntimeValidation(record) {
-  return record?.decorator === "validated_request";
+  return ["validated_request", "validated_api_request"].includes(
+    record?.decorator,
+  );
 }
 
 function decoratorHasInputContract(record) {
@@ -153,7 +165,16 @@ const validated = decorators.filter(decoratorUsesRuntimeValidation);
 const directSwagger = decorators.filter(
   (record) => record.decorator === "swagger_auto_schema",
 );
-const docOnlyInputContracts = directSwagger.filter(decoratorHasInputContract);
+const runtimeInputContractKeys = new Set(
+  validated
+    .filter(decoratorHasInputContract)
+    .map((record) => `${record.rel}:${record.functionName || ""}`),
+);
+const docOnlyInputContracts = directSwagger.filter(
+  (record) =>
+    decoratorHasInputContract(record) &&
+    !runtimeInputContractKeys.has(`${record.rel}:${record.functionName || ""}`),
+);
 const broadRequestContracts = decorators.filter((record) =>
   record.serializers.some((name) => BROAD_REQUEST_SERIALIZERS.has(name)),
 );

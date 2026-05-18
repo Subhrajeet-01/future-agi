@@ -5,10 +5,10 @@
     "futureagi/tracer/views"
   ],
   "summary": {
-    "runtime_backed_validated_request_decorators": 46,
+    "runtime_backed_validated_request_decorators": 48,
     "direct_swagger_auto_schema_decorators": 386,
-    "doc_only_input_contract_decorators": 261,
-    "broad_request_contract_decorators": 2
+    "doc_only_input_contract_decorators": 259,
+    "broad_request_contract_decorators": 0
   },
   "doc_only_input_contract_decorators": [
     {
@@ -213,23 +213,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 118,
-      "function": "user_signup",
-      "serializers": [
-        "AccountsJSONRequestSerializer"
-      ]
-    },
-    {
-      "path": "futureagi/accounts/views/signup.py",
-      "line": 191,
-      "function": "user_logout",
-      "serializers": [
-        "AccountsJSONRequestSerializer"
-      ]
-    },
-    {
-      "path": "futureagi/accounts/views/signup.py",
-      "line": 314,
+      "line": 334,
       "function": "initiate_password_reset",
       "serializers": [
         "PasswordResetInitiateRequestSerializer"
@@ -237,7 +221,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 389,
+      "line": 409,
       "function": "reset_password_confirm",
       "serializers": [
         "PasswordResetConfirmRequestSerializer"
@@ -245,7 +229,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 502,
+      "line": 522,
       "function": "accept_invitation_mail",
       "serializers": [
         "AcceptInvitationRequestSerializer"
@@ -253,7 +237,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 709,
+      "line": 729,
       "function": "resend_invitation_emails",
       "serializers": [
         "UserIdsRequestSerializer"
@@ -261,7 +245,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 773,
+      "line": 793,
       "function": "delete_users",
       "serializers": [
         "UserIdsRequestSerializer"
@@ -269,7 +253,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 843,
+      "line": 863,
       "function": "update_user",
       "serializers": [
         "UpdateUserSerializer"
@@ -277,7 +261,7 @@
     },
     {
       "path": "futureagi/accounts/views/signup.py",
-      "line": 927,
+      "line": 947,
       "function": "update_user_full_name",
       "serializers": [
         "UserFullNameUpdateRequestSerializer"
@@ -358,7 +342,7 @@
     {
       "path": "futureagi/accounts/views/user.py",
       "line": 66,
-      "function": null,
+      "function": "manage_redis_key",
       "serializers": [
         "RedisKeyRequestSerializer"
       ]
@@ -2101,22 +2085,5 @@
       ]
     }
   ],
-  "broad_request_contract_decorators": [
-    {
-      "path": "futureagi/accounts/views/signup.py",
-      "line": 118,
-      "function": "user_signup",
-      "serializers": [
-        "AccountsJSONRequestSerializer"
-      ]
-    },
-    {
-      "path": "futureagi/accounts/views/signup.py",
-      "line": 191,
-      "function": "user_logout",
-      "serializers": [
-        "AccountsJSONRequestSerializer"
-      ]
-    }
-  ]
+  "broad_request_contract_decorators": []
 }

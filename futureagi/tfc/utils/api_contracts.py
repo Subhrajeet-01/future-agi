@@ -193,3 +193,92 @@ def validated_request(
         return wrapper
 
     return decorator
+
+
+def validated_api_request(
+    request_serializer=None,
+    *,
+    query_serializer=None,
+    responses=None,
+    method=None,
+    document=True,
+    strict_request_validation=True,
+    strict_response_validation=False,
+    **swagger_kwargs,
+):
+    """Document and validate a function-based DRF view from one serializer set."""
+
+    def decorator(view_func):
+        swagger_options = dict(swagger_kwargs)
+        if method is not None:
+            swagger_options["method"] = method
+        if request_serializer is not None:
+            swagger_options["request_body"] = request_serializer
+        if query_serializer is not None:
+            swagger_options["query_serializer"] = query_serializer
+        if responses is not None:
+            swagger_options["responses"] = responses
+
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            request.validated_data = {}
+            request.validated_query_data = {}
+            gm = GeneralMethods(request=request)
+
+            if query_serializer is not None:
+                serializer = query_serializer(data=request.query_params)
+                if not serializer.is_valid():
+                    return gm.bad_request(serializer.errors)
+                request.validated_query_data = serializer.validated_data
+
+            if request_serializer is not None:
+                serializer = request_serializer(data=request.data)
+                is_valid = serializer.is_valid()
+                if not is_valid:
+                    if strict_request_validation:
+                        return gm.bad_request(serializer.errors)
+                    if settings.DEBUG:
+                        logger.warning(
+                            "API request does not match declared serializer.",
+                            view_func=view_func.__name__,
+                            serializer_class=request_serializer.__name__,
+                            validation_errors=serializer.errors,
+                        )
+                request.validated_data = serializer.validated_data
+
+            response = view_func(request, *args, **kwargs)
+
+            if not responses or not isinstance(response, Response):
+                return response
+
+            response_serializer = responses.get(response.status_code)
+            if response_serializer is None:
+                if strict_response_validation:
+                    raise serializers.ValidationError(
+                        f"Undocumented response status {response.status_code} "
+                        f"for {view_func.__name__}."
+                    )
+                if settings.DEBUG:
+                    logger.warning(
+                        "API response status is not declared.",
+                        view_func=view_func.__name__,
+                        status_code=response.status_code,
+                        declared_status_codes=sorted(responses),
+                    )
+                return response
+
+            if strict_response_validation or settings.DEBUG:
+                _validate_response(
+                    view_func.__name__,
+                    response_serializer,
+                    response,
+                    strict_response_validation,
+                )
+
+            return response
+
+        if not document:
+            return wrapper
+        return swagger_auto_schema(**swagger_options)(wrapper)
+
+    return decorator

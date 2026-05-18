@@ -36,13 +36,14 @@ from accounts.serializers.contracts import (
     AcceptInvitationRequestSerializer,
     AccountsBulkUserMutationItemSerializer,
     AccountsDirectMessageResponseSerializer,
-    AccountsJSONRequestSerializer,
     AccountsMessageResponseSerializer,
     AccountsStringResultResponseSerializer,
     AccountsTokenPairResponseSerializer,
     AccountsUserProfileResponseSerializer,
+    LogoutRequestSerializer,
     PasswordResetConfirmRequestSerializer,
     PasswordResetInitiateRequestSerializer,
+    SignupRequestSerializer,
     UserFullNameUpdateRequestSerializer,
     UserIdsRequestSerializer,
 )
@@ -60,6 +61,7 @@ from tfc.constants.roles import OrganizationRoles
 from tfc.permissions.rbac import IsOrganizationAdmin
 from tfc.permissions.utils import get_org_membership
 from tfc.settings.settings import RECAPTCHA_ENABLED, RECAPTCHA_SECRET_KEY, ssl
+from tfc.utils.api_contracts import validated_api_request
 from tfc.utils.email import email_helper
 from tfc.utils.general_methods import GeneralMethods
 
@@ -117,13 +119,21 @@ def verify_recaptcha(token):
 
 @swagger_auto_schema(
     method="post",
-    request_body=AccountsJSONRequestSerializer,
+    request_body=SignupRequestSerializer,
     responses={200: AccountsMessageResponseSerializer, **ACCOUNTS_ERROR_RESPONSES},
 )
 @api_view(["POST"])
+@validated_api_request(
+    request_serializer=SignupRequestSerializer,
+    responses={200: AccountsMessageResponseSerializer, **ACCOUNTS_ERROR_RESPONSES},
+    document=False,
+)
 def user_signup(request):
     try:
-        recaptcha_token = request.data.get("recaptcha-response")
+        data = request.validated_data
+        recaptcha_token = request.data.get("recaptcha-response") or data.get(
+            "recaptcha_response"
+        )
         logger.info(
             "signup_request",
             host=request.get_host(),
@@ -134,9 +144,7 @@ def user_signup(request):
             },
         )
 
-        email = request.data.get("email", "")
-        if not email:
-            return _gm.bad_request("Email is required.")
+        email = data.get("email", "")
         email = email.lower()
 
         # Log and reject deprecated account-update parameters (security hardening)
@@ -176,7 +184,14 @@ def user_signup(request):
             "recaptcha-response",
             "allow_email",
         }
-        sanitized_data = {k: v for k, v in request.data.items() if k in allowed_fields}
+        sanitized_data = {
+            k: v
+            for k, v in {
+                **data,
+                "recaptcha-response": recaptcha_token,
+            }.items()
+            if k in allowed_fields
+        }
         first_signup(sanitized_data)
 
         return _gm.success_response(
@@ -190,10 +205,15 @@ def user_signup(request):
 
 @swagger_auto_schema(
     method="post",
-    request_body=AccountsJSONRequestSerializer,
+    request_body=LogoutRequestSerializer,
     responses={200: AccountsMessageResponseSerializer, **ACCOUNTS_ERROR_RESPONSES},
 )
 @api_view(["POST"])
+@validated_api_request(
+    request_serializer=LogoutRequestSerializer,
+    responses={200: AccountsMessageResponseSerializer, **ACCOUNTS_ERROR_RESPONSES},
+    document=False,
+)
 def user_logout(request):
     try:
         auth_token = (
