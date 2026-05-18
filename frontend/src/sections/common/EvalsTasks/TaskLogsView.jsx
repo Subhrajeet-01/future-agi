@@ -393,6 +393,7 @@ const TaskLogsView = ({ evalTaskId, taskStatus }) => {
   const {
     success_count: successCount = 0,
     errors_count: errorsCount = 0,
+    skipped_count: skippedCount = 0,
     total_count: totalCount = 0,
     start_time: startTime,
     end_time: endTime,
@@ -432,7 +433,17 @@ const TaskLogsView = ({ evalTaskId, taskStatus }) => {
                 : "No data"}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {totalCount > 0 ? `${successCount} / ${totalCount} passed` : "—"}
+            {/* TH-4910 — when every row was skipped (mapped attribute
+                missing on the matching spans), don't lie with
+                "0/N passed". Show "N/N skipped" instead, or append a
+                "· M skipped" tail when mixed. */}
+            {totalCount > 0
+              ? skippedCount === totalCount
+                ? `${skippedCount} / ${totalCount} skipped`
+                : `${successCount} / ${totalCount} passed${
+                    skippedCount > 0 ? ` · ${skippedCount} skipped` : ""
+                  }`
+              : "—"}
           </Typography>
         </Box>
         <LinearProgress
@@ -480,6 +491,16 @@ const TaskLogsView = ({ evalTaskId, taskStatus }) => {
           value={errorsCount ?? 0}
           color="error.main"
           bgColor={alpha(theme.palette.error.main, 0.1)}
+        />
+        {/* TH-4910 — skipped (mapped attribute missing on the span);
+            displayed as its own tile so customers can see at a glance
+            that the failures aren't real eval failures. */}
+        <StatCard
+          icon="solar:forbidden-circle-linear"
+          label="Skipped"
+          value={skippedCount ?? 0}
+          color="text.secondary"
+          bgColor={alpha(theme.palette.text.secondary, 0.08)}
         />
         <StatCard
           icon="solar:layers-linear"
@@ -649,17 +670,32 @@ const TaskLogsView = ({ evalTaskId, taskStatus }) => {
             borderColor: "divider",
           }}
         >
+          {/* TH-4910 — don't claim "completed successfully" when every
+              row was actually skipped. Use a neutral icon + accurate
+              copy explaining why nothing ran. */}
           <Iconify
-            icon="solar:check-circle-bold"
+            icon={
+              skippedCount === totalCount
+                ? "solar:forbidden-circle-bold"
+                : "solar:check-circle-bold"
+            }
             width={32}
-            sx={{ color: "success.main", mb: 1 }}
+            sx={{
+              color:
+                skippedCount === totalCount ? "text.secondary" : "success.main",
+              mb: 1,
+            }}
           />
           <Typography
             variant="body2"
             color="text.secondary"
             sx={{ fontSize: "13px" }}
           >
-            All evaluations completed successfully
+            {skippedCount === totalCount
+              ? `All ${totalCount} evaluation${totalCount === 1 ? "" : "s"} were skipped — the mapped attribute wasn't present on the matching spans.`
+              : skippedCount > 0
+                ? `${successCount} eval${successCount === 1 ? "" : "s"} succeeded · ${skippedCount} skipped (mapped attribute missing)`
+                : "All evaluations completed successfully"}
           </Typography>
         </Box>
       )}

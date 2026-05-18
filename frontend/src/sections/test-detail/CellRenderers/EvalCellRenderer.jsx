@@ -62,6 +62,27 @@ const EvalCellRenderer = ({ value: evalData }) => {
           <Skeleton sx={{ width: "100%", height: "20px" }} variant="rounded" />
         </Box>
       );
+    // TH-4910 — skipped wins over error so a missing-attribute row
+    // renders the neutral "Skipped" label instead of red "Error".
+    if (evalData?.skipped) {
+      return (
+        <Box
+          sx={{
+            color: "text.secondary",
+            opacity: 1,
+            flex: 1,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+          title="Eval skipped — required attribute not present on span"
+        >
+          <Typography variant="body2" align="center">
+            Skipped
+          </Typography>
+        </Box>
+      );
+    }
     if (evalData?.error) {
       return (
         <Box
@@ -97,7 +118,10 @@ const EvalCellRenderer = ({ value: evalData }) => {
       return (
         <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
           {evalData?.value?.map((item, idx) => {
-            const label = typeof item === "object" ? (item?.choice ?? item?.value ?? JSON.stringify(item)) : item;
+            const label =
+              typeof item === "object"
+                ? item?.choice ?? item?.value ?? JSON.stringify(item)
+                : item;
             return (
               <Chip
                 color="primary"

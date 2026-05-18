@@ -577,10 +577,22 @@ class TraceListQueryBuilder(BaseQueryBuilder):
             pass_rate = _get(row, "pass_rate", 3)
             success_count = _get(row, "success_count", 4, 0) or 0
             error_count = _get(row, "error_count", 5, 0) or 0
-            str_lists = _get(row, "str_lists", 7, []) or []
+            # TH-4910 — ``skipped_count`` is emitted by callers that
+            # opted into the skipped-sentinel grouping (currently
+            # ``VoiceCallListQueryBuilder.build_eval_query``). Defaults
+            # to 0 for callers that haven't.
+            skipped_count = _get(row, "skipped_count", 6, 0) or 0
+            str_lists = _get(row, "str_lists", 8, []) or []
 
-            # All rows errored — surface an explicit error marker so the
-            # UI can render an error state (distinct from "no eval run").
+            # Skipped takes precedence over error: the eval pipeline
+            # never ran, so surfacing "Error" would falsely flag the
+            # model — exactly the bug TH-4910 was filed to fix.
+            if success_count == 0 and skipped_count > 0 and error_count == 0:
+                result.setdefault(trace_id, {})[config_id] = {"skipped": True}
+                continue
+
+            # All non-skipped rows errored — explicit error marker
+            # distinct from "no eval run" / "skipped".
             if success_count == 0 and error_count > 0:
                 result.setdefault(trace_id, {})[config_id] = {"error": True}
                 continue

@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from tracer.utils.eval import _process_mapping
+from tracer.utils.eval import EvalSkippedMissingAttribute, _process_mapping
 
 
 @pytest.fixture
@@ -91,7 +91,27 @@ def test_provider_transcript_alias_resolves(_span_with_attrs, missing_eval_templ
 
 def test_missing_attribute_raises(_span_with_attrs, missing_eval_template_id):
     span = _span_with_attrs({"unrelated": "value"})
+    # ``EvalSkippedMissingAttribute`` is a ``ValueError`` subclass so
+    # legacy ``except ValueError`` clauses still catch it.
     with pytest.raises(ValueError, match="Required attribute 'input'"):
         _process_mapping(
             {"prompt": "input"}, span, eval_template_id=missing_eval_template_id
         )
+
+
+def test_missing_attribute_raises_typed_skip_exception(
+    _span_with_attrs, missing_eval_template_id
+):
+    # TH-4910 contract: dispatch sites detect ``EvalSkippedMissingAttribute``
+    # specifically and write a *skipped* row, distinct from a real eval
+    # failure. If this assertion ever regresses to a plain ``ValueError``
+    # the "Skipped" vs "Fail" distinction collapses silently — no test
+    # would catch it without this one.
+    span = _span_with_attrs({"unrelated": "value"})
+    with pytest.raises(EvalSkippedMissingAttribute) as excinfo:
+        _process_mapping(
+            {"prompt": "input"}, span, eval_template_id=missing_eval_template_id
+        )
+    assert excinfo.value.attribute == "input"
+    assert excinfo.value.key == "prompt"
+    assert excinfo.value.span_id == str(span.id)

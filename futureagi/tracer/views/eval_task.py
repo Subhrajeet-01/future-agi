@@ -35,7 +35,10 @@ class _RegexpReplace(Func):
 
 
 # Re-exported for back-compat; canonical definition lives in `tracer.utils.eval`.
-from tracer.utils.eval import _walk_dotted_path  # noqa: E402, F401
+from tracer.utils.eval import (  # noqa: E402, F401
+    EVAL_SKIPPED_OUTPUT_STR,
+    _walk_dotted_path,
+)
 
 
 # Per-variable size cap to keep the panel payload bounded — a single
@@ -268,10 +271,24 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
                 or self.request.user.organization,
             )
 
-            # Pass/fail counts — cheap aggregate, two indexed COUNTs.
+            # Pass / fail / skipped counts — cheap aggregate, three
+            # indexed COUNTs.
+            # TH-4910: skipped rows carry ``output_str = EVAL_SKIPPED_OUTPUT_STR``
+            # (sentinel written by ``_create_error_eval_logger`` when the
+            # span lacked the mapped attribute). They are neither a
+            # success nor a failure — they get their own bucket and are
+            # excluded from the success denominator so the failure rate
+            # doesn't get diluted.
             counts = EvalLogger.objects.filter(eval_task_id=eval_task_id).aggregate(
                 errors_count=Count("id", filter=Q(error=True)),
-                success_count=Count("id", filter=Q(error=False)),
+                success_count=Count(
+                    "id",
+                    filter=Q(error=False)
+                    & ~Q(output_str=EVAL_SKIPPED_OUTPUT_STR),
+                ),
+                skipped_count=Count(
+                    "id", filter=Q(output_str=EVAL_SKIPPED_OUTPUT_STR)
+                ),
             )
 
             # ── Pre-aggregate error groups in SQL ──
@@ -327,13 +344,18 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
                 for row in error_groups_qs
             ]
 
-            total_count = counts["errors_count"] + counts["success_count"]
+            total_count = (
+                counts["errors_count"]
+                + counts["success_count"]
+                + counts["skipped_count"]
+            )
 
             result = {
                 "start_time": eval_task.start_time,
                 "end_time": eval_task.end_time,
                 "errors_count": counts["errors_count"],
                 "success_count": counts["success_count"],
+                "skipped_count": counts["skipped_count"],
                 "total_count": total_count,
                 "error_groups": error_groups,
                 # Indicates whether we capped at _ERROR_GROUPS_LIMIT — the

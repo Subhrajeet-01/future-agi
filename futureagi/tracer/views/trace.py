@@ -65,6 +65,7 @@ from tracer.services.clickhouse.query_builders import (
 from tracer.services.clickhouse.query_service import AnalyticsQueryService, QueryType
 from tracer.services.observability_providers import ObservabilityService
 from tracer.utils.aggregates import JSONBObjectAgg
+from tracer.utils.eval import EVAL_SKIPPED_OUTPUT_STR  # TH-4910 skipped sentinel
 from tracer.utils.annotations import (
     build_annotation_subqueries as _build_annotation_subqueries_impl,
 )
@@ -1131,6 +1132,7 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                 metric_type = getattr(trace, f"metric_type_{config.id}", None)
                 reason = getattr(trace, f"metric_reason_{config.id}", None)
                 error = getattr(trace, f"error_{config.id}", False)
+                skipped = bool(getattr(trace, f"skipped_{config.id}", False))
                 metric_name = getattr(config, "name", None) or (
                     getattr(config, "eval_template", None).name
                     if getattr(config, "eval_template", None)
@@ -1142,6 +1144,7 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                     "output_type": metric_type,
                     "reason": reason,
                     "error": error,
+                    "skipped": skipped,
                 }
 
                 if isinstance(data, list):
@@ -1328,6 +1331,18 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                         metric_subquery.values("eval_explanation")
                     ),
                     f"error_{config.id}": Subquery(metric_subquery.values("error")),
+                    # TH-4910 — does this (trace, config) pair have a
+                    # row tagged with the skipped sentinel? Used by
+                    # ``populate_call_logs_result`` to surface
+                    # ``metric_entry["skipped"]`` so the FE renders
+                    # "Skipped" not "Fail" / "Error".
+                    f"skipped_{config.id}": Exists(
+                        EvalLogger.objects.filter(
+                            trace_id=OuterRef("id"),
+                            custom_eval_config_id=config.id,
+                            output_str=EVAL_SKIPPED_OUTPUT_STR,
+                        )
+                    ),
                 }
             )
         return eval_configs, base_query
@@ -3670,16 +3685,23 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                         "output": None,
                         "reason": None,
                         "error": None,
+                        "skipped": False,
                     }
                     continue
 
+                # TH-4910 — skipped sentinel takes precedence so the
+                # cell renders "Skipped" not the residual Pass/Fail.
+                is_skipped = log.output_str == EVAL_SKIPPED_OUTPUT_STR
                 metric_entry = {
                     "name": metric_name,
                     "output_type": output_type,
                     "reason": log.eval_explanation,
                     "error": log.error,
+                    "skipped": is_skipped,
                 }
-                if log.output_str_list:
+                if is_skipped:
+                    metric_entry["output"] = None
+                elif log.output_str_list:
                     metric_entry["output"] = log.output_str_list
                 elif output_type == "Pass/Fail" and log.output_bool is not None:
                     metric_entry["output"] = "Pass" if log.output_bool else "Fail"
@@ -3932,12 +3954,22 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
         eval_outputs = {}
         trace_evals: Dict[str, Any] = {}
         if eval_config_ids:
+            # TH-4910: ``output_str = EVAL_SKIPPED_OUTPUT_STR`` flags rows
+            # the dispatch wrote because the span had no value for the
+            # mapped attribute. Excluded from score aggregates and
+            # surfaced as ``skipped_count`` so the pivot can emit a
+            # ``{"skipped": True}`` marker for the (trace, config) pair.
             eval_query = f"""
             SELECT
                 trace_id,
                 toString(custom_eval_config_id) AS eval_config_id,
-                avg(output_float) AS avg_score,
-                avg(CASE WHEN output_bool = 1 THEN 100.0 ELSE 0.0 END) AS pass_rate,
+                avgIf(output_float, ifNull(output_str, '') != %(skipped_sentinel)s) AS avg_score,
+                avgIf(
+                    CASE WHEN output_bool = 1 THEN 100.0 ELSE 0.0 END,
+                    ifNull(output_str, '') != %(skipped_sentinel)s
+                ) AS pass_rate,
+                countIf(ifNull(output_str, '') != %(skipped_sentinel)s) AS success_count,
+                countIf(ifNull(output_str, '') = %(skipped_sentinel)s) AS skipped_count,
                 count() AS eval_count,
                 any(output_str_list) AS output_str_list
             FROM tracer_eval_logger FINAL
@@ -3951,6 +3983,7 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                 {
                     "trace_id": str(trace_id),
                     "eval_config_ids": tuple(eval_config_ids),
+                    "skipped_sentinel": EVAL_SKIPPED_OUTPUT_STR,
                 },
                 timeout_ms=30000,
             )
@@ -3981,13 +4014,25 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                     "output": None,
                     "reason": None,
                     "error": None,
+                    "skipped": False,
                 }
                 continue
 
             scores = trace_evals[config_id]
-            metric_entry = {"name": metric_name, "output_type": output_type}
+            metric_entry = {
+                "name": metric_name,
+                "output_type": output_type,
+                "skipped": False,
+            }
             if isinstance(scores, dict):
-                if scores.get("per_choice"):
+                # TH-4910 — skipped marker propagated by the CH pivot.
+                # Beats any residual avg/per-choice that might be in the
+                # dict for a (trace, config) pair where the only rows
+                # were skipped.
+                if scores.get("skipped"):
+                    metric_entry["skipped"] = True
+                    metric_entry["output"] = None
+                elif scores.get("per_choice"):
                     metric_entry["output"] = [
                         k for k, v in scores["per_choice"].items() if v > 0
                     ]

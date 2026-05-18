@@ -216,7 +216,13 @@ const VoiceRightPanel = ({
       let score = null;
       let scoreLabel;
 
-      if (typeof rawValue === "number") {
+      // TH-4910 — ``skipped`` is propagated by the backend voice
+      // serializer when the span lacked the mapped attribute. Wins over
+      // the typed branches below so any residual rawValue is ignored
+      // and the badge goes gray with the "Skipped" label.
+      if (e?.skipped) {
+        scoreLabel = "Skipped";
+      } else if (typeof rawValue === "number") {
         // Numbers in [0, 1] → percent. Numbers already in [0, 100] → as-is.
         score =
           rawValue <= 1 ? Math.round(rawValue * 100) : Math.round(rawValue);

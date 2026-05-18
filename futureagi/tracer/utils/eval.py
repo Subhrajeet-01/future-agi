@@ -37,6 +37,41 @@ custom_prompt_eval_types = ["CustomPrompt"]
 EXPERIMENT = "experiment"
 OBSERVE = "observe"
 
+
+# TH-4910 — distinct ``output_str`` sentinel for eval rows that were
+# skipped because the dispatch had no input data (the span lacked the
+# attribute the mapping pointed at). Tighter than bare ``"SKIPPED"`` so
+# a customer's custom eval can't accidentally collide by emitting that
+# string itself. Read by:
+#   * ``_create_error_eval_logger`` (this file, write site)
+#   * ``tracer.views.eval_task.get_eval_task_logs`` (count aggregate)
+#   * ``tracer.views.trace.populate_call_logs_result`` (PG voice list)
+#   * ``tracer.views.trace.voice_call_detail`` (PG voice detail)
+#   * ``tracer.views.trace._voice_call_detail_clickhouse`` (CH voice detail)
+#   * ``tracer.services.clickhouse.query_builders.voice_call_list``
+#     (CH voice list builder)
+# Anyone touching the sentinel string must update all six call sites.
+EVAL_SKIPPED_OUTPUT_STR = "__SKIPPED_MISSING_ATTRIBUTE__"
+
+
+class EvalSkippedMissingAttribute(ValueError):
+    """Raised by ``_process_mapping`` when the span has no value for the
+    attribute that the eval config's mapping points at.
+
+    Subclasses ``ValueError`` so legacy ``except ValueError`` handlers
+    in the dispatch chain still catch it. The typed identity lets
+    ``_create_error_eval_logger`` mark the resulting ``EvalLogger`` row
+    as **skipped** (TH-4910) instead of as a real eval failure.
+    """
+
+    def __init__(self, attribute: str, key: str, span_id: str):
+        self.attribute = attribute
+        self.key = key
+        self.span_id = span_id
+        super().__init__(
+            f"Required attribute '{attribute}' for key '{key}' not found for span {span_id}"
+        )
+
 # Re-export for backward compat
 from tracer.utils.eval_helpers import resolve_eval_config_id  # noqa: F401, E402
 
@@ -435,8 +470,15 @@ def _process_mapping(
             logger.error(
                 f"Required attribute '{attribute}' for key '{key}' not found for span {span.id}"
             )
-            raise ValueError(
-                f"Required attribute '{attribute}' for key '{key}' not found for span {span.id}"
+            # TH-4910: the eval did not run — span had no value for the
+            # mapped attribute. Raise a typed subclass of ``ValueError``
+            # so the dispatch chain's ``except ValueError`` clauses still
+            # catch it and ``_create_error_eval_logger`` can detect the
+            # type and write a *skipped* row instead of a failure row.
+            # DO NOT change this exception class without also updating
+            # ``_create_error_eval_logger`` — they are a contract pair.
+            raise EvalSkippedMissingAttribute(
+                attribute=attribute, key=key, span_id=str(span.id)
             )
 
     return parsed_mapping
@@ -1100,10 +1142,43 @@ def _create_error_eval_logger(
     custom_eval_config: CustomEvalConfig,
     eval_task_id: str,
     error_message: str,
+    exc: BaseException | None = None,
 ):
+    """Persist an EvalLogger row for a failed (or skipped) eval dispatch.
+
+    TH-4910: when ``exc`` is a ``EvalSkippedMissingAttribute`` instance,
+    the span had no value for the mapped attribute — the eval pipeline
+    never ran. That row is written as **skipped** (``output_str`` set
+    to ``EVAL_SKIPPED_OUTPUT_STR``, ``error=False``) so the read paths
+    can render "Skipped" instead of "Fail" / "Error".
+
+    All other paths keep the legacy error shape.
     """
-    Create an error eval logger for the given observation span, custom eval config, and eval task id.
-    """
+    if isinstance(exc, EvalSkippedMissingAttribute):
+        EvalLogger.objects.create(
+            trace=observation_span.trace,
+            observation_span=observation_span,
+            output_metadata={
+                "skipped": True,
+                "missing_attribute": exc.attribute,
+                "mapping_key": exc.key,
+            },
+            eval_explanation=(
+                f"Skipped: required attribute '{exc.attribute}' for key "
+                f"'{exc.key}' not present on span"
+            ),
+            results_explanation={"reason": str(exc)},
+            eval_task_id=eval_task_id,
+            custom_eval_config=custom_eval_config,
+            # Skipped rows are NOT eval failures — leave ``error`` /
+            # ``error_message`` empty so failure-rate aggregates and the
+            # error_groups grouping in get_eval_task_logs ignore them.
+            error=False,
+            error_message=None,
+            output_str=EVAL_SKIPPED_OUTPUT_STR,
+        )
+        return
+
     EvalLogger.objects.create(
         trace=observation_span.trace,
         observation_span=observation_span,
@@ -1175,8 +1250,13 @@ def evaluate_observation_span(
         )
         return True
     except ValueError as e:
+        # ``EvalSkippedMissingAttribute`` is a ``ValueError`` subclass —
+        # caught here and passed through ``exc`` so the helper can write
+        # a *skipped* row instead of an error row (TH-4910).
         logger.error(f"Error during evaluation in evaluate_observation_span: {e}")
-        _create_error_eval_logger(observation_span, custom_eval_config, None, str(e))
+        _create_error_eval_logger(
+            observation_span, custom_eval_config, None, str(e), exc=e
+        )
         return False
 
     except Exception as e:
@@ -1314,13 +1394,18 @@ def evaluate_observation_span_observe(
                         eval_task.failed_spans if eval_task.failed_spans else []
                     )
 
-                    failed_spans.append(
-                        {
-                            "observation_span_id": observation_span_id,
-                            "custom_eval_config_id": custom_eval_config_id,
-                            "error": str(e),
-                        }
-                    )
+                    # TH-4910: tag the entry as skipped when the cause
+                    # was a missing-attribute exception so downstream
+                    # consumers of ``failed_spans`` can re-categorise
+                    # without re-parsing the message.
+                    entry = {
+                        "observation_span_id": observation_span_id,
+                        "custom_eval_config_id": custom_eval_config_id,
+                        "error": str(e),
+                    }
+                    if isinstance(e, EvalSkippedMissingAttribute):
+                        entry["reason"] = "skipped_missing_attribute"
+                    failed_spans.append(entry)
 
                     eval_task.failed_spans = failed_spans
                     eval_task.save(update_fields=["failed_spans", "updated_at"])
@@ -1330,8 +1415,10 @@ def evaluate_observation_span_observe(
                 logger.error(
                     f"Error during updating failed spans in exception handling evaluate_observation_span_observe: {e}"
                 )
+        # TH-4910 — pass ``exc=e`` so the helper can detect a
+        # ``EvalSkippedMissingAttribute`` and write a skipped row.
         _create_error_eval_logger(
-            observation_span, custom_eval_config, eval_task_id, str(e)
+            observation_span, custom_eval_config, eval_task_id, str(e), exc=e
         )
 
         return False

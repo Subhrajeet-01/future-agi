@@ -212,9 +212,20 @@ class VoiceCallListQueryBuilder(BaseQueryBuilder):
         if not trace_ids or not self.eval_config_ids:
             return "", {}
 
+        # TH-4910: rows tagged with ``EVAL_SKIPPED_OUTPUT_STR`` in
+        # ``output_str`` are skipped (eval pipeline never ran), not real
+        # results. Exclude them from score aggregates and surface a
+        # ``skipped_count`` so the caller's pivot
+        # (TraceListQueryBuilder.pivot_eval_results) can emit a
+        # ``{"skipped": True}`` marker for the (trace, config) pair.
+        # Imported here (not at module top) to avoid a circular import
+        # between ``tracer.utils.eval`` and the CH-side service code.
+        from tracer.utils.eval import EVAL_SKIPPED_OUTPUT_STR
+
         params: Dict[str, Any] = {
             "trace_ids": tuple(trace_ids),
             "eval_config_ids": tuple(self.eval_config_ids),
+            "skipped_sentinel": EVAL_SKIPPED_OUTPUT_STR,
         }
 
         query = f"""
@@ -223,9 +234,19 @@ class VoiceCallListQueryBuilder(BaseQueryBuilder):
             toString(custom_eval_config_id) AS eval_config_id,
             -- ifNotFinite(, NULL): avg over an all-NULL group returns NaN, which
             -- json.dumps(allow_nan=False) rejects. NULL serializes as null.
-            ifNotFinite(avg(output_float), NULL) AS avg_score,
-            ifNotFinite(avg(CASE WHEN output_bool = 1 THEN 100.0 ELSE 0.0 END), NULL)
-                AS pass_rate,
+            ifNotFinite(
+                avgIf(output_float, ifNull(output_str, '') != %(skipped_sentinel)s),
+                NULL
+            ) AS avg_score,
+            ifNotFinite(
+                avgIf(
+                    CASE WHEN output_bool = 1 THEN 100.0 ELSE 0.0 END,
+                    ifNull(output_str, '') != %(skipped_sentinel)s
+                ),
+                NULL
+            ) AS pass_rate,
+            countIf(ifNull(output_str, '') != %(skipped_sentinel)s) AS success_count,
+            countIf(ifNull(output_str, '') = %(skipped_sentinel)s) AS skipped_count,
             count() AS eval_count,
             any(output_str_list) AS output_str_list
         FROM {self.EVAL_TABLE} FINAL
