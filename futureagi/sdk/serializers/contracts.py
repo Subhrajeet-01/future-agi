@@ -13,8 +13,12 @@ from sdk.serializers.evaluations import ConfigureEvaluationsSerializer
 
 class SDKErrorResponseSerializer(serializers.Serializer):
     status = serializers.BooleanField()
-    result = serializers.JSONField(required=False, allow_null=True)
-    message = serializers.JSONField(required=False, allow_null=True)
+    result = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    message = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    errors = serializers.DictField(
+        child=serializers.ListField(child=serializers.CharField()),
+        required=False,
+    )
 
 
 class ConfigureEvaluationsRequestSerializer(serializers.Serializer):

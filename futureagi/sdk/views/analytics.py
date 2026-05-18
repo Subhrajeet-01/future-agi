@@ -23,6 +23,7 @@ from sdk.serializers.contracts import (
     SDKSimulationMetricsResponseSerializer,
     SDKSimulationRunsResponseSerializer,
 )
+from sdk.utils.api_errors import sdk_validation_error_response
 from simulate.models import CallExecution, TestExecution
 from simulate.models.run_test import RunTest
 from simulate.utils.eval_summary import (
@@ -102,7 +103,7 @@ class SimulationMetricsView(APIView):
 
             serializer = SimulationQuerySerializer(data=request.query_params)
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             data = serializer.validated_data
             run_test_name = data.get("run_test_name")
@@ -285,7 +286,7 @@ class SimulationRunsView(APIView):
 
             serializer = SimulationRunsQuerySerializer(data=request.query_params)
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             data = serializer.validated_data
             run_test_name = data.get("run_test_name")
@@ -483,7 +484,7 @@ class SimulationAnalyticsView(APIView):
 
             serializer = SimulationAnalyticsQuerySerializer(data=request.query_params)
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             data = serializer.validated_data
             run_test_name = data.get("run_test_name")

@@ -12296,14 +12296,13 @@ export interface SDKConfigureEvaluationsResponseApi {
   result: SDKMessageResultApi;
 }
 
-export type SDKErrorResponseApiResult = { [key: string]: unknown };
-
-export type SDKErrorResponseApiMessage = { [key: string]: unknown };
+export type SDKErrorResponseApiErrors = {[key: string]: string[]};
 
 export interface SDKErrorResponseApi {
   status: boolean;
-  result?: SDKErrorResponseApiResult;
-  message?: SDKErrorResponseApiMessage;
+  result?: string;
+  message?: string;
+  errors?: SDKErrorResponseApiErrors;
 }
 
 export type SDKStandaloneEvalRequestApiConfig = {[key: string]: string};

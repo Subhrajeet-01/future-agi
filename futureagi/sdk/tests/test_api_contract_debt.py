@@ -7,9 +7,7 @@ def _repo_root():
 
 
 def _swagger():
-    with (
-        _repo_root() / "api_contracts" / "openapi" / "swagger.json"
-    ).open() as f:
+    with (_repo_root() / "api_contracts" / "openapi" / "swagger.json").open() as f:
         return json.load(f)
 
 
@@ -42,6 +40,7 @@ def _response_ref(operation, status_code="200"):
 
 def test_sdk_contract_debt_is_fully_burned_down():
     report = _debt_report()
+    sdk_report = report["by_group"]["sdk"]
 
     assert [
         item
@@ -53,6 +52,8 @@ def test_sdk_contract_debt_is_fully_burned_down():
         for item in report["operations_without_response_schema"]
         if item["tags"] == ["sdk"]
     ] == []
+    assert sdk_report["operations_without_error_response_schema"] == 0
+    assert sdk_report["broad_error_response_schemas"] == 0
 
 
 def test_sdk_mutations_have_body_contracts():
@@ -76,9 +77,7 @@ def test_sdk_endpoints_have_response_contracts():
         ),
         ("POST", "/sdk/api/v1/eval/"): "SDKStandaloneEvalResponse",
         ("GET", "/sdk/api/v1/eval/{eval_id}/"): "SDKEvalTemplateResponse",
-        ("GET", "/sdk/api/v1/evaluate-pipeline/"): (
-            "SDKCICDEvaluationRunsResponse"
-        ),
+        ("GET", "/sdk/api/v1/evaluate-pipeline/"): ("SDKCICDEvaluationRunsResponse"),
         ("POST", "/sdk/api/v1/evaluate-pipeline/"): (
             "SDKCICDEvaluationRunAcceptedResponse"
         ),
@@ -88,11 +87,20 @@ def test_sdk_endpoints_have_response_contracts():
         ("GET", "/sdk/api/v1/simulation/analytics/"): (
             "SDKSimulationAnalyticsResponse"
         ),
-        ("GET", "/sdk/api/v1/simulation/metrics/"): (
-            "SDKSimulationMetricsResponse"
-        ),
+        ("GET", "/sdk/api/v1/simulation/metrics/"): ("SDKSimulationMetricsResponse"),
         ("GET", "/sdk/api/v1/simulation/runs/"): "SDKSimulationRunsResponse",
     }
 
     for (method, path), definition_name in expected.items():
         assert _response_ref(_operation(path, method)) == definition_name
+
+
+def test_sdk_endpoints_have_typed_error_contracts():
+    expected = {
+        ("POST", "/sdk/api/v1/configure-evaluations/", "400"): "SDKErrorResponse",
+        ("GET", "/sdk/api/v1/eval/{eval_id}/", "500"): "SDKErrorResponse",
+        ("GET", "/sdk/api/v1/simulation/metrics/", "404"): "SDKErrorResponse",
+    }
+
+    for (method, path, status_code), definition_name in expected.items():
+        assert _response_ref(_operation(path, method), status_code) == definition_name

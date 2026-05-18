@@ -33,6 +33,7 @@ from sdk.serializers.contracts import (
     SDKStandaloneEvalV2ResponseSerializer,
 )
 from sdk.serializers.evaluations import ConfigureEvaluationsSerializer
+from sdk.utils.api_errors import sdk_validation_error_response
 from sdk.utils.async_evaluations import _handle_async_eval
 from sdk.utils.evaluations import (
     StandaloneEvaluationError,
@@ -282,9 +283,9 @@ class StandaloneEvalView_v2(APIView):
                 }
 
                 if evaluation.error_localizer.status == ErrorLocalizerStatus.FAILED:
-                    response_data["result"]["error_localizer"][
-                        "error_message"
-                    ] = evaluation.error_localizer.error_message
+                    response_data["result"]["error_localizer"]["error_message"] = (
+                        evaluation.error_localizer.error_message
+                    )
 
             if evaluation.status == StatusChoices.FAILED:
                 response_data["result"]["error_message"] = evaluation.error_message
@@ -335,7 +336,7 @@ class StandaloneEvalView_v2(APIView):
                 data=eval_config, context={"request": request}
             )
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             eval_template = EvalTemplate.no_workspace_objects.get(
                 Q(name=eval_name)
@@ -526,7 +527,7 @@ class ConfigureEvaluationsView(APIView):
                 data=eval_config, context={"request": request}
             )
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             eval_template = EvalTemplate.objects.get(
                 name=serializer.validated_data.get("eval_templates")

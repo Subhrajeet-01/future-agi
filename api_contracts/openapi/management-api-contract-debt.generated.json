@@ -7,7 +7,7 @@
     "operations_without_response_schema": 0,
     "broad_success_response_schemas": 0,
     "operations_without_error_response_schema": 550,
-    "broad_error_response_schemas": 2869
+    "broad_error_response_schemas": 2845
   },
   "by_group": {
     "accounts": {
@@ -125,7 +125,7 @@
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
       "operations_without_error_response_schema": 0,
-      "broad_error_response_schemas": 24
+      "broad_error_response_schemas": 0
     },
     "simulate": {
       "paths": 106,

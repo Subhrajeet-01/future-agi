@@ -14,6 +14,7 @@ from sdk.serializers.eval_ci_cd import (
     CICDEvaluationRunsQuerySerializer,
     CICDJobSerializer,
 )
+from sdk.utils.api_errors import sdk_validation_error_response
 from sdk.utils.cicd_evaluations import (
     are_evaluation_runs_processing,
     create_evaluation_run,
@@ -47,7 +48,7 @@ class CICDEvaluationsView(APIView):
                 data=request.data, context={"request": request}
             )
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             evaluation_run = create_evaluation_run(
                 serializer.validated_data, request.user
@@ -86,7 +87,7 @@ class CICDEvaluationsView(APIView):
                 data=query_data, context={"request": request}
             )
             if not serializer.is_valid():
-                return self._gm.bad_request(serializer.errors)
+                return sdk_validation_error_response(serializer.errors)
 
             validated_data = serializer.validated_data
             evaluation_runs = validated_data["evaluation_runs"]

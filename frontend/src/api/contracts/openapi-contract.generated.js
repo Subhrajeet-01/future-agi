@@ -57910,13 +57910,24 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "result": {
           "title": "Result",
-          "type": "object",
+          "type": "string",
           "x-nullable": true
         },
         "message": {
           "title": "Message",
-          "type": "object",
+          "type": "string",
           "x-nullable": true
+        },
+        "errors": {
+          "title": "Errors",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
