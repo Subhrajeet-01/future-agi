@@ -16629,6 +16629,336 @@ export interface DashboardCreateUpdateApi {
   description?: string;
 }
 
+export type DashboardQueryApiWorkflow = typeof DashboardQueryApiWorkflow[keyof typeof DashboardQueryApiWorkflow];
+
+
+export const DashboardQueryApiWorkflow = {
+  observability: 'observability',
+  dataset: 'dataset',
+  simulation: 'simulation',
+} as const;
+
+export type DashboardQueryApiGranularity = typeof DashboardQueryApiGranularity[keyof typeof DashboardQueryApiGranularity];
+
+
+export const DashboardQueryApiGranularity = {
+  minute: 'minute',
+  hour: 'hour',
+  day: 'day',
+  week: 'week',
+  month: 'month',
+} as const;
+
+export type DashboardQueryApiFiltersItemFilterConfig = {
+  /** Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array. */
+  filter_type: string;
+  /** Canonical operator from api_contracts/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null. */
+  filter_op: string;
+  /** Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type. */
+  filter_value?: unknown;
+  /** Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL. */
+  col_type?: string;
+};
+
+export type DashboardQueryApiFiltersItem = {
+  /** Column or attribute id to filter on. */
+  column_id: string;
+  /** Optional UI label for chips and saved views. */
+  display_name?: string;
+  /** Optional source surface for mixed-source filters, for example traces, datasets, or simulation. */
+  source?: string;
+  /** Optional metric output type metadata used by eval and annotation filters. */
+  output_type?: string;
+  filter_config: DashboardQueryApiFiltersItemFilterConfig;
+};
+
+export type DashboardTimeRangeApiPreset = typeof DashboardTimeRangeApiPreset[keyof typeof DashboardTimeRangeApiPreset];
+
+
+export const DashboardTimeRangeApiPreset = {
+  '30m': '30m',
+  '6h': '6h',
+  today: 'today',
+  yesterday: 'yesterday',
+  '7D': '7D',
+  '30D': '30D',
+  '3M': '3M',
+  '6M': '6M',
+  '12M': '12M',
+} as const;
+
+export interface DashboardTimeRangeApi {
+  preset?: DashboardTimeRangeApiPreset;
+  custom_start?: string;
+  custom_end?: string;
+}
+
+export type DashboardMetricApiType = typeof DashboardMetricApiType[keyof typeof DashboardMetricApiType];
+
+
+export const DashboardMetricApiType = {
+  system_metric: 'system_metric',
+  eval_metric: 'eval_metric',
+  annotation_metric: 'annotation_metric',
+  custom_attribute: 'custom_attribute',
+  custom_column: 'custom_column',
+} as const;
+
+export type DashboardMetricApiSource = typeof DashboardMetricApiSource[keyof typeof DashboardMetricApiSource];
+
+
+export const DashboardMetricApiSource = {
+  traces: 'traces',
+  datasets: 'datasets',
+  simulation: 'simulation',
+  both: 'both',
+  all: 'all',
+} as const;
+
+export type DashboardMetricApiAggregation = typeof DashboardMetricApiAggregation[keyof typeof DashboardMetricApiAggregation];
+
+
+export const DashboardMetricApiAggregation = {
+  avg: 'avg',
+  median: 'median',
+  max: 'max',
+  min: 'min',
+  p25: 'p25',
+  p50: 'p50',
+  p75: 'p75',
+  p90: 'p90',
+  p95: 'p95',
+  p99: 'p99',
+  count: 'count',
+  count_distinct: 'count_distinct',
+  sum: 'sum',
+  pass_rate: 'pass_rate',
+  fail_rate: 'fail_rate',
+  pass_count: 'pass_count',
+  fail_count: 'fail_count',
+  true_rate: 'true_rate',
+} as const;
+
+export type DashboardMetricApiAttributeType = typeof DashboardMetricApiAttributeType[keyof typeof DashboardMetricApiAttributeType];
+
+
+export const DashboardMetricApiAttributeType = {
+  string: 'string',
+  text: 'text',
+  number: 'number',
+  float: 'float',
+  integer: 'integer',
+  boolean: 'boolean',
+  datetime: 'datetime',
+  date: 'date',
+} as const;
+
+export type DashboardMetricApiDataType = typeof DashboardMetricApiDataType[keyof typeof DashboardMetricApiDataType];
+
+
+export const DashboardMetricApiDataType = {
+  string: 'string',
+  text: 'text',
+  number: 'number',
+  float: 'float',
+  integer: 'integer',
+  boolean: 'boolean',
+  datetime: 'datetime',
+  date: 'date',
+} as const;
+
+export type DashboardMetricApiFiltersItemFilterConfig = {
+  /** Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array. */
+  filter_type: string;
+  /** Canonical operator from api_contracts/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null. */
+  filter_op: string;
+  /** Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type. */
+  filter_value?: unknown;
+  /** Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL. */
+  col_type?: string;
+};
+
+export type DashboardMetricApiFiltersItem = {
+  /** Column or attribute id to filter on. */
+  column_id: string;
+  /** Optional UI label for chips and saved views. */
+  display_name?: string;
+  /** Optional source surface for mixed-source filters, for example traces, datasets, or simulation. */
+  source?: string;
+  /** Optional metric output type metadata used by eval and annotation filters. */
+  output_type?: string;
+  filter_config: DashboardMetricApiFiltersItemFilterConfig;
+};
+
+export interface DashboardMetricApi {
+  id?: string;
+  /** @minLength 1 */
+  name: string;
+  display_name?: string;
+  type: DashboardMetricApiType;
+  source?: DashboardMetricApiSource;
+  aggregation?: DashboardMetricApiAggregation;
+  unit?: string;
+  output_type?: string;
+  eval_key?: string;
+  config_id?: string;
+  label_id?: string;
+  attribute_key?: string;
+  attribute_type?: DashboardMetricApiAttributeType;
+  column_id?: string;
+  data_type?: DashboardMetricApiDataType;
+  filters?: DashboardMetricApiFiltersItem[];
+}
+
+export type DashboardBreakdownApiType = typeof DashboardBreakdownApiType[keyof typeof DashboardBreakdownApiType];
+
+
+export const DashboardBreakdownApiType = {
+  system_metric: 'system_metric',
+  eval_metric: 'eval_metric',
+  annotation_metric: 'annotation_metric',
+  custom_attribute: 'custom_attribute',
+  custom_column: 'custom_column',
+} as const;
+
+export type DashboardBreakdownApiSource = typeof DashboardBreakdownApiSource[keyof typeof DashboardBreakdownApiSource];
+
+
+export const DashboardBreakdownApiSource = {
+  traces: 'traces',
+  datasets: 'datasets',
+  simulation: 'simulation',
+  both: 'both',
+  all: 'all',
+} as const;
+
+export type DashboardBreakdownApiAttributeType = typeof DashboardBreakdownApiAttributeType[keyof typeof DashboardBreakdownApiAttributeType];
+
+
+export const DashboardBreakdownApiAttributeType = {
+  string: 'string',
+  text: 'text',
+  number: 'number',
+  float: 'float',
+  integer: 'integer',
+  boolean: 'boolean',
+  datetime: 'datetime',
+  date: 'date',
+} as const;
+
+export type DashboardBreakdownApiDataType = typeof DashboardBreakdownApiDataType[keyof typeof DashboardBreakdownApiDataType];
+
+
+export const DashboardBreakdownApiDataType = {
+  string: 'string',
+  text: 'text',
+  number: 'number',
+  float: 'float',
+  integer: 'integer',
+  boolean: 'boolean',
+  datetime: 'datetime',
+  date: 'date',
+} as const;
+
+export interface DashboardBreakdownApi {
+  /** @minLength 1 */
+  name: string;
+  display_name?: string;
+  type?: DashboardBreakdownApiType;
+  source?: DashboardBreakdownApiSource;
+  output_type?: string;
+  label_id?: string;
+  config_id?: string;
+  eval_key?: string;
+  attribute_key?: string;
+  attribute_type?: DashboardBreakdownApiAttributeType;
+  column_id?: string;
+  data_type?: DashboardBreakdownApiDataType;
+}
+
+export interface DashboardQueryApi {
+  workflow?: DashboardQueryApiWorkflow;
+  project_ids?: string[];
+  time_range: DashboardTimeRangeApi;
+  granularity?: DashboardQueryApiGranularity;
+  metrics: DashboardMetricApi[];
+  filters?: DashboardQueryApiFiltersItem[];
+  breakdowns?: DashboardBreakdownApi[];
+}
+
+export type DashboardQueryMetricResultApiAggregation = typeof DashboardQueryMetricResultApiAggregation[keyof typeof DashboardQueryMetricResultApiAggregation];
+
+
+export const DashboardQueryMetricResultApiAggregation = {
+  avg: 'avg',
+  median: 'median',
+  max: 'max',
+  min: 'min',
+  p25: 'p25',
+  p50: 'p50',
+  p75: 'p75',
+  p90: 'p90',
+  p95: 'p95',
+  p99: 'p99',
+  count: 'count',
+  count_distinct: 'count_distinct',
+  sum: 'sum',
+  pass_rate: 'pass_rate',
+  fail_rate: 'fail_rate',
+  pass_count: 'pass_count',
+  fail_count: 'fail_count',
+  true_rate: 'true_rate',
+} as const;
+
+export interface DashboardQuerySeriesPointApi {
+  /** @minLength 1 */
+  timestamp: string;
+  value: number;
+}
+
+export interface DashboardQuerySeriesApi {
+  /** @minLength 1 */
+  name: string;
+  data: DashboardQuerySeriesPointApi[];
+}
+
+export interface DashboardQueryMetricResultApi {
+  id: string;
+  name: string;
+  aggregation: DashboardQueryMetricResultApiAggregation;
+  unit: string;
+  series: DashboardQuerySeriesApi[];
+}
+
+export interface DashboardQueryTimeRangeResultApi {
+  /** @minLength 1 */
+  start: string;
+  /** @minLength 1 */
+  end: string;
+}
+
+export type DashboardQueryResultApiGranularity = typeof DashboardQueryResultApiGranularity[keyof typeof DashboardQueryResultApiGranularity];
+
+
+export const DashboardQueryResultApiGranularity = {
+  minute: 'minute',
+  hour: 'hour',
+  day: 'day',
+  week: 'week',
+  month: 'month',
+} as const;
+
+export interface DashboardQueryResultApi {
+  metrics: DashboardQueryMetricResultApi[];
+  time_range: DashboardQueryTimeRangeResultApi;
+  granularity: DashboardQueryResultApiGranularity;
+}
+
+export interface DashboardQueryApiResponseApi {
+  status?: boolean;
+  result: DashboardQueryResultApi;
+}
+
 export type DashboardWidgetApiQueryConfig = { [key: string]: unknown };
 
 export type DashboardWidgetApiChartConfig = { [key: string]: unknown };
@@ -16661,6 +16991,10 @@ export interface DashboardWidgetApi {
   readonly created_by?: string;
   readonly created_at?: string;
   readonly updated_at?: string;
+}
+
+export interface DashboardPreviewQueryApi {
+  query_config: DashboardQueryApi;
 }
 
 export interface DashboardDetailApi {

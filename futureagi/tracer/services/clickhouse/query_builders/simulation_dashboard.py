@@ -462,9 +462,7 @@ class SimulationQueryBuilder(DashboardQueryBuilderBase):
             sql, params = self.build_metric_query(metric)
             metric_info = {
                 "id": metric.get("id", ""),
-                "name": metric.get("displayName")
-                or metric.get("display_name")
-                or metric.get("name", ""),
+                "name": metric.get("display_name") or metric.get("name", ""),
                 "type": metric.get("type", "system_metric"),
                 "aggregation": self._effective_aggregation(metric),
             }

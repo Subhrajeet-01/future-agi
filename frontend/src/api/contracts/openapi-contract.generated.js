@@ -24129,12 +24129,15 @@ export const OPENAPI_CONTRACT = Object.freeze({
       "post": {
         "operationId": "tracer_dashboard_query",
         "requestBody": {
-          "$ref": "#/definitions/Dashboard"
+          "$ref": "#/definitions/DashboardQuery"
         },
         "queryParameters": {},
         "responses": {
-          "201": {
-            "$ref": "#/definitions/Dashboard"
+          "200": {
+            "$ref": "#/definitions/DashboardQueryApiResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
           }
         }
       }
@@ -24255,12 +24258,15 @@ export const OPENAPI_CONTRACT = Object.freeze({
       "post": {
         "operationId": "tracer_dashboard_widgets_preview_query",
         "requestBody": {
-          "$ref": "#/definitions/DashboardWidget"
+          "$ref": "#/definitions/DashboardPreviewQuery"
         },
         "queryParameters": {},
         "responses": {
-          "201": {
-            "$ref": "#/definitions/DashboardWidget"
+          "200": {
+            "$ref": "#/definitions/DashboardQueryApiResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
           }
         }
       }
@@ -24339,12 +24345,15 @@ export const OPENAPI_CONTRACT = Object.freeze({
       "post": {
         "operationId": "tracer_dashboard_widgets_execute_query",
         "requestBody": {
-          "$ref": "#/definitions/DashboardWidget"
+          "$ref": "#/definitions/EmptyRequest"
         },
         "queryParameters": {},
         "responses": {
-          "201": {
-            "$ref": "#/definitions/DashboardWidget"
+          "200": {
+            "$ref": "#/definitions/DashboardQueryApiResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/ApiErrorResponse"
           }
         }
       }
@@ -41825,6 +41834,145 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Widgets",
           "type": "string",
           "readOnly": true
+        }
+      }
+    },
+    "DashboardPreviewQuery": {
+      "required": [
+        "query_config"
+      ],
+      "type": "object",
+      "properties": {
+        "query_config": {
+          "$ref": "#/definitions/DashboardQuery"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DashboardQuery": {
+      "required": [
+        "time_range",
+        "metrics"
+      ],
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "title": "Workflow",
+          "type": "string",
+          "enum": [
+            "observability",
+            "dataset",
+            "simulation"
+          ],
+          "default": "observability"
+        },
+        "project_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        },
+        "time_range": {
+          "$ref": "#/definitions/DashboardTimeRange"
+        },
+        "granularity": {
+          "title": "Granularity",
+          "type": "string",
+          "enum": [
+            "minute",
+            "hour",
+            "day",
+            "week",
+            "month"
+          ],
+          "default": "day"
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DashboardMetric"
+          }
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "column_id": {
+                "type": "string",
+                "description": "Column or attribute id to filter on."
+              },
+              "display_name": {
+                "type": "string",
+                "description": "Optional UI label for chips and saved views."
+              },
+              "source": {
+                "type": "string",
+                "description": "Optional source surface for mixed-source filters, for example traces, datasets, or simulation."
+              },
+              "output_type": {
+                "type": "string",
+                "description": "Optional metric output type metadata used by eval and annotation filters."
+              },
+              "filter_config": {
+                "type": "object",
+                "properties": {
+                  "filter_type": {
+                    "type": "string",
+                    "description": "Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array."
+                  },
+                  "filter_op": {
+                    "type": "string",
+                    "description": "Canonical operator from api_contracts/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null."
+                  },
+                  "filter_value": {
+                    "description": "Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type."
+                  },
+                  "col_type": {
+                    "type": "string",
+                    "description": "Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL."
+                  }
+                },
+                "required": [
+                  "filter_type",
+                  "filter_op"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "column_id",
+              "filter_config"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "breakdowns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DashboardBreakdown"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "DashboardQueryApiResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/DashboardQueryResult"
         }
       }
     },
@@ -66770,6 +66918,347 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "DashboardBreakdown": {
+      "required": [
+        "name"
+      ],
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "title": "Display name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "system_metric",
+            "eval_metric",
+            "annotation_metric",
+            "custom_attribute",
+            "custom_column"
+          ],
+          "default": "system_metric"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string",
+          "enum": [
+            "traces",
+            "datasets",
+            "simulation",
+            "both",
+            "all"
+          ],
+          "default": "traces"
+        },
+        "output_type": {
+          "title": "Output type",
+          "type": "string"
+        },
+        "label_id": {
+          "title": "Label id",
+          "type": "string"
+        },
+        "config_id": {
+          "title": "Config id",
+          "type": "string"
+        },
+        "eval_key": {
+          "title": "Eval key",
+          "type": "string"
+        },
+        "attribute_key": {
+          "title": "Attribute key",
+          "type": "string"
+        },
+        "attribute_type": {
+          "title": "Attribute type",
+          "type": "string",
+          "enum": [
+            "string",
+            "text",
+            "number",
+            "float",
+            "integer",
+            "boolean",
+            "datetime",
+            "date"
+          ],
+          "default": "string"
+        },
+        "column_id": {
+          "title": "Column id",
+          "type": "string"
+        },
+        "data_type": {
+          "title": "Data type",
+          "type": "string",
+          "enum": [
+            "string",
+            "text",
+            "number",
+            "float",
+            "integer",
+            "boolean",
+            "datetime",
+            "date"
+          ],
+          "default": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DashboardMetric": {
+      "required": [
+        "name",
+        "type"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "minLength": 1
+        },
+        "display_name": {
+          "title": "Display name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "system_metric",
+            "eval_metric",
+            "annotation_metric",
+            "custom_attribute",
+            "custom_column"
+          ]
+        },
+        "source": {
+          "title": "Source",
+          "type": "string",
+          "enum": [
+            "traces",
+            "datasets",
+            "simulation",
+            "both",
+            "all"
+          ],
+          "default": "traces"
+        },
+        "aggregation": {
+          "title": "Aggregation",
+          "type": "string",
+          "enum": [
+            "avg",
+            "median",
+            "max",
+            "min",
+            "p25",
+            "p50",
+            "p75",
+            "p90",
+            "p95",
+            "p99",
+            "count",
+            "count_distinct",
+            "sum",
+            "pass_rate",
+            "fail_rate",
+            "pass_count",
+            "fail_count",
+            "true_rate"
+          ],
+          "default": "avg"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "output_type": {
+          "title": "Output type",
+          "type": "string"
+        },
+        "eval_key": {
+          "title": "Eval key",
+          "type": "string"
+        },
+        "config_id": {
+          "title": "Config id",
+          "type": "string"
+        },
+        "label_id": {
+          "title": "Label id",
+          "type": "string"
+        },
+        "attribute_key": {
+          "title": "Attribute key",
+          "type": "string"
+        },
+        "attribute_type": {
+          "title": "Attribute type",
+          "type": "string",
+          "enum": [
+            "string",
+            "text",
+            "number",
+            "float",
+            "integer",
+            "boolean",
+            "datetime",
+            "date"
+          ],
+          "default": "string"
+        },
+        "column_id": {
+          "title": "Column id",
+          "type": "string"
+        },
+        "data_type": {
+          "title": "Data type",
+          "type": "string",
+          "enum": [
+            "string",
+            "text",
+            "number",
+            "float",
+            "integer",
+            "boolean",
+            "datetime",
+            "date"
+          ],
+          "default": "string"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "column_id": {
+                "type": "string",
+                "description": "Column or attribute id to filter on."
+              },
+              "display_name": {
+                "type": "string",
+                "description": "Optional UI label for chips and saved views."
+              },
+              "source": {
+                "type": "string",
+                "description": "Optional source surface for mixed-source filters, for example traces, datasets, or simulation."
+              },
+              "output_type": {
+                "type": "string",
+                "description": "Optional metric output type metadata used by eval and annotation filters."
+              },
+              "filter_config": {
+                "type": "object",
+                "properties": {
+                  "filter_type": {
+                    "type": "string",
+                    "description": "Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array."
+                  },
+                  "filter_op": {
+                    "type": "string",
+                    "description": "Canonical operator from api_contracts/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null."
+                  },
+                  "filter_value": {
+                    "description": "Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type."
+                  },
+                  "col_type": {
+                    "type": "string",
+                    "description": "Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL."
+                  }
+                },
+                "required": [
+                  "filter_type",
+                  "filter_op"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "column_id",
+              "filter_config"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "DashboardTimeRange": {
+      "type": "object",
+      "properties": {
+        "preset": {
+          "title": "Preset",
+          "type": "string",
+          "enum": [
+            "30m",
+            "6h",
+            "today",
+            "yesterday",
+            "7D",
+            "30D",
+            "3M",
+            "6M",
+            "12M"
+          ]
+        },
+        "custom_start": {
+          "title": "Custom start",
+          "type": "string",
+          "format": "date-time"
+        },
+        "custom_end": {
+          "title": "Custom end",
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DashboardQueryResult": {
+      "required": [
+        "metrics",
+        "time_range",
+        "granularity"
+      ],
+      "type": "object",
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DashboardQueryMetricResult"
+          }
+        },
+        "time_range": {
+          "$ref": "#/definitions/DashboardQueryTimeRangeResult"
+        },
+        "granularity": {
+          "title": "Granularity",
+          "type": "string",
+          "enum": [
+            "minute",
+            "hour",
+            "day",
+            "week",
+            "month"
+          ]
+        }
+      }
+    },
     "DatasetCellValue": {
       "type": "object",
       "properties": {
@@ -79037,6 +79526,79 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "DashboardQueryMetricResult": {
+      "required": [
+        "id",
+        "name",
+        "aggregation",
+        "unit",
+        "series"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "aggregation": {
+          "title": "Aggregation",
+          "type": "string",
+          "enum": [
+            "avg",
+            "median",
+            "max",
+            "min",
+            "p25",
+            "p50",
+            "p75",
+            "p90",
+            "p95",
+            "p99",
+            "count",
+            "count_distinct",
+            "sum",
+            "pass_rate",
+            "fail_rate",
+            "pass_count",
+            "fail_count",
+            "true_rate"
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "series": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DashboardQuerySeries"
+          }
+        }
+      }
+    },
+    "DashboardQueryTimeRangeResult": {
+      "required": [
+        "start",
+        "end"
+      ],
+      "type": "object",
+      "properties": {
+        "start": {
+          "title": "Start",
+          "type": "string",
+          "minLength": 1
+        },
+        "end": {
+          "title": "End",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "DatasetColumnDetailItem": {
       "required": [
         "id",
@@ -84887,6 +85449,26 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "DashboardQuerySeries": {
+      "required": [
+        "name",
+        "data"
+      ],
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DashboardQuerySeriesPoint"
+          }
+        }
+      }
+    },
     "EmbeddingConfigOption": {
       "required": [
         "type",
@@ -85576,6 +86158,25 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "additionalProperties": {
             "$ref": "#/definitions/AgentPromptOptimiserComponentEvalResult"
           }
+        }
+      }
+    },
+    "DashboardQuerySeriesPoint": {
+      "required": [
+        "timestamp",
+        "value"
+      ],
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "title": "Timestamp",
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "title": "Value",
+          "type": "number",
+          "x-nullable": true
         }
       }
     },

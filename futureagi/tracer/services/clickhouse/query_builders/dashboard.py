@@ -248,7 +248,7 @@ class DashboardQueryBuilder:
 
     def parse_time_range(self) -> Tuple[datetime, datetime]:
         """Parse time range from preset or custom start/end."""
-        tr = self.config.get("time_range") or self.config.get("timeRange") or {}
+        tr = self.config.get("time_range") or {}
         preset = tr.get("preset")
         custom_start = tr.get("custom_start")
         custom_end = tr.get("custom_end")
@@ -634,9 +634,7 @@ class DashboardQueryBuilder:
                 ev_tid = resolve_eval_template_id(
                     ev_tid, organization_id=self.organization_id
                 )
-                bd_output_type = (
-                    bd.get("output_type") or bd.get("outputType") or ""
-                ).upper()
+                bd_output_type = (bd.get("output_type") or "").upper()
 
                 # Same eval as the metric → use main table columns directly
                 if ev_tid == eval_template_id:
@@ -793,9 +791,7 @@ class DashboardQueryBuilder:
 
         # model_hub_score stores the value as a JSON string.
         # The extraction depends on annotation type:
-        output_type = (
-            metric.get("output_type") or metric.get("outputType") or ""
-        ).lower()
+        output_type = (metric.get("output_type") or "").lower()
         # If output_type missing, look it up from PG
         if not output_type and label_id:
             try:
@@ -945,9 +941,7 @@ class DashboardQueryBuilder:
             sql, params = self.build_metric_query(metric)
             metric_info = {
                 "id": metric.get("id", ""),
-                "name": metric.get("display_name")
-                or metric.get("displayName")
-                or metric.get("name", ""),
+                "name": metric.get("display_name") or metric.get("name", ""),
                 "type": metric.get("type", "system_metric"),
                 "aggregation": metric.get("aggregation", "avg"),
             }
@@ -1135,9 +1129,7 @@ class DashboardQueryBuilder:
 
             elif bd_type == "annotation_metric":
                 label_id = bd.get("label_id") or bd_name
-                output_type = (
-                    bd.get("output_type") or bd.get("outputType") or ""
-                ).lower()
+                output_type = (bd.get("output_type") or "").lower()
                 if not output_type and label_id:
                     try:
                         from model_hub.models.develop_annotations import (
@@ -1202,9 +1194,7 @@ class DashboardQueryBuilder:
 
             elif bd_type == "eval_metric":
                 eval_template_id = bd.get("config_id") or bd.get("label_id") or bd_name
-                output_type = (
-                    bd.get("output_type") or bd.get("outputType") or ""
-                ).upper()
+                output_type = (bd.get("output_type") or "").upper()
                 # Auto-detect output type from PG if missing
                 if not output_type and eval_template_id:
                     try:

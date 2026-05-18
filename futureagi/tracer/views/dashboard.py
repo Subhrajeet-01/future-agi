@@ -1,8 +1,13 @@
 import structlog
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
+from tfc.utils.api_serializers import (
+    ApiErrorResponseSerializer,
+    EmptyRequestSerializer,
+)
 from tfc.utils.base_viewset import BaseModelViewSetMixin
 from tfc.utils.general_methods import GeneralMethods
 from tracer.models.custom_eval_config import CustomEvalConfig
@@ -12,6 +17,8 @@ from tracer.serializers.dashboard import (
     DashboardCreateUpdateSerializer,
     DashboardDetailSerializer,
     DashboardFilterValuesQuerySerializer,
+    DashboardQueryApiResponseSerializer,
+    DashboardPreviewQuerySerializer,
     DashboardQuerySerializer,
     DashboardSerializer,
     DashboardWidgetSerializer,
@@ -167,9 +174,7 @@ class DashboardViewSet(BaseModelViewSetMixin, ModelViewSet):
         return (
             {
                 "id": metric.get("id", ""),
-                "name": metric.get("displayName")
-                or metric.get("display_name")
-                or metric.get("name", ""),
+                "name": metric.get("display_name") or metric.get("name", ""),
                 "type": metric.get("type", "system_metric"),
                 "aggregation": metric.get("aggregation", "avg"),
                 "source": "simulation",
@@ -337,6 +342,13 @@ class DashboardViewSet(BaseModelViewSetMixin, ModelViewSet):
     # Query endpoint — routes each metric to the right builder by source
     # ------------------------------------------------------------------
 
+    @swagger_auto_schema(
+        request_body=DashboardQuerySerializer,
+        responses={
+            200: DashboardQueryApiResponseSerializer,
+            400: ApiErrorResponseSerializer,
+        },
+    )
     @action(detail=False, methods=["post"])
     def query(self, request):
         """Execute a widget query and return chart data.
@@ -345,24 +357,13 @@ class DashboardViewSet(BaseModelViewSetMixin, ModelViewSet):
         Metrics are partitioned by source and dispatched to the appropriate
         query builder.  Results are merged into a single response.
 
-        Backward compat: if ``workflow`` is present and metrics lack
-        ``source``, infer source from workflow.
+        Each metric is validated against the canonical query contract before
+        it reaches any query builder.
         """
         serializer = DashboardQuerySerializer(data=request.data)
         if not serializer.is_valid():
             return self._gm.bad_request(f"Invalid query config: {serializer.errors}")
         query_config = _normalize_dashboard_query_filters(serializer.validated_data)
-
-        # Backward compat: infer source from workflow when missing
-        workflow = query_config.get("workflow")
-        for m in query_config["metrics"]:
-            if "source" not in m:
-                if workflow == "dataset":
-                    m["source"] = "datasets"
-                elif workflow == "simulation":
-                    m["source"] = "simulation"
-                else:
-                    m["source"] = "traces"
 
         query_config["metrics"] = self._normalize_metric_sources(
             query_config["metrics"]
@@ -2614,20 +2615,21 @@ class DashboardWidgetViewSet(BaseModelViewSetMixin, ModelViewSet):
 
         Routes each metric to the appropriate builder based on source.
         """
-        query_config = _normalize_dashboard_query_filters(query_config)
-
-        # Infer source from workflow for backward compat
-        workflow = query_config.get("workflow", "")
-        for m in query_config.get("metrics", []):
-            if "source" not in m:
-                m["source"] = "datasets" if workflow == "dataset" else "traces"
+        serializer = DashboardQuerySerializer(data=query_config)
+        if not serializer.is_valid():
+            return self._gm.bad_request(
+                f"Invalid query config: {serializer.errors}"
+            )
+        query_config = _normalize_dashboard_query_filters(serializer.validated_data)
 
         query_config["metrics"] = self._normalize_metric_sources(
             query_config["metrics"]
         )
 
         trace_metrics = [
-            m for m in query_config["metrics"] if m.get("source") == "traces"
+            m
+            for m in query_config["metrics"]
+            if m.get("source") in ("traces", "both", "all")
         ]
         dataset_metrics = [
             m for m in query_config["metrics"] if m.get("source") == "datasets"
@@ -2708,6 +2710,13 @@ class DashboardWidgetViewSet(BaseModelViewSetMixin, ModelViewSet):
 
         return self._gm.success_response(formatted)
 
+    @swagger_auto_schema(
+        request_body=EmptyRequestSerializer,
+        responses={
+            200: DashboardQueryApiResponseSerializer,
+            400: ApiErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["post"], url_path="query")
     def execute_query(self, request, *args, **kwargs):
         """Execute the widget's query_config against ClickHouse and return results."""
@@ -2727,6 +2736,13 @@ class DashboardWidgetViewSet(BaseModelViewSetMixin, ModelViewSet):
             logger.error("widget_query_execution_failed", error=str(e), exc_info=True)
             return self._gm.bad_request(f"Query execution failed: {str(e)}")
 
+    @swagger_auto_schema(
+        request_body=DashboardPreviewQuerySerializer,
+        responses={
+            200: DashboardQueryApiResponseSerializer,
+            400: ApiErrorResponseSerializer,
+        },
+    )
     @action(detail=False, methods=["post"], url_path="preview")
     def preview_query(self, request, *args, **kwargs):
         """Execute an ad-hoc query_config without saving, for live preview."""
@@ -2734,9 +2750,12 @@ class DashboardWidgetViewSet(BaseModelViewSetMixin, ModelViewSet):
             if not is_clickhouse_enabled():
                 return self._gm.bad_request("ClickHouse is not enabled.")
 
-            query_config = request.data.get("query_config", {})
-            if not query_config or not query_config.get("metrics"):
-                return self._gm.bad_request("query_config with metrics is required.")
+            serializer = DashboardPreviewQuerySerializer(data=request.data)
+            if not serializer.is_valid():
+                return self._gm.bad_request(
+                    f"Invalid query config: {serializer.errors}"
+                )
+            query_config = serializer.validated_data["query_config"]
 
             return self._execute_ch_query_config(query_config, request.workspace)
         except Exception as e:

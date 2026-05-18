@@ -290,9 +290,11 @@ import type {
   CustomMetricTestResponseApi,
   CustomPaymentCheckoutRequestApi,
   CustomerInvoicesResponseApi,
-  DashboardApi,
   DashboardCreateUpdateApi,
   DashboardDetailApi,
+  DashboardPreviewQueryApi,
+  DashboardQueryApi,
+  DashboardQueryApiResponseApi,
   DashboardWidgetApi,
   DatasetAddColumnsRequestApi,
   DatasetAddEmptyColumnsRequestApi,
@@ -50457,17 +50459,24 @@ export const tracerDashboardMetrics = async (params?: TracerDashboardMetricsPara
 
 
 
-export type tracerDashboardQueryResponse201 = {
-  data: DashboardApi
-  status: 201
+export type tracerDashboardQueryResponse200 = {
+  data: DashboardQueryApiResponseApi
+  status: 200
 }
 
-export type tracerDashboardQueryResponseSuccess = (tracerDashboardQueryResponse201) & {
+export type tracerDashboardQueryResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type tracerDashboardQueryResponseSuccess = (tracerDashboardQueryResponse200) & {
   headers: Headers;
 };
-;
+export type tracerDashboardQueryResponseError = (tracerDashboardQueryResponse400) & {
+  headers: Headers;
+};
 
-export type tracerDashboardQueryResponse = (tracerDashboardQueryResponseSuccess)
+export type tracerDashboardQueryResponse = (tracerDashboardQueryResponseSuccess | tracerDashboardQueryResponseError)
 
 export const getTracerDashboardQueryUrl = () => {
 
@@ -50482,11 +50491,11 @@ export const getTracerDashboardQueryUrl = () => {
 Metrics are partitioned by source and dispatched to the appropriate
 query builder.  Results are merged into a single response.
 
-Backward compat: if ``workflow`` is present and metrics lack
-``source``, infer source from workflow.
+Each metric is validated against the canonical query contract before
+it reaches any query builder.
  * @summary Execute a widget query and return chart data.
  */
-export const tracerDashboardQuery = async (dashboardApi: NonReadonly<DashboardApi>, options?: RequestInit): Promise<tracerDashboardQueryResponse> => {
+export const tracerDashboardQuery = async (dashboardQueryApi: DashboardQueryApi, options?: RequestInit): Promise<tracerDashboardQueryResponse> => {
 
   return apiMutator<tracerDashboardQueryResponse>(getTracerDashboardQueryUrl(),
   {
@@ -50494,7 +50503,7 @@ export const tracerDashboardQuery = async (dashboardApi: NonReadonly<DashboardAp
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      dashboardApi,)
+      dashboardQueryApi,)
   }
 );}
 
@@ -50620,17 +50629,24 @@ export const tracerDashboardWidgetsCreate = async (dashboardPk: string,
 
 
 
-export type tracerDashboardWidgetsPreviewQueryResponse201 = {
-  data: DashboardWidgetApi
-  status: 201
+export type tracerDashboardWidgetsPreviewQueryResponse200 = {
+  data: DashboardQueryApiResponseApi
+  status: 200
 }
 
-export type tracerDashboardWidgetsPreviewQueryResponseSuccess = (tracerDashboardWidgetsPreviewQueryResponse201) & {
+export type tracerDashboardWidgetsPreviewQueryResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type tracerDashboardWidgetsPreviewQueryResponseSuccess = (tracerDashboardWidgetsPreviewQueryResponse200) & {
   headers: Headers;
 };
-;
+export type tracerDashboardWidgetsPreviewQueryResponseError = (tracerDashboardWidgetsPreviewQueryResponse400) & {
+  headers: Headers;
+};
 
-export type tracerDashboardWidgetsPreviewQueryResponse = (tracerDashboardWidgetsPreviewQueryResponseSuccess)
+export type tracerDashboardWidgetsPreviewQueryResponse = (tracerDashboardWidgetsPreviewQueryResponseSuccess | tracerDashboardWidgetsPreviewQueryResponseError)
 
 export const getTracerDashboardWidgetsPreviewQueryUrl = (dashboardPk: string,) => {
 
@@ -50644,7 +50660,7 @@ export const getTracerDashboardWidgetsPreviewQueryUrl = (dashboardPk: string,) =
  * Execute an ad-hoc query_config without saving, for live preview.
  */
 export const tracerDashboardWidgetsPreviewQuery = async (dashboardPk: string,
-    dashboardWidgetApi: NonReadonly<DashboardWidgetApi>, options?: RequestInit): Promise<tracerDashboardWidgetsPreviewQueryResponse> => {
+    dashboardPreviewQueryApi: DashboardPreviewQueryApi, options?: RequestInit): Promise<tracerDashboardWidgetsPreviewQueryResponse> => {
 
   return apiMutator<tracerDashboardWidgetsPreviewQueryResponse>(getTracerDashboardWidgetsPreviewQueryUrl(dashboardPk),
   {
@@ -50652,7 +50668,7 @@ export const tracerDashboardWidgetsPreviewQuery = async (dashboardPk: string,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      dashboardWidgetApi,)
+      dashboardPreviewQueryApi,)
   }
 );}
 
@@ -50880,17 +50896,24 @@ export const tracerDashboardWidgetsDuplicateWidget = async (dashboardPk: string,
 
 
 
-export type tracerDashboardWidgetsExecuteQueryResponse201 = {
-  data: DashboardWidgetApi
-  status: 201
+export type tracerDashboardWidgetsExecuteQueryResponse200 = {
+  data: DashboardQueryApiResponseApi
+  status: 200
 }
 
-export type tracerDashboardWidgetsExecuteQueryResponseSuccess = (tracerDashboardWidgetsExecuteQueryResponse201) & {
+export type tracerDashboardWidgetsExecuteQueryResponse400 = {
+  data: ApiErrorResponseApi
+  status: 400
+}
+
+export type tracerDashboardWidgetsExecuteQueryResponseSuccess = (tracerDashboardWidgetsExecuteQueryResponse200) & {
   headers: Headers;
 };
-;
+export type tracerDashboardWidgetsExecuteQueryResponseError = (tracerDashboardWidgetsExecuteQueryResponse400) & {
+  headers: Headers;
+};
 
-export type tracerDashboardWidgetsExecuteQueryResponse = (tracerDashboardWidgetsExecuteQueryResponseSuccess)
+export type tracerDashboardWidgetsExecuteQueryResponse = (tracerDashboardWidgetsExecuteQueryResponseSuccess | tracerDashboardWidgetsExecuteQueryResponseError)
 
 export const getTracerDashboardWidgetsExecuteQueryUrl = (dashboardPk: string,
     id: string,) => {
@@ -50906,7 +50929,7 @@ export const getTracerDashboardWidgetsExecuteQueryUrl = (dashboardPk: string,
  */
 export const tracerDashboardWidgetsExecuteQuery = async (dashboardPk: string,
     id: string,
-    dashboardWidgetApi: NonReadonly<DashboardWidgetApi>, options?: RequestInit): Promise<tracerDashboardWidgetsExecuteQueryResponse> => {
+    emptyRequestApi: EmptyRequestApi, options?: RequestInit): Promise<tracerDashboardWidgetsExecuteQueryResponse> => {
 
   return apiMutator<tracerDashboardWidgetsExecuteQueryResponse>(getTracerDashboardWidgetsExecuteQueryUrl(dashboardPk,id),
   {
@@ -50914,7 +50937,7 @@ export const tracerDashboardWidgetsExecuteQuery = async (dashboardPk: string,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      dashboardWidgetApi,)
+      emptyRequestApi,)
   }
 );}
 

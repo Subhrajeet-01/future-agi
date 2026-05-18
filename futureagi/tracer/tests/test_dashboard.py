@@ -1131,8 +1131,17 @@ class TestDashboardQueryExecution:
         assert response.status_code == 200
 
     @pytest.mark.django_db
-    def test_query_action_missing_project_ids_still_works(self, auth_client):
+    @patch("tracer.views.dashboard.AnalyticsQueryService")
+    def test_query_action_missing_project_ids_still_works(
+        self, mock_analytics_cls, auth_client, observe_project
+    ):
         """Query endpoint accepts requests without project_ids (unified picker)."""
+        mock_service = MagicMock()
+        mock_result = MagicMock()
+        mock_result.data = [{"time_bucket": "2025-01-01T00:00:00", "value": 123.45}]
+        mock_service.execute_ch_query.return_value = mock_result
+        mock_analytics_cls.return_value = mock_service
+
         response = auth_client.post(
             "/tracer/dashboard/query/",
             {
@@ -1297,7 +1306,7 @@ class TestDashboardQueryExecution:
                     {
                         "id": "duration",
                         "name": "duration",
-                        "displayName": "Duration",
+                        "display_name": "Duration",
                         "type": "system_metric",
                         "aggregation": "avg",
                         "source": "simulation",
@@ -2516,6 +2525,83 @@ class TestDashboardQuerySerializer:
 
         assert not serializer.is_valid()
         assert "filters" in serializer.errors
+
+    def test_legacy_dashboard_filter_shape_fails_metric_serializer(self):
+        data = {
+            "workflow": "observability",
+            "project_ids": ["proj-1"],
+            "time_range": {"preset": "7D"},
+            "granularity": "day",
+            "metrics": [
+                {
+                    "name": "latency",
+                    "type": "system_metric",
+                    "aggregation": "avg",
+                    "source": "traces",
+                    "filters": [
+                        {
+                            "metric_type": "system_metric",
+                            "metric_name": "latency",
+                            "operator": "greater_than",
+                            "value": 100,
+                        }
+                    ],
+                }
+            ],
+        }
+        serializer = DashboardQuerySerializer(data=data)
+
+        assert not serializer.is_valid()
+        assert "metrics" in serializer.errors
+
+    def test_metric_rejects_camel_case_display_name(self):
+        data = {
+            "workflow": "observability",
+            "project_ids": ["proj-1"],
+            "time_range": {"preset": "7D"},
+            "granularity": "day",
+            "metrics": [
+                {
+                    "name": "latency",
+                    "displayName": "Latency",
+                    "type": "system_metric",
+                    "aggregation": "avg",
+                    "source": "traces",
+                }
+            ],
+        }
+        serializer = DashboardQuerySerializer(data=data)
+
+        assert not serializer.is_valid()
+        assert "metrics" in serializer.errors
+
+    def test_breakdown_rejects_camel_case_output_type(self):
+        data = {
+            "workflow": "observability",
+            "project_ids": ["proj-1"],
+            "time_range": {"preset": "7D"},
+            "granularity": "day",
+            "metrics": [
+                {
+                    "name": "latency",
+                    "type": "system_metric",
+                    "aggregation": "avg",
+                    "source": "traces",
+                }
+            ],
+            "breakdowns": [
+                {
+                    "name": "quality",
+                    "type": "eval_metric",
+                    "source": "traces",
+                    "outputType": "CHOICE",
+                }
+            ],
+        }
+        serializer = DashboardQuerySerializer(data=data)
+
+        assert not serializer.is_valid()
+        assert "breakdowns" in serializer.errors
 
     def test_missing_metrics_fails(self):
         """Verify missing metrics field fails validation."""

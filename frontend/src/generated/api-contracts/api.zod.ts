@@ -33390,95 +33390,119 @@ export const TracerDashboardMetricsResponse = zod.object({
 Metrics are partitioned by source and dispatched to the appropriate
 query builder.  Results are merged into a single response.
 
-Backward compat: if ``workflow`` is present and metrics lack
-``source``, infer source from workflow.
+Each metric is validated against the canonical query contract before
+it reaches any query builder.
  * @summary Execute a widget query and return chart data.
  */
-export const tracerDashboardQueryBodyNameMax = 255;
-
-export const tracerDashboardQueryBodyCreatedByEmailMax = 254;
-
-export const tracerDashboardQueryBodyCreatedByNameMax = 255;
-
-export const tracerDashboardQueryBodyCreatedByOrganizationNameMax = 255;
-
-export const tracerDashboardQueryBodyCreatedByOrganizationDisplayNameMax = 255;
-
-export const tracerDashboardQueryBodyCreatedByOrganizationRegionMax = 16;
-
-export const tracerDashboardQueryBodyCreatedByOrganizationRequire2faGracePeriodDaysMin = 0;
-export const tracerDashboardQueryBodyCreatedByOrganizationRequire2faGracePeriodDaysMax = 32767;
-
-export const tracerDashboardQueryBodyCreatedByRoleMax = 255;
-
-export const tracerDashboardQueryBodyUpdatedByEmailMax = 254;
-
-export const tracerDashboardQueryBodyUpdatedByNameMax = 255;
-
-export const tracerDashboardQueryBodyUpdatedByOrganizationNameMax = 255;
-
-export const tracerDashboardQueryBodyUpdatedByOrganizationDisplayNameMax = 255;
-
-export const tracerDashboardQueryBodyUpdatedByOrganizationRegionMax = 16;
-
-export const tracerDashboardQueryBodyUpdatedByOrganizationRequire2faGracePeriodDaysMin = 0;
-export const tracerDashboardQueryBodyUpdatedByOrganizationRequire2faGracePeriodDaysMax = 32767;
-
-export const tracerDashboardQueryBodyUpdatedByRoleMax = 255;
-
-
+export const tracerDashboardQueryBodyWorkflowDefault = `observability`;
+export const tracerDashboardQueryBodyProjectIdsDefault = [];
+export const tracerDashboardQueryBodyGranularityDefault = `day`;
+export const tracerDashboardQueryBodyMetricsItemSourceDefault = `traces`;
+export const tracerDashboardQueryBodyMetricsItemAggregationDefault = `avg`;
+export const tracerDashboardQueryBodyMetricsItemAttributeTypeDefault = `string`;
+export const tracerDashboardQueryBodyMetricsItemDataTypeDefault = `string`;
+export const tracerDashboardQueryBodyMetricsItemFiltersDefault = [];
+export const tracerDashboardQueryBodyFiltersDefault = [];
+export const tracerDashboardQueryBodyBreakdownsItemTypeDefault = `system_metric`;
+export const tracerDashboardQueryBodyBreakdownsItemSourceDefault = `traces`;
+export const tracerDashboardQueryBodyBreakdownsItemAttributeTypeDefault = `string`;
+export const tracerDashboardQueryBodyBreakdownsItemDataTypeDefault = `string`;
+export const tracerDashboardQueryBodyBreakdownsDefault = [];
 
 export const TracerDashboardQueryBody = zod.object({
-  "name": zod.string().min(1).max(tracerDashboardQueryBodyNameMax),
-  "description": zod.string().optional(),
-  "created_by": zod.object({
-  "id": zod.string().uuid().optional(),
-  "email": zod.string().email().min(1).max(tracerDashboardQueryBodyCreatedByEmailMax),
-  "name": zod.string().min(1).max(tracerDashboardQueryBodyCreatedByNameMax),
-  "organization_role": zod.enum(['Owner', 'Admin', 'Member', 'Viewer', 'workspace_admin', 'workspace_member', 'workspace_viewer']).optional(),
-  "organization": zod.object({
-  "id": zod.string().uuid().optional(),
-  "created_at": zod.string().datetime({"offset":true}).optional(),
-  "name": zod.string().min(1).max(tracerDashboardQueryBodyCreatedByOrganizationNameMax),
-  "display_name": zod.string().max(tracerDashboardQueryBodyCreatedByOrganizationDisplayNameMax).optional(),
-  "is_new": zod.boolean().optional(),
-  "ws_enabled": zod.boolean().optional(),
-  "region": zod.string().min(1).max(tracerDashboardQueryBodyCreatedByOrganizationRegionMax).optional(),
-  "require_2fa": zod.boolean().optional(),
-  "require_2fa_grace_period_days": zod.number().min(tracerDashboardQueryBodyCreatedByOrganizationRequire2faGracePeriodDaysMin).max(tracerDashboardQueryBodyCreatedByOrganizationRequire2faGracePeriodDaysMax).optional(),
-  "require_2fa_enforced_at": zod.string().datetime({"offset":true}).optional()
-}).optional(),
-  "created_at": zod.string().datetime({"offset":true}).optional(),
-  "status": zod.string().optional(),
-  "role": zod.string().max(tracerDashboardQueryBodyCreatedByRoleMax).optional().describe('User\'s job role (e.g., Data Scientist, ML Engineer, or custom role)'),
-  "goals": zod.object({
+  "workflow": zod.enum(['observability', 'dataset', 'simulation']).default(tracerDashboardQueryBodyWorkflowDefault),
+  "project_ids": zod.array(zod.string().min(1)).default(tracerDashboardQueryBodyProjectIdsDefault),
+  "time_range": zod.object({
+  "preset": zod.enum(['30m', '6h', 'today', 'yesterday', '7D', '30D', '3M', '6M', '12M']).optional(),
+  "custom_start": zod.string().datetime({"offset":true}).optional(),
+  "custom_end": zod.string().datetime({"offset":true}).optional()
+}),
+  "granularity": zod.enum(['minute', 'hour', 'day', 'week', 'month']).default(tracerDashboardQueryBodyGranularityDefault),
+  "metrics": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "name": zod.string().min(1),
+  "display_name": zod.string().optional(),
+  "type": zod.enum(['system_metric', 'eval_metric', 'annotation_metric', 'custom_attribute', 'custom_column']),
+  "source": zod.enum(['traces', 'datasets', 'simulation', 'both', 'all']).default(tracerDashboardQueryBodyMetricsItemSourceDefault),
+  "aggregation": zod.enum(['avg', 'median', 'max', 'min', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99', 'count', 'count_distinct', 'sum', 'pass_rate', 'fail_rate', 'pass_count', 'fail_count', 'true_rate']).default(tracerDashboardQueryBodyMetricsItemAggregationDefault),
+  "unit": zod.string().optional(),
+  "output_type": zod.string().optional(),
+  "eval_key": zod.string().optional(),
+  "config_id": zod.string().optional(),
+  "label_id": zod.string().optional(),
+  "attribute_key": zod.string().optional(),
+  "attribute_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardQueryBodyMetricsItemAttributeTypeDefault),
+  "column_id": zod.string().optional(),
+  "data_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardQueryBodyMetricsItemDataTypeDefault),
+  "filters": zod.array(zod.object({
+  "column_id": zod.string().describe('Column or attribute id to filter on.'),
+  "display_name": zod.string().optional().describe('Optional UI label for chips and saved views.'),
+  "source": zod.string().optional().describe('Optional source surface for mixed-source filters, for example traces, datasets, or simulation.'),
+  "output_type": zod.string().optional().describe('Optional metric output type metadata used by eval and annotation filters.'),
+  "filter_config": zod.object({
+  "filter_type": zod.string().describe('Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array.'),
+  "filter_op": zod.string().describe('Canonical operator from api_contracts\/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null.'),
+  "filter_value": zod.unknown().optional().describe('Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type.'),
+  "col_type": zod.string().optional().describe('Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL.')
+})
+})).default(tracerDashboardQueryBodyMetricsItemFiltersDefault)
+})),
+  "filters": zod.array(zod.object({
+  "column_id": zod.string().describe('Column or attribute id to filter on.'),
+  "display_name": zod.string().optional().describe('Optional UI label for chips and saved views.'),
+  "source": zod.string().optional().describe('Optional source surface for mixed-source filters, for example traces, datasets, or simulation.'),
+  "output_type": zod.string().optional().describe('Optional metric output type metadata used by eval and annotation filters.'),
+  "filter_config": zod.object({
+  "filter_type": zod.string().describe('Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array.'),
+  "filter_op": zod.string().describe('Canonical operator from api_contracts\/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null.'),
+  "filter_value": zod.unknown().optional().describe('Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type.'),
+  "col_type": zod.string().optional().describe('Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL.')
+})
+})).default(tracerDashboardQueryBodyFiltersDefault),
+  "breakdowns": zod.array(zod.object({
+  "name": zod.string().min(1),
+  "display_name": zod.string().optional(),
+  "type": zod.enum(['system_metric', 'eval_metric', 'annotation_metric', 'custom_attribute', 'custom_column']).default(tracerDashboardQueryBodyBreakdownsItemTypeDefault),
+  "source": zod.enum(['traces', 'datasets', 'simulation', 'both', 'all']).default(tracerDashboardQueryBodyBreakdownsItemSourceDefault),
+  "output_type": zod.string().optional(),
+  "label_id": zod.string().optional(),
+  "config_id": zod.string().optional(),
+  "eval_key": zod.string().optional(),
+  "attribute_key": zod.string().optional(),
+  "attribute_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardQueryBodyBreakdownsItemAttributeTypeDefault),
+  "column_id": zod.string().optional(),
+  "data_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardQueryBodyBreakdownsItemDataTypeDefault)
+})).default(tracerDashboardQueryBodyBreakdownsDefault)
+})
 
-}).passthrough().optional().describe('List of user\'s goals for using the platform')
-}).optional(),
-  "updated_by": zod.object({
-  "id": zod.string().uuid().optional(),
-  "email": zod.string().email().min(1).max(tracerDashboardQueryBodyUpdatedByEmailMax),
-  "name": zod.string().min(1).max(tracerDashboardQueryBodyUpdatedByNameMax),
-  "organization_role": zod.enum(['Owner', 'Admin', 'Member', 'Viewer', 'workspace_admin', 'workspace_member', 'workspace_viewer']).optional(),
-  "organization": zod.object({
-  "id": zod.string().uuid().optional(),
-  "created_at": zod.string().datetime({"offset":true}).optional(),
-  "name": zod.string().min(1).max(tracerDashboardQueryBodyUpdatedByOrganizationNameMax),
-  "display_name": zod.string().max(tracerDashboardQueryBodyUpdatedByOrganizationDisplayNameMax).optional(),
-  "is_new": zod.boolean().optional(),
-  "ws_enabled": zod.boolean().optional(),
-  "region": zod.string().min(1).max(tracerDashboardQueryBodyUpdatedByOrganizationRegionMax).optional(),
-  "require_2fa": zod.boolean().optional(),
-  "require_2fa_grace_period_days": zod.number().min(tracerDashboardQueryBodyUpdatedByOrganizationRequire2faGracePeriodDaysMin).max(tracerDashboardQueryBodyUpdatedByOrganizationRequire2faGracePeriodDaysMax).optional(),
-  "require_2fa_enforced_at": zod.string().datetime({"offset":true}).optional()
-}).optional(),
-  "created_at": zod.string().datetime({"offset":true}).optional(),
-  "status": zod.string().optional(),
-  "role": zod.string().max(tracerDashboardQueryBodyUpdatedByRoleMax).optional().describe('User\'s job role (e.g., Data Scientist, ML Engineer, or custom role)'),
-  "goals": zod.object({
+export const tracerDashboardQueryResponseStatusDefault = true;
 
-}).passthrough().optional().describe('List of user\'s goals for using the platform')
-}).optional()
+
+
+
+
+export const TracerDashboardQueryResponse = zod.object({
+  "status": zod.boolean().default(tracerDashboardQueryResponseStatusDefault),
+  "result": zod.object({
+  "metrics": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "aggregation": zod.enum(['avg', 'median', 'max', 'min', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99', 'count', 'count_distinct', 'sum', 'pass_rate', 'fail_rate', 'pass_count', 'fail_count', 'true_rate']),
+  "unit": zod.string(),
+  "series": zod.array(zod.object({
+  "name": zod.string().min(1),
+  "data": zod.array(zod.object({
+  "timestamp": zod.string().min(1),
+  "value": zod.number()
+}))
+}))
+})),
+  "time_range": zod.object({
+  "start": zod.string().min(1),
+  "end": zod.string().min(1)
+}),
+  "granularity": zod.enum(['minute', 'hour', 'day', 'week', 'month'])
+})
 })
 
 
@@ -33673,31 +33697,117 @@ export const TracerDashboardWidgetsPreviewQueryParams = zod.object({
   "dashboard_pk": zod.string()
 })
 
-export const tracerDashboardWidgetsPreviewQueryBodyNameMax = 255;
-
-export const tracerDashboardWidgetsPreviewQueryBodyPositionMin = -2147483648;
-export const tracerDashboardWidgetsPreviewQueryBodyPositionMax = 2147483647;
-
-export const tracerDashboardWidgetsPreviewQueryBodyWidthMin = -2147483648;
-export const tracerDashboardWidgetsPreviewQueryBodyWidthMax = 2147483647;
-
-export const tracerDashboardWidgetsPreviewQueryBodyHeightMin = -2147483648;
-export const tracerDashboardWidgetsPreviewQueryBodyHeightMax = 2147483647;
-
-
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigWorkflowDefault = `observability`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigProjectIdsDefault = [];
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigGranularityDefault = `day`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemSourceDefault = `traces`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemAggregationDefault = `avg`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemAttributeTypeDefault = `string`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemDataTypeDefault = `string`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemFiltersDefault = [];
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigFiltersDefault = [];
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemTypeDefault = `system_metric`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemSourceDefault = `traces`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemAttributeTypeDefault = `string`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemDataTypeDefault = `string`;
+export const tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsDefault = [];
 
 export const TracerDashboardWidgetsPreviewQueryBody = zod.object({
-  "name": zod.string().min(1).max(tracerDashboardWidgetsPreviewQueryBodyNameMax).optional(),
-  "description": zod.string().optional(),
-  "position": zod.number().min(tracerDashboardWidgetsPreviewQueryBodyPositionMin).max(tracerDashboardWidgetsPreviewQueryBodyPositionMax).optional(),
-  "width": zod.number().min(tracerDashboardWidgetsPreviewQueryBodyWidthMin).max(tracerDashboardWidgetsPreviewQueryBodyWidthMax).optional(),
-  "height": zod.number().min(tracerDashboardWidgetsPreviewQueryBodyHeightMin).max(tracerDashboardWidgetsPreviewQueryBodyHeightMax).optional(),
   "query_config": zod.object({
+  "workflow": zod.enum(['observability', 'dataset', 'simulation']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigWorkflowDefault),
+  "project_ids": zod.array(zod.string().min(1)).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigProjectIdsDefault),
+  "time_range": zod.object({
+  "preset": zod.enum(['30m', '6h', 'today', 'yesterday', '7D', '30D', '3M', '6M', '12M']).optional(),
+  "custom_start": zod.string().datetime({"offset":true}).optional(),
+  "custom_end": zod.string().datetime({"offset":true}).optional()
+}),
+  "granularity": zod.enum(['minute', 'hour', 'day', 'week', 'month']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigGranularityDefault),
+  "metrics": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "name": zod.string().min(1),
+  "display_name": zod.string().optional(),
+  "type": zod.enum(['system_metric', 'eval_metric', 'annotation_metric', 'custom_attribute', 'custom_column']),
+  "source": zod.enum(['traces', 'datasets', 'simulation', 'both', 'all']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemSourceDefault),
+  "aggregation": zod.enum(['avg', 'median', 'max', 'min', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99', 'count', 'count_distinct', 'sum', 'pass_rate', 'fail_rate', 'pass_count', 'fail_count', 'true_rate']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemAggregationDefault),
+  "unit": zod.string().optional(),
+  "output_type": zod.string().optional(),
+  "eval_key": zod.string().optional(),
+  "config_id": zod.string().optional(),
+  "label_id": zod.string().optional(),
+  "attribute_key": zod.string().optional(),
+  "attribute_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemAttributeTypeDefault),
+  "column_id": zod.string().optional(),
+  "data_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemDataTypeDefault),
+  "filters": zod.array(zod.object({
+  "column_id": zod.string().describe('Column or attribute id to filter on.'),
+  "display_name": zod.string().optional().describe('Optional UI label for chips and saved views.'),
+  "source": zod.string().optional().describe('Optional source surface for mixed-source filters, for example traces, datasets, or simulation.'),
+  "output_type": zod.string().optional().describe('Optional metric output type metadata used by eval and annotation filters.'),
+  "filter_config": zod.object({
+  "filter_type": zod.string().describe('Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array.'),
+  "filter_op": zod.string().describe('Canonical operator from api_contracts\/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null.'),
+  "filter_value": zod.unknown().optional().describe('Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type.'),
+  "col_type": zod.string().optional().describe('Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL.')
+})
+})).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigMetricsItemFiltersDefault)
+})),
+  "filters": zod.array(zod.object({
+  "column_id": zod.string().describe('Column or attribute id to filter on.'),
+  "display_name": zod.string().optional().describe('Optional UI label for chips and saved views.'),
+  "source": zod.string().optional().describe('Optional source surface for mixed-source filters, for example traces, datasets, or simulation.'),
+  "output_type": zod.string().optional().describe('Optional metric output type metadata used by eval and annotation filters.'),
+  "filter_config": zod.object({
+  "filter_type": zod.string().describe('Canonical field type, for example text, number, boolean, datetime, categorical, thumbs, annotator, or array.'),
+  "filter_op": zod.string().describe('Canonical operator from api_contracts\/filter_contract.json, for example equals, not_equals, in, not_in, between, not_between, is_null, or is_not_null.'),
+  "filter_value": zod.unknown().optional().describe('Scalar, list, range tuple, boolean, or null depending on filter_op and filter_type.'),
+  "col_type": zod.string().optional().describe('Column family such as SYSTEM_METRIC, SPAN_ATTRIBUTE, EVAL_METRIC, ANNOTATION, or NORMAL.')
+})
+})).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigFiltersDefault),
+  "breakdowns": zod.array(zod.object({
+  "name": zod.string().min(1),
+  "display_name": zod.string().optional(),
+  "type": zod.enum(['system_metric', 'eval_metric', 'annotation_metric', 'custom_attribute', 'custom_column']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemTypeDefault),
+  "source": zod.enum(['traces', 'datasets', 'simulation', 'both', 'all']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemSourceDefault),
+  "output_type": zod.string().optional(),
+  "label_id": zod.string().optional(),
+  "config_id": zod.string().optional(),
+  "eval_key": zod.string().optional(),
+  "attribute_key": zod.string().optional(),
+  "attribute_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemAttributeTypeDefault),
+  "column_id": zod.string().optional(),
+  "data_type": zod.enum(['string', 'text', 'number', 'float', 'integer', 'boolean', 'datetime', 'date']).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsItemDataTypeDefault)
+})).default(tracerDashboardWidgetsPreviewQueryBodyQueryConfigBreakdownsDefault)
+})
+})
 
-}).passthrough().optional(),
-  "chart_config": zod.object({
+export const tracerDashboardWidgetsPreviewQueryResponseStatusDefault = true;
 
-}).passthrough().optional()
+
+
+
+
+export const TracerDashboardWidgetsPreviewQueryResponse = zod.object({
+  "status": zod.boolean().default(tracerDashboardWidgetsPreviewQueryResponseStatusDefault),
+  "result": zod.object({
+  "metrics": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "aggregation": zod.enum(['avg', 'median', 'max', 'min', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99', 'count', 'count_distinct', 'sum', 'pass_rate', 'fail_rate', 'pass_count', 'fail_count', 'true_rate']),
+  "unit": zod.string(),
+  "series": zod.array(zod.object({
+  "name": zod.string().min(1),
+  "data": zod.array(zod.object({
+  "timestamp": zod.string().min(1),
+  "value": zod.number()
+}))
+}))
+})),
+  "time_range": zod.object({
+  "start": zod.string().min(1),
+  "end": zod.string().min(1)
+}),
+  "granularity": zod.enum(['minute', 'hour', 'day', 'week', 'month'])
+})
 })
 
 
@@ -33951,31 +34061,38 @@ export const TracerDashboardWidgetsExecuteQueryParams = zod.object({
   "id": zod.string()
 })
 
-export const tracerDashboardWidgetsExecuteQueryBodyNameMax = 255;
-
-export const tracerDashboardWidgetsExecuteQueryBodyPositionMin = -2147483648;
-export const tracerDashboardWidgetsExecuteQueryBodyPositionMax = 2147483647;
-
-export const tracerDashboardWidgetsExecuteQueryBodyWidthMin = -2147483648;
-export const tracerDashboardWidgetsExecuteQueryBodyWidthMax = 2147483647;
-
-export const tracerDashboardWidgetsExecuteQueryBodyHeightMin = -2147483648;
-export const tracerDashboardWidgetsExecuteQueryBodyHeightMax = 2147483647;
-
-
-
 export const TracerDashboardWidgetsExecuteQueryBody = zod.object({
-  "name": zod.string().min(1).max(tracerDashboardWidgetsExecuteQueryBodyNameMax).optional(),
-  "description": zod.string().optional(),
-  "position": zod.number().min(tracerDashboardWidgetsExecuteQueryBodyPositionMin).max(tracerDashboardWidgetsExecuteQueryBodyPositionMax).optional(),
-  "width": zod.number().min(tracerDashboardWidgetsExecuteQueryBodyWidthMin).max(tracerDashboardWidgetsExecuteQueryBodyWidthMax).optional(),
-  "height": zod.number().min(tracerDashboardWidgetsExecuteQueryBodyHeightMin).max(tracerDashboardWidgetsExecuteQueryBodyHeightMax).optional(),
-  "query_config": zod.object({
 
-}).passthrough().optional(),
-  "chart_config": zod.object({
+})
 
-}).passthrough().optional()
+export const tracerDashboardWidgetsExecuteQueryResponseStatusDefault = true;
+
+
+
+
+
+export const TracerDashboardWidgetsExecuteQueryResponse = zod.object({
+  "status": zod.boolean().default(tracerDashboardWidgetsExecuteQueryResponseStatusDefault),
+  "result": zod.object({
+  "metrics": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "aggregation": zod.enum(['avg', 'median', 'max', 'min', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99', 'count', 'count_distinct', 'sum', 'pass_rate', 'fail_rate', 'pass_count', 'fail_count', 'true_rate']),
+  "unit": zod.string(),
+  "series": zod.array(zod.object({
+  "name": zod.string().min(1),
+  "data": zod.array(zod.object({
+  "timestamp": zod.string().min(1),
+  "value": zod.number()
+}))
+}))
+})),
+  "time_range": zod.object({
+  "start": zod.string().min(1),
+  "end": zod.string().min(1)
+}),
+  "granularity": zod.enum(['minute', 'hour', 'day', 'week', 'month'])
+})
 })
 
 

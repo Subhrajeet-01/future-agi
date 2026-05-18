@@ -1707,7 +1707,7 @@ export default function WidgetEditorView() {
     const base = {
       id: m.id || `m${i}`,
       name: m.id,
-      displayName: m.name || m.id,
+      display_name: m.name || m.id,
       type: backendType,
       source: m.source || "traces",
       aggregation,
