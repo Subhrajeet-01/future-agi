@@ -7,7 +7,7 @@
     "operations_without_response_schema": 0,
     "broad_success_response_schemas": 0,
     "operations_without_error_response_schema": 0,
-    "broad_error_response_schemas": 836
+    "broad_error_response_schemas": 0
   },
   "by_group": {
     "accounts": {
@@ -35,7 +35,7 @@
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
       "operations_without_error_response_schema": 0,
-      "broad_error_response_schemas": 33
+      "broad_error_response_schemas": 0
     },
     "ai-tools": {
       "paths": 1,
@@ -143,7 +143,7 @@
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
       "operations_without_error_response_schema": 0,
-      "broad_error_response_schemas": 89
+      "broad_error_response_schemas": 0
     },
     "usage": {
       "paths": 66,
@@ -152,7 +152,7 @@
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
       "operations_without_error_response_schema": 0,
-      "broad_error_response_schemas": 714
+      "broad_error_response_schemas": 0
     },
     "v1": {
       "paths": 2,

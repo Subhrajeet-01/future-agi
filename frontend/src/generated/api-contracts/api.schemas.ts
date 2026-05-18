@@ -2210,15 +2210,15 @@ export interface APIKeyBulkResponseApi {
   result: APIKeyBulkItemApi[];
 }
 
-export type AgentccErrorResponseApiResult = { [key: string]: unknown };
-
-export type AgentccErrorResponseApiMessage = { [key: string]: unknown };
+export type AgentccErrorResponseApiDetails = {[key: string]: string[]};
 
 export interface AgentccErrorResponseApi {
   status: boolean;
-  result?: AgentccErrorResponseApiResult;
+  result?: string;
   error?: string;
-  message?: AgentccErrorResponseApiMessage;
+  message?: string;
+  detail?: string;
+  details?: AgentccErrorResponseApiDetails;
 }
 
 export type AgentccBlocklistApiWords = { [key: string]: unknown };
@@ -16684,17 +16684,15 @@ export interface BulkAnnotationResponseApi {
   result: BulkAnnotationResponseResultApi;
 }
 
-export type ApiErrorResponseApiResult = { [key: string]: unknown };
-
-export type ApiErrorResponseApiMessage = { [key: string]: unknown };
-
-export type ApiErrorResponseApiError = { [key: string]: unknown };
+export type ApiErrorResponseApiDetails = {[key: string]: string[]};
 
 export interface ApiErrorResponseApi {
   status?: boolean;
-  result?: ApiErrorResponseApiResult;
-  message?: ApiErrorResponseApiMessage;
-  error?: ApiErrorResponseApiError;
+  result?: string;
+  message?: string;
+  error?: string;
+  detail?: string;
+  details?: ApiErrorResponseApiDetails;
 }
 
 export type FetchGraphApiFiltersItemFilterConfig = {
@@ -19125,14 +19123,15 @@ export interface AdminCustomPlanResponseApi {
   result: AdminCustomPlanResponseApiResult;
 }
 
-export type UsageErrorResponseApiResult = { [key: string]: unknown };
-
-export type UsageErrorResponseApiMessage = { [key: string]: unknown };
+export type UsageErrorResponseApiDetails = {[key: string]: string[]};
 
 export interface UsageErrorResponseApi {
   status: boolean;
-  result?: UsageErrorResponseApiResult;
-  message?: UsageErrorResponseApiMessage;
+  result?: string;
+  message?: string;
+  error?: string;
+  detail?: string;
+  details?: UsageErrorResponseApiDetails;
 }
 
 export type AdminCustomPlanRequestApiEntitlements = {[key: string]: { [key: string]: unknown }};

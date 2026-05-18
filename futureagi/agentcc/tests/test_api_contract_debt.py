@@ -43,6 +43,8 @@ def _response_ref(operation, status_code="200"):
 def test_agentcc_contract_debt_is_fully_burned_down():
     report = _debt_report()
 
+    assert report["by_group"]["agentcc"]["operations_without_error_response_schema"] == 0
+    assert report["by_group"]["agentcc"]["broad_error_response_schemas"] == 0
     assert [
         item
         for item in report["mutation_endpoints_without_body_schema"]

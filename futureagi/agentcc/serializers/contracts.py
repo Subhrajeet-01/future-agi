@@ -3,9 +3,15 @@ from rest_framework import serializers
 
 class AgentccErrorResponseSerializer(serializers.Serializer):
     status = serializers.BooleanField()
-    result = serializers.JSONField(required=False, allow_null=True)
+    result = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     error = serializers.CharField(required=False, allow_blank=True)
-    message = serializers.JSONField(required=False, allow_null=True)
+    message = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    detail = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    details = serializers.DictField(
+        child=serializers.ListField(child=serializers.CharField()),
+        required=False,
+        allow_empty=True,
+    )
 
 
 class AgentccEmptyRequestSerializer(serializers.Serializer):

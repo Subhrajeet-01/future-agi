@@ -43,6 +43,8 @@ def test_usage_contract_debt_is_fully_burned_down():
 
     assert report["by_group"]["usage"]["mutation_endpoints_without_body_schema"] == 0
     assert report["by_group"]["usage"]["operations_without_response_schema"] == 0
+    assert report["by_group"]["usage"]["operations_without_error_response_schema"] == 0
+    assert report["by_group"]["usage"]["broad_error_response_schemas"] == 0
 
 
 def test_usage_mutations_have_request_contracts():
