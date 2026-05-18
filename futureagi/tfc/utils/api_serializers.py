@@ -56,6 +56,22 @@ class ApiErrorWithDetailsResponseSerializer(ApiTextErrorResponseSerializer):
     )
 
 
+class ManagementAPIErrorResponseSerializer(serializers.Serializer):
+    """Default typed error envelope for management API endpoints."""
+
+    status = serializers.BooleanField(default=False, required=False)
+    result = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    message = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    error = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    detail = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    code = serializers.IntegerField(required=False)
+    details = serializers.DictField(
+        child=serializers.ListField(child=serializers.CharField()),
+        required=False,
+        allow_empty=True,
+    )
+
+
 class ApiDetailErrorResponseSerializer(serializers.Serializer):
     """DRF authentication/permission error envelope."""
 

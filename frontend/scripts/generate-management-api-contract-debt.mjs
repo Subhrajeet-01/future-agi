@@ -25,6 +25,7 @@ const NON_RESPONSE_OPTIONAL_METHODS = new Set(["delete"]);
 const NO_BODY_RESPONSE_STATUS = /^(204|205|304|3\d\d)$/;
 const SUCCESS_RESPONSE_STATUS = /^2\d\d$/;
 const ERROR_RESPONSE_STATUS = /^[45]\d\d$/;
+const DEFAULT_ERROR_RESPONSE_STATUS = "default";
 const HTTP_METHODS = new Set([
   "get",
   "post",
@@ -130,7 +131,9 @@ function errorResponseSchemaEntries(operation) {
   return Object.entries(operation.responses || {})
     .filter(
       ([statusCode, response]) =>
-        ERROR_RESPONSE_STATUS.test(statusCode) && response?.schema,
+        (ERROR_RESPONSE_STATUS.test(statusCode) ||
+          statusCode === DEFAULT_ERROR_RESPONSE_STATUS) &&
+        response?.schema,
     )
     .map(([statusCode, response]) => ({
       statusCode,

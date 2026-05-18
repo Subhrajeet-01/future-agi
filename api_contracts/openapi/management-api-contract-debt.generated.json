@@ -6,7 +6,7 @@
     "mutation_endpoints_without_body_schema": 0,
     "operations_without_response_schema": 0,
     "broad_success_response_schemas": 0,
-    "operations_without_error_response_schema": 493,
+    "operations_without_error_response_schema": 0,
     "broad_error_response_schemas": 836
   },
   "by_group": {
@@ -34,7 +34,7 @@
       "mutation_endpoints_without_body_schema": 0,
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
-      "operations_without_error_response_schema": 120,
+      "operations_without_error_response_schema": 0,
       "broad_error_response_schemas": 33
     },
     "ai-tools": {
@@ -106,7 +106,7 @@
       "mutation_endpoints_without_body_schema": 0,
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
-      "operations_without_error_response_schema": 170,
+      "operations_without_error_response_schema": 0,
       "broad_error_response_schemas": 0
     },
     "saml2_auth": {
@@ -142,7 +142,7 @@
       "mutation_endpoints_without_body_schema": 0,
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
-      "operations_without_error_response_schema": 200,
+      "operations_without_error_response_schema": 0,
       "broad_error_response_schemas": 89
     },
     "usage": {
@@ -151,7 +151,7 @@
       "mutation_endpoints_without_body_schema": 0,
       "operations_without_response_schema": 0,
       "broad_success_response_schemas": 0,
-      "operations_without_error_response_schema": 3,
+      "operations_without_error_response_schema": 0,
       "broad_error_response_schemas": 714
     },
     "v1": {

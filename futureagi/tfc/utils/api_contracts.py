@@ -3,11 +3,43 @@ from functools import wraps
 import structlog
 from django.conf import settings
 from drf_yasg import openapi
+from drf_yasg.inspectors import SwaggerAutoSchema
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers
 from rest_framework.response import Response
 
+from tfc.utils.api_serializers import ManagementAPIErrorResponseSerializer
+
 logger = structlog.get_logger(__name__)
+
+DEFAULT_ERROR_STATUS_CODE = "default"
+
+
+def _documented_response_has_schema(response):
+    if response is None:
+        return False
+    if isinstance(response, openapi.Response):
+        return response.schema is not None
+    if isinstance(response, str):
+        return False
+    return True
+
+
+class ManagementAPIAutoSchema(SwaggerAutoSchema):
+    """Add a common typed error contract to management API operations."""
+
+    def get_response_serializers(self):
+        responses = super().get_response_serializers()
+
+        if not _documented_response_has_schema(
+            responses.get(DEFAULT_ERROR_STATUS_CODE)
+        ):
+            responses[DEFAULT_ERROR_STATUS_CODE] = openapi.Response(
+                "Default error response",
+                ManagementAPIErrorResponseSerializer,
+            )
+
+        return responses
 
 
 def _serializer_name(serializer):

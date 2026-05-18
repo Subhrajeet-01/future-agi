@@ -18,6 +18,18 @@ export interface AccountsErrorResponseApi {
   detail?: string;
 }
 
+export type ManagementAPIErrorResponseApiDetails = {[key: string]: string[]};
+
+export interface ManagementAPIErrorResponseApi {
+  status?: boolean;
+  result?: string;
+  message?: string;
+  error?: string;
+  detail?: string;
+  code?: number;
+  details?: ManagementAPIErrorResponseApiDetails;
+}
+
 export interface RecoveryCodesRegenerateApi {
   /**
      * @minLength 6

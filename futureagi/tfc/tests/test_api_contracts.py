@@ -69,6 +69,19 @@ def _swagger():
         return json.load(f)
 
 
+def _debt_report():
+    import json
+
+    repo_root = Path(__file__).resolve().parents[3]
+    with (
+        repo_root
+        / "api_contracts"
+        / "openapi"
+        / "management-api-contract-debt.generated.json"
+    ).open() as f:
+        return json.load(f)
+
+
 def _body_ref(path, method):
     body_param = next(
         parameter
@@ -144,3 +157,25 @@ def test_core_management_endpoints_have_runtime_backed_contracts():
         _response_ref("/call-websocket/", "post", "400")
         == "#/definitions/CallWebsocketErrorResponse"
     )
+
+
+def test_management_api_auto_schema_adds_default_error_contracts():
+    assert (
+        _response_ref("/model-hub/annotation-queues/", "get", "default")
+        == "#/definitions/ManagementAPIErrorResponse"
+    )
+
+    assert (
+        _response_ref("/call-websocket/", "post", "400")
+        == "#/definitions/CallWebsocketErrorResponse"
+    )
+    assert (
+        _response_ref("/call-websocket/", "post", "default")
+        == "#/definitions/ManagementAPIErrorResponse"
+    )
+
+
+def test_management_api_has_no_missing_error_response_contract_debt():
+    report = _debt_report()
+
+    assert report["summary"]["operations_without_error_response_schema"] == 0

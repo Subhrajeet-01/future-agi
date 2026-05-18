@@ -18,7 +18,7 @@ const MIN_ENDPOINTS = 960;
 const MAX_MUTATIONS_WITHOUT_BODY_SCHEMA = 0;
 const MAX_OPERATIONS_WITHOUT_RESPONSE_SCHEMA = 0;
 const MAX_BROAD_SUCCESS_RESPONSE_SCHEMAS = 0;
-const MAX_OPERATIONS_WITHOUT_ERROR_RESPONSE_SCHEMA = 625;
+const MAX_OPERATIONS_WITHOUT_ERROR_RESPONSE_SCHEMA = 0;
 const MAX_BROAD_ERROR_RESPONSE_SCHEMAS = 2898;
 const MIN_GROUP_PATHS = {
   accounts: 75,
@@ -34,6 +34,7 @@ const NON_RESPONSE_OPTIONAL_METHODS = new Set(["delete"]);
 const NO_BODY_RESPONSE_STATUS = /^(204|205|304|3\d\d)$/;
 const SUCCESS_RESPONSE_STATUS = /^2\d\d$/;
 const ERROR_RESPONSE_STATUS = /^[45]\d\d$/;
+const DEFAULT_ERROR_RESPONSE_STATUS = "default";
 const EXACT_EMPTY_SUCCESS_RESPONSE_SCHEMAS = new Set([
   // OTLP export success responses are intentionally an empty JSON object.
   // This is an exact protocol acknowledgement, not an untyped application DTO.
@@ -116,7 +117,10 @@ function responseSchemaEntries(operation) {
 function errorResponseSchemaEntries(operation) {
   return Object.entries(operation.responses || {})
     .filter(
-      ([statusCode, response]) => ERROR_RESPONSE_STATUS.test(statusCode) && response?.schema,
+      ([statusCode, response]) =>
+        (ERROR_RESPONSE_STATUS.test(statusCode) ||
+          statusCode === DEFAULT_ERROR_RESPONSE_STATUS) &&
+        response?.schema,
     )
     .map(([statusCode, response]) => ({
       statusCode,
