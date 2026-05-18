@@ -16,6 +16,7 @@ import PropTypes from "prop-types";
 import ComplexFilter from "src/components/ComplexFilter/ComplexFilter";
 import { EvalTaskFilterDefinition } from "./common";
 import { getRandomId } from "src/utils/utils";
+import { extractErrorMessage } from "src/utils/errorUtils";
 import { useGetValidatedFilters } from "src/hooks/use-get-validated-filters";
 import { useGetProjectById } from "src/api/project/evals-task";
 import DeleteConfirmation from "./DeleteConfirmation";
@@ -135,8 +136,14 @@ const EvalsTasksView = ({ observeId = null }) => {
         gridRef?.current?.api?.refreshServerSide();
         setSelectedRowsData([]);
         setDeleteLoading(false);
-      } catch (error) {
-        enqueueSnackbar(error.message, { variant: "error" });
+      } catch (e) {
+        const error = e;
+        enqueueSnackbar(
+          error?.result
+            ? extractErrorMessage(error.result)
+            : "Failed to delete",
+          { variant: "error" },
+        );
       } finally {
         setDeleteLoading(false);
       }

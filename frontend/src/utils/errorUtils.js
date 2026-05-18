@@ -1,7 +1,16 @@
 import { RESPONSE_CODES } from "./constants";
 
-const DEFAULT_RATE_LIMIT_MESSAGE =
-  "Rate limit reached.";
+
+
+export const extractErrorMessage = (result) => {
+  if (typeof result === "string") return result;
+  if (Array.isArray(result)) return result.join(", ");
+  if (result && typeof result === "object")
+    return Object.values(result).flat().join(", ");
+  return "Something went wrong";
+};
+
+const DEFAULT_RATE_LIMIT_MESSAGE = "Rate limit reached.";
 const DEFAULT_RETRY_GUIDANCE = "Please try again in a few minutes.";
 
 const hasTerminalPunctuation = (message) => /[.!?]$/.test(message);

@@ -28,6 +28,7 @@ import { useNavigate, useParams } from "react-router";
 import { useSearchParams } from "react-router-dom";
 import { useSnackbar } from "notistack";
 import { useDeploymentMode } from "src/hooks/useDeploymentMode";
+import { extractErrorMessage } from "src/utils/errorUtils";
 import Iconify from "src/components/iconify";
 import axios, { endpoints } from "src/utils/axios";
 
@@ -965,8 +966,14 @@ const EvalDetailPage = () => {
       });
       enqueueSnackbar("Evaluation deleted", { variant: "success" });
       navigate("/dashboard/evaluations");
-    } catch {
-      enqueueSnackbar("Failed to delete evaluation", { variant: "error" });
+    } catch (e) {
+      const error = e;
+      enqueueSnackbar(
+        error?.result
+          ? extractErrorMessage(error.result)
+          : "Failed to delete evaluation",
+        { variant: "error" },
+      );
     }
     setMenuAnchor(null);
   }, [evalId, enqueueSnackbar, navigate]);
@@ -981,8 +988,14 @@ const EvalDetailPage = () => {
       enqueueSnackbar("Evaluation duplicated", { variant: "success" });
       if (data?.result?.id)
         navigate(`/dashboard/evaluations/${data.result.id}`);
-    } catch {
-      enqueueSnackbar("Failed to duplicate evaluation", { variant: "error" });
+    } catch (e) {
+      const error = e;
+      enqueueSnackbar(
+        error?.result
+          ? extractErrorMessage(error.result)
+          : "Failed to duplicate evaluation",
+        { variant: "error" },
+      );
     }
     setMenuAnchor(null);
   }, [evalId, enqueueSnackbar, navigate]);

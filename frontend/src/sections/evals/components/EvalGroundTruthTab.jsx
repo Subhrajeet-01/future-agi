@@ -25,6 +25,7 @@ import { AgGridReact } from "ag-grid-react";
 import { useAgTheme } from "src/hooks/use-ag-theme";
 import Iconify from "src/components/iconify";
 import { canonicalEntries } from "src/utils/utils";
+import { extractErrorMessage } from "src/utils/errorUtils";
 
 import {
   useDevelopDatasetList,
@@ -1171,8 +1172,14 @@ const ConfigPanel = ({ templateId, gtId }) => {
         enabled ? "Ground truth disabled" : "Ground truth enabled",
         { variant: "success" },
       );
-    } catch {
-      enqueueSnackbar("Failed to update config", { variant: "error" });
+    } catch (e) {
+      const error = e;
+      enqueueSnackbar(
+        error?.result
+          ? extractErrorMessage(error.result)
+          : "Failed to update config",
+        { variant: "error" },
+      );
     }
   }, [enabled, gtId, maxExamples, threshold, updateConfig, enqueueSnackbar]);
 
@@ -1186,8 +1193,14 @@ const ConfigPanel = ({ templateId, gtId }) => {
         similarity_threshold: threshold,
       });
       enqueueSnackbar("Config saved", { variant: "success" });
-    } catch {
-      enqueueSnackbar("Failed to save config", { variant: "error" });
+    } catch (e) {
+      const error = e;
+      enqueueSnackbar(
+        error?.result
+          ? extractErrorMessage(error.result)
+          : "Failed to save config",
+        { variant: "error" },
+      );
     }
   }, [gtId, maxExamples, threshold, updateConfig, enqueueSnackbar]);
 
@@ -1418,8 +1431,14 @@ const EvalGroundTruthTab = ({ templateId }) => {
     try {
       await deleteGt.mutateAsync(activeDataset.id);
       enqueueSnackbar("Dataset deleted", { variant: "success" });
-    } catch {
-      enqueueSnackbar("Failed to delete", { variant: "error" });
+    } catch (e) {
+      const error = e;
+      enqueueSnackbar(
+        error?.result
+          ? extractErrorMessage(error.result)
+          : "Failed to delete",
+        { variant: "error" },
+      );
     }
   }, [activeDataset, deleteGt, enqueueSnackbar]);
 

@@ -29,6 +29,7 @@ import { buildApiFilterArray } from "src/sections/tasks/components/TaskLivePrevi
 import { ROW_TYPE_LABELS } from "src/utils/constants";
 import { useSnackbar } from "notistack";
 import { useDeploymentMode } from "src/hooks/useDeploymentMode";
+import { extractErrorMessage } from "src/utils/errorUtils";
 
 // Same components as EvalCreatePage
 import { useCreateEval } from "src/sections/evals/hooks/useCreateEval";
@@ -515,8 +516,14 @@ const EvalPickerCreateNew = ({ onBack, onSave }) => {
             ? dataInjectionFromContextOptions(contextOptions)
             : undefined,
       });
-    } catch (error) {
-      enqueueSnackbar(error?.message || "Failed to save", { variant: "error" });
+    } catch (e) {
+      const error = e;
+      enqueueSnackbar(
+        error?.result
+          ? extractErrorMessage(error.result)
+          : "Failed to save",
+        { variant: "error" },
+      );
     } finally {
       setIsSaving(false);
     }

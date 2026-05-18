@@ -33,6 +33,7 @@ import {
   useEvaluationContext,
 } from "./context/EvaluationContext";
 import axios, { endpoints } from "src/utils/axios";
+import { extractErrorMessage } from "src/utils/errorUtils";
 import { enqueueSnackbar } from "notistack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
@@ -450,10 +451,14 @@ const EvaluationDrawerChild = ({
                         });
                         invalidateEvalCaches();
                         refreshGrid?.(null, true);
-                      } catch {
-                        enqueueSnackbar("Failed to stop evaluation", {
-                          variant: "error",
-                        });
+                      } catch (e) {
+                        const error =e;
+                        enqueueSnackbar(
+                          error?.result
+                            ? extractErrorMessage(error.result)
+                            : "Failed to stop evaluation",
+                          { variant: "error" },
+                        );
                       }
                     }}
                     onEditEvalClick={openEditForSavedEval}

@@ -41,16 +41,9 @@ import logger from "./utils/logger";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 import { setRecaptchaExecutor } from "./utils/recaptchaService";
 import { AudioPlaybackProvider } from "./components/custom-audio/context-provider/AudioPlaybackContext";
+import { extractErrorMessage } from "./utils/errorUtils";
 
 // ----------------------------------------------------------------------
-const extractErrorMessage = (result) => {
-  if (typeof result === "string") return result;
-  if (Array.isArray(result)) return result.join(", ");
-  if (result && typeof result === "object")
-    return Object.values(result).flat().join(", ");
-  return "Something went wrong";
-};
-
 const handleError = (error, variable, context, mutation) => {
   if (error?.statusCode == RESPONSE_CODES.LIMIT_REACHED) return;
   if (

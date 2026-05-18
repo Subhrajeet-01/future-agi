@@ -29,6 +29,7 @@ import { extractCodeEvaluateParams } from "src/utils/codeEvalParams";
 import { extractJinjaVariables } from "src/utils/jinjaVariables";
 import { canonicalEntries } from "src/utils/utils";
 import { camelCaseToTitleCase } from "src/utils/utils";
+import { extractErrorMessage } from "src/utils/errorUtils";
 import CodeEditor from "./CodeEditor";
 import DatasetTestMode from "./DatasetTestMode";
 import TracingTestMode from "./TracingTestMode";
@@ -680,8 +681,14 @@ const TestPlayground = React.forwardRef(
         enqueueSnackbar(`V${menuVersion.version_number} set as default`, {
           variant: "success",
         });
-      } catch {
-        enqueueSnackbar("Failed to set default version", { variant: "error" });
+      } catch (e) {
+        const error = e;
+        enqueueSnackbar(
+          error?.result
+            ? extractErrorMessage(error.result)
+            : "Failed to set default version",
+          { variant: "error" },
+        );
       }
       handleVersionMenuClose();
     }, [
@@ -699,8 +706,14 @@ const TestPlayground = React.forwardRef(
           `Restored V${menuVersion.version_number} as new V${restored?.version_number || ""}`,
           { variant: "success" },
         );
-      } catch {
-        enqueueSnackbar("Failed to restore version", { variant: "error" });
+      } catch (e) {
+        const error = e;
+        enqueueSnackbar(
+          error?.result
+            ? extractErrorMessage(error.result)
+            : "Failed to restore version",
+          { variant: "error" },
+        );
       }
       handleVersionMenuClose();
     }, [menuVersion, restoreVersion, enqueueSnackbar, handleVersionMenuClose]);
