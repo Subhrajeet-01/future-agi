@@ -44116,7 +44116,55 @@
             "get": {
                 "operationId": "simulate_test-executions_read",
                 "description": "Get a specific test execution with all its details and paginated call executions\nQuery Parameters:\n- search: search string to filter call executions\n- page: page number for call executions (default: 1)\n- filters: JSON array of filter objects\n- row_groups: JSON array of column IDs to group by\n- group_keys: JSON array of group keys",
-                "parameters": [],
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "type": "string",
+                        "default": ""
+                    },
+                    {
+                        "name": "filters",
+                        "in": "query",
+                        "required": false,
+                        "type": "string",
+                        "default": "[]",
+                        "minLength": 1
+                    },
+                    {
+                        "name": "row_groups",
+                        "in": "query",
+                        "required": false,
+                        "type": "string",
+                        "default": "[]",
+                        "minLength": 1
+                    },
+                    {
+                        "name": "group_keys",
+                        "in": "query",
+                        "required": false,
+                        "type": "string",
+                        "default": "[]",
+                        "minLength": 1
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "type": "integer",
+                        "default": 1,
+                        "minimum": 1
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "type": "integer",
+                        "default": 30,
+                        "minimum": 1
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "",

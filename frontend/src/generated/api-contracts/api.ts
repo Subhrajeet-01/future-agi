@@ -986,6 +986,7 @@ import type {
   SimulateRunTestsListParams,
   SimulateScenariosGetColumnsListParams,
   SimulateScenariosListParams,
+  SimulateTestExecutionsReadParams,
   SimulatorAgentApi,
   SimulatorAgentListResponseApi,
   SimulatorAgentValidationErrorResponseApi,
@@ -48945,12 +48946,20 @@ export type simulateTestExecutionsReadResponseError = (simulateTestExecutionsRea
 
 export type simulateTestExecutionsReadResponse = (simulateTestExecutionsReadResponseSuccess | simulateTestExecutionsReadResponseError)
 
-export const getSimulateTestExecutionsReadUrl = (testExecutionId: string,) => {
+export const getSimulateTestExecutionsReadUrl = (testExecutionId: string,
+    params?: SimulateTestExecutionsReadParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/simulate/test-executions/${testExecutionId}/`
+  return stringifiedParams.length > 0 ? `/simulate/test-executions/${testExecutionId}/?${stringifiedParams}` : `/simulate/test-executions/${testExecutionId}/`
 }
 
 /**
@@ -48962,9 +48971,10 @@ Query Parameters:
 - row_groups: JSON array of column IDs to group by
 - group_keys: JSON array of group keys
  */
-export const simulateTestExecutionsRead = async (testExecutionId: string, options?: RequestInit): Promise<simulateTestExecutionsReadResponse> => {
+export const simulateTestExecutionsRead = async (testExecutionId: string,
+    params?: SimulateTestExecutionsReadParams, options?: RequestInit): Promise<simulateTestExecutionsReadResponse> => {
 
-  return apiMutator<simulateTestExecutionsReadResponse>(getSimulateTestExecutionsReadUrl(testExecutionId),
+  return apiMutator<simulateTestExecutionsReadResponse>(getSimulateTestExecutionsReadUrl(testExecutionId,params),
   {
     ...options,
     method: 'GET'

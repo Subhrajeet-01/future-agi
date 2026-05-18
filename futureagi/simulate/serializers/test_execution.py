@@ -1,3 +1,4 @@
+import json
 import traceback
 from datetime import datetime
 
@@ -13,6 +14,10 @@ from simulate.models import (
     TestExecution,
 )
 from simulate.serializers.chat_message import ChatMessageSerializer
+from tracer.serializers.filters import (
+    StrictInputSerializer,
+    filter_list_query_param_field,
+)
 
 try:
     from ee.voice.services.voice_service_manager import VoiceServiceManager
@@ -21,6 +26,37 @@ except ImportError:
 from tracer.models.observability_provider import ProviderChoices
 
 logger = structlog.get_logger(__name__)
+
+
+class JsonArrayQueryParamField(serializers.CharField):
+    """Parse a JSON-encoded list from query params without accepting objects."""
+
+    class Meta:
+        swagger_schema_fields = {
+            "type": "string",
+            "description": "JSON-encoded array.",
+        }
+
+    def to_internal_value(self, data):
+        if data in (None, ""):
+            return []
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError("Value must be valid JSON.") from exc
+        if not isinstance(data, list):
+            raise serializers.ValidationError("Value must be a list.")
+        return data
+
+
+class ExecutionDetailQuerySerializer(StrictInputSerializer):
+    search = serializers.CharField(required=False, allow_blank=True, default="")
+    filters = filter_list_query_param_field(required=False, default=list)
+    row_groups = JsonArrayQueryParamField(required=False, default=list)
+    group_keys = JsonArrayQueryParamField(required=False, default=list)
+    page = serializers.IntegerField(required=False, default=1, min_value=1)
+    limit = serializers.IntegerField(required=False, default=30, min_value=1)
 
 
 class CallTranscriptSerializer(serializers.ModelSerializer):

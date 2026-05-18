@@ -22761,6 +22761,30 @@ page?: number;
 limit?: number;
 };
 
+export type SimulateTestExecutionsReadParams = {
+search?: string;
+/**
+ * @minLength 1
+ */
+filters?: string;
+/**
+ * @minLength 1
+ */
+row_groups?: string;
+/**
+ * @minLength 1
+ */
+group_keys?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ */
+limit?: number;
+};
+
 export type TracerChartsListParams = {
 /**
  * A page number within the paginated result set.

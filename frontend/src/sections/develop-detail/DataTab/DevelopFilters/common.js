@@ -1,5 +1,5 @@
 import { format, isValid } from "date-fns";
-import logger from "src/utils/logger";
+import { buildApiFilterFromPanelRow } from "src/api/contracts/filter-contract";
 
 export const DefaultFilter = {
   columnId: "",
@@ -44,7 +44,6 @@ export const validateFilter = (filter) => {
 
 const transformFilterValue = (filterValue, filterType) => {
   if (filterType === "datetime") {
-    logger.debug({ filterValue });
     if (Array.isArray(filterValue)) {
       return [
         filterValue[0]
@@ -73,18 +72,16 @@ const transformFilterValue = (filterValue, filterType) => {
   return filterValue;
 };
 
-export const transformFilter = (filter) => ({
-  column_id: filter.columnId,
-  filter_config: {
-    filter_type: filter.filterConfig.filterType,
-    filter_op: filter.filterConfig.filterOp,
-    filter_value: transformFilterValue(
+export const transformFilter = (filter) =>
+  buildApiFilterFromPanelRow({
+    field: filter.columnId,
+    fieldType: filter.filterConfig.filterType,
+    operator: filter.filterConfig.filterOp,
+    value: transformFilterValue(
       filter.filterConfig.filterValue,
       filter.filterConfig.filterType,
-      filter.filterConfig.filterOp,
     ),
-  },
-});
+  });
 
 export const compareFilterChange = (prevFilters, filters) => {
   if (!prevFilters || !filters) return false;

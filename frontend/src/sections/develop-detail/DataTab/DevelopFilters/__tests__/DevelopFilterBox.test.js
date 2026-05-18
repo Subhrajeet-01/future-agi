@@ -16,10 +16,8 @@
  * came from a manual edit or the AI query.
  */
 import { describe, it, expect } from "vitest";
-import {
-  panelFilterToStore,
-  unwrapScalarValue,
-} from "../DevelopFilterBox";
+import { panelFilterToStore, unwrapScalarValue } from "../DevelopFilterBox";
+import { transformFilter } from "../common";
 
 describe("unwrapScalarValue", () => {
   it("unwraps single-element arrays for scalar string fields", () => {
@@ -35,9 +33,7 @@ describe("unwrapScalarValue", () => {
   });
 
   it("unwraps single-element arrays for date fields", () => {
-    expect(unwrapScalarValue(["2026-04-21"], "date", "on")).toBe(
-      "2026-04-21",
-    );
+    expect(unwrapScalarValue(["2026-04-21"], "date", "on")).toBe("2026-04-21");
   });
 
   it("preserves arrays for `array` fieldType", () => {
@@ -52,8 +48,7 @@ describe("unwrapScalarValue", () => {
     // Numeric between needs [min, max]; collapsing would lose the range.
     expect(unwrapScalarValue([1, 10], "number", "between")).toEqual([1, 10]);
     expect(unwrapScalarValue([1, 10], "number", "not_between")).toEqual([
-      1,
-      10,
+      1, 10,
     ]);
   });
 
@@ -157,5 +152,62 @@ describe("panelFilterToStore — AI-path regression (TH-4400)", () => {
       value: [undefined],
     });
     expect(out.filterConfig.filterValue).toBe("");
+  });
+});
+
+describe("transformFilter", () => {
+  it("emits the canonical backend filter contract", () => {
+    const out = transformFilter({
+      columnId: "col_score",
+      filterConfig: {
+        filterType: "number",
+        filterOp: "greater_than_or_equal",
+        filterValue: "10",
+      },
+    });
+
+    expect(out).toEqual({
+      column_id: "col_score",
+      filter_config: {
+        filter_type: "number",
+        filter_op: "greater_than_or_equal",
+        filter_value: 10,
+      },
+    });
+    expect(out).not.toHaveProperty("columnId");
+    expect(out).not.toHaveProperty("filterConfig");
+  });
+
+  it("keeps dataset datetime values in the backend's accepted format", () => {
+    const out = transformFilter({
+      columnId: "col_created_at",
+      filterConfig: {
+        filterType: "datetime",
+        filterOp: "between",
+        filterValue: [
+          new Date(2026, 4, 1, 0, 0, 0),
+          new Date(2026, 4, 2, 0, 0, 0),
+        ],
+      },
+    });
+
+    expect(out.filter_config).toEqual({
+      filter_type: "datetime",
+      filter_op: "between",
+      filter_value: ["2026-05-01 00:00:00", "2026-05-02 00:00:00"],
+    });
+  });
+
+  it("rejects non-canonical operators before the API call", () => {
+    expect(() =>
+      transformFilter({
+        columnId: "col_score",
+        filterConfig: {
+          filterType: "number",
+          filterOp: "not_in_between",
+          filterValue: [1, 2],
+        },
+      }),
+    ).toThrow(/Unsupported filter operator/);
   });
 });

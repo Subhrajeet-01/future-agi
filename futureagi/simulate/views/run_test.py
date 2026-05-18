@@ -144,6 +144,7 @@ from simulate.serializers.test_execution import (
     RunTestAnalyticsSerializer,
     RunTestKPIsResponseSerializer,
     TestExecutionDetailResponseSerializer,
+    ExecutionDetailQuerySerializer,
     TestExecutionAnalyticsSerializer,
     TestExecutionBulkDeleteResponseSerializer,
     TestExecutionBulkDeleteSerializer,
@@ -1981,6 +1982,7 @@ class TestExecutionDetailView(APIView):
     utils = TestExecutionUtils()
 
     @swagger_auto_schema(
+        query_serializer=ExecutionDetailQuerySerializer,
         responses={
             200: TestExecutionDetailResponseSerializer,
             404: ErrorResponseSerializer,
@@ -2009,6 +2011,18 @@ class TestExecutionDetailView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            query_serializer = ExecutionDetailQuerySerializer(data=request.query_params)
+            if not query_serializer.is_valid():
+                return Response(
+                    query_serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            query_data = query_serializer.validated_data
+            search_query = query_data.get("search", "").strip()
+            filters = query_data.get("filters", [])
+            row_groups = query_data.get("row_groups", [])
+            group_keys = query_data.get("group_keys", [])
+
             # Get the test execution
             test_execution = get_object_or_404(
                 TestExecution,
@@ -2016,22 +2030,6 @@ class TestExecutionDetailView(APIView):
                 run_test__organization=user_organization,
                 run_test__deleted=False,
             )
-
-            # Get query parameters
-            search_query = request.query_params.get("search", "").strip()
-            filters = request.query_params.get("filters", "[]")
-            row_groups = request.query_params.get("row_groups", "[]")
-            group_keys = request.query_params.get("group_keys", "[]")
-
-            # Parse JSON parameters
-            try:
-                filters = json.loads(filters) if filters else []
-                row_groups = json.loads(row_groups) if row_groups else []
-                group_keys = json.loads(group_keys) if group_keys else []
-            except json.JSONDecodeError:
-                filters = []
-                row_groups = []
-                group_keys = []
 
             # Get call executions for this test execution
             call_executions = (
@@ -2365,8 +2363,8 @@ class TestExecutionDetailView(APIView):
                     column_order,
                 )
                 # Grouping now always returns a list, so handle pagination manually
-                page = int(request.query_params.get("page", 1))
-                page_size = int(request.query_params.get("limit", 30))
+                page = query_data.get("page", 1)
+                page_size = query_data.get("limit", 30)
                 start = (page - 1) * page_size
                 end = start + page_size
                 paginated_calls = call_executions[start:end]
@@ -2415,7 +2413,7 @@ class TestExecutionDetailView(APIView):
                         "previous": None,
                         "results": [],
                         "total_pages": total_pages,
-                        "current_page": int(request.query_params.get("page", 1) or 1),
+                        "current_page": query_data.get("page", 1),
                         "column_order": column_order,
                         "error_messages": error_messages,
                         "status": test_execution.status,

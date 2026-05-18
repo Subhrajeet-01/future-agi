@@ -23331,7 +23331,55 @@ export const OPENAPI_CONTRACT = Object.freeze({
       "get": {
         "operationId": "simulate_test-executions_read",
         "requestBody": null,
-        "queryParameters": {},
+        "queryParameters": {
+          "search": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "filters": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "default": "[]"
+            }
+          },
+          "row_groups": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "default": "[]"
+            }
+          },
+          "group_keys": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "default": "[]"
+            }
+          },
+          "page": {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          "limit": {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 30
+            }
+          }
+        },
         "responses": {
           "200": {
             "$ref": "#/definitions/TestExecutionDetailResponse"

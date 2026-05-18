@@ -348,6 +348,10 @@ const DevelopData = React.forwardRef(
     const validatedFilters = useMemo(() => {
       return filters.filter(validateFilter).map(transformFilter);
     }, [filters]);
+    const encodedFilters = useMemo(
+      () => JSON.stringify(validatedFilters),
+      [validatedFilters],
+    );
 
     // Polling to check if data is added every 5 seconds when no data exists
     useEffect(() => {
@@ -361,7 +365,7 @@ const DevelopData = React.forwardRef(
               {
                 params: {
                   current_page_index: 0,
-                  filters: validatedFilters,
+                  filters: encodedFilters,
                 },
               },
             );
@@ -383,7 +387,7 @@ const DevelopData = React.forwardRef(
           clearInterval(pollingInterval);
         }
       };
-    }, [isData, dataset, validatedFilters]);
+    }, [isData, dataset, encodedFilters]);
 
     const getMainMenuItems = (params) => {
       const allMenuItems = setMenuIcons(params, currentDataset?.name); // Pass dataset name
@@ -671,7 +675,7 @@ const DevelopData = React.forwardRef(
             {
               params: {
                 current_page_index: p,
-                filters: validatedFilters,
+                filters: encodedFilters,
               },
             },
           );
@@ -741,6 +745,11 @@ const DevelopData = React.forwardRef(
           setSelectedAll(false);
 
           const pageNumber = Math.floor(request.startRow / 10);
+          const sortParams =
+            request?.sortModel?.map(({ colId, sort }) => ({
+              column_id: colId,
+              type: sort === "asc" ? "ascending" : "descending",
+            })) || [];
 
           try {
             const { data } = await axios.get(
@@ -748,16 +757,13 @@ const DevelopData = React.forwardRef(
               {
                 params: {
                   current_page_index: pageNumber,
-                  filters: validatedFilters,
-                  sort: request?.sortModel?.map(({ colId, sort }) => ({
-                    columnId: colId,
-                    type: sort === "asc" ? "ascending" : "descending",
-                  })),
+                  filters: encodedFilters,
+                  sort: JSON.stringify(sortParams),
                   ...(searchQuery && {
-                    search: {
+                    search: JSON.stringify({
                       key: searchQuery,
                       type: ["text", "image", "audio"],
-                    },
+                    }),
                   }),
                 },
               },
@@ -792,7 +798,7 @@ const DevelopData = React.forwardRef(
           }
         },
       }),
-      [dataset, validatedFilters, searchQuery],
+      [dataset, encodedFilters, searchQuery],
     );
 
     const { data: columnConfigData } = useQuery({

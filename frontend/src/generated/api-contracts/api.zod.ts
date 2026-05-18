@@ -32093,6 +32093,28 @@ export const SimulateTestExecutionsReadParams = zod.object({
   "test_execution_id": zod.string()
 })
 
+export const simulateTestExecutionsReadQuerySearchDefault = ``;
+export const simulateTestExecutionsReadQueryFiltersDefault = `[]`;
+
+export const simulateTestExecutionsReadQueryRowGroupsDefault = `[]`;
+
+export const simulateTestExecutionsReadQueryGroupKeysDefault = `[]`;
+
+export const simulateTestExecutionsReadQueryPageDefault = 1;
+
+export const simulateTestExecutionsReadQueryLimitDefault = 30;
+
+
+
+export const SimulateTestExecutionsReadQueryParams = zod.object({
+  "search": zod.string().default(simulateTestExecutionsReadQuerySearchDefault),
+  "filters": zod.string().min(1).default(simulateTestExecutionsReadQueryFiltersDefault),
+  "row_groups": zod.string().min(1).default(simulateTestExecutionsReadQueryRowGroupsDefault),
+  "group_keys": zod.string().min(1).default(simulateTestExecutionsReadQueryGroupKeysDefault),
+  "page": zod.number().min(1).default(simulateTestExecutionsReadQueryPageDefault),
+  "limit": zod.number().min(1).default(simulateTestExecutionsReadQueryLimitDefault)
+})
+
 
 
 

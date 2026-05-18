@@ -107,6 +107,17 @@ def test_test_execution_endpoints_have_response_contracts():
         assert _response_ref(_operation(path, method)) == definition_name
 
 
+def test_test_execution_detail_documents_query_contract():
+    operation = _operation("/simulate/test-executions/{test_execution_id}/", "GET")
+    params = {param["name"]: param for param in operation["parameters"]}
+
+    assert params["filters"]["type"] == "string"
+    assert params["row_groups"]["type"] == "string"
+    assert params["group_keys"]["type"] == "string"
+    assert params["page"]["minimum"] == 1
+    assert params["limit"]["minimum"] == 1
+
+
 def test_test_execution_contract_debt_stays_burned_down():
     covered_paths = {
         "/simulate/test-executions/{test_execution_id}/cancel/",
