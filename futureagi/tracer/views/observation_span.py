@@ -2050,11 +2050,10 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
         # the filter to `end_user_id` scoped to this project + organization.
         _resolved: List[Dict] = []
         for _f in filters:
-            _col = _f.get("column_id") or _f.get("columnId")
-            _cfg = _f.get("filter_config") or _f.get("filterConfig") or {}
-            _col_type = _cfg.get("col_type") or _cfg.get("colType") or "NORMAL"
+            _col, _cfg = FilterEngine._normalize_filter_params(_f)
+            _col_type = _cfg.get("col_type", "NORMAL")
             if _col == "user_id" and _col_type == "NORMAL":
-                _val = _cfg.get("filter_value", _cfg.get("filterValue"))
+                _val = _cfg.get("filter_value")
                 _vals = _val if isinstance(_val, list) else [_val]
                 _vals = [v for v in _vals if v]
                 if not _vals:
@@ -3163,6 +3162,8 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
         self, observation_span_id, custom_eval_config_id, analytics
     ):
         """Get evaluation details from ClickHouse."""
+        # Span- and trace-target rows both anchor to observation_span_id;
+        # session rows don't and are served by /trace-session/:id/eval_logs/.
         query = """
             SELECT
                 output_float,
@@ -3176,7 +3177,7 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
             FROM tracer_eval_logger FINAL
             WHERE observation_span_id = %(span_id)s
               AND custom_eval_config_id = %(config_id)s
-              AND target_type = 'span'
+              AND target_type IN ('span', 'trace')
               AND _peerdb_is_deleted = 0
               AND (deleted = 0 OR deleted IS NULL)
             LIMIT 1
@@ -3273,9 +3274,11 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
                         "CH eval details failed, falling back to PG", error=str(e)
                     )
 
+            # Mirror the ClickHouse filter; excludes session-target rows.
             eval_logger = EvalLogger.objects.filter(
                 observation_span_id=observation_span_id,
                 custom_eval_config_id=custom_eval_config_id,
+                target_type__in=["span", "trace"],
             ).first()
 
             if not eval_logger:
