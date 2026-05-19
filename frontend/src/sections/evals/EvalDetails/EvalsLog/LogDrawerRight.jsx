@@ -133,19 +133,104 @@ const LogDrawerRight = ({
               borderRadius: "4px",
             }}
           >
-            <Typography fontWeight={400} fontSize={14} color="text.primary">
-              {typeof output.reason === "string" ? (
-                output?.reason?.trim() ? (
-                  <CellMarkdown spacing={0} text={output?.reason} />
+            {/*
+              Composite eval results carry a structured ``composite.children``
+              payload (BE: tracer/views/observation_span.py::get_evaluation_details).
+              When present we render per-child cards instead of markdown-parsing
+              the flattened ``output.reason`` string — the flattened form uses
+              [child_name] (score:..., weight:...) which collides with markdown
+              link syntax and renders as broken ``[]()`` artifacts.
+            */}
+            {output?.composite?.children?.length ? (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {output.composite.children.map((child) => {
+                  const isFailed = child.status === "failed";
+                  const passLabel =
+                    child.output === "Passed" || child.output === true;
+                  const failLabel =
+                    child.output === "Failed" || child.output === false;
+                  let chipColor = "default";
+                  if (isFailed) chipColor = "error";
+                  else if (passLabel) chipColor = "success";
+                  else if (failLabel) chipColor = "error";
+                  return (
+                    <Box
+                      key={child.child_id || child.order}
+                      sx={{
+                        border: `1px solid ${alpha(theme.palette.text.disabled, 0.2)}`,
+                        borderRadius: "4px",
+                        padding: "12px",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 0.5,
+                        }}
+                      >
+                        <Typography fontSize={13} fontWeight={600}>
+                          {child.child_name}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={
+                            isFailed
+                              ? "failed"
+                              : String(child.output ?? child.status ?? "—")
+                          }
+                          color={chipColor}
+                          sx={{ textTransform: "capitalize" }}
+                        />
+                      </Box>
+                      <Typography
+                        fontSize={11}
+                        color="text.secondary"
+                        sx={{ mb: child.reason ? 1 : 0 }}
+                      >
+                        score:{" "}
+                        {typeof child.score === "number"
+                          ? child.score.toFixed(2)
+                          : "N/A"}{" "}
+                        · weight: {child.weight ?? 1.0}
+                      </Typography>
+                      {isFailed && child.error && (
+                        <Typography
+                          fontSize={12}
+                          color="error"
+                          sx={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {child.error}
+                        </Typography>
+                      )}
+                      {!isFailed && child.reason && (
+                        <Typography
+                          fontSize={13}
+                          sx={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {child.reason}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+            ) : (
+              <Typography fontWeight={400} fontSize={14} color="text.primary">
+                {typeof output.reason === "string" ? (
+                  output?.reason?.trim() ? (
+                    <CellMarkdown spacing={0} text={output?.reason} />
+                  ) : (
+                    "Unable to fetch Explanation"
+                  )
                 ) : (
-                  "Unable to fetch Explanation"
-                )
-              ) : (
-                output?.reason?.map((item, index) => (
-                  <CellMarkdown key={index} spacing={0} text={item} />
-                ))
-              )}
-            </Typography>
+                  output?.reason?.map((item, index) => (
+                    <CellMarkdown key={index} spacing={0} text={item} />
+                  ))
+                )}
+              </Typography>
+            )}
           </Box>
         </Box>
 

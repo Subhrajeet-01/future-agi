@@ -3174,6 +3174,24 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
                 "input_types": output_metadata.get("input_types"),
                 "score": evaluation_result,
                 "explanation": evaluation_explanation,
+                # Composite payload — only populated for composite eval results.
+                # Lets the FE render per-child cards instead of markdown-parsing
+                # the flattened ``eval_explanation`` string.
+                "composite": (
+                    {
+                        "composite_id": output_metadata.get("composite_id"),
+                        "aggregation_function": output_metadata.get(
+                            "aggregation_function"
+                        ),
+                        "aggregation_enabled": output_metadata.get(
+                            "aggregation_enabled"
+                        ),
+                        "aggregate_pass": output_metadata.get("aggregate_pass"),
+                        "children": output_metadata.get("children"),
+                    }
+                    if output_metadata.get("composite_id")
+                    else None
+                ),
             }
         )
 
@@ -3261,6 +3279,24 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
                 "input_types": output_metadata.get("input_types", None),
                 "score": evaluation_result,
                 "explanation": evaluation_explanation,
+                # Composite payload — only populated for composite eval results.
+                # Lets the FE render per-child cards instead of markdown-parsing
+                # the flattened ``eval_explanation`` string.
+                "composite": (
+                    {
+                        "composite_id": output_metadata.get("composite_id"),
+                        "aggregation_function": output_metadata.get(
+                            "aggregation_function"
+                        ),
+                        "aggregation_enabled": output_metadata.get(
+                            "aggregation_enabled"
+                        ),
+                        "aggregate_pass": output_metadata.get("aggregate_pass"),
+                        "children": output_metadata.get("children"),
+                    }
+                    if output_metadata.get("composite_id")
+                    else None
+                ),
             }
 
             return self._gm.success_response(result)
@@ -4057,7 +4093,101 @@ def get_observation_spans(filters):
     # Process orphaned spans
     response_data.extend(_process_orphaned_spans(base_filters))
 
+    # TH-5228: attach eval_scores onto every entry in the tree. The CH path
+    # for trace detail (tracer/views/trace.py::_retrieve_clickhouse) already
+    # decorates each entry with `eval_scores`; the PG path was only setting
+    # `total_evals_count`, so the FE's Evals tab (which reads `eval_scores`)
+    # showed empty for every trace when CH wasn't available. Use a batched
+    # query keyed by trace_id to avoid N+1.
+    if trace_id:
+        try:
+            _attach_eval_scores_to_tree(response_data, trace_id=trace_id)
+        except Exception as exc:
+            logger.warning(
+                f"Failed to attach eval_scores to PG span tree: {exc}"
+            )
+
     return response_data
+
+
+def _attach_eval_scores_to_tree(response_data, trace_id):
+    """Decorate each entry in a span tree with `eval_scores` (PG path).
+
+    Mirrors the shape produced by `tracer/views/trace.py::_retrieve_clickhouse`
+    so the FE consumer (EvalsTabView.collectAllEvalsFromEntry) sees identical
+    data regardless of which backend served the trace detail.
+
+    One batched query against ``EvalLogger`` for the whole trace, joined to
+    ``CustomEvalConfig`` + ``EvalTemplate`` for the per-eval display name and
+    output_type. The result is pivoted into a per-span map and applied
+    recursively to every entry under ``response_data``.
+    """
+    if not response_data or not trace_id:
+        return
+
+    eval_loggers = (
+        EvalLogger.objects.filter(trace_id=trace_id, deleted=False)
+        .select_related("custom_eval_config__eval_template")
+    )
+
+    eval_map = {}
+    for el in eval_loggers:
+        span_id = (
+            str(el.observation_span_id) if el.observation_span_id else None
+        )
+        if not span_id:
+            continue
+
+        # Mirror the CH score derivation: prefer float, fall back to bool.
+        if el.output_float is not None and el.output_float != 0:
+            score = round(float(el.output_float) * 100, 2)
+        elif el.output_bool is not None:
+            score = 100 if el.output_bool else 0
+        else:
+            score = None
+
+        cec = el.custom_eval_config
+        eval_template = cec.eval_template if cec and cec.eval_template_id else None
+
+        eval_map.setdefault(span_id, []).append(
+            {
+                "eval_config_id": str(cec.id) if cec else None,
+                "eval_name": (
+                    (cec.name if cec and cec.name else None)
+                    or (eval_template.name if eval_template else None)
+                    or (str(cec.id) if cec else "")
+                ),
+                "output_type": (
+                    getattr(eval_template, "output_type_normalized", None)
+                    if eval_template
+                    else None
+                ),
+                "score": score,
+                "result": (
+                    el.output_str
+                    if el.output_str
+                    else (el.output_bool if el.output_bool is not None else None)
+                ),
+                "explanation": el.eval_explanation or None,
+                # Identifiers the FE uses for the per-eval drill-down and
+                # error-localizer overlay. Match CH retrieve shape where it
+                # already exposes these (see trace.py CH path for parity).
+                "eval_log_id": str(el.id),
+                "observation_span_id": span_id,
+                "custom_eval_config_id": str(cec.id) if cec else None,
+            }
+        )
+
+    def _walk(entries):
+        for entry in entries:
+            span = entry.get("observation_span") or {}
+            sid = str(span.get("id")) if span.get("id") else None
+            entry["eval_scores"] = eval_map.get(sid, []) if sid else []
+            children = entry.get("children", [])
+            if children:
+                _walk(children)
+
+    _walk(response_data)
 
 
 def fetch_children_span_ids(root_span: ObservationSpan):
