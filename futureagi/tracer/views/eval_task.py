@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from random import sample
 
 import structlog
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models, transaction
 from django.db.models import Avg, Count, F, Func, Max, Q, Value
 from django.utils import timezone
@@ -102,6 +103,7 @@ from tracer.serializers.eval_task import (
     EvalTaskSerializer,
     PaginationQuerySerializer,
 )
+from tracer.services.clickhouse.query_builders.span_list import SpanListQueryBuilder
 from tracer.utils.eval_tasks import parsing_evaltask_filters, run_for_processed_spans
 from tracer.utils.filters import FilterEngine
 from tracer.utils.helper import get_default_eval_task_config
@@ -360,24 +362,6 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
     # response shape of `EvalUsageStatsView` so the frontend can reuse
     # `UsageChart`, `DataTable`, and `DataTablePagination` directly.
     # ──────────────────────────────────────────────────────────────────
-    _ATTR_FILTER_PREFIX = "attr."
-
-    @staticmethod
-    def _parse_attr_filters(query_params):
-        """Pull ``?attr.<key>=<value>`` pairs from the request query string.
-
-        Returns a flat ``{key: value}`` dict suitable for the
-        ``span_attributes__contains`` JSONField lookup. Multiple
-        ``attr.*`` params are AND-ed (every pair must match). Empty
-        suffix (``?attr.=foo``) is ignored.
-        """
-        prefix = EvalTaskView._ATTR_FILTER_PREFIX
-        return {
-            k[len(prefix):]: v
-            for k, v in query_params.items()
-            if k.startswith(prefix) and len(k) > len(prefix)
-        }
-
     _USAGE_PERIOD_MAP = {
         "30m": timedelta(minutes=30),
         "6h": timedelta(hours=6),
@@ -464,19 +448,30 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
             if eval_id_filter:
                 base_qs = base_qs.filter(custom_eval_config_id=eval_id_filter)
 
-            # Optional span-attribute filter — see
-            # ``_parse_attr_filters`` for the ``?attr.<key>=<value>``
-            # syntax. Applied via the same ``span_attributes__contains``
-            # JSONField lookup ``FilterEngine`` uses for its ``equals``
-            # span-attribute operator (tracer/utils/filters.py), so this
-            # is a thin shortcut over the same PG path — not a parallel
-            # filter system. Session-target rows have no span, so they're
-            # naturally dropped when any attr is set.
-            attr_filters = self._parse_attr_filters(self.request.query_params)
-            if attr_filters:
-                base_qs = base_qs.filter(
-                    observation_span__span_attributes__contains=attr_filters
+            # Optional span-attribute filter. Accepts the canonical
+            # ``span_attributes_filters`` JSON-list shape already used by
+            # ``EvalTask.filters`` (see tracer/utils/eval_tasks.py
+            # `parsing_evaltask_filters`) so URL filters and stored
+            # filters share one vocabulary. Routed through
+            # ``FilterEngine.get_filter_conditions_for_span_attributes``
+            # to inherit its 7+ operators (equals, not_equals, in, not_in,
+            # icontains, has_key, …) — no parallel filter parsing here.
+            raw = self.request.query_params.get("span_attributes_filters")
+            if raw:
+                try:
+                    span_attr_filters = json.loads(raw)
+                except (ValueError, TypeError):
+                    return self._gm.bad_request(
+                        "span_attributes_filters must be a JSON-encoded list "
+                        "of {column_id, filter_config} objects."
+                    )
+                q = FilterEngine.get_filter_conditions_for_span_attributes(
+                    span_attr_filters
                 )
+                if q.children or hasattr(q, "connector"):
+                    base_qs = base_qs.filter(
+                        Q(observation_span__in=ObservationSpan.objects.filter(q))
+                    )
 
             total_runs = base_qs.count()
             period_qs = base_qs.filter(created_at__gte=start_date)
@@ -576,6 +571,46 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
 
             span_aggregation = None
             if want_span_agg:
+                # GROUP BY (span, config) -> one row per pair with the
+                # aggregates ``SpanListQueryBuilder.pivot_eval_results``
+                # expects. Reusing the platform pivot gives us the
+                # ``{"error": True}`` marker for all-errored cells and
+                # the per-choice percentage dict for CHOICES evals — both
+                # encoded once on the platform side, not re-implemented
+                # here. ArrayAgg collects output_str_list values so the
+                # pivot can compute CHOICES percentages.
+                eval_rows = list(
+                    period_qs.filter(
+                        target_type="span",
+                        observation_span_id__isnull=False,
+                    )
+                    .values("observation_span_id", "custom_eval_config_id")
+                    .annotate(
+                        avg_score=Avg("output_float"),
+                        bool_total=Count(
+                            "id", filter=Q(output_bool__isnull=False)
+                        ),
+                        bool_pass=Count("id", filter=Q(output_bool=True)),
+                        success_count=Count("id", filter=Q(error=False)),
+                        error_count=Count("id", filter=Q(error=True)),
+                        str_lists=ArrayAgg("output_str_list"),
+                    )
+                )
+                # pivot_eval_results expects ``eval_config_id`` + ``pass_rate``
+                # on each row. Compute pass_rate from the bool tallies and
+                # alias the FK name to what the pivot reads.
+                for r in eval_rows:
+                    r["eval_config_id"] = r["custom_eval_config_id"]
+                    r["pass_rate"] = (
+                        round((r["bool_pass"] / r["bool_total"]) * 100, 2)
+                        if r["bool_total"] > 0
+                        else None
+                    )
+                pivoted = SpanListQueryBuilder.pivot_eval_results(eval_rows)
+                # Wrap each pivot cell into the customer-facing
+                # {output_type, score} envelope. output_type tags whether
+                # the value is a bool/numeric/list eval so the caller
+                # doesn't have to reverse-engineer from value shape.
                 _ot_tag = {
                     "pass_fail": "bool",
                     "score": "numeric",
@@ -583,42 +618,20 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
                     "deterministic": "numeric",
                     "choices": "list",
                 }
-                span_aggregation = defaultdict(dict)
-                # EvalLogger has no unique constraint on (observation_span_id,
-                # custom_eval_config_id) — re-evaluated spans produce multiple
-                # rows. Order ascending so the LATEST row wins the last-write
-                # in the dict overwrite below; otherwise the score for a
-                # span × eval pair would be whichever row PG returned last,
-                # which is undefined across queries.
-                for log in period_qs.filter(
-                    target_type="span",
-                    observation_span_id__isnull=False,
-                ).order_by("created_at").values(
-                    "observation_span_id",
-                    "custom_eval_config_id",
-                    "output_bool",
-                    "output_float",
-                    "output_str_list",
-                    "custom_eval_config__eval_template__output_type_normalized",
-                ):
-                    raw_ot = log[
-                        "custom_eval_config__eval_template__output_type_normalized"
-                    ]
-                    tag = _ot_tag.get(raw_ot, "bool")
-                    if tag == "bool":
-                        bv = log["output_bool"]
-                        score = 1.0 if bv is True else (0.0 if bv is False else None)
-                    elif tag == "numeric":
-                        fv = log["output_float"]
-                        score = round(float(fv), 4) if fv is not None else None
-                    elif tag == "list":
-                        score = log["output_str_list"] or []
-                    else:
-                        score = None
-                    span_aggregation[str(log["observation_span_id"])][
-                        str(log["custom_eval_config_id"])
-                    ] = {"output_type": tag, "score": score}
-                span_aggregation = dict(span_aggregation)
+                output_type_by_cc = {
+                    meta["id"]: _ot_tag.get(meta["output_type"], "bool")
+                    for meta in evals_meta
+                }
+                span_aggregation = {
+                    span_id: {
+                        cc_id: {
+                            "output_type": output_type_by_cc.get(cc_id, "bool"),
+                            "score": value,
+                        }
+                        for cc_id, value in cells.items()
+                    }
+                    for span_id, cells in pivoted.items()
+                }
 
             # ── Chart data — bucket by period and aggregate ──
             chart_data = []

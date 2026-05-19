@@ -493,7 +493,9 @@ class TestGetUsageAggregationBlocks:
             )
             for cc_id, cell in evals.items():
                 assert cell["output_type"] == "bool"
-                assert cell["score"] == 1.0
+                # pivot_eval_results returns pass_rate on a 0-100 scale for
+                # pass_fail evals; all 20 seeded rows pass so pass_rate = 100.
+                assert cell["score"] == 100.0
 
         # eval_aggregation: one entry per config, output_type present.
         ea = body["eval_aggregation"]
