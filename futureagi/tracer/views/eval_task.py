@@ -7,7 +7,7 @@ from random import sample
 
 import structlog
 from django.db import models, transaction
-from django.db.models import Count, F, Func, Max, Q, Value
+from django.db.models import Avg, Count, F, Func, Max, Q, Value
 from django.utils import timezone
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -446,6 +446,22 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
             if eval_id_filter:
                 base_qs = base_qs.filter(custom_eval_config_id=eval_id_filter)
 
+            # Optional span-attribute filter. Customers pass
+            # ``?attr.<key>=<value>`` (repeatable) to scope the entire
+            # response — stats, chart, per-eval breakdown, and logs — to
+            # rows whose ObservationSpan's ``span_attributes`` JSONField
+            # contains every requested pair. Session-target rows have no
+            # span, so they're naturally dropped when any attr is set.
+            attr_filters = {
+                k[len("attr."):]: v
+                for k, v in self.request.query_params.items()
+                if k.startswith("attr.") and len(k) > len("attr.")
+            }
+            if attr_filters:
+                base_qs = base_qs.filter(
+                    observation_span__span_attributes__contains=attr_filters
+                )
+
             total_runs = base_qs.count()
             period_qs = base_qs.filter(created_at__gte=start_date)
             runs_period = period_qs.count()
@@ -475,6 +491,112 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
             pass_rate = (
                 round((success_count / runs_period * 100), 2) if runs_period > 0 else 0
             )
+
+            # Per-eval pass-rate breakdown — one PG GROUP BY across all
+            # configs on this task, merged back into ``evals_meta`` so
+            # consumers get {runs_period, success_count, error_count,
+            # pass_rate} per eval alongside the existing identity fields.
+            # Pass-rate formula mirrors the rolled-up stats above
+            # (success_count / runs_period) so per-eval reconciles with
+            # the total.
+            per_eval_aggs = period_qs.values("custom_eval_config_id").annotate(
+                runs=Count("id"),
+                success=Count("id", filter=Q(error=False)),
+                errors=Count("id", filter=Q(error=True)),
+            )
+            agg_by_cc = {
+                str(r["custom_eval_config_id"]): r for r in per_eval_aggs
+            }
+            for meta in evals_meta:
+                a = agg_by_cc.get(meta["id"], {})
+                runs = a.get("runs", 0)
+                s = a.get("success", 0)
+                e = a.get("errors", 0)
+                meta["runs_period"] = runs
+                meta["success_count"] = s
+                meta["error_count"] = e
+                meta["pass_rate"] = round((s / runs * 100), 2) if runs > 0 else 0
+
+            # ── Optional aggregation payloads (opt-in via query params) ──
+            # ``eval_aggregation=true`` → {eval_id: {name, output_type,
+            # agg_score}} where agg_score is the eval's pass_rate
+            # (pass_fail) or avg output_float (numeric); null for choices.
+            # ``span_aggregation=true`` → {span_id: {eval_id: {output_type,
+            # score}}} per-span × per-eval matrix. Both honor the same
+            # period, eval_id, and attr.* filters as the rest of the
+            # response, so they describe the same subset users see in the
+            # chart and logs.
+            _truthy = lambda v: str(v).lower() in ("true", "1", "yes")
+            want_eval_agg = _truthy(
+                self.request.query_params.get("eval_aggregation", "")
+            )
+            want_span_agg = _truthy(
+                self.request.query_params.get("span_aggregation", "")
+            )
+
+            eval_aggregation = None
+            if want_eval_agg:
+                avg_floats = {
+                    str(r["custom_eval_config_id"]): r["avg_f"]
+                    for r in period_qs.values(
+                        "custom_eval_config_id"
+                    ).annotate(avg_f=Avg("output_float"))
+                }
+                eval_aggregation = {}
+                for meta in evals_meta:
+                    ot = meta["output_type"]
+                    if ot == "pass_fail":
+                        score = meta["pass_rate"]
+                    elif ot in ("score", "percentage", "deterministic"):
+                        v = avg_floats.get(meta["id"])
+                        score = round(float(v), 4) if v is not None else None
+                    else:
+                        score = None
+                    eval_aggregation[meta["id"]] = {
+                        "name": meta["name"],
+                        "output_type": ot,
+                        "agg_score": score,
+                    }
+
+            span_aggregation = None
+            if want_span_agg:
+                _ot_tag = {
+                    "pass_fail": "bool",
+                    "score": "numeric",
+                    "percentage": "numeric",
+                    "deterministic": "numeric",
+                    "choices": "list",
+                }
+                span_aggregation = defaultdict(dict)
+                for log in period_qs.filter(
+                    target_type="span",
+                    observation_span_id__isnull=False,
+                ).values(
+                    "observation_span_id",
+                    "custom_eval_config_id",
+                    "output_bool",
+                    "output_float",
+                    "output_str_list",
+                    "custom_eval_config__eval_template__output_type_normalized",
+                ):
+                    raw_ot = log[
+                        "custom_eval_config__eval_template__output_type_normalized"
+                    ]
+                    tag = _ot_tag.get(raw_ot, "bool")
+                    if tag == "bool":
+                        bv = log["output_bool"]
+                        score = 1.0 if bv is True else (0.0 if bv is False else None)
+                    elif tag == "numeric":
+                        fv = log["output_float"]
+                        score = round(float(fv), 4) if fv is not None else None
+                    elif tag == "list":
+                        score = log["output_str_list"] or []
+                    else:
+                        score = None
+                    span_aggregation[str(log["observation_span_id"])][
+                        str(log["custom_eval_config_id"])
+                    ] = {"output_type": tag, "score": score}
+                span_aggregation = dict(span_aggregation)
 
             # ── Chart data — bucket by period and aggregate ──
             chart_data = []
@@ -731,6 +853,10 @@ class EvalTaskView(BaseModelViewSetMixin, ModelViewSet):
                 "period_requested": period,
                 "period_used": period_used,
             }
+            if eval_aggregation is not None:
+                response["eval_aggregation"] = eval_aggregation
+            if span_aggregation is not None:
+                response["span_aggregation"] = span_aggregation
             return self._gm.success_response(response)
 
         except Exception as e:
