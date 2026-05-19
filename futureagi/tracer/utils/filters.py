@@ -10,6 +10,7 @@ from django.db.models.functions import Cast, Round
 from django.utils.dateparse import parse_datetime as django_parse_datetime
 
 from tracer.models.observability_provider import ProviderChoices
+from tracer.utils.filter_operators import normalize_filter_op
 from tracer.utils.helper import extract_date
 
 
@@ -63,10 +64,10 @@ def apply_created_at_filters(qs, filters):
     """
     applied = set()
     for i, f in enumerate(filters):
-        cfg = f.get("filter_config") or f.get("filterConfig") or {}
+        _, cfg = FilterEngine._normalize_filter_params(f)
         if cfg.get("filter_type") != "datetime":
             continue
-        op = cfg.get("filter_op")
+        op = normalize_filter_op(cfg.get("filter_op"))
         val = cfg.get("filter_value")
         if val is None:
             continue
@@ -105,7 +106,16 @@ class ColType(Enum):
 class FilterEngine:
     DEFAULT_FIELD_MAP = {
         "avg_cost": "row_avg_cost",
+        "cost": "row_avg_cost",
         "avg_latency": "row_avg_latency_ms",
+        "latency": "row_avg_latency_ms",
+        "latency_ms": "row_avg_latency_ms",
+        "tokens": "total_tokens",
+        "total_tokens": "total_tokens",
+        "input_tokens": "avg_input_tokens",
+        "prompt_tokens": "avg_input_tokens",
+        "output_tokens": "avg_output_tokens",
+        "completion_tokens": "avg_output_tokens",
         "node_type": "node_type",
         "trace_id": "trace_id",
         "span_id": "id",
@@ -219,10 +229,21 @@ class FilterEngine:
         except (ValueError, TypeError, IndexError):
             return False, None
 
+    _INNER_KEY_MAP = {
+        "filterOp": "filter_op",
+        "filterType": "filter_type",
+        "filterValue": "filter_value",
+        "colType": "col_type",
+    }
+
     @staticmethod
     def _normalize_filter_params(filter_item):
         """
         Normalize filter parameters to handle both camelCase and snake_case.
+
+        Normalizes both outer keys (columnId/column_id, filterConfig/filter_config)
+        and inner keys within filter_config (filterOp→filter_op, filterType→filter_type,
+        filterValue→filter_value, colType→col_type).
 
         Args:
             filter_item: Dictionary containing filter parameters
@@ -231,17 +252,26 @@ class FilterEngine:
             tuple: (column_id, filter_config) with normalized parameter names
         """
         column_id = filter_item.get("columnId") or filter_item.get("column_id")
-        filter_config = filter_item.get("filterConfig") or filter_item.get(
-            "filter_config", {}
+        filter_config = (
+            filter_item.get("filterConfig") or filter_item.get("filter_config") or {}
         )
+
+        if filter_config:
+            normalized = {}
+            for key, value in filter_config.items():
+                canonical = FilterEngine._INNER_KEY_MAP.get(key, key)
+                normalized[canonical] = value
+            filter_config = normalized
+
         return column_id, filter_config
 
     def apply_filters(self, filters):
         filtered_objects = self.objects
 
         for filter_item in filters:
-            column_id = filter_item.get("column_id")
-            filter_config = filter_item.get("filter_config", {})
+            column_id, filter_config = FilterEngine._normalize_filter_params(
+                filter_item
+            )
             col_type = filter_config.get("col_type", ColType.NORMAL)
 
             if isinstance(col_type, str):
@@ -280,12 +310,17 @@ class FilterEngine:
 
     def _filter_number(self, objects, column_id, filter_op, filter_value, col_type):
         if filter_op in ("is_null", "is_not_null"):
+
             def _missing(obj):
                 if col_type == ColType.EVAL_METRIC:
-                    return obj.get("evals_metrics", {}).get(column_id, {}).get("score") is None
+                    return (
+                        obj.get("evals_metrics", {}).get(column_id, {}).get("score")
+                        is None
+                    )
                 if col_type == ColType.SYSTEM_METRIC:
                     return obj.get("system_metrics", {}).get(column_id) is None
                 return obj.get(column_id) is None
+
             return [obj for obj in objects if _missing(obj) == (filter_op == "is_null")]
 
         operator_map = {
@@ -332,14 +367,20 @@ class FilterEngine:
 
     def _filter_text(self, objects, column_id, filter_op, filter_value, col_type):
         if filter_op in ("is_null", "is_not_null"):
+
             def _missing(obj):
                 if col_type == ColType.EVAL_METRIC:
-                    v = obj.get("evals_metrics", {}).get(str(column_id), {}).get("score")
+                    v = (
+                        obj.get("evals_metrics", {})
+                        .get(str(column_id), {})
+                        .get("score")
+                    )
                 elif col_type == ColType.SYSTEM_METRIC:
                     v = obj.get("system_metrics", {}).get(column_id)
                 else:
                     v = obj.get(column_id)
                 return v is None or v == ""
+
             return [obj for obj in objects if _missing(obj) == (filter_op == "is_null")]
 
         # Set-membership ops (in/not_in): filter_value is a list of values.
@@ -348,20 +389,24 @@ class FilterEngine:
             if isinstance(filter_value, list):
                 values = [str(v).lower() for v in filter_value]
             else:
-                values = [v.strip().lower() for v in str(filter_value).split(",") if v.strip()]
+                values = [
+                    v.strip().lower() for v in str(filter_value).split(",") if v.strip()
+                ]
             text_ops = {
-                "in":     lambda x: x in values,
+                "in": lambda x: x in values,
                 "not_in": lambda x: x not in values,
             }
         else:
-            fv = (filter_value if isinstance(filter_value, str) else str(filter_value)).lower()
+            fv = (
+                filter_value if isinstance(filter_value, str) else str(filter_value)
+            ).lower()
             text_ops = {
-                "contains":     lambda x: fv in x,
+                "contains": lambda x: fv in x,
                 "not_contains": lambda x: fv not in x,
-                "equals":       lambda x: x == fv,
-                "not_equals":   lambda x: x != fv,
-                "starts_with":  lambda x: x.startswith(fv),
-                "ends_with":    lambda x: x.endswith(fv),
+                "equals": lambda x: x == fv,
+                "not_equals": lambda x: x != fv,
+                "starts_with": lambda x: x.startswith(fv),
+                "ends_with": lambda x: x.endswith(fv),
             }
 
         if filter_op not in text_ops:
@@ -385,12 +430,15 @@ class FilterEngine:
                     result.append(obj)
         return result
 
-    def _filter_boolean(self, objects, column_id, filter_value, col_type, filter_op=None):
+    def _filter_boolean(
+        self, objects, column_id, filter_value, col_type, filter_op=None
+    ):
         filter_op = filter_op or "equals"
 
         if filter_op in ("is_null", "is_not_null"):
             return [
-                obj for obj in objects
+                obj
+                for obj in objects
                 if (obj.get(column_id) is None) == (filter_op == "is_null")
             ]
 
@@ -408,6 +456,7 @@ class FilterEngine:
         return [obj for obj in objects if matches(obj.get(column_id))]
 
     def _filter_datetime(self, objects, column_id, filter_op, filter_value, col_type):
+        filter_op = normalize_filter_op(filter_op)
         if isinstance(filter_value, str):
             filter_value = datetime.strptime((filter_value), "%Y-%m-%dT%H:%M:%S.%fZ")
         elif isinstance(filter_value, list):
@@ -533,7 +582,11 @@ class FilterEngine:
             if column_id in [
                 "avg_score",
                 "avg_latency",
+                "latency",
+                "latency_ms",
                 "avg_cost",
+                "cost",
+                "tokens",
                 "node_type",
                 "trace_id",
                 "span_id",
@@ -545,7 +598,11 @@ class FilterEngine:
                 "prompt_template_version",
                 "labels",
                 "avg_input_tokens",
+                "input_tokens",
+                "prompt_tokens",
                 "avg_output_tokens",
+                "output_tokens",
+                "completion_tokens",
                 "unique_traces",
                 "first_used",
                 "last_used",
@@ -592,7 +649,7 @@ class FilterEngine:
             if not column_id or not filter_config:
                 continue
 
-            filter_op = str(filter_config.get("filter_op"))
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
             filter_value = filter_config.get("filter_value")
             filter_type = filter_config.get("filter_type")
 
@@ -755,9 +812,7 @@ class FilterEngine:
             column_id, filter_config = FilterEngine._normalize_filter_params(
                 filter_item
             )
-            col_type = (
-                filter_config.get("col_type") or filter_config.get("colType") or ""
-            )
+            col_type = filter_config.get("col_type", "")
 
             if column_id not in FilterEngine.VOICE_SYSTEM_METRIC_IDS:
                 continue
@@ -768,15 +823,9 @@ class FilterEngine:
             if not defn:
                 continue
 
-            filter_op = str(
-                filter_config.get("filter_op") or filter_config.get("filterOp", "")
-            )
-            filter_value = filter_config.get(
-                "filter_value", filter_config.get("filterValue")
-            )
-            filter_type = filter_config.get("filter_type") or filter_config.get(
-                "filterType"
-            )
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
+            filter_value = filter_config.get("filter_value")
+            filter_type = filter_config.get("filter_type")
 
             if not filter_op or filter_value is None or not filter_type:
                 continue
@@ -876,15 +925,16 @@ class FilterEngine:
 
         conditions = []
         for filter_item in filters:
-            column_id = filter_item.get("columnId")
-            filter_config = filter_item.get("filterConfig", {})
+            column_id, filter_config = FilterEngine._normalize_filter_params(
+                filter_item
+            )
 
             if not column_id or not filter_config:
                 continue
 
-            filter_op = filter_config.get("filterOp")
-            filter_value = filter_config.get("filterValue")
-            filter_type = filter_config.get("filterType")
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
+            filter_value = filter_config.get("filter_value")
+            filter_type = filter_config.get("filter_type")
 
             if not all([filter_op, filter_value is not None, filter_type]):
                 continue
@@ -989,7 +1039,7 @@ class FilterEngine:
             if column_id not in field_map:
                 continue
 
-            filter_op = filter_config.get("filter_op")
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
             filter_value = filter_config.get("filter_value")
             filter_type = filter_config.get("filter_type")
 
@@ -1100,7 +1150,7 @@ class FilterEngine:
             if column_id in FilterEngine.VOICE_SYSTEM_METRIC_IDS:
                 continue
 
-            filter_op = filter_config.get("filter_op")
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
             filter_value = filter_config.get("filter_value")
             filter_type = filter_config.get("filter_type")
 
@@ -1199,8 +1249,9 @@ class FilterEngine:
         having = None
 
         for filter_item in filters:
-            column_id = filter_item.get("columnId")
-            filter_config = filter_item.get("filterConfig", {})
+            column_id, filter_config = FilterEngine._normalize_filter_params(
+                filter_item
+            )
 
             if (
                 not column_id
@@ -1221,9 +1272,9 @@ class FilterEngine:
             ):
                 continue
 
-            filter_type = filter_config.get("filterType")
-            filter_op = filter_config.get("filterOp")
-            filter_value = filter_config.get("filterValue")
+            filter_type = filter_config.get("filter_type")
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
+            filter_value = filter_config.get("filter_value")
 
             if filter_type == "number":
                 metric_val = None
@@ -1315,8 +1366,9 @@ class FilterEngine:
     def get_filter_conditions_for_non_system_metrics(filters):
         eval_filter_conditions = Q()
         for filter_item in filters:
-            column_id = filter_item.get("column_id")
-            filter_config = filter_item.get("filter_config", {})
+            column_id, filter_config = FilterEngine._normalize_filter_params(
+                filter_item
+            )
             col_type = (
                 filter_config.get("col_type", ColType.EVAL_METRIC.value)
                 if "col_type" in filter_config
@@ -1365,7 +1417,7 @@ class FilterEngine:
                 continue
 
             filter_type = filter_config.get("filter_type")
-            filter_op = filter_config.get("filter_op")
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
             filter_value = filter_config.get("filter_value")
 
             # Replace '*' with '_' in column_id
@@ -1377,6 +1429,38 @@ class FilterEngine:
                 metric_column_id = f"metric_{column_id}"
             elif col_type == ColType.EVAL_METRIC.value:
                 metric_column_id = f"metric_{column_id}"
+
+            def _values(raw_value):
+                if isinstance(raw_value, (list, tuple)):
+                    return [v for v in raw_value if v not in (None, "")]
+                if raw_value in (None, ""):
+                    return []
+                return [raw_value]
+
+            def _eval_choice_condition(raw_value):
+                values = _values(raw_value)
+                if not values:
+                    return (
+                        Q()
+                        if filter_op in ("not_equals", "not_in", "not_contains")
+                        else Q(id__isnull=True)
+                    )
+
+                positive = Q()
+                for value in values:
+                    text_value = str(value).strip()
+                    if not text_value:
+                        continue
+                    normalized = text_value.lower()
+                    if normalized in ("passed", "pass", "true", "1"):
+                        positive |= Q(**{f"{metric_column_id}__score__gt": 0})
+                    elif normalized in ("failed", "fail", "false", "0"):
+                        positive |= Q(**{f"{metric_column_id}__score": 0})
+                    positive |= Q(**{f"{metric_column_id}__{text_value}__score__gt": 0})
+
+                if filter_op in ("not_equals", "not_in", "not_contains"):
+                    return Q(**{f"{metric_column_id}__isnull": False}) & ~positive
+                return positive
 
             if filter_type == "number":
                 # Append 'metric_' at the beginning and '__score' at the end of column_id
@@ -1395,13 +1479,6 @@ class FilterEngine:
                     _fv = float(_fv) if not isinstance(_fv, (int, float)) else _fv
                 except (ValueError, TypeError):
                     pass
-
-                # UI shows scores as 0-100 but DB stores output_float as 0-1.
-                # Divide by 100 for eval metric filters (not annotations or prompts).
-                if col_type == ColType.EVAL_METRIC.value and isinstance(
-                    _fv, (int, float)
-                ):
-                    _fv = _fv / 100.0
 
                 score_condition = None
 
@@ -1425,11 +1502,6 @@ class FilterEngine:
                         _hi = float(_hi)
                     except (ValueError, TypeError):
                         pass
-                    if col_type == ColType.EVAL_METRIC.value:
-                        if isinstance(_lo, (int, float)):
-                            _lo = _lo / 100.0
-                        if isinstance(_hi, (int, float)):
-                            _hi = _hi / 100.0
                     score_condition = Q(
                         **{
                             f"{metric_column_id}__gte": _lo,
@@ -1447,11 +1519,6 @@ class FilterEngine:
                         _hi = float(_hi)
                     except (ValueError, TypeError):
                         pass
-                    if col_type == ColType.EVAL_METRIC.value:
-                        if isinstance(_lo, (int, float)):
-                            _lo = _lo / 100.0
-                        if isinstance(_hi, (int, float)):
-                            _hi = _hi / 100.0
                     score_condition = ~Q(
                         **{
                             f"{metric_column_id}__gte": _lo,
@@ -1472,11 +1539,14 @@ class FilterEngine:
                     eval_filter_conditions &= Q(bool_pass_rate=filter_value)
 
             elif filter_type == "array":
-
                 if col_type in [
                     ColType.PROMPT_METRIC.value,
                     ColType.EVAL_METRIC.value,
                 ]:
+                    if col_type == ColType.EVAL_METRIC.value:
+                        eval_filter_conditions &= _eval_choice_condition(filter_value)
+                        continue
+
                     if isinstance(filter_value, list):
                         array_conditions = Q()
                         for value in filter_value:
@@ -1488,9 +1558,9 @@ class FilterEngine:
                         eval_filter_conditions &= Q(
                             **{f"{metric_column_id}__icontains": filter_value}
                         )
-            elif filter_type == "text":
-                # Skip EVAL_METRIC as it stores numeric scores, not text data
+            elif filter_type in ("text", "categorical"):
                 if col_type == ColType.EVAL_METRIC.value:
+                    eval_filter_conditions &= _eval_choice_condition(filter_value)
                     continue
 
                 eval_filter_conditions &= Q(**{f"{metric_column_id}": filter_value})
@@ -1681,7 +1751,7 @@ class FilterEngine:
                 continue
 
             filter_type = filter_config.get("filter_type")
-            filter_op = filter_config.get("filter_op")
+            filter_op = normalize_filter_op(filter_config.get("filter_op"))
             filter_value = filter_config.get("filter_value")
 
             # Parse column_id for sub-field separator
@@ -1709,6 +1779,7 @@ class FilterEngine:
                     score_field = f"{annotation_field}__{sub_field}"
                 else:
                     score_field = f"{annotation_field}__score"
+                has_score = Q(**{f"{score_field}__isnull": False})
                 score_condition = None
 
                 if filter_op == "greater_than":
@@ -1747,7 +1818,7 @@ class FilterEngine:
                     )
 
                 if score_condition:
-                    q_conditions &= score_condition
+                    q_conditions &= has_score & score_condition
 
             elif filter_type == "boolean":
                 # Thumbs up/down annotations: {"thumbs_up": N, "thumbs_down": M, ...}
@@ -1787,8 +1858,10 @@ class FilterEngine:
                     if t is not None and t not in tokens:
                         tokens.append(t)
                 if tokens:
-                    negate = filter_op in ("not_in", "not_equals", "is_not")
+                    negate = filter_op in ("not_in", "not_equals")
+                    has_annotation = Q(**{f"{annotation_field}__isnull": False})
                     if negate:
+                        q_conditions &= has_annotation
                         for t in tokens:
                             q_conditions &= ~Q(**{f"{annotation_field}__{t}__gt": 0})
                     else:
@@ -1804,8 +1877,11 @@ class FilterEngine:
                 # Thumbs Up/Down annotations use keys "thumbs_up"/"thumbs_down"
                 # but the frontend sends display labels "Thumbs Up"/"Thumbs Down".
                 _THUMBS_MAP = {"Thumbs Up": "thumbs_up", "Thumbs Down": "thumbs_down"}
-                raw_values = filter_value if isinstance(filter_value, list) else [filter_value]
+                raw_values = (
+                    filter_value if isinstance(filter_value, list) else [filter_value]
+                )
                 values = [_THUMBS_MAP.get(v, v) for v in raw_values]
+                has_annotation = Q(**{f"{annotation_field}__isnull": False})
 
                 if filter_op in ("equals", "in", "contains"):
                     choice_q = Q()
@@ -1813,6 +1889,7 @@ class FilterEngine:
                         choice_q |= Q(**{f"{annotation_field}__{val}__gt": 0})
                     q_conditions &= choice_q
                 elif filter_op in ("not_equals", "not_in", "not_contains"):
+                    q_conditions &= has_annotation
                     for val in values:
                         q_conditions &= ~Q(**{f"{annotation_field}__{val}__gt": 0})
 
@@ -1821,17 +1898,18 @@ class FilterEngine:
                 # under the "text" key.  Use Exists subqueries against Score
                 # so that starts_with / ends_with operate on the actual text,
                 # not on a stringified JSON blob.
-                base_ann_filter = {
-                    "observation_span__trace_id": OuterRef("trace_id"),
-                    "label_id": (column_id if not sub_field else base_column_id),
-                    "value__text__isnull": False,
-                    "deleted": False,
-                }
+                label_id = column_id if not sub_field else base_column_id
+                base_text_qs = Score.objects.filter(
+                    source_q,
+                    label_id=label_id,
+                    value__text__isnull=False,
+                    deleted=False,
+                )
+                has_text_annotation = Q(Exists(base_text_qs))
                 if filter_op == "contains":
                     q_conditions &= Q(
                         Exists(
-                            Score.objects.filter(
-                                **base_ann_filter,
+                            base_text_qs.filter(
                                 value__text__icontains=filter_value,
                             )
                         )
@@ -1839,26 +1917,23 @@ class FilterEngine:
                 elif filter_op == "equals":
                     q_conditions &= Q(
                         Exists(
-                            Score.objects.filter(
-                                **base_ann_filter,
+                            base_text_qs.filter(
                                 value__text__iexact=filter_value,
                             )
                         )
                     )
                 elif filter_op == "not_contains":
-                    q_conditions &= ~Q(
+                    q_conditions &= has_text_annotation & ~Q(
                         Exists(
-                            Score.objects.filter(
-                                **base_ann_filter,
+                            base_text_qs.filter(
                                 value__text__icontains=filter_value,
                             )
                         )
                     )
                 elif filter_op == "not_equals":
-                    q_conditions &= ~Q(
+                    q_conditions &= has_text_annotation & ~Q(
                         Exists(
-                            Score.objects.filter(
-                                **base_ann_filter,
+                            base_text_qs.filter(
                                 value__text__iexact=filter_value,
                             )
                         )
@@ -1866,8 +1941,7 @@ class FilterEngine:
                 elif filter_op == "starts_with":
                     q_conditions &= Q(
                         Exists(
-                            Score.objects.filter(
-                                **base_ann_filter,
+                            base_text_qs.filter(
                                 value__text__istartswith=filter_value,
                             )
                         )
@@ -1875,8 +1949,7 @@ class FilterEngine:
                 elif filter_op == "ends_with":
                     q_conditions &= Q(
                         Exists(
-                            Score.objects.filter(
-                                **base_ann_filter,
+                            base_text_qs.filter(
                                 value__text__iendswith=filter_value,
                             )
                         )
@@ -2127,12 +2200,10 @@ class FilterEngine:
         # Use span_attributes (canonical) for all filters - eval_attributes is deprecated.
         # Vocabulary mirrors `SPAN_ATTR_ALLOWED_OPS` in `tracer.utils.constants`.
         _null_q = lambda col: (
-            ~Q(span_attributes__has_key=col)
-            | Q(span_attributes__contains={col: None})
+            ~Q(span_attributes__has_key=col) | Q(span_attributes__contains={col: None})
         )
         _not_null_q = lambda col: (
-            Q(span_attributes__has_key=col)
-            & ~Q(span_attributes__contains={col: None})
+            Q(span_attributes__has_key=col) & ~Q(span_attributes__contains={col: None})
         )
 
         text_operator_map = {
@@ -2140,14 +2211,16 @@ class FilterEngine:
             "not_equals": lambda col, val: ~Q(span_attributes__contains={col: val}),
             "in": lambda col, val: Q(
                 **{
-                    f"span_attributes__{col}__in":
+                    f"span_attributes__{col}__in": (
                         val if isinstance(val, list) else [val]
+                    )
                 }
             ),
             "not_in": lambda col, val: ~Q(
                 **{
-                    f"span_attributes__{col}__in":
+                    f"span_attributes__{col}__in": (
                         val if isinstance(val, list) else [val]
+                    )
                 }
             ),
             "contains": lambda col, val: Q(
