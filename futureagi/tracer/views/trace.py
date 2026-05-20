@@ -4774,9 +4774,13 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                     _ids = ["00000000-0000-0000-0000-000000000000"]
                 _resolved.append(
                     {
-                        "column_id": "end_user_id",
+                        # Use the SYSTEM_METRIC "user" alias so the CH filter
+                        # builder maps to `end_user_id` and wraps in the
+                        # standard `trace_id IN (...)` subquery (with
+                        # project scoping) for trace-list mode.
+                        "column_id": "user",
                         "filter_config": {
-                            "col_type": "TRACE_END_USER",
+                            "col_type": "SYSTEM_METRIC",
                             "filter_type": "text",
                             "filter_op": "in",
                             "filter_value": _ids,

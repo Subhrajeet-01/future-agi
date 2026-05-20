@@ -451,7 +451,7 @@ class TestClickHouseFilterBuilder:
         builder = ClickHouseFilterBuilder()
         filters = [
             {
-                "column_id": "avg_latency",
+                "column_id": "latency_ms",
                 "filter_config": {
                     "filter_type": "number",
                     "filter_op": "greater_than",
@@ -461,7 +461,7 @@ class TestClickHouseFilterBuilder:
             }
         ]
         where, params = builder.translate(filters)
-        # avg_latency should map to latency_ms
+        # SYSTEM_METRIC numeric filter resolves to the latency_ms column
         assert "latency_ms" in where
         assert ">" in where
 

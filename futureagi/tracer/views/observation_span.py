@@ -2023,17 +2023,19 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
                 ]
                 if not _ids:
                     _ids = ["00000000-0000-0000-0000-000000000000"]
-                _resolved.append(
-                    {
-                        "column_id": "end_user_id",
-                        "filter_config": {
-                            "col_type": "NORMAL",
-                            "filter_type": "text",
-                            "filter_op": "in",
-                            "filter_value": _ids,
-                        },
-                    }
-                )
+                _resolved.append({
+                    # Use the SYSTEM_METRIC "user" alias — the CH filter
+                    # builder maps it to `end_user_id` via
+                    # `SYSTEM_METRIC_MAP["user"]`. NORMAL col_type is
+                    # rejected by `_build_condition`.
+                    "column_id": "user",
+                    "filter_config": {
+                        "col_type": "SYSTEM_METRIC",
+                        "filter_type": "text",
+                        "filter_op": "in",
+                        "filter_value": _ids,
+                    },
+                })
                 continue
             _resolved.append(_f)
         filters = _resolved
@@ -2225,6 +2227,10 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
                 "status": row.get("status"),
                 "latency_ms": row.get("latency_ms"),
                 "total_tokens": row.get("total_tokens"),
+                "prompt_tokens": row.get("prompt_tokens"),
+                "completion_tokens": row.get("completion_tokens"),
+                "model": row.get("model"),
+                "provider": row.get("provider"),
                 "cost": round(cost, 6) if cost else 0,
             }
 

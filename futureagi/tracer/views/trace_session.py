@@ -1424,8 +1424,13 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
                 _ids = ["00000000-0000-0000-0000-000000000000"]
             filters.append(
                 {
-                    "column_id": "end_user_id",
+                    # Use the SYSTEM_METRIC "user" alias — the CH filter
+                    # builder maps it to `end_user_id` via
+                    # `SYSTEM_METRIC_MAP["user"]`. NORMAL col_type is
+                    # rejected by `_build_condition`.
+                    "column_id": "user",
                     "filter_config": {
+                        "col_type": "SYSTEM_METRIC",
                         "filter_type": "text",
                         "filter_op": "in",
                         "filter_value": _ids,
