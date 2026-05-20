@@ -27,9 +27,9 @@
     "broad_request_contract_decorators": 0
   },
   "app_wide_summary": {
-    "runtime_backed_validated_request_decorators": 392,
-    "direct_swagger_auto_schema_decorators": 365,
-    "doc_only_input_contract_decorators": 83,
+    "runtime_backed_validated_request_decorators": 394,
+    "direct_swagger_auto_schema_decorators": 363,
+    "doc_only_input_contract_decorators": 81,
     "broad_request_contract_decorators": 0
   },
   "doc_only_input_contract_decorators": [],
@@ -519,24 +519,6 @@
       "function": null,
       "serializers": [
         "LIVEKIT_WEBHOOK_REQUEST"
-      ]
-    },
-    {
-      "path": "futureagi/simulate/views/persona.py",
-      "line": 356,
-      "class": "PersonaViewSet",
-      "function": "duplicate",
-      "serializers": [
-        "PersonaDuplicateRequestSerializer"
-      ]
-    },
-    {
-      "path": "futureagi/simulate/views/persona.py",
-      "line": 448,
-      "class": "PersonaDuplicateView",
-      "function": "post",
-      "serializers": [
-        "PersonaDuplicateRequestSerializer"
       ]
     },
     {

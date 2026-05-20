@@ -15,6 +15,7 @@ from simulate.serializers.persona import (
     PersonaListSerializer,
     PersonaSerializer,
 )
+from tfc.utils.api_contracts import validated_request
 from tfc.utils.api_serializers import (
     ApiErrorWithDetailsResponseSerializer,
     ApiTextErrorResponseSerializer,
@@ -353,13 +354,15 @@ class PersonaViewSet(BaseModelViewSetMixin, viewsets.ModelViewSet):
         serializer = PersonaFieldOptionsSerializer({})
         return self._gm.success_response(serializer.data)
 
-    @swagger_auto_schema(
-        request_body=PersonaDuplicateRequestSerializer,
+    @validated_request(
+        request_serializer=PersonaDuplicateRequestSerializer,
         responses={
+            201: PersonaDuplicateResponseSerializer,
             400: ApiErrorWithDetailsResponseSerializer,
             404: ApiErrorWithDetailsResponseSerializer,
             500: ApiErrorWithDetailsResponseSerializer,
         },
+        reject_unknown_fields=True,
     )
     @action(detail=True, methods=["post"], url_path="duplicate")
     def duplicate(self, request, id=None):
@@ -378,8 +381,8 @@ class PersonaViewSet(BaseModelViewSetMixin, viewsets.ModelViewSet):
         if not organization:
             return self._gm.bad_request("Organization context required")
 
-        # Get custom name from request payload (required)
-        new_name = request.data.get("name", "").strip()
+        payload = getattr(request, "validated_data", request.data)
+        new_name = payload.get("name", "").strip()
         if not new_name:
             return self._gm.bad_request("Name is required in the request payload")
 
@@ -445,12 +448,13 @@ class PersonaDuplicateView(APIView):
         super().__init__(*args, **kwargs)
         self._gm = GeneralMethods()
 
-    @swagger_auto_schema(
-        request_body=PersonaDuplicateRequestSerializer,
+    @validated_request(
+        request_serializer=PersonaDuplicateRequestSerializer,
         responses={
             201: PersonaDuplicateResponseSerializer,
             400: ApiTextErrorResponseSerializer,
         },
+        reject_unknown_fields=True,
     )
     def post(self, request, persona_id):
         """Duplicate a persona by ID"""
@@ -467,8 +471,7 @@ class PersonaDuplicateView(APIView):
         if not organization:
             return self._gm.bad_request("Organization context required")
 
-        # Get custom name from request payload (required)
-        new_name = request.data.get("name", "").strip()
+        new_name = request.validated_data.get("name", "").strip()
         if not new_name:
             return self._gm.bad_request("Name is required in the request payload")
 
