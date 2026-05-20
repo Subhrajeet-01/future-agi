@@ -43290,8 +43290,12 @@ export const TracerWebhookCreateResponse = zod.object({
 /**
  * Get custom plan summary for an org.
  */
+
+
+
 export const UsageAdminCustomPlanListQueryParams = zod.object({
-  "organization_id": zod.string().uuid()
+  "organization_id": zod.string().uuid(),
+  "dimension": zod.string().min(1).optional()
 })
 
 export const UsageAdminCustomPlanListResponse = zod.object({
@@ -43323,6 +43327,7 @@ export const UsageAdminCustomPlanCreateBody = zod.object({
   "platform_fee": zod.string().optional(),
   "platform_fee_billing_cycle": zod.number().min(1).optional(),
   "contract_end_date": zod.string().date().optional(),
+  "start_date": zod.string().date().optional(),
   "entitlements": zod.record(zod.string(), zod.object({
 
 }).passthrough()).optional(),
@@ -43352,6 +43357,7 @@ export const UsageAdminCustomPlanUpdateBody = zod.object({
   "platform_fee": zod.string().optional(),
   "platform_fee_billing_cycle": zod.number().min(1).optional(),
   "contract_end_date": zod.string().date().optional(),
+  "start_date": zod.string().date().optional(),
   "entitlements": zod.record(zod.string(), zod.object({
 
 }).passthrough()).optional(),
@@ -43373,8 +43379,12 @@ export const UsageAdminCustomPlanUpdateResponse = zod.object({
 /**
  * List entitlement overrides for an org.
  */
+
+
+
 export const UsageAdminEntitlementsListQueryParams = zod.object({
-  "organization_id": zod.string().uuid()
+  "organization_id": zod.string().uuid(),
+  "feature": zod.string().min(1).optional()
 })
 
 export const UsageAdminEntitlementsListResponse = zod.object({
@@ -43414,8 +43424,12 @@ export const UsageAdminEntitlementsCreateResponse = zod.object({
 /**
  * Remove an entitlement override (falls back to plan default).
  */
+
+
+
 export const UsageAdminEntitlementsDeleteQueryParams = zod.object({
-  "organization_id": zod.string().uuid()
+  "organization_id": zod.string().uuid(),
+  "feature": zod.string().min(1).optional()
 })
 
 export const UsageAdminEntitlementsDeleteResponse = zod.object({
@@ -43519,8 +43533,12 @@ export const UsageAdminInvoicePreviewCreateResponse = zod.object({
 /**
  * List custom pricing tiers for an org.
  */
+
+
+
 export const UsageAdminPricingListQueryParams = zod.object({
-  "organization_id": zod.string().uuid()
+  "organization_id": zod.string().uuid(),
+  "dimension": zod.string().min(1).optional()
 })
 
 
@@ -43572,8 +43590,12 @@ export const UsageAdminPricingCreateResponse = zod.object({
 /**
  * Remove all custom pricing tiers for a dimension.
  */
+
+
+
 export const UsageAdminPricingDeleteQueryParams = zod.object({
-  "organization_id": zod.string().uuid()
+  "organization_id": zod.string().uuid(),
+  "dimension": zod.string().min(1).optional()
 })
 
 export const UsageAdminPricingDeleteResponse = zod.object({

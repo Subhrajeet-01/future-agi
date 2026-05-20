@@ -20017,6 +20017,7 @@ export interface AdminCustomPlanRequestApi {
   /** @minimum 1 */
   platform_fee_billing_cycle?: number;
   contract_end_date?: string;
+  start_date?: string;
   entitlements?: AdminCustomPlanRequestApiEntitlements;
   pricing?: AdminCustomPlanRequestApiPricing;
   create_stripe_subscription?: boolean;
@@ -25310,22 +25311,42 @@ filters?: string;
 
 export type UsageAdminCustomPlanListParams = {
 organization_id: string;
+/**
+ * @minLength 1
+ */
+dimension?: string;
 };
 
 export type UsageAdminEntitlementsListParams = {
 organization_id: string;
+/**
+ * @minLength 1
+ */
+feature?: string;
 };
 
 export type UsageAdminEntitlementsDeleteParams = {
 organization_id: string;
+/**
+ * @minLength 1
+ */
+feature?: string;
 };
 
 export type UsageAdminPricingListParams = {
 organization_id: string;
+/**
+ * @minLength 1
+ */
+dimension?: string;
 };
 
 export type UsageAdminPricingDeleteParams = {
 organization_id: string;
+/**
+ * @minLength 1
+ */
+dimension?: string;
 };
 
 export type UsageApiCallCountListParams = {

@@ -37027,8 +37027,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/admin/custom-plan/": {
       "get": {
         "operationId": "usage_admin_custom-plan_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "organization_id": {
@@ -37036,6 +37036,13 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "dimension": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -37068,8 +37075,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_admin_custom-plan_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AdminCustomPlanRequest"
         },
@@ -37103,8 +37110,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "put": {
         "operationId": "usage_admin_custom-plan_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AdminCustomPlanRequest"
         },
@@ -37140,8 +37147,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/admin/entitlements/": {
       "get": {
         "operationId": "usage_admin_entitlements_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "organization_id": {
@@ -37149,6 +37156,13 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "feature": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -37181,8 +37195,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_admin_entitlements_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AdminEntitlementMutationRequest"
         },
@@ -37216,8 +37230,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "delete": {
         "operationId": "usage_admin_entitlements_delete",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "organization_id": {
@@ -37225,6 +37239,13 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "feature": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -37259,8 +37280,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/admin/invoice/generate/": {
       "post": {
         "operationId": "usage_admin_invoice_generate_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AdminInvoiceRequest"
         },
@@ -37296,8 +37317,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/admin/invoice/preview/": {
       "post": {
         "operationId": "usage_admin_invoice_preview_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AdminInvoiceRequest"
         },
@@ -37333,8 +37354,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/admin/pricing/": {
       "get": {
         "operationId": "usage_admin_pricing_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "organization_id": {
@@ -37342,6 +37363,13 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "dimension": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -37374,8 +37402,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_admin_pricing_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AdminPricingMutationRequest"
         },
@@ -37409,8 +37437,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "delete": {
         "operationId": "usage_admin_pricing_delete",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "organization_id": {
@@ -37418,6 +37446,13 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "dimension": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -37452,8 +37487,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/api-call-count/": {
       "get": {
         "operationId": "usage_api-call-count_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "year": {
@@ -37544,8 +37579,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/cancel-subscription/": {
       "post": {
         "operationId": "usage_cancel-subscription_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageEmptyRequest"
         },
@@ -37581,8 +37616,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/create-auto-recharge-session/": {
       "post": {
         "operationId": "usage_create-auto-recharge-session_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageEmptyRequest"
         },
@@ -37618,8 +37653,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/create-billing-portal-session/": {
       "post": {
         "operationId": "usage_create-billing-portal-session_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageEmptyRequest"
         },
@@ -37655,8 +37690,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/create-checkout-session/": {
       "post": {
         "operationId": "usage_create-checkout-session_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/CheckoutSessionRequest"
         },
@@ -37692,8 +37727,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/create-custom-payment-checkout-session/": {
       "post": {
         "operationId": "usage_create-custom-payment-checkout-session_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/CustomPaymentCheckoutRequest"
         },
@@ -37729,8 +37764,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/download-invoice/": {
       "post": {
         "operationId": "usage_download-invoice_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/DownloadInvoiceRequest"
         },
@@ -37781,7 +37816,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_ee_licenses_create",
-        "runtimeRequestValidation": false,
+        "runtimeRequestValidation": true,
         "runtimeResponseValidation": false,
         "requestBody": {
           "$ref": "#/definitions/EELicenseCreateRequest"
@@ -37800,7 +37835,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/ee/licenses/{grant_id}/revoke/": {
       "post": {
         "operationId": "usage_ee_licenses_revoke_create",
-        "runtimeRequestValidation": false,
+        "runtimeRequestValidation": true,
         "runtimeResponseValidation": false,
         "requestBody": {
           "$ref": "#/definitions/EELicenseRevokeRequest"
@@ -38062,8 +38097,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_organization-billing_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageOrganizationBilling"
         },
@@ -38132,8 +38167,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_organization-billing_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageOrganizationBilling"
         },
@@ -38237,8 +38272,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_organization-subscription_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageOrganizationSubscriptionCreate"
         },
@@ -38272,8 +38307,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_organization-subscription_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageOrganizationSubscriptionCreate"
         },
@@ -38375,8 +38410,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_organization-subscription_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageOrganizationSubscriptionCreate"
         },
@@ -38410,8 +38445,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_organization-subscription_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageOrganizationSubscriptionCreate"
         },
@@ -38515,8 +38550,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/pricing-card-details/": {
       "post": {
         "operationId": "usage_pricing-card-details_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageEmptyRequest"
         },
@@ -38585,8 +38620,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_pricing_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsagePricingCreate"
         },
@@ -38620,8 +38655,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_pricing_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsagePricingCreate"
         },
@@ -38723,8 +38758,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_pricing_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsagePricingCreate"
         },
@@ -38758,8 +38793,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_pricing_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsagePricingCreate"
         },
@@ -38861,8 +38896,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_rate-limits_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageRateLimitCreate"
         },
@@ -38896,8 +38931,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_rate-limits_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageRateLimitCreate"
         },
@@ -38999,8 +39034,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_rate-limits_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageRateLimitCreate"
         },
@@ -39034,8 +39069,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_rate-limits_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageRateLimitCreate"
         },
@@ -39137,8 +39172,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_resource-limits_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageResourceLimitCreate"
         },
@@ -39172,8 +39207,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_resource-limits_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageResourceLimitCreate"
         },
@@ -39275,8 +39310,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_resource-limits_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageResourceLimitCreate"
         },
@@ -39310,8 +39345,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_resource-limits_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageResourceLimitCreate"
         },
@@ -39518,8 +39553,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_subscription-tier_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageSubscriptionTier"
         },
@@ -39553,8 +39588,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_subscription-tier_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageSubscriptionTier"
         },
@@ -39656,8 +39691,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "post": {
         "operationId": "usage_subscription-tier_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageSubscriptionTier"
         },
@@ -39691,8 +39726,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "patch": {
         "operationId": "usage_subscription-tier_partial_update",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UsageSubscriptionTier"
         },
@@ -39761,8 +39796,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/update-auto-reload-settings/": {
       "post": {
         "operationId": "usage_update-auto-reload-settings_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/AutoReloadSettingsRequest"
         },
@@ -39798,8 +39833,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/update-billing-details/": {
       "post": {
         "operationId": "usage_update-billing-details_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/UpdateOrganizationBillingRequest"
         },
@@ -39835,8 +39870,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/usage-summary/": {
       "get": {
         "operationId": "usage_usage-summary_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "month": {
@@ -41009,8 +41044,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/v2/stripe-webhook/": {
       "post": {
         "operationId": "usage_v2_stripe-webhook_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/StripeWebhookRequest"
         },
@@ -41289,8 +41324,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/webhook/": {
       "post": {
         "operationId": "usage_webhook_create",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": {
           "$ref": "#/definitions/StripeWebhookRequest"
         },
@@ -41326,8 +41361,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/workspace-eval-summary/": {
       "get": {
         "operationId": "usage_workspace-eval-summary_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "month": {
@@ -41383,8 +41418,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
     "/usage/workspace-usage-summary/": {
       "get": {
         "operationId": "usage_workspace-usage-summary_list",
-        "runtimeRequestValidation": false,
-        "runtimeResponseValidation": false,
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
         "requestBody": null,
         "queryParameters": {
           "month": {
@@ -42300,6 +42335,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "contract_end_date": {
           "title": "Contract end date",
+          "type": "string",
+          "format": "date",
+          "x-nullable": true
+        },
+        "start_date": {
+          "title": "Start date",
           "type": "string",
           "format": "date",
           "x-nullable": true
