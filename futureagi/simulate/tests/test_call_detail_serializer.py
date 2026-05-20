@@ -9,52 +9,18 @@ CreateSimulationPreviewMode.jsx.
 
 import pytest
 
-from model_hub.models.choices import DatasetSourceChoices, SourceChoices, StatusType
-from model_hub.models.develop_dataset import Cell, Column, Dataset, Row
-from simulate.models import AgentDefinition, Persona, Scenarios
-from simulate.models.run_test import RunTest
-from simulate.models.simulator_agent import SimulatorAgent
-from simulate.models.test_execution import CallExecution, TestExecution
 from simulate.serializers.test_execution import CallExecutionDetailSerializer
+from simulate.tests.factories import (
+    make_agent_definition,
+    make_call_execution,
+    make_persona,
+    make_run_test,
+    make_scenario,
+    make_simulator_agent,
+    make_test_execution,
+)
 
 pytestmark = pytest.mark.integration
-
-
-def _make_persona(organization, workspace, **overrides):
-    defaults = dict(
-        name="Test Persona",
-        organization=organization,
-        workspace=workspace,
-        persona_type=Persona.PersonaType.WORKSPACE,
-    )
-    defaults.update(overrides)
-    return Persona.objects.create(**defaults)
-
-
-def _make_agent_definition(organization, workspace):
-    return AgentDefinition.objects.create(
-        agent_name="Test Agent",
-        agent_type=AgentDefinition.AgentTypeChoices.VOICE,
-        inbound=True,
-        description="Test agent",
-        organization=organization,
-        workspace=workspace,
-        languages=["en"],
-    )
-
-
-def _make_simulator(organization, workspace, **overrides):
-    defaults = dict(
-        name="Sim",
-        prompt="You are a simulator",
-        voice_provider="elevenlabs",
-        voice_name="marissa",
-        model="gpt-4",
-        organization=organization,
-        workspace=workspace,
-    )
-    defaults.update(overrides)
-    return SimulatorAgent.objects.create(**defaults)
 
 
 def _make_call(
@@ -65,61 +31,42 @@ def _make_call(
     scenario_metadata=None,
     simulator=None,
 ):
-    """Bootstrap a CallExecution with optional persona / scenario.metadata wiring."""
-    agent_def = _make_agent_definition(organization, workspace)
-    simulator = simulator or _make_simulator(organization, workspace)
+    """Bootstrap a CallExecution with optional persona / scenario.metadata wiring.
+
+    Composes primitives from `simulate.tests.factories` — kept here (not in
+    the shared factories module) because the persona-resolution wiring is
+    specific to this suite's contract assertions.
+    """
+    agent_def = make_agent_definition(organization, workspace)
+    simulator = simulator or make_simulator_agent(organization, workspace)
 
     metadata = scenario_metadata or {}
     if persona is not None and "persona_ids" not in metadata:
         metadata["persona_ids"] = [str(persona.id)]
 
-    scenario = Scenarios.objects.create(
-        name="Test Scenario",
-        description="d",
-        source="s",
-        scenario_type=Scenarios.ScenarioTypes.DATASET,
-        organization=organization,
-        workspace=workspace,
-        agent_definition=agent_def,
-        status=StatusType.COMPLETED.value,
-        metadata=metadata,
+    scenario = make_scenario(
+        organization, workspace, agent_def, metadata=metadata
     )
-
-    rt = RunTest.objects.create(
-        name="rt",
-        description="d",
-        agent_definition=agent_def,
+    rt = make_run_test(
+        organization,
+        workspace,
+        agent_def,
         simulator_agent=simulator,
-        organization=organization,
-        workspace=workspace,
+        scenarios=[scenario],
     )
-    rt.scenarios.add(scenario)
-
-    te = TestExecution.objects.create(
-        run_test=rt,
-        status=TestExecution.ExecutionStatus.COMPLETED,
-        simulator_agent=simulator,
-        agent_definition=agent_def,
+    te = make_test_execution(
+        rt, agent_definition=agent_def, simulator_agent=simulator
     )
 
-    call_metadata = {}
-    if persona is not None:
-        call_metadata["row_data"] = {"persona": str(persona.id)}
-
-    return CallExecution.objects.create(
-        test_execution=te,
-        scenario=scenario,
-        phone_number="+1234567890",
-        status=CallExecution.CallStatus.COMPLETED,
-        call_metadata=call_metadata,
-    )
+    row_data = {"persona": str(persona.id)} if persona is not None else None
+    return make_call_execution(te, scenario, row_data=row_data)
 
 
 @pytest.mark.django_db
 def test_persona_profile_exposes_persona_model_attributes(
     organization, workspace
 ):
-    persona = _make_persona(
+    persona = make_persona(
         organization,
         workspace,
         name="Alice",
@@ -149,8 +96,8 @@ def test_persona_profile_excludes_simulator_fields(organization, workspace):
     still resolve at runtime via the eval-context resolver — but the
     dropdown source must never list them.
     """
-    persona = _make_persona(organization, workspace, name="Alice")
-    simulator = _make_simulator(
+    persona = make_persona(organization, workspace, name="Alice")
+    simulator = make_simulator_agent(
         organization, workspace, voice_name="alloy", prompt="You are helpful"
     )
     call = _make_call(
@@ -170,7 +117,7 @@ def test_persona_profile_excludes_simulator_fields(organization, workspace):
 def test_persona_profile_empty_when_no_persona_bound(organization, workspace):
     """If the scenario has no persona_ids and no row_data.persona, the
     profile is an empty dict (no SimulatorAgent stand-in)."""
-    simulator = _make_simulator(organization, workspace, voice_name="alloy")
+    simulator = make_simulator_agent(organization, workspace, voice_name="alloy")
     call = _make_call(organization, workspace, simulator=simulator)
 
     data = CallExecutionDetailSerializer(call).data
@@ -185,7 +132,7 @@ def test_persona_profile_nests_metadata_under_metadata_key(
     """Persona.metadata sub-keys should land under persona_profile["metadata"]
     so the frontend flattener can emit flat.persona.metadata.<key>.
     """
-    persona = _make_persona(
+    persona = make_persona(
         organization,
         workspace,
         metadata={"region": "EMEA", "vip_tier": "gold"},
@@ -200,7 +147,7 @@ def test_persona_profile_nests_metadata_under_metadata_key(
 
 @pytest.mark.django_db
 def test_persona_profile_multi_value_list_joined(organization, workspace):
-    persona = _make_persona(
+    persona = make_persona(
         organization,
         workspace,
         languages=["English", "Hindi", "Marathi"],
