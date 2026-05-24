@@ -738,3 +738,32 @@ WEBAUTHN_ORIGIN = os.getenv("WEBAUTHN_ORIGIN", "http://localhost:3031")
 # 2FA challenge token TTLs (seconds)
 TWO_FACTOR_CHALLENGE_TTL = 300  # 5 minutes
 WEBAUTHN_CHALLENGE_TTL = 120  # 2 minutes
+
+# ─── ClickHouse 25.3 (v2) span store ────────────────────────────────────────
+# The new spans cluster (typed Maps + typed JSON; PLAN_V2_NO_CDC). Falls back
+# to the legacy CLICKHOUSE dict above for connection details if not set
+# explicitly — see tracer/services/clickhouse/v2/__init__.py:get_v2_config().
+CLICKHOUSE_V2 = {
+    "CH25_HOST":      os.getenv("CH25_HOST"),
+    "CH25_HTTP_PORT": os.getenv("CH25_HTTP_PORT", "8123"),
+    "CH25_TCP_PORT":  os.getenv("CH25_TCP_PORT", "9000"),
+    "CH25_USER":      os.getenv("CH25_USER", "default"),
+    "CH25_PASSWORD":  os.getenv("CH25_PASSWORD", ""),
+    "CH25_DATABASE":  os.getenv("CH25_DATABASE", "default"),
+    # ─── Per-query-type routing for the shadow-mode rollout ──────────────────
+    # Comma-separated query type names. See tracer/services/clickhouse/v2/shadow.py
+    # for RoutingMode definitions. Anything not listed defaults to V1_ONLY.
+    "QUERY_TYPES_V2_PRIMARY": os.getenv("CH25_QUERY_TYPES_V2_PRIMARY", ""),
+    "QUERY_TYPES_V2_ONLY":    os.getenv("CH25_QUERY_TYPES_V2_ONLY", ""),
+    "QUERY_TYPES_SHADOW":     os.getenv("CH25_QUERY_TYPES_SHADOW", ""),
+    "QUERY_TYPES_DISABLED":   os.getenv("CH25_QUERY_TYPES_DISABLED", ""),
+}
+
+# Where the eval runner reads span data from.
+#   "postgres"   — current behavior; reads from tracer_observation_span (Django ORM)
+#   "clickhouse" — reads span data from CH 25.3 via the hybrid loader
+#                  (tracer/services/clickhouse/v2/eval_loader.py). Django FK
+#                  navigation (project, trace, end_user, …) still hits PG.
+# Default is "postgres" so cutover is opt-in. Flip to "clickhouse" only after
+# the backfill + validator pass and a soak period.
+EVAL_SPAN_READ_SOURCE = os.getenv("EVAL_SPAN_READ_SOURCE", "postgres").lower()

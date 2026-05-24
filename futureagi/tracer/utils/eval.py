@@ -185,6 +185,7 @@ def build_trace_context(trace, *, anchor_span_id: str | None = None) -> dict:
     from tracer.models.observation_span import ObservationSpan
 
     try:
+        # CH25-TODO: trace-level aggregate. Migrate via v2 query builder (eval_metrics) + shadow runner — see tracer/services/clickhouse/v2/shadow.py.
         _agg = ObservationSpan.objects.filter(
             trace=trace, deleted=False
         ).aggregate(
@@ -194,6 +195,7 @@ def build_trace_context(trace, *, anchor_span_id: str | None = None) -> dict:
             total_latency_ms=Sum("latency_ms"),
         )
         _spans = list(
+            # CH25-TODO: trace span listing. Use v2 SpanListQueryBuilder once ported (target query type: SPAN_LIST).
             ObservationSpan.objects.filter(trace=trace, deleted=False)
             .order_by("start_time")
             .values("id", "name", "observation_type", "status", "parent_span_id")[:200]
@@ -246,6 +248,7 @@ def build_session_context(session) -> dict | None:
         from tracer.models.trace import Trace
 
         trace_qs = Trace.objects.filter(session=session, deleted=False)
+        # CH25-TODO: trace-level aggregate. Migrate via v2 query builder (eval_metrics) + shadow runner — see tracer/services/clickhouse/v2/shadow.py.
         sess_agg = ObservationSpan.objects.filter(
             trace__in=trace_qs, deleted=False
         ).aggregate(
@@ -264,6 +267,7 @@ def build_session_context(session) -> dict | None:
         per_trace = {
             row["trace_id"]: row
             for row in (
+                # CH25-TODO: aggregate/listing over trace_id set. Migrate via v2 query builder + shadow runner — see tracer/services/clickhouse/v2/shadow.py.
                 ObservationSpan.objects.filter(
                     trace_id__in=trace_ids, deleted=False
                 )
@@ -281,6 +285,7 @@ def build_session_context(session) -> dict | None:
         # trace to bound payload size.
         spans_by_trace: dict = {}
         for s in (
+            # CH25-TODO: aggregate/listing over trace_id set. Migrate via v2 query builder + shadow runner — see tracer/services/clickhouse/v2/shadow.py.
             ObservationSpan.objects.filter(
                 trace_id__in=trace_ids, deleted=False
             )
@@ -663,9 +668,16 @@ def _execute_composite_on_span(
     from model_hub.utils.composite_execution import execute_composite_children_sync
 
     try:
-        observation_span = ObservationSpan.objects.select_related(
-            "project", "project__organization", "project__workspace"
-        ).get(id=observation_span_id)
+        # CH 25.3 read when EVAL_SPAN_READ_SOURCE=clickhouse. Hybrid loader
+        # constructs a partial Django ObservationSpan from the CH row; the
+        # `select_related` FK preload is honored on the PG fallback path,
+        # and project/organization/workspace lazy-load from PG on attribute
+        # access in the CH path.
+        from tracer.services.clickhouse.v2.eval_loader import get_observation_span
+        observation_span = get_observation_span(
+            observation_span_id,
+            select_related=("project", "project__organization", "project__workspace"),
+        )
         custom_eval_config = CustomEvalConfig.objects.get(
             id=custom_eval_config_id, deleted=False
         )
@@ -1046,9 +1058,11 @@ def _execute_evaluation(
 
     raw_mapping = run_params.copy()
     try:
-        observation_span = ObservationSpan.objects.select_related(
-            "project", "project__organization", "project__workspace"
-        ).get(id=observation_span_id)
+        from tracer.services.clickhouse.v2.eval_loader import get_observation_span
+        observation_span = get_observation_span(
+            observation_span_id,
+            select_related=("project", "project__organization", "project__workspace"),
+        )
 
         custom_eval_config = CustomEvalConfig.objects.get(
             id=custom_eval_config_id, deleted=False
@@ -1414,7 +1428,8 @@ def evaluate_observation_span(
 
     try:
         custom_eval_config = CustomEvalConfig.objects.get(id=custom_eval_config_id)
-        observation_span = ObservationSpan.objects.get(id=observation_span_id)
+        from tracer.services.clickhouse.v2.eval_loader import get_observation_span
+        observation_span = get_observation_span(observation_span_id)
     except CustomEvalConfig.DoesNotExist:
         raise ValueError(
             f"CustomEvalConfig with id {custom_eval_config_id} does not exist."
@@ -1499,7 +1514,8 @@ def evaluate_observation_span_observe(
         )
     try:
         custom_eval_config = CustomEvalConfig.objects.get(id=custom_eval_config_id)
-        observation_span = ObservationSpan.objects.get(id=observation_span_id)
+        from tracer.services.clickhouse.v2.eval_loader import get_observation_span
+        observation_span = get_observation_span(observation_span_id)
     except CustomEvalConfig.DoesNotExist:
         raise ValueError(
             f"CustomEvalConfig with id {custom_eval_config_id} does not exist."
@@ -1632,7 +1648,12 @@ def evaluate_observation_span_observe(
 )
 def eval_observation_span_runner(observation_span_id, eval_tags):
     try:
-        observation_span = ObservationSpan.objects.get(id=observation_span_id)
+        # Goes via CH 25.3 when EVAL_SPAN_READ_SOURCE=clickhouse (CH 25.3
+        # span point-read replaces the heavy JSONB select on tracer_observation_span);
+        # falls back to PG ORM otherwise. Raises ObservationSpan.DoesNotExist
+        # in both modes — downstream `except` blocks unchanged.
+        from tracer.services.clickhouse.v2.eval_loader import get_observation_span
+        observation_span = get_observation_span(observation_span_id)
         if not observation_span or not eval_tags:
             return
 
@@ -2139,6 +2160,7 @@ def _resolve_session_path(trace_session: TraceSession, path: str):
         from django.db.models.functions import Coalesce
 
         root_start = (
+            # CH25-TODO: aggregate/listing over trace_id set. Migrate via v2 query builder + shadow runner — see tracer/services/clickhouse/v2/shadow.py.
             ObservationSpan.objects.filter(
                 trace_id=OuterRef("id"), parent_span_id__isnull=True
             )
