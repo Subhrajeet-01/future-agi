@@ -1911,6 +1911,9 @@ export const datasetEvalJourneys = [
       let labelId = null;
       let annotationTaskListCount = 0;
       let annotationTaskReadStatus = "skipped_no_task";
+      let annotationTaskFixture = null;
+      let annotationTaskCleanup = null;
+      let annotationTaskFixtureCleaned = false;
 
       const dataset = await createOrResolveWritableDataset(
         client,
@@ -2024,21 +2027,62 @@ export const datasetEvalJourneys = [
         ),
       );
 
+      annotationTaskFixture = await seedAnnotationTaskFixture({
+        runId,
+        userId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        annotationTaskFixture?.fixture_created === true,
+        "AnnotationTask fixture seed did not create a task.",
+      );
+      cleanup.defer("hard delete API journey annotation task fixture", async () => {
+        if (!annotationTaskFixtureCleaned) {
+          await hardDeleteAnnotationTaskFixture(annotationTaskFixture);
+        }
+      });
+
       const annotationTasks = asArray(
         await client.get(apiPath("/model-hub/annotation-tasks/"), {
-          query: { page: 1, limit: 10 },
+          query: {
+            page: 1,
+            limit: 10,
+            predictive_journey: annotationTaskFixture.ai_model_id,
+          },
         }),
       );
       annotationTaskListCount = annotationTasks.length;
-      const annotationTask = annotationTasks.find((task) => task?.id);
-      if (annotationTask?.id) {
-        await client.get(
-          apiPath("/model-hub/annotation-tasks/{id}/", {
-            id: annotationTask.id,
-          }),
-        );
-        annotationTaskReadStatus = 200;
-      }
+      const annotationTask = annotationTasks.find(
+        (task) => task?.id === annotationTaskFixture.annotation_task_id,
+      );
+      assert(
+        annotationTask?.id,
+        "Seeded AnnotationTask was not returned by the filtered list.",
+      );
+      assertAnnotationTaskPayload(annotationTask, annotationTaskFixture, userId);
+      const annotationTaskDetail = await client.get(
+        apiPath("/model-hub/annotation-tasks/{id}/", {
+          id: annotationTask.id,
+        }),
+      );
+      assertAnnotationTaskPayload(
+        annotationTaskDetail,
+        annotationTaskFixture,
+        userId,
+      );
+      annotationTaskReadStatus = 200;
+      annotationTaskCleanup =
+        await hardDeleteAnnotationTaskFixture(annotationTaskFixture);
+      annotationTaskFixtureCleaned = true;
+      assert(
+        Number(annotationTaskCleanup.remaining_task_count) === 0,
+        "AnnotationTask fixture cleanup left a task row.",
+      );
+      assert(
+        Number(annotationTaskCleanup.remaining_ai_model_count) === 0,
+        "AnnotationTask fixture cleanup left an AIModel row.",
+      );
 
       const preview = await client.post(
         apiPath("/model-hub/annotations/preview_annotations/"),
@@ -2304,7 +2348,10 @@ export const datasetEvalJourneys = [
         detail_annotation_id: detailAnnotation.id,
         bulk_annotation_id: bulkAnnotation.id,
         annotation_task_list_count: annotationTaskListCount,
+        annotation_task_id: annotationTaskFixture.annotation_task_id,
+        annotation_task_ai_model_id: annotationTaskFixture.ai_model_id,
         annotation_task_read_status: annotationTaskReadStatus,
+        annotation_task_cleanup: annotationTaskCleanup,
         required_update_status: requiredUpdateStatus,
         bulk_deleted_count: bulkDeletedCount,
         deleted_annotation_ids: Array.from(deletedAnnotationIds),
@@ -19305,6 +19352,181 @@ WHERE ak.organization_id = ${sqlUuid(organizationId)}
   AND u.email = ${sqlTextLiteral(email)};
 `;
   return runPostgresJson(sql);
+}
+
+async function seedAnnotationTaskFixture({
+  runId,
+  userId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(userId), "userId must be a UUID for AnnotationTask seed.");
+  assert(
+    isUuid(organizationId),
+    "organizationId must be a UUID for AnnotationTask seed.",
+  );
+  assert(
+    isUuid(workspaceId),
+    "workspaceId must be a UUID for AnnotationTask seed.",
+  );
+  const aiModelId = randomUUID();
+  const annotationTaskId = randomUUID();
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const modelUserId = `api_journey_annotation_task_model_${suffix}`;
+  const taskName = `api journey annotation task ${runId}`;
+  const sql = `
+WITH inserted_model AS (
+  INSERT INTO model_hub_aimodel (
+    id,
+    organization_id,
+    workspace_id,
+    created_at,
+    model_type,
+    user_model_id,
+    deleted
+  )
+  VALUES (
+    ${sqlUuid(aiModelId)},
+    ${sqlUuid(organizationId)},
+    ${sqlUuid(workspaceId)},
+    NOW(),
+    'GenerativeLLM',
+    ${sqlTextLiteral(modelUserId)},
+    false
+  )
+  RETURNING id, user_model_id
+),
+inserted_task AS (
+  INSERT INTO model_hub_annotationtask (
+    id,
+    created_at,
+    updated_at,
+    is_deleted,
+    ai_model_id,
+    task_name,
+    organization_id,
+    workspace_id
+  )
+  SELECT
+    ${sqlUuid(annotationTaskId)},
+    NOW(),
+    NOW(),
+    false,
+    id,
+    ${sqlTextLiteral(taskName)},
+    ${sqlUuid(organizationId)},
+    ${sqlUuid(workspaceId)}
+  FROM inserted_model
+  RETURNING id
+),
+inserted_assignment AS (
+  INSERT INTO model_hub_annotationtask_assigned_users (
+    annotationtask_id,
+    user_id
+  )
+  SELECT id, ${sqlUuid(userId)}
+  FROM inserted_task
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', EXISTS(SELECT 1 FROM inserted_model)
+    AND EXISTS(SELECT 1 FROM inserted_task)
+    AND EXISTS(SELECT 1 FROM inserted_assignment),
+  'ai_model_id', ${sqlTextLiteral(aiModelId)},
+  'annotation_task_id', ${sqlTextLiteral(annotationTaskId)},
+  'task_name', ${sqlTextLiteral(taskName)},
+  'model_user_id', ${sqlTextLiteral(modelUserId)},
+  'organization_id', ${sqlTextLiteral(organizationId)},
+  'workspace_id', ${sqlTextLiteral(workspaceId)},
+  'assigned_user_id', ${sqlTextLiteral(userId)}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteAnnotationTaskFixture(fixture) {
+  assert(
+    isUuid(fixture?.annotation_task_id) && isUuid(fixture?.ai_model_id),
+    "AnnotationTask fixture cleanup requires task and model ids.",
+  );
+  const sql = `
+WITH deleted_assignments AS (
+  DELETE FROM model_hub_annotationtask_assigned_users
+  WHERE annotationtask_id = ${sqlUuid(fixture.annotation_task_id)}
+  RETURNING 1
+),
+deleted_clickhouse_annotations AS (
+  DELETE FROM model_hub_clickhouseannotation
+  WHERE annotation_task_id = ${sqlUuid(fixture.annotation_task_id)}
+  RETURNING 1
+),
+deleted_task AS (
+  DELETE FROM model_hub_annotationtask
+  WHERE id = ${sqlUuid(fixture.annotation_task_id)}
+  RETURNING 1
+),
+deleted_model AS (
+  DELETE FROM model_hub_aimodel
+  WHERE id = ${sqlUuid(fixture.ai_model_id)}
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_assignment_count', (SELECT COUNT(*)::int FROM deleted_assignments),
+  'deleted_clickhouse_annotation_count',
+    (SELECT COUNT(*)::int FROM deleted_clickhouse_annotations),
+  'deleted_task_count', (SELECT COUNT(*)::int FROM deleted_task),
+  'deleted_ai_model_count', (SELECT COUNT(*)::int FROM deleted_model)
+);
+`;
+  const deleteAudit = await runPostgresJson(sql);
+  const residueAudit = await loadAnnotationTaskFixtureResidue(fixture);
+  return { ...deleteAudit, ...residueAudit };
+}
+
+async function loadAnnotationTaskFixtureResidue(fixture) {
+  assert(
+    isUuid(fixture?.annotation_task_id) && isUuid(fixture?.ai_model_id),
+    "AnnotationTask fixture residue check requires task and model ids.",
+  );
+  const sql = `
+SELECT json_build_object(
+  'remaining_assignment_count', (
+    SELECT COUNT(*)::int
+    FROM model_hub_annotationtask_assigned_users
+    WHERE annotationtask_id = ${sqlUuid(fixture.annotation_task_id)}
+  ),
+  'remaining_task_count', (
+    SELECT COUNT(*)::int
+    FROM model_hub_annotationtask
+    WHERE id = ${sqlUuid(fixture.annotation_task_id)}
+  ),
+  'remaining_ai_model_count', (
+    SELECT COUNT(*)::int
+    FROM model_hub_aimodel
+    WHERE id = ${sqlUuid(fixture.ai_model_id)}
+  )
+);
+`;
+  return runPostgresJson(sql);
+}
+
+function assertAnnotationTaskPayload(task, fixture, userId) {
+  assert(
+    task?.id === fixture.annotation_task_id,
+    "AnnotationTask payload returned the wrong task id.",
+  );
+  assert(
+    task.task_name === fixture.task_name,
+    "AnnotationTask payload returned the wrong task name.",
+  );
+  assert(
+    task.ai_model?.id === fixture.ai_model_id,
+    "AnnotationTask payload returned the wrong AI model.",
+  );
+  assert(
+    asArray(task.assigned_users).some((assigned) => assigned.id === userId),
+    "AnnotationTask payload did not include the assigned user.",
+  );
 }
 
 async function loadLegacyAnnotationLifecycleDbAudit({
