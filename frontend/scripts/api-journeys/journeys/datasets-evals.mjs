@@ -1169,6 +1169,225 @@ export const datasetEvalJourneys = [
     },
   },
   {
+    id: "EXP-API-004",
+    title: "Legacy experiment collection create, update, and scope guards",
+    tags: ["experiments", "legacy", "mutating", "data-roundtrip", "db-audit"],
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+      user,
+    }) {
+      requireMutations();
+      const fixture = await seedLegacyExperimentCreateUpdateFixture({
+        runId,
+        organizationId,
+        workspaceId,
+        userId: currentUserId(user),
+      });
+      assert(
+        fixture?.fixture_created,
+        "Legacy experiment create/update fixture seed failed.",
+      );
+      cleanup.defer("hard delete legacy experiment create/update fixture", () =>
+        hardDeleteLegacyExperimentCreateUpdateFixture(fixture),
+      );
+
+      const createName = `api journey legacy create ${runId}`;
+      const createPromptConfig = {
+        model: "gpt-4o-mini",
+        temperature: 0.1,
+        journey: "EXP-API-004-create",
+      };
+      const created = await client.post(apiPath("/model-hub/experiments/"), {
+        name: createName,
+        dataset_id: fixture.dataset_id,
+        column_id: fixture.output_column_id,
+        prompt_config: createPromptConfig,
+        user_eval_template_ids: [fixture.eval_metric_id],
+      });
+      assert(
+        String(created).includes("Experiment created successfully"),
+        "Legacy experiment create returned an unexpected response.",
+      );
+
+      const createdAudit = await loadLegacyExperimentCreateUpdateAudit({
+        datasetId: fixture.dataset_id,
+        experimentName: createName,
+        organizationId,
+        workspaceId,
+      });
+      fixture.created_experiment_id = createdAudit.experiment_id;
+      assertLegacyExperimentAudit(createdAudit, {
+        experimentName: createName,
+        datasetId: fixture.dataset_id,
+        columnId: fixture.output_column_id,
+        organizationId,
+        workspaceId,
+        metricIds: [fixture.eval_metric_id],
+        promptConfigJourney: "EXP-API-004-create",
+      });
+
+      const legacyDetail = await client.get(
+        apiPath("/model-hub/experiments/"),
+        {
+          query: { experiment_id: createdAudit.experiment_id },
+        },
+      );
+      assert(
+        legacyDetail?.name === createName &&
+          legacyDetail?.dataset_id === fixture.dataset_id,
+        "Legacy experiment detail did not read back the created experiment.",
+      );
+
+      const updateName = `api journey legacy update ${runId}`;
+      const updatePromptConfig = {
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        journey: "EXP-API-004-update",
+      };
+      const updated = await client.put(apiPath("/model-hub/experiments/"), {
+        experiment_id: createdAudit.experiment_id,
+        re_run: false,
+        name: updateName,
+        dataset_id: fixture.dataset_id,
+        column_id: fixture.output_column_id,
+        prompt_config: updatePromptConfig,
+        user_eval_template_ids: [fixture.second_eval_metric_id],
+      });
+      assert(
+        String(updated).includes("Experiment updated successfully"),
+        "Legacy experiment update returned an unexpected response.",
+      );
+
+      const updatedAudit = await loadLegacyExperimentCreateUpdateAudit({
+        experimentId: createdAudit.experiment_id,
+        datasetId: fixture.dataset_id,
+        organizationId,
+        workspaceId,
+      });
+      assertLegacyExperimentAudit(updatedAudit, {
+        experimentName: updateName,
+        datasetId: fixture.dataset_id,
+        columnId: fixture.output_column_id,
+        organizationId,
+        workspaceId,
+        metricIds: [fixture.second_eval_metric_id],
+        promptConfigJourney: "EXP-API-004-update",
+      });
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/experiments/"), {
+            name: fixture.blocked_column_experiment_name,
+            dataset_id: fixture.dataset_id,
+            column_id: fixture.blocked_column_id,
+            prompt_config: createPromptConfig,
+          }),
+        404,
+        "Legacy experiment create accepted a column from another dataset.",
+      );
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/experiments/"), {
+            name: fixture.blocked_metric_experiment_name,
+            dataset_id: fixture.dataset_id,
+            column_id: fixture.output_column_id,
+            prompt_config: createPromptConfig,
+            user_eval_template_ids: [fixture.blocked_eval_metric_id],
+          }),
+        404,
+        "Legacy experiment create accepted an eval metric from another dataset.",
+      );
+
+      let otherWorkspaceCreateStatus = "skipped:no-other-workspace";
+      let otherWorkspaceDetailGuard = "skipped:no-other-workspace";
+      let otherWorkspaceUpdateGuard = "skipped:no-other-workspace";
+      if (fixture.other_workspace_id) {
+        try {
+          await client.post(apiPath("/model-hub/experiments/"), {
+            name: fixture.other_workspace_create_name,
+            dataset_id: fixture.other_dataset_id,
+            column_id: fixture.other_column_id,
+            prompt_config: createPromptConfig,
+          });
+          throw new Error(
+            "Legacy experiment create accepted another workspace dataset.",
+          );
+        } catch (error) {
+          assert(
+            [400, 404].includes(error?.status),
+            `Other-workspace legacy create returned HTTP ${error?.status}.`,
+          );
+          otherWorkspaceCreateStatus = error.status;
+        }
+
+        await expectApiErrorStatus(
+          () =>
+            client.get(apiPath("/model-hub/experiments/"), {
+              query: { experiment_id: fixture.other_experiment_id },
+            }),
+          404,
+          "Legacy experiment detail exposed another workspace experiment.",
+        );
+        otherWorkspaceDetailGuard = "passed";
+
+        await expectApiErrorStatus(
+          () =>
+            client.put(apiPath("/model-hub/experiments/"), {
+              experiment_id: fixture.other_experiment_id,
+              re_run: false,
+              name: "api journey other workspace update blocked",
+              dataset_id: fixture.dataset_id,
+              column_id: fixture.output_column_id,
+              prompt_config: updatePromptConfig,
+            }),
+          404,
+          "Legacy experiment update accepted another workspace experiment.",
+        );
+        otherWorkspaceUpdateGuard = "passed";
+      }
+
+      const guardAudit = await loadLegacyExperimentGuardAudit(fixture);
+      assert(
+        Number(guardAudit.blocked_column_count) === 0,
+        "Blocked column legacy create persisted an experiment.",
+      );
+      assert(
+        Number(guardAudit.blocked_metric_count) === 0,
+        "Blocked metric legacy create persisted an experiment.",
+      );
+      assert(
+        Number(guardAudit.other_workspace_create_count) === 0,
+        "Blocked other-workspace legacy create persisted an experiment.",
+      );
+      if (fixture.other_experiment_id) {
+        assert(
+          guardAudit.other_experiment_name === fixture.other_experiment_name,
+          "Blocked other-workspace legacy update mutated the experiment name.",
+        );
+      }
+
+      evidence.push({
+        experiment_id: createdAudit.experiment_id,
+        dataset_id: fixture.dataset_id,
+        output_column_id: fixture.output_column_id,
+        created_name: createName,
+        updated_name: updatedAudit.experiment_name,
+        create_metric_id: fixture.eval_metric_id,
+        update_metric_id: fixture.second_eval_metric_id,
+        blocked_column_guard: "passed",
+        blocked_metric_guard: "passed",
+        other_workspace_create_status: otherWorkspaceCreateStatus,
+        other_workspace_detail_guard: otherWorkspaceDetailGuard,
+        other_workspace_update_guard: otherWorkspaceUpdateGuard,
+      });
+    },
+  },
+  {
     id: "DPE-API-002",
     title:
       "Dataset create, column add, row add, cell edit, download, and delete lifecycle",
@@ -2641,7 +2860,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-022",
     title: "Dataset generated-column creation, preview, and scope guards",
     tags: ["dataset", "dynamic-columns", "mutating", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedDatasetDynamicColumnFixture({
         runId,
@@ -2672,7 +2898,9 @@ export const datasetEvalJourneys = [
         "Dynamic-column preview did not return the seeded sample rows.",
       );
       assert(
-        previewResults.map((row) => row.output).includes(fixture.preview_name_one),
+        previewResults
+          .map((row) => row.output)
+          .includes(fixture.preview_name_one),
         "Dynamic-column extract-json preview did not return the expected value.",
       );
 
@@ -2706,7 +2934,9 @@ export const datasetEvalJourneys = [
         dynamic_column_count: Number(audit.dynamic_column_count),
         column_order_length: Number(audit.column_order_length),
         created_columns: createdColumns,
-        dynamic_sources: asArray(audit.dynamic_columns).map((row) => row.source),
+        dynamic_sources: asArray(audit.dynamic_columns).map(
+          (row) => row.source,
+        ),
       });
     },
   },
@@ -2714,7 +2944,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-023",
     title: "Dataset generated-column config and rerun guards",
     tags: ["dataset", "dynamic-columns", "mutating", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedDatasetDynamicColumnFixture({
         runId,
@@ -2725,8 +2962,9 @@ export const datasetEvalJourneys = [
         fixture?.fixture_created,
         "Dynamic-column rerun fixture seed did not create a dataset.",
       );
-      cleanup.defer("hard delete API journey dynamic-column rerun fixture", () =>
-        hardDeleteDatasetCopyFixture([fixture.dataset_id]),
+      cleanup.defer(
+        "hard delete API journey dynamic-column rerun fixture",
+        () => hardDeleteDatasetCopyFixture([fixture.dataset_id]),
       );
 
       const createdColumns = await createDatasetDynamicColumns(client, fixture);
@@ -2816,7 +3054,8 @@ export const datasetEvalJourneys = [
         { operation_type: "extract_json" },
       );
       assert(
-        rerunJson.column_id === createdColumns[fixture.extract_json_column_name] &&
+        rerunJson.column_id ===
+          createdColumns[fixture.extract_json_column_name] &&
           rerunJson.status === "running",
         "Extract-json rerun did not use stored metadata successfully.",
       );
@@ -2856,7 +3095,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-024",
     title: "Dataset synthetic config update and guards",
     tags: ["dataset", "synthetic", "mutating", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedDatasetSyntheticFixture({
         runId,
@@ -2898,16 +3144,19 @@ export const datasetEvalJourneys = [
 
       await expectApiErrorStatus(
         () =>
-          client.post(apiPath("/model-hub/develops/create-synthetic-dataset/"), {
-            num_rows: 9,
-            columns: [fixture.synthetic_column_payload],
-            dataset: {
-              name: `api invalid synthetic ${runId}`,
-              description: "Invalid synthetic guard",
-              objective: "Guard invalid synthetic creation",
-              patterns: [],
+          client.post(
+            apiPath("/model-hub/develops/create-synthetic-dataset/"),
+            {
+              num_rows: 9,
+              columns: [fixture.synthetic_column_payload],
+              dataset: {
+                name: `api invalid synthetic ${runId}`,
+                description: "Invalid synthetic guard",
+                objective: "Guard invalid synthetic creation",
+                patterns: [],
+              },
             },
-          }),
+          ),
         400,
         "Create synthetic dataset accepted fewer than ten rows.",
       );
@@ -2984,7 +3233,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-025",
     title: "Dataset explanation summary refresh guards",
     tags: ["dataset", "summary", "mutating", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedDatasetExplanationFixture({
         runId,
@@ -3011,9 +3267,12 @@ export const datasetEvalJourneys = [
       );
 
       const refreshed = await client.post(
-        apiPath("/model-hub/datasets/explanation-summary/{dataset_id}/refresh/", {
-          dataset_id: fixture.dataset_id,
-        }),
+        apiPath(
+          "/model-hub/datasets/explanation-summary/{dataset_id}/refresh/",
+          {
+            dataset_id: fixture.dataset_id,
+          },
+        ),
         {},
       );
       assert(
@@ -3125,7 +3384,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-027",
     title: "Dataset eval drawer list, preview, run, stop, and cleanup",
     tags: ["dataset", "evals", "mutating", "data-roundtrip", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
       const template = await findEvalTemplateDetailByName(
@@ -3133,7 +3399,9 @@ export const datasetEvalJourneys = [
         "word_count_in_range",
       );
       if (!template) {
-        skip("System eval word_count_in_range was not available for dataset evals.");
+        skip(
+          "System eval word_count_in_range was not available for dataset evals.",
+        );
       }
       const requiredKeys = promptEvalRequiredKeys(template);
       if (!requiredKeys.includes("text")) {
@@ -3163,11 +3431,18 @@ export const datasetEvalJourneys = [
         apiPath("/model-hub/develops/{dataset_id}/get_evals_list/", {
           dataset_id: fixture.dataset_id,
         }),
-        { query: { eval_categories: "futureagi_built", search_text: template.name } },
+        {
+          query: {
+            eval_categories: "futureagi_built",
+            search_text: template.name,
+          },
+        },
       );
       const systemRows = payloadArray(systemList?.evals, "evals");
       assert(
-        systemRows.some((row) => row.id === template.id && row.name === template.name),
+        systemRows.some(
+          (row) => row.id === template.id && row.name === template.name,
+        ),
         "Dataset eval list did not include the expected system eval template.",
       );
 
@@ -3229,7 +3504,10 @@ export const datasetEvalJourneys = [
       );
       const userRows = payloadArray(userList?.evals, "evals");
       const userEval = userRows.find((row) => row.name === metricName);
-      assert(isUuid(userEval?.id), "Dataset eval list did not return the new metric.");
+      assert(
+        isUuid(userEval?.id),
+        "Dataset eval list did not return the new metric.",
+      );
       const metricId = userEval.id;
 
       const userStructure = await client.get(
@@ -3331,10 +3609,13 @@ export const datasetEvalJourneys = [
       });
 
       await client.delete(
-        apiPath("/model-hub/develops/{dataset_id}/delete_user_eval/{eval_id}/", {
-          dataset_id: fixture.dataset_id,
-          eval_id: metricId,
-        }),
+        apiPath(
+          "/model-hub/develops/{dataset_id}/delete_user_eval/{eval_id}/",
+          {
+            dataset_id: fixture.dataset_id,
+            eval_id: metricId,
+          },
+        ),
         { body: { delete_column: true } },
       );
       const deletedMetricAudit = await loadDatasetEvalDrawerDbAudit({
@@ -3364,7 +3645,8 @@ export const datasetEvalJourneys = [
         apiPath("/model-hub/create_custom_evals/"),
         {
           name: templateName,
-          description: "Custom eval template for dataset drawer delete coverage.",
+          description:
+            "Custom eval template for dataset drawer delete coverage.",
           template_type: "Futureagi",
           output_type: "Pass/Fail",
           required_keys: ["response"],
@@ -3448,7 +3730,9 @@ export const datasetEvalJourneys = [
         ),
         deleted_template_id: templateId,
         deleted_template_deleted_at_set: deletedTemplateAudit.deleted_at_set,
-        active_metric_count_after_delete: Number(activeAudit.active_metric_count),
+        active_metric_count_after_delete: Number(
+          activeAudit.active_metric_count,
+        ),
       });
     },
   },
@@ -3456,7 +3740,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-028",
     title: "Legacy experiment row diff scope and payload",
     tags: ["experiments", "dataset", "guard", "data-roundtrip", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedLegacyExperimentRowDiffFixture({
         runId,
@@ -3582,7 +3873,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-029",
     title: "Hugging Face create and add-rows validation guards",
     tags: ["dataset", "huggingface", "guard", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedHuggingFaceGuardFixture({
         runId,
@@ -3599,14 +3897,17 @@ export const datasetEvalJourneys = [
 
       await expectApiErrorStatus(
         () =>
-          client.post(apiPath("/model-hub/develops/create-dataset-from-huggingface/"), {
-            name: fixture.duplicate_dataset_name,
-            model_type: "GenerativeLLM",
-            num_rows: 1,
-            huggingface_dataset_name: "rajpurkar/squad",
-            huggingface_dataset_config: "plain_text",
-            huggingface_dataset_split: "train",
-          }),
+          client.post(
+            apiPath("/model-hub/develops/create-dataset-from-huggingface/"),
+            {
+              name: fixture.duplicate_dataset_name,
+              model_type: "GenerativeLLM",
+              num_rows: 1,
+              huggingface_dataset_name: "rajpurkar/squad",
+              huggingface_dataset_config: "plain_text",
+              huggingface_dataset_split: "train",
+            },
+          ),
         400,
         "Hugging Face create accepted a duplicate active dataset name.",
       );
@@ -3669,7 +3970,9 @@ export const datasetEvalJourneys = [
         ),
         other_workspace_guard: otherWorkspaceGuard,
         other_dataset_id: fixture.other_dataset_id,
-        other_dataset_row_count: Number(finalAudit.other_dataset_row_count || 0),
+        other_dataset_row_count: Number(
+          finalAudit.other_dataset_row_count || 0,
+        ),
         other_dataset_column_count: Number(
           finalAudit.other_dataset_column_count || 0,
         ),
@@ -3680,7 +3983,14 @@ export const datasetEvalJourneys = [
     id: "DPE-API-030",
     title: "Experiment dataset table readback and materialize guards",
     tags: ["dataset", "experiment", "guard", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedExperimentDatasetMaterializeFixture({
         runId,
@@ -3737,8 +4047,7 @@ export const datasetEvalJourneys = [
         asArray(table.column_config).map((column) => column.name),
       );
       assert(
-        columnNames.has("api_exp_input") &&
-          columnNames.has("api_exp_result"),
+        columnNames.has("api_exp_input") && columnNames.has("api_exp_result"),
         "Experiment dataset table did not expose both base and experiment columns.",
       );
 
@@ -3765,8 +4074,7 @@ export const datasetEvalJourneys = [
               apiPath(
                 "/model-hub/develops/{experiment_dataset_id}/get-experiment-dataset-table/",
                 {
-                  experiment_dataset_id:
-                    fixture.other_experiment_dataset_id,
+                  experiment_dataset_id: fixture.other_experiment_dataset_id,
                 },
               ),
             ),
@@ -4067,7 +4375,14 @@ export const datasetEvalJourneys = [
     id: "PROMPT-API-005",
     title: "Dataset run-prompt edit and config scope guards",
     tags: ["prompts", "dataset", "mutating", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const fixture = await seedRunPromptEditFixture({
         runId,
@@ -5208,9 +5523,19 @@ export const datasetEvalJourneys = [
     id: "EVAL-API-019",
     title: "Legacy eval-template create contract and version audit",
     tags: ["evals", "mutating", "data-roundtrip", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
-      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 22);
+      const suffix = runId
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .slice(0, 22);
       const templateName = `api_legacy_eval_${suffix}`;
       const systemOwnerName = `api_legacy_eval_sys_${suffix}`;
       const createPayload = {
@@ -5223,11 +5548,13 @@ export const datasetEvalJourneys = [
         eval_tags: ["api-journey", "legacy-eval-template"],
       };
 
-      cleanup.defer("hard delete API journey legacy eval-template create rows", () =>
-        hardDeleteLegacyEvalTemplateCreateFixture([
-          templateName,
-          systemOwnerName,
-        ], organizationId),
+      cleanup.defer(
+        "hard delete API journey legacy eval-template create rows",
+        () =>
+          hardDeleteLegacyEvalTemplateCreateFixture(
+            [templateName, systemOwnerName],
+            organizationId,
+          ),
       );
 
       const created = await client.post(
@@ -5316,9 +5643,19 @@ export const datasetEvalJourneys = [
     id: "EVAL-API-020",
     title: "Legacy eval-user-template create and evaluate-rows scoping",
     tags: ["evals", "mutating", "data-roundtrip", "db-audit"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
-      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 22);
+      const suffix = runId
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .slice(0, 22);
       const metricName = `api_legacy_user_eval_${suffix}`;
       const duplicateName = `api_legacy_user_dup_${suffix}`;
       const template = await findEvalTemplateDetailByName(
@@ -5326,7 +5663,9 @@ export const datasetEvalJourneys = [
         "word_count_in_range",
       );
       if (!template) {
-        skip("System eval word_count_in_range was not available for legacy eval-user-template coverage.");
+        skip(
+          "System eval word_count_in_range was not available for legacy eval-user-template coverage.",
+        );
       }
       const requiredKeys = promptEvalRequiredKeys(template);
       if (!requiredKeys.includes("text")) {
@@ -5343,8 +5682,9 @@ export const datasetEvalJourneys = [
         fixture?.fixture_created,
         "Legacy eval-user-template fixture seed did not create datasets.",
       );
-      cleanup.defer("hard delete API journey legacy eval-user-template fixture", () =>
-        hardDeleteLegacyEvalUserTemplateFixture(fixture),
+      cleanup.defer(
+        "hard delete API journey legacy eval-user-template fixture",
+        () => hardDeleteLegacyEvalUserTemplateFixture(fixture),
       );
 
       const createPayload = {
@@ -5568,7 +5908,9 @@ export const datasetEvalJourneys = [
         selected_all_scope_guard: "passed",
         other_workspace_create_guard: otherWorkspaceCreateGuard,
         other_workspace_metric_guard: otherWorkspaceMetricGuard,
-        running_eval_cell_count: Number(selectedAllAudit.running_eval_cell_count),
+        running_eval_cell_count: Number(
+          selectedAllAudit.running_eval_cell_count,
+        ),
       });
     },
   },
@@ -5585,7 +5927,10 @@ export const datasetEvalJourneys = [
       workspaceId,
     }) {
       requireMutations();
-      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 22);
+      const suffix = runId
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .slice(0, 22);
       const templateName = `api_gt_retrieval_${suffix}`;
       const emptyGroundTruthName = `api_gt_retrieval_empty_${suffix}`;
       const groundTruthName = `api_gt_retrieval_rows_${suffix}`;
@@ -5607,8 +5952,10 @@ export const datasetEvalJourneys = [
         isUuid(templateId),
         "Ground-truth retrieval eval template create did not return a UUID id.",
       );
-      cleanup.defer("hard delete API journey ground-truth retrieval fixture", () =>
-        hardDeleteGroundTruthRetrievalFixture([templateId], organizationId),
+      cleanup.defer(
+        "hard delete API journey ground-truth retrieval fixture",
+        () =>
+          hardDeleteGroundTruthRetrievalFixture([templateId], organizationId),
       );
 
       const emptyGroundTruth = await client.post(
@@ -13497,7 +13844,10 @@ async function seedExperimentDatasetMaterializeFixture({
     assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
   const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
   const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
-  const otherWorkspaceId = await findOtherWorkspaceId(organizationId, workspaceId);
+  const otherWorkspaceId = await findOtherWorkspaceId(
+    organizationId,
+    workspaceId,
+  );
   const datasetId = randomUUID();
   const duplicateDatasetId = randomUUID();
   const experimentId = randomUUID();
@@ -13725,9 +14075,7 @@ async function seedExperimentDatasetMaterializeFixture({
     )
     .join(",\n");
 
-  const experimentDatasetColumnRows = [
-    [experimentDatasetId, resultColumnId],
-  ];
+  const experimentDatasetColumnRows = [[experimentDatasetId, resultColumnId]];
   if (otherWorkspaceId) {
     experimentDatasetColumnRows.push([
       otherExperimentDatasetId,
@@ -13735,10 +14083,7 @@ async function seedExperimentDatasetMaterializeFixture({
     ]);
   }
   const experimentDatasetColumnValues = experimentDatasetColumnRows
-    .map(
-      ([edtId, columnId]) =>
-        `(${sqlUuid(edtId)}, ${sqlUuid(columnId)})`,
-    )
+    .map(([edtId, columnId]) => `(${sqlUuid(edtId)}, ${sqlUuid(columnId)})`)
     .join(",\n");
 
   const experimentDatasetM2mRows = [[experimentId, experimentDatasetId]];
@@ -13749,9 +14094,7 @@ async function seedExperimentDatasetMaterializeFixture({
     ]);
   }
   const experimentDatasetM2mValues = experimentDatasetM2mRows
-    .map(
-      ([expId, edtId]) => `(${sqlUuid(expId)}, ${sqlUuid(edtId)})`,
-    )
+    .map(([expId, edtId]) => `(${sqlUuid(expId)}, ${sqlUuid(edtId)})`)
     .join(",\n");
 
   const sql = `
@@ -14036,7 +14379,10 @@ async function seedHuggingFaceGuardFixture({
   if (workspaceId)
     assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
   const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
-  const otherWorkspaceId = await findOtherWorkspaceId(organizationId, workspaceId);
+  const otherWorkspaceId = await findOtherWorkspaceId(
+    organizationId,
+    workspaceId,
+  );
   const duplicateDatasetId = randomUUID();
   const otherDatasetId = otherWorkspaceId ? randomUUID() : null;
   const otherColumnId = otherWorkspaceId ? randomUUID() : null;
@@ -14220,7 +14566,10 @@ async function loadHuggingFaceGuardFixtureAudit(
   organizationId,
   workspaceId,
 ) {
-  assert(isUuid(fixture.duplicate_dataset_id), "fixture duplicate dataset id required.");
+  assert(
+    isUuid(fixture.duplicate_dataset_id),
+    "fixture duplicate dataset id required.",
+  );
   assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
   if (workspaceId)
     assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
@@ -14256,7 +14605,10 @@ async function hardDeleteHuggingFaceGuardFixture(fixture) {
     fixture.duplicate_dataset_id,
     fixture.other_dataset_id,
   ].filter(isUuid);
-  assert(datasetIds.length > 0, "Hugging Face fixture cleanup missing datasets.");
+  assert(
+    datasetIds.length > 0,
+    "Hugging Face fixture cleanup missing datasets.",
+  );
   const sql = `
 WITH deleted_cells AS (
   DELETE FROM model_hub_cell
@@ -14614,7 +14966,9 @@ SELECT json_build_object(
 }
 
 async function hardDeleteLegacyExperimentRowDiffFixture(fixture) {
-  const datasetIds = [fixture.dataset_id, fixture.outside_dataset_id].filter(isUuid);
+  const datasetIds = [fixture.dataset_id, fixture.outside_dataset_id].filter(
+    isUuid,
+  );
   const experimentIds = [fixture.experiment_id].filter(isUuid);
   const experimentDatasetIds = [fixture.experiment_dataset_id].filter(isUuid);
   assert(datasetIds.length > 0, "Legacy row-diff cleanup missing dataset ids.");
@@ -14675,6 +15029,685 @@ SELECT json_build_object(
   'deleted_experiment_dataset_column_count', (SELECT count(*) FROM deleted_experiment_dataset_columns),
   'deleted_experiment_dataset_count', (SELECT count(*) FROM deleted_experiment_datasets),
   'deleted_experiment_count', (SELECT count(*) FROM deleted_experiments),
+  'deleted_column_count', (SELECT count(*) FROM deleted_columns),
+  'deleted_dataset_count', (SELECT count(*) FROM deleted_datasets)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedLegacyExperimentCreateUpdateFixture({
+  runId,
+  organizationId,
+  workspaceId,
+  userId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const userSql = userId && isUuid(userId) ? sqlUuid(userId) : "NULL::uuid";
+  const otherWorkspaceId = await findOtherWorkspaceId(
+    organizationId,
+    workspaceId,
+  );
+  const datasetId = randomUUID();
+  const outputColumnId = randomUUID();
+  const blockedDatasetId = randomUUID();
+  const blockedColumnId = randomUUID();
+  const evalTemplateId = randomUUID();
+  const evalMetricId = randomUUID();
+  const secondEvalMetricId = randomUUID();
+  const blockedEvalMetricId = randomUUID();
+  const otherDatasetId = otherWorkspaceId ? randomUUID() : null;
+  const otherColumnId = otherWorkspaceId ? randomUUID() : null;
+  const otherExperimentId = otherWorkspaceId ? randomUUID() : null;
+  const datasetName = `api journey legacy exp dataset ${runId}`;
+  const blockedDatasetName = `api journey legacy blocked dataset ${runId}`;
+  const evalTemplateName = `api journey legacy exp eval ${runId}`;
+  const otherExperimentName = `api journey legacy other ws ${runId}`;
+  const blockedColumnExperimentName = `api journey legacy blocked column ${runId}`;
+  const blockedMetricExperimentName = `api journey legacy blocked metric ${runId}`;
+  const otherWorkspaceCreateName = `api journey legacy other create ${runId}`;
+  const otherDatasetSql = otherWorkspaceId
+    ? `,
+  (
+    ${sqlUuid(otherDatasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(`api journey legacy other dataset ${runId}`)},
+    ARRAY[${sqlTextLiteral(otherColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${sqlUuid(otherWorkspaceId)},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )`
+    : "";
+  const otherColumnSql = otherWorkspaceId
+    ? `,
+  (
+    ${sqlUuid(otherColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'Other Workspace Output',
+    'text',
+    'run_prompt',
+    '',
+    ${sqlUuid(otherDatasetId)},
+    '{}'::jsonb,
+    'NotStarted'
+  )`
+    : "";
+  const otherExperimentSql = otherWorkspaceId
+    ? `,
+inserted_other_experiment AS (
+  INSERT INTO model_hub_experimentstable (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    prompt_config,
+    status,
+    dataset_id,
+    column_id,
+    user_id,
+    experiment_type,
+    snapshot_dataset_id
+  )
+  VALUES (
+    ${sqlUuid(otherExperimentId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(otherExperimentName)},
+    ${sqlJsonLiteral({ model: "gpt-4o-mini", journey: "EXP-API-004-other" })},
+    'NotStarted',
+    ${sqlUuid(otherDatasetId)},
+    ${sqlUuid(otherColumnId)},
+    ${userSql},
+    'llm',
+    NULL::uuid
+  )
+  RETURNING id
+)`
+    : "";
+  const sql = `
+WITH inserted_datasets AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES
+  (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[${sqlTextLiteral(outputColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${activeWorkspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  ),
+  (
+    ${sqlUuid(blockedDatasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(blockedDatasetName)},
+    ARRAY[${sqlTextLiteral(blockedColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${activeWorkspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )${otherDatasetSql}
+  RETURNING id
+),
+inserted_columns AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES
+  (
+    ${sqlUuid(outputColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'Legacy Output',
+    'text',
+    'run_prompt',
+    '',
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb,
+    'NotStarted'
+  ),
+  (
+    ${sqlUuid(blockedColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'Blocked Other Dataset Column',
+    'text',
+    'run_prompt',
+    '',
+    ${sqlUuid(blockedDatasetId)},
+    '{}'::jsonb,
+    'NotStarted'
+  )${otherColumnSql}
+  RETURNING id
+),
+inserted_eval_template AS (
+  INSERT INTO model_hub_evaltemplate (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    owner,
+    eval_tags,
+    config,
+    organization_id,
+    description,
+    eval_id,
+    criteria,
+    choices,
+    multi_choice,
+    model,
+    proxy_agi,
+    visible_ui,
+    evaluator_id,
+    workspace_id,
+    choice_scores,
+    output_type_normalized,
+    pass_threshold,
+    template_type,
+    eval_type,
+    allow_edit,
+    allow_copy,
+    error_localizer_enabled,
+    aggregation_enabled,
+    aggregation_function,
+    composite_child_axis
+  )
+  VALUES (
+    ${sqlUuid(evalTemplateId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(evalTemplateName)},
+    'user',
+    ARRAY[]::varchar[],
+    ${sqlJsonLiteral({ required_keys: ["output"] })},
+    ${sqlUuid(organizationId)},
+    'API journey legacy experiment eval',
+    0,
+    'Evaluate {{output}}',
+    NULL::jsonb,
+    false,
+    'gpt-4o-mini',
+    false,
+    false,
+    NULL::uuid,
+    ${activeWorkspaceSql},
+    NULL::jsonb,
+    NULL::varchar,
+    NULL::double precision,
+    'single',
+    'llm',
+    true,
+    true,
+    false,
+    false,
+    'mean',
+    'shared'
+  )
+  RETURNING id
+),
+inserted_eval_metrics AS (
+  INSERT INTO model_hub_userevalmetric (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    config,
+    dataset_id,
+    template_id,
+    organization_id,
+    status,
+    show_in_sidebar,
+    source_id,
+    column_deleted,
+    user_id,
+    error_localizer,
+    kb_id,
+    model,
+    workspace_id,
+    eval_group_id,
+    composite_weight_overrides
+  )
+  VALUES
+  (
+    ${sqlUuid(evalMetricId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'Legacy Create Metric',
+    ${sqlJsonLiteral({ mapping: { output: outputColumnId }, config: {} })},
+    ${sqlUuid(datasetId)},
+    ${sqlUuid(evalTemplateId)},
+    ${sqlUuid(organizationId)},
+    'NotStarted',
+    true,
+    '',
+    false,
+    ${userSql},
+    false,
+    NULL::uuid,
+    'gpt-4o-mini',
+    ${activeWorkspaceSql},
+    NULL::uuid,
+    NULL::jsonb
+  ),
+  (
+    ${sqlUuid(secondEvalMetricId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'Legacy Update Metric',
+    ${sqlJsonLiteral({ mapping: { output: outputColumnId }, config: {} })},
+    ${sqlUuid(datasetId)},
+    ${sqlUuid(evalTemplateId)},
+    ${sqlUuid(organizationId)},
+    'NotStarted',
+    true,
+    '',
+    false,
+    ${userSql},
+    false,
+    NULL::uuid,
+    'gpt-4o-mini',
+    ${activeWorkspaceSql},
+    NULL::uuid,
+    NULL::jsonb
+  ),
+  (
+    ${sqlUuid(blockedEvalMetricId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'Legacy Blocked Metric',
+    ${sqlJsonLiteral({ mapping: { output: blockedColumnId }, config: {} })},
+    ${sqlUuid(blockedDatasetId)},
+    ${sqlUuid(evalTemplateId)},
+    ${sqlUuid(organizationId)},
+    'NotStarted',
+    true,
+    '',
+    false,
+    ${userSql},
+    false,
+    NULL::uuid,
+    'gpt-4o-mini',
+    ${activeWorkspaceSql},
+    NULL::uuid,
+    NULL::jsonb
+  )
+  RETURNING id
+)${otherExperimentSql}
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_datasets) >= 2,
+  'organization_id', ${sqlUuid(organizationId)}::text,
+  'workspace_id', ${workspaceId ? `${sqlUuid(workspaceId)}::text` : "NULL"},
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'output_column_id', ${sqlUuid(outputColumnId)}::text,
+  'blocked_dataset_id', ${sqlUuid(blockedDatasetId)}::text,
+  'blocked_column_id', ${sqlUuid(blockedColumnId)}::text,
+  'eval_template_id', ${sqlUuid(evalTemplateId)}::text,
+  'eval_metric_id', ${sqlUuid(evalMetricId)}::text,
+  'second_eval_metric_id', ${sqlUuid(secondEvalMetricId)}::text,
+  'blocked_eval_metric_id', ${sqlUuid(blockedEvalMetricId)}::text,
+  'blocked_column_experiment_name', ${sqlTextLiteral(blockedColumnExperimentName)},
+  'blocked_metric_experiment_name', ${sqlTextLiteral(blockedMetricExperimentName)},
+  'other_workspace_id', ${otherWorkspaceId ? `${sqlUuid(otherWorkspaceId)}::text` : "NULL"},
+  'other_dataset_id', ${otherDatasetId ? `${sqlUuid(otherDatasetId)}::text` : "NULL"},
+  'other_column_id', ${otherColumnId ? `${sqlUuid(otherColumnId)}::text` : "NULL"},
+  'other_experiment_id', ${otherExperimentId ? `${sqlUuid(otherExperimentId)}::text` : "NULL"},
+  'other_experiment_name', ${sqlTextLiteral(otherExperimentName)},
+  'other_workspace_create_name', ${sqlTextLiteral(otherWorkspaceCreateName)}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadLegacyExperimentCreateUpdateAudit({
+  experimentId,
+  datasetId,
+  experimentName,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(datasetId), "datasetId must be a UUID for DB audit.");
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (experimentId)
+    assert(isUuid(experimentId), "experimentId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const experimentPredicate = experimentId
+    ? `e.id = ${sqlUuid(experimentId)}`
+    : `e.name = ${sqlTextLiteral(experimentName)}`;
+  const workspacePredicate = workspaceId
+    ? `AND d.workspace_id = ${sqlUuid(workspaceId)}`
+    : "";
+  const sql = `
+WITH experiment_row AS (
+  SELECT
+    e.id,
+    e.name,
+    e.prompt_config,
+    e.status,
+    e.dataset_id,
+    e.column_id,
+    e.user_id,
+    e.deleted,
+    d.organization_id,
+    d.workspace_id,
+    c.dataset_id AS column_dataset_id
+  FROM model_hub_experimentstable e
+  JOIN model_hub_dataset d ON d.id = e.dataset_id
+  LEFT JOIN model_hub_column c ON c.id = e.column_id
+  WHERE ${experimentPredicate}
+    AND e.dataset_id = ${sqlUuid(datasetId)}
+    AND d.organization_id = ${sqlUuid(organizationId)}
+    ${workspacePredicate}
+    AND e.deleted = false
+  ORDER BY e.created_at DESC
+  LIMIT 1
+)
+SELECT COALESCE((
+  SELECT json_build_object(
+    'experiment_id', e.id::text,
+    'experiment_name', e.name,
+    'prompt_config', e.prompt_config,
+    'status', e.status,
+    'dataset_id', e.dataset_id::text,
+    'column_id', e.column_id::text,
+    'organization_id', e.organization_id::text,
+    'workspace_id', e.workspace_id::text,
+    'column_dataset_id', e.column_dataset_id::text,
+    'metric_count', (
+      SELECT count(*)
+      FROM model_hub_experimentstable_user_eval_template_ids m
+      WHERE m.experimentstable_id = e.id
+    ),
+    'metric_ids', (
+      SELECT COALESCE(json_agg(m.userevalmetric_id::text ORDER BY m.userevalmetric_id::text), '[]'::json)
+      FROM model_hub_experimentstable_user_eval_template_ids m
+      WHERE m.experimentstable_id = e.id
+    )
+  )
+  FROM experiment_row e
+), '{}'::json);
+`;
+  return runPostgresJson(sql);
+}
+
+function assertLegacyExperimentAudit(
+  audit,
+  {
+    experimentName,
+    datasetId,
+    columnId,
+    organizationId,
+    workspaceId,
+    metricIds,
+    promptConfigJourney,
+  },
+) {
+  assert(isUuid(audit?.experiment_id), "Legacy experiment audit found no row.");
+  assert(
+    audit.experiment_name === experimentName,
+    "Legacy experiment audit name mismatch.",
+  );
+  assert(
+    audit.dataset_id === datasetId,
+    "Legacy experiment audit dataset mismatch.",
+  );
+  assert(
+    audit.column_id === columnId,
+    "Legacy experiment audit column mismatch.",
+  );
+  assert(
+    audit.column_dataset_id === datasetId,
+    "Legacy experiment audit column was not in the experiment dataset.",
+  );
+  assert(
+    audit.organization_id === organizationId,
+    "Legacy experiment audit organization mismatch.",
+  );
+  if (workspaceId) {
+    assert(
+      audit.workspace_id === workspaceId,
+      "Legacy experiment audit workspace mismatch.",
+    );
+  }
+  assert(
+    audit.prompt_config?.journey === promptConfigJourney,
+    "Legacy experiment audit prompt_config mismatch.",
+  );
+  const actualMetricIds = payloadArray(audit.metric_ids, "metric_ids").sort();
+  assert(
+    JSON.stringify(actualMetricIds) === JSON.stringify([...metricIds].sort()),
+    "Legacy experiment audit metric relation mismatch.",
+  );
+}
+
+async function loadLegacyExperimentGuardAudit(fixture) {
+  assert(isUuid(fixture.dataset_id), "fixture dataset id is required.");
+  const otherExperimentNameSelect = fixture.other_experiment_id
+    ? `(SELECT name FROM model_hub_experimentstable WHERE id = ${sqlUuid(fixture.other_experiment_id)})`
+    : "NULL";
+  const sql = `
+SELECT json_build_object(
+  'blocked_column_count', (
+    SELECT count(*)
+    FROM model_hub_experimentstable e
+    WHERE e.name = ${sqlTextLiteral(fixture.blocked_column_experiment_name)}
+      AND e.deleted = false
+  ),
+  'blocked_metric_count', (
+    SELECT count(*)
+    FROM model_hub_experimentstable e
+    WHERE e.name = ${sqlTextLiteral(fixture.blocked_metric_experiment_name)}
+      AND e.deleted = false
+  ),
+  'other_workspace_create_count', (
+    SELECT count(*)
+    FROM model_hub_experimentstable e
+    WHERE e.name = ${sqlTextLiteral(fixture.other_workspace_create_name)}
+      AND e.deleted = false
+  ),
+  'other_experiment_name', ${otherExperimentNameSelect}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteLegacyExperimentCreateUpdateFixture(fixture) {
+  const datasetIds = [
+    fixture.dataset_id,
+    fixture.blocked_dataset_id,
+    fixture.other_dataset_id,
+  ].filter(isUuid);
+  const experimentIds = [
+    fixture.created_experiment_id,
+    fixture.other_experiment_id,
+  ].filter(isUuid);
+  const metricIds = [
+    fixture.eval_metric_id,
+    fixture.second_eval_metric_id,
+    fixture.blocked_eval_metric_id,
+  ].filter(isUuid);
+  const templateIds = [fixture.eval_template_id].filter(isUuid);
+  assert(datasetIds.length > 0, "Legacy experiment cleanup missing datasets.");
+  const experimentIdArray = experimentIds.length
+    ? sqlUuidArray(experimentIds)
+    : "ARRAY[]::uuid[]";
+  const sql = `
+WITH target_datasets AS (
+  SELECT id
+  FROM model_hub_dataset
+  WHERE id = ANY(${sqlUuidArray(datasetIds)})
+),
+target_experiments AS (
+  SELECT id
+  FROM model_hub_experimentstable
+  WHERE id = ANY(${experimentIdArray})
+     OR dataset_id IN (SELECT id FROM target_datasets)
+     OR name IN (
+       ${sqlTextLiteral(fixture.blocked_column_experiment_name)},
+       ${sqlTextLiteral(fixture.blocked_metric_experiment_name)},
+       ${sqlTextLiteral(fixture.other_workspace_create_name)}
+     )
+),
+deleted_pending_tasks AS (
+  DELETE FROM model_hub_pendingrowtask
+  WHERE experiment_id IN (SELECT id FROM target_experiments)
+  RETURNING 1
+),
+deleted_metric_m2m AS (
+  DELETE FROM model_hub_experimentstable_user_eval_template_ids
+  WHERE experimentstable_id IN (SELECT id FROM target_experiments)
+     OR userevalmetric_id = ANY(${sqlUuidArray(metricIds)})
+  RETURNING 1
+),
+deleted_experiment_m2m AS (
+  DELETE FROM model_hub_experimentstable_experiments_datasets
+  WHERE experimentstable_id IN (SELECT id FROM target_experiments)
+  RETURNING 1
+),
+deleted_experiment_dataset_columns AS (
+  DELETE FROM model_hub_experimentdatasettable_columns edtc
+  USING model_hub_experimentdatasettable edt
+  WHERE edtc.experimentdatasettable_id = edt.id
+    AND edt.experiment_id IN (SELECT id FROM target_experiments)
+  RETURNING 1
+),
+deleted_experiment_datasets AS (
+  DELETE FROM model_hub_experimentdatasettable
+  WHERE experiment_id IN (SELECT id FROM target_experiments)
+  RETURNING 1
+),
+deleted_comparisons AS (
+  DELETE FROM model_hub_experimentcomparison
+  WHERE experiment_id IN (SELECT id FROM target_experiments)
+  RETURNING 1
+),
+deleted_experiments AS (
+  DELETE FROM model_hub_experimentstable
+  WHERE id IN (SELECT id FROM target_experiments)
+  RETURNING 1
+),
+deleted_metrics AS (
+  DELETE FROM model_hub_userevalmetric
+  WHERE id = ANY(${sqlUuidArray(metricIds)})
+  RETURNING 1
+),
+deleted_templates AS (
+  DELETE FROM model_hub_evaltemplate
+  WHERE id = ANY(${sqlUuidArray(templateIds)})
+  RETURNING 1
+),
+deleted_cells AS (
+  DELETE FROM model_hub_cell
+  WHERE dataset_id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+),
+deleted_rows AS (
+  DELETE FROM model_hub_row
+  WHERE dataset_id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+),
+deleted_columns AS (
+  DELETE FROM model_hub_column
+  WHERE dataset_id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+),
+deleted_datasets AS (
+  DELETE FROM model_hub_dataset
+  WHERE id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_pending_task_count', (SELECT count(*) FROM deleted_pending_tasks),
+  'deleted_metric_m2m_count', (SELECT count(*) FROM deleted_metric_m2m),
+  'deleted_experiment_m2m_count', (SELECT count(*) FROM deleted_experiment_m2m),
+  'deleted_experiment_dataset_column_count', (SELECT count(*) FROM deleted_experiment_dataset_columns),
+  'deleted_experiment_dataset_count', (SELECT count(*) FROM deleted_experiment_datasets),
+  'deleted_comparison_count', (SELECT count(*) FROM deleted_comparisons),
+  'deleted_experiment_count', (SELECT count(*) FROM deleted_experiments),
+  'deleted_metric_count', (SELECT count(*) FROM deleted_metrics),
+  'deleted_template_count', (SELECT count(*) FROM deleted_templates),
+  'deleted_cell_count', (SELECT count(*) FROM deleted_cells),
+  'deleted_row_count', (SELECT count(*) FROM deleted_rows),
   'deleted_column_count', (SELECT count(*) FROM deleted_columns),
   'deleted_dataset_count', (SELECT count(*) FROM deleted_datasets)
 );
@@ -15742,7 +16775,11 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
-function assertDatasetDynamicColumnFixtureAudit(audit, fixture, createdColumns) {
+function assertDatasetDynamicColumnFixtureAudit(
+  audit,
+  fixture,
+  createdColumns,
+) {
   assert(Number(audit.row_count) === 2, "Dynamic fixture row count mismatch.");
   assert(
     Number(audit.base_cell_count) === 2,
@@ -15769,7 +16806,10 @@ function assertDatasetDynamicColumnFixtureAudit(audit, fixture, createdColumns) 
   for (const [name, source] of expected) {
     const column = byName.get(name);
     assert(column, `Dynamic column ${name} was missing from DB audit.`);
-    assert(column.id === createdColumns[name], `Dynamic column ${name} id mismatch.`);
+    assert(
+      column.id === createdColumns[name],
+      `Dynamic column ${name} id mismatch.`,
+    );
     assert(column.source === source, `Dynamic column ${name} source mismatch.`);
     assert(
       ["Running", "Completed", "Error"].includes(column.status),
@@ -16214,7 +17254,10 @@ function assertDatasetEvalStructure(
   const evalData = payload?.eval || payload;
   assert(evalData && typeof evalData === "object", "Eval structure was empty.");
   if (metricId) {
-    assert(evalData.id === metricId, "Eval structure returned wrong metric id.");
+    assert(
+      evalData.id === metricId,
+      "Eval structure returned wrong metric id.",
+    );
   }
   assert(
     evalData.template_id === templateId,
@@ -16451,7 +17494,10 @@ async function seedLegacyEvalUserTemplateFixture({
     assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
   const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
   const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
-  const otherWorkspaceId = await findOtherWorkspaceId(organizationId, workspaceId);
+  const otherWorkspaceId = await findOtherWorkspaceId(
+    organizationId,
+    workspaceId,
+  );
   const datasetId = randomUUID();
   const outsideDatasetId = randomUUID();
   const inputColumnId = randomUUID();
@@ -16537,7 +17583,11 @@ async function seedLegacyEvalUserTemplateFixture({
     [outsideColumnId, outsideColumnName, outsideDatasetId],
   ];
   if (otherWorkspaceId) {
-    columnRows.push([otherColumnId, `api_legacy_eval_other_${suffix}`, otherDatasetId]);
+    columnRows.push([
+      otherColumnId,
+      `api_legacy_eval_other_${suffix}`,
+      otherDatasetId,
+    ]);
   }
   const columnSql = columnRows
     .map(
@@ -16851,7 +17901,10 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
-async function seedLegacyEvalUserTemplateEvaluationCells({ fixture, metricId }) {
+async function seedLegacyEvalUserTemplateEvaluationCells({
+  fixture,
+  metricId,
+}) {
   assert(
     fixture && isUuid(fixture.dataset_id) && isUuid(fixture.outside_dataset_id),
     "Legacy eval-user-template fixture ids must be UUIDs for DB seeding.",
@@ -17000,8 +18053,11 @@ async function hardDeleteLegacyEvalUserTemplateFixture(fixture) {
     fixture && isUuid(fixture.dataset_id) && isUuid(fixture.outside_dataset_id),
     "Legacy eval-user-template fixture ids must be UUIDs for DB cleanup.",
   );
-  const datasetIds = [fixture.dataset_id, fixture.outside_dataset_id].filter(isUuid);
-  if (isUuid(fixture.other_dataset_id)) datasetIds.push(fixture.other_dataset_id);
+  const datasetIds = [fixture.dataset_id, fixture.outside_dataset_id].filter(
+    isUuid,
+  );
+  if (isUuid(fixture.other_dataset_id))
+    datasetIds.push(fixture.other_dataset_id);
   const sql = `
 WITH deleted_pending_tasks AS (
   DELETE FROM model_hub_pendingrowtask
@@ -17182,7 +18238,14 @@ LEFT JOIN model_hub_dataset d
 
 function assertLegacyEvalUserTemplateCreateAudit(
   audit,
-  { fixture, templateId, metricName, organizationId, workspaceId, expectedParams },
+  {
+    fixture,
+    templateId,
+    metricName,
+    organizationId,
+    workspaceId,
+    expectedParams,
+  },
 ) {
   assert(
     audit?.dataset_id === fixture.dataset_id,
@@ -17235,7 +18298,8 @@ function assertLegacyEvalUserTemplateCreateAudit(
     "Legacy eval-user-template create did not persist requested model.",
   );
   assert(
-    String(audit.metric_config?.mapping?.text || "") === fixture.input_column_id,
+    String(audit.metric_config?.mapping?.text || "") ===
+      fixture.input_column_id,
     "Legacy eval-user-template create did not persist the scoped column mapping.",
   );
   const actualParams = audit.metric_config?.params || {};
@@ -17256,7 +18320,10 @@ function assertLegacyEvalCellState(audit, rowId, expected) {
   const cell = payloadArray(audit?.eval_cells, "eval_cells").find(
     (candidate) => candidate?.row_id === rowId,
   );
-  assert(isUuid(cell?.row_id), "Legacy evaluate-rows audit did not find eval cell.");
+  assert(
+    isUuid(cell?.row_id),
+    "Legacy evaluate-rows audit did not find eval cell.",
+  );
   if (Object.hasOwn(expected, "status")) {
     assert(
       cell.status === expected.status,
@@ -17401,11 +18468,23 @@ function assertDatasetEvalDrawerDbAudit(
     expectedDeletedReasonColumns = 0,
   },
 ) {
-  assert(audit?.dataset_id === datasetId, "Eval drawer audit dataset mismatch.");
-  assert(audit.template_id === templateId, "Eval drawer audit template mismatch.");
-  assert(audit.metric_exists === true, "Eval drawer audit did not find metric.");
+  assert(
+    audit?.dataset_id === datasetId,
+    "Eval drawer audit dataset mismatch.",
+  );
+  assert(
+    audit.template_id === templateId,
+    "Eval drawer audit template mismatch.",
+  );
+  assert(
+    audit.metric_exists === true,
+    "Eval drawer audit did not find metric.",
+  );
   assert(audit.metric_id === metricId, "Eval drawer audit metric id mismatch.");
-  assert(audit.metric_name === metricName, "Eval drawer audit metric name mismatch.");
+  assert(
+    audit.metric_name === metricName,
+    "Eval drawer audit metric name mismatch.",
+  );
   assert(
     audit.metric_organization_id === organizationId,
     "Eval drawer audit organization mismatch.",
@@ -20558,7 +21637,10 @@ SELECT json_build_object(
   return result;
 }
 
-async function loadGroundTruthRetrievalAudit({ groundTruthIds, organizationId }) {
+async function loadGroundTruthRetrievalAudit({
+  groundTruthIds,
+  organizationId,
+}) {
   assert(
     Array.isArray(groundTruthIds) && groundTruthIds.every(isUuid),
     "groundTruthIds must be UUIDs for DB audit.",

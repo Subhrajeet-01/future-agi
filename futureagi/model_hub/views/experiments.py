@@ -12,7 +12,6 @@ import pandas as pd
 import structlog
 from django.db.models import Count, Max, Prefetch, Q
 from django.http import FileResponse
-from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
@@ -160,6 +159,72 @@ def _scoped_experiment_queryset(request, organization=None):
         dataset__organization=organization,
         deleted=False,
     )
+
+
+def _scoped_dataset_queryset(request, organization=None):
+    organization = organization or getattr(request, "organization", None)
+    if organization is None:
+        organization = request.user.organization
+    return Dataset.objects.filter(
+        _request_workspace_filter(request, "workspace"),
+        organization=organization,
+        deleted=False,
+    )
+
+
+def _scoped_eval_metric_queryset(request, dataset, organization=None):
+    organization = organization or getattr(request, "organization", None)
+    if organization is None:
+        organization = request.user.organization
+    return UserEvalMetric.objects.filter(
+        _request_workspace_filter(request, "workspace"),
+        organization=organization,
+        dataset=dataset,
+        deleted=False,
+    )
+
+
+def _validate_legacy_experiment_payload(request, validated_data, *, experiment=None):
+    dataset = validated_data.get("dataset") or (
+        experiment.dataset if experiment else None
+    )
+    if not dataset:
+        return None, None, [], "Dataset not found"
+
+    scoped_dataset = _scoped_dataset_queryset(request).filter(id=dataset.id).first()
+    if not scoped_dataset:
+        return None, None, [], "Dataset not found"
+
+    column = validated_data.get("column") or (experiment.column if experiment else None)
+    scoped_column = None
+    if column:
+        scoped_column = Column.objects.filter(
+            id=column.id,
+            dataset=scoped_dataset,
+            deleted=False,
+        ).first()
+        if not scoped_column:
+            return scoped_dataset, None, [], "Column not found in dataset"
+
+    metrics = list(validated_data.get("user_eval_template_ids") or [])
+    if metrics:
+        metric_ids = [metric.id for metric in metrics]
+        scoped_metrics = list(
+            _scoped_eval_metric_queryset(request, scoped_dataset)
+            .filter(id__in=metric_ids)
+            .distinct()
+        )
+        if len(scoped_metrics) != len(set(metric_ids)):
+            return (
+                scoped_dataset,
+                scoped_column,
+                [],
+                "Evaluation metric not found in dataset",
+            )
+        metrics_by_id = {metric.id: metric for metric in scoped_metrics}
+        metrics = [metrics_by_id[metric_id] for metric_id in metric_ids]
+
+    return scoped_dataset, scoped_column, metrics, None
 
 
 def _normalize_experiment_comparison_weights(weights):
@@ -421,12 +486,11 @@ class ExperimentsTableView(APIView):
             getattr(request, "organization", None) or request.user.organization
         )
         try:
-            experiment = ExperimentsTable.objects.select_related("dataset").get(
-                id=experiment_id
+            experiment = (
+                _scoped_experiment_queryset(request, organization)
+                .select_related("dataset")
+                .get(id=experiment_id)
             )
-            # Enforce organization isolation
-            if experiment.dataset.organization_id != organization.id:
-                return self._gm.not_found("Experiment not found")
             serializer = ExperimentsTableSerializer(experiment).data
             return self._gm.success_response(serializer)
         except ExperimentsTable.DoesNotExist:
@@ -445,23 +509,24 @@ class ExperimentsTableView(APIView):
     def post(self, request):
         try:
             validated_data = request.validated_data
+            dataset, column, eval_metrics, validation_error = (
+                _validate_legacy_experiment_payload(request, validated_data)
+            )
+            if validation_error:
+                return self._gm.not_found(validation_error)
 
-            if experiment_name_exists(
-                validated_data["name"], validated_data["dataset"]
-            ):
+            if experiment_name_exists(validated_data["name"], dataset):
                 return self._gm.bad_request(get_error_message("EXPERIMENT_NAME_EXISTS"))
 
             experiment = ExperimentsTable.objects.create(
                 name=validated_data["name"],
-                dataset=validated_data["dataset"],
-                column=validated_data["column"],
+                dataset=dataset,
+                column=column,
                 prompt_config=validated_data["prompt_config"],
                 user=request.user,
             )
             if "user_eval_template_ids" in validated_data:
-                experiment.user_eval_template_ids.set(
-                    validated_data["user_eval_template_ids"]
-                )
+                experiment.user_eval_template_ids.set(eval_metrics)
 
             # Start Temporal workflow immediately (don't wait for periodic task)
             try:
@@ -498,24 +563,36 @@ class ExperimentsTableView(APIView):
             validated_data = request.validated_data
             pk = str(validated_data["experiment_id"])
             re_run = validated_data.get("re_run", False)
-            experiment = get_object_or_404(ExperimentsTable, pk=pk)
-            if experiment_name_exists(
-                validated_data["name"], validated_data["dataset"], exclude_id=pk
-            ):
+            experiment = (
+                _scoped_experiment_queryset(request)
+                .select_related("dataset", "column")
+                .filter(pk=pk)
+                .first()
+            )
+            if not experiment:
+                return self._gm.not_found("Experiment not found")
+
+            dataset, column, eval_metrics, validation_error = (
+                _validate_legacy_experiment_payload(
+                    request, validated_data, experiment=experiment
+                )
+            )
+            if validation_error:
+                return self._gm.not_found(validation_error)
+
+            if experiment_name_exists(validated_data["name"], dataset, exclude_id=pk):
                 return self._gm.bad_request(get_error_message("EXPERIMENT_NAME_EXISTS"))
 
             ExperimentsTable.objects.filter(id=pk).update(
                 name=validated_data.get("name", experiment.name),
-                dataset=validated_data.get("dataset", experiment.dataset),
-                column=validated_data.get("column", experiment.column),
+                dataset=dataset,
+                column=column,
                 prompt_config=validated_data.get(
                     "prompt_config", experiment.prompt_config
                 ),
             )
             if "user_eval_template_ids" in validated_data:
-                experiment.user_eval_template_ids.set(
-                    validated_data["user_eval_template_ids"]
-                )
+                experiment.user_eval_template_ids.set(eval_metrics)
 
             if re_run:
                 try:
@@ -1533,15 +1610,17 @@ class GetRowDiffView(APIView):
                 ).values_list("columns__id", flat=True)
                 if column_id
             }
-            if experiment_column_ids and set(compare_column_ids) - experiment_column_ids:
+            if (
+                experiment_column_ids
+                and set(compare_column_ids) - experiment_column_ids
+            ):
                 return self._gm.bad_request("Columns not found in experiment.")
 
             base_column_id = next(
                 (
                     column_id
                     for column_id in compare_column_ids
-                    if not experiment_column_ids
-                    or column_id in experiment_column_ids
+                    if not experiment_column_ids or column_id in experiment_column_ids
                 ),
                 None,
             )
@@ -5378,10 +5457,10 @@ class ExperimentRerunV2View(APIView):
             experiments = _scoped_experiment_queryset(request, organization).filter(
                 id__in=experiment_ids,
             )
-            found_experiment_ids = set(
+            found_experiment_ids = {
                 str(experiment_id)
                 for experiment_id in experiments.values_list("id", flat=True)
-            )
+            }
             missing_experiment_ids = set(experiment_ids) - found_experiment_ids
             if missing_experiment_ids:
                 return self._gm.not_found("Experiment not found")

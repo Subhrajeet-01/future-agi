@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import process from "node:process";
 import { promisify } from "node:util";
 import {
   apiPath,
@@ -17,10 +18,14 @@ const execFileAsync = promisify(execFile);
 export const appCoreJourneys = [
   {
     id: "CORE-API-001",
-    title: "Core app account, workspace, model/provider, observe, and simulation catalogs load",
+    title:
+      "Core app account, workspace, model/provider, observe, and simulation catalogs load",
     tags: ["core", "safe", "smoke"],
     async run({ client, user, evidence }) {
-      assert(currentUserId(user), "Authenticated user info did not include a user id.");
+      assert(
+        currentUserId(user),
+        "Authenticated user info did not include a user id.",
+      );
 
       const workspaces = asArray(
         await client.get(apiPath("/accounts/workspace/list/")),
@@ -56,12 +61,19 @@ export const appCoreJourneys = [
       );
 
       const agentDefinitions = asArray(
-        await client.get(apiPath("/simulate/api/agent-definition-operations/"), {
-          query: { limit: 5 },
-        }),
+        await client.get(
+          apiPath("/simulate/api/agent-definition-operations/"),
+          {
+            query: { limit: 5 },
+          },
+        ),
       );
-      const scenarios = asArray(await client.get(apiPath("/simulate/scenarios/")));
-      const runTests = asArray(await client.get(apiPath("/simulate/run-tests/")));
+      const scenarios = asArray(
+        await client.get(apiPath("/simulate/scenarios/")),
+      );
+      const runTests = asArray(
+        await client.get(apiPath("/simulate/run-tests/")),
+      );
 
       evidence.push({
         workspace_count: workspaces.length,
@@ -77,12 +89,32 @@ export const appCoreJourneys = [
   },
   {
     id: "PRT-API-001",
-    title: "Prototype project list, search, create, detail, run list, update, and delete lifecycle",
-    tags: ["prototype", "projects", "project-version", "mutating", "data-integrity"],
-    async run({ client, cleanup, runId, organizationId, workspaceId, evidence }) {
+    title:
+      "Prototype project list, search, create, detail, run list, update, and delete lifecycle",
+    tags: [
+      "prototype",
+      "projects",
+      "project-version",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const list = await client.get(apiPath("/tracer/project/"), {
         query: {
@@ -95,14 +127,20 @@ export const appCoreJourneys = [
       });
       const projects = Array.isArray(list?.projects) ? list.projects : [];
       assert(projects.length > 0, "Prototype project list returned no rows.");
-      assert(Number(list.total_count || 0) >= projects.length, "Prototype project total_count was inconsistent.");
+      assert(
+        Number(list.total_count || 0) >= projects.length,
+        "Prototype project total_count was inconsistent.",
+      );
       for (const project of projects) {
         assertPrototypeProjectListRow(project);
       }
-      const listRowsWithoutWorkspace = projects.filter((project) => project.workspace == null).length;
+      const listRowsWithoutWorkspace = projects.filter(
+        (project) => project.workspace == null,
+      ).length;
 
       const selectedProject =
-        projects.find((project) => Number(project.run_count || 0) > 0) || projects[0];
+        projects.find((project) => Number(project.run_count || 0) > 0) ||
+        projects[0];
       const searchTerm = String(selectedProject.name || "").slice(0, 8);
       const search = await client.get(apiPath("/tracer/project/"), {
         query: {
@@ -115,7 +153,9 @@ export const appCoreJourneys = [
         },
       });
       assert(
-        (search.projects || []).some((project) => project.id === selectedProject.id),
+        (search.projects || []).some(
+          (project) => project.id === selectedProject.id,
+        ),
         "Prototype project search did not return the selected project.",
       );
 
@@ -139,26 +179,44 @@ export const appCoreJourneys = [
         workspaceId,
       });
 
-      const runList = await client.get(apiPath("/tracer/project-version/list_runs/"), {
-        query: {
-          project_id: selectedProject.id,
-          page_number: 0,
-          page_size: 10,
-          filters: [],
-          sort_params: [],
+      const runList = await client.get(
+        apiPath("/tracer/project-version/list_runs/"),
+        {
+          query: {
+            project_id: selectedProject.id,
+            page_number: 0,
+            page_size: 10,
+            filters: [],
+            sort_params: [],
+          },
         },
-      });
+      );
       assertPrototypeRunList(runList);
       const firstRun = (runList.table || []).find((row) => isUuid(row?.id));
-      assert(firstRun, "Prototype run list did not return a run row for the selected project.");
+      assert(
+        firstRun,
+        "Prototype run list did not return a run row for the selected project.",
+      );
 
       const runDetail = await client.get(
         apiPath("/tracer/project-version/{id}/", { id: firstRun.id }),
       );
-      assert(runDetail?.id === firstRun.id, "Prototype run detail id mismatch.");
-      assert(runDetail?.project === selectedProject.id, "Prototype run detail project id mismatch.");
-      assert(String(runDetail?.name || "").trim(), "Prototype run detail omitted name.");
-      assert(String(runDetail?.version || "").trim(), "Prototype run detail omitted version.");
+      assert(
+        runDetail?.id === firstRun.id,
+        "Prototype run detail id mismatch.",
+      );
+      assert(
+        runDetail?.project === selectedProject.id,
+        "Prototype run detail project id mismatch.",
+      );
+      assert(
+        String(runDetail?.name || "").trim(),
+        "Prototype run detail omitted name.",
+      );
+      assert(
+        String(runDetail?.version || "").trim(),
+        "Prototype run detail omitted version.",
+      );
 
       const runIds = await client.get(
         apiPath("/tracer/project-version/get_project_version_ids/"),
@@ -172,22 +230,34 @@ export const appCoreJourneys = [
         },
       );
       assert(
-        (runIds.project_version_ids || []).some((row) => row.id === firstRun.id),
+        (runIds.project_version_ids || []).some(
+          (row) => row.id === firstRun.id,
+        ),
         "Prototype run id search did not include the selected run.",
       );
 
-      const projectIds = await client.get(apiPath("/tracer/project/list_project_ids/"));
+      const projectIds = await client.get(
+        apiPath("/tracer/project/list_project_ids/"),
+      );
       assert(
-        (projectIds.projects || []).some((project) => project.id === selectedProject.id),
+        (projectIds.projects || []).some(
+          (project) => project.id === selectedProject.id,
+        ),
         "Project id catalog did not include the selected prototype project.",
       );
 
-      const sdkCode = await client.get(apiPath("/tracer/project/project_sdk_code/"), {
-        query: { project_type: "experiment" },
-      });
+      const sdkCode = await client.get(
+        apiPath("/tracer/project/project_sdk_code/"),
+        {
+          query: { project_type: "experiment" },
+        },
+      );
       assertPrototypeSdkCode(sdkCode);
       const sdkCodeHasRawFiKeys = prototypeSdkCodeHasRawFiKeys(sdkCode);
-      assert(!sdkCodeHasRawFiKeys, "Prototype SDK code exposed raw FI key material.");
+      assert(
+        !sdkCodeHasRawFiKeys,
+        "Prototype SDK code exposed raw FI key material.",
+      );
       const invalidSdkType = await expectApiError(
         () =>
           client.get(apiPath("/tracer/project/project_sdk_code/"), {
@@ -207,7 +277,10 @@ export const appCoreJourneys = [
         metadata: { api_journey: "PRT-API-001", run_id: runId },
       });
       const createdProjectId = created.project_id;
-      assert(isUuid(createdProjectId), "Prototype project create did not return project_id.");
+      assert(
+        isUuid(createdProjectId),
+        "Prototype project create did not return project_id.",
+      );
       cleanup.defer("hard delete disposable prototype project", () =>
         hardDeletePrototypeProject({
           projectId: createdProjectId,
@@ -240,13 +313,22 @@ export const appCoreJourneys = [
         deleted: false,
       });
 
-      const update = await client.post(apiPath("/tracer/project/update_project_name/"), {
-        project_id: createdProjectId,
-        name: updatedProjectName,
-        sampling_rate: 0.25,
-      });
-      assert(update.project_id === createdProjectId, "Prototype project rename response id mismatch.");
-      assert(update.project_name === updatedProjectName, "Prototype project rename response name mismatch.");
+      const update = await client.post(
+        apiPath("/tracer/project/update_project_name/"),
+        {
+          project_id: createdProjectId,
+          name: updatedProjectName,
+          sampling_rate: 0.25,
+        },
+      );
+      assert(
+        update.project_id === createdProjectId,
+        "Prototype project rename response id mismatch.",
+      );
+      assert(
+        update.project_name === updatedProjectName,
+        "Prototype project rename response name mismatch.",
+      );
       assert(
         Number(update.sampling_rate?.new_rate) === 0.25,
         "Prototype project sampling_rate update response mismatch.",
@@ -255,8 +337,14 @@ export const appCoreJourneys = [
       const updatedDetail = await client.get(
         apiPath("/tracer/project/{id}/", { id: createdProjectId }),
       );
-      assert(updatedDetail.name === updatedProjectName, "Prototype project detail did not reflect rename.");
-      assert(Number(updatedDetail.sampling_rate) === 0.25, "Prototype project detail did not reflect sampling_rate.");
+      assert(
+        updatedDetail.name === updatedProjectName,
+        "Prototype project detail did not reflect rename.",
+      );
+      assert(
+        Number(updatedDetail.sampling_rate) === 0.25,
+        "Prototype project detail did not reflect sampling_rate.",
+      );
 
       const updatedAudit = await loadPrototypeProjectDbAudit({
         projectId: createdProjectId,
@@ -348,12 +436,32 @@ export const appCoreJourneys = [
   },
   {
     id: "PRT-API-002",
-    title: "Prototype run CRUD, export, insights, winner, annotations, config, and delete lifecycle",
-    tags: ["prototype", "project-version", "runs", "mutating", "data-integrity"],
-    async run({ client, cleanup, runId, organizationId, workspaceId, evidence }) {
+    title:
+      "Prototype run CRUD, export, insights, winner, annotations, config, and delete lifecycle",
+    tags: [
+      "prototype",
+      "project-version",
+      "runs",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 20);
       const projectName = `api journey pv ${marker}`;
@@ -369,7 +477,10 @@ export const appCoreJourneys = [
         metadata: { api_journey: "PRT-API-002", run_id: runId },
       });
       const projectId = createdProject.project_id;
-      assert(isUuid(projectId), "Prototype project create did not return project_id.");
+      assert(
+        isUuid(projectId),
+        "Prototype project create did not return project_id.",
+      );
       cleanup.defer("hard delete PRT-API-002 project-version artifacts", () =>
         hardDeleteProjectVersionJourneyArtifacts({ projectId, projectName }),
       );
@@ -386,14 +497,26 @@ export const appCoreJourneys = [
         name: betaName,
         metadata: { lane: "beta", run_id: runId },
       });
-      assert(alphaVersion.version === "v1", "First disposable project version was not v1.");
-      assert(betaVersion.version === "v2", "Second disposable project version was not v2.");
+      assert(
+        alphaVersion.version === "v1",
+        "First disposable project version was not v1.",
+      );
+      assert(
+        betaVersion.version === "v2",
+        "Second disposable project version was not v2.",
+      );
 
       const alphaDetail = await client.get(
         apiPath("/tracer/project-version/{id}/", { id: alphaVersion.id }),
       );
-      assert(alphaDetail.id === alphaVersion.id, "Project-version detail id mismatch.");
-      assert(alphaDetail.project === projectId, "Project-version detail project mismatch.");
+      assert(
+        alphaDetail.id === alphaVersion.id,
+        "Project-version detail id mismatch.",
+      );
+      assert(
+        alphaDetail.project === projectId,
+        "Project-version detail project mismatch.",
+      );
 
       const genericList = asArray(
         await client.get(apiPath("/tracer/project-version/"), {
@@ -413,7 +536,10 @@ export const appCoreJourneys = [
           metadata: { lane: "alpha", patched: true, run_id: runId },
         },
       );
-      assert(patchedAlpha.name === alphaPatchedName, "Project-version PATCH did not update name.");
+      assert(
+        patchedAlpha.name === alphaPatchedName,
+        "Project-version PATCH did not update name.",
+      );
 
       const putBeta = await client.put(
         apiPath("/tracer/project-version/{id}/", { id: betaVersion.id }),
@@ -425,8 +551,14 @@ export const appCoreJourneys = [
           avg_eval_score: 0,
         },
       );
-      assert(putBeta.name === betaPutName, "Project-version PUT did not update name.");
-      assert(putBeta.project === projectId, "Project-version PUT changed project unexpectedly.");
+      assert(
+        putBeta.name === betaPutName,
+        "Project-version PUT did not update name.",
+      );
+      assert(
+        putBeta.project === projectId,
+        "Project-version PUT changed project unexpectedly.",
+      );
 
       const alphaSeed = await seedProjectVersionJourneyTraceAndSpan({
         client,
@@ -447,18 +579,27 @@ export const appCoreJourneys = [
         cost: 0.004,
       });
 
-      const runList = await client.get(apiPath("/tracer/project-version/list_runs/"), {
-        query: {
-          project_id: projectId,
-          page_number: 0,
-          page_size: 10,
-          filters: [],
-          sort_params: [],
+      const runList = await client.get(
+        apiPath("/tracer/project-version/list_runs/"),
+        {
+          query: {
+            project_id: projectId,
+            page_number: 0,
+            page_size: 10,
+            filters: [],
+            sort_params: [],
+          },
         },
-      });
+      );
       const runRows = asArray(runList);
-      assert(runRows.some((row) => row?.id === alphaVersion.id), "Run list omitted alpha run.");
-      assert(runRows.some((row) => row?.id === betaVersion.id), "Run list omitted beta run.");
+      assert(
+        runRows.some((row) => row?.id === alphaVersion.id),
+        "Run list omitted alpha run.",
+      );
+      assert(
+        runRows.some((row) => row?.id === betaVersion.id),
+        "Run list omitted beta run.",
+      );
 
       const runIds = await client.get(
         apiPath("/tracer/project-version/get_project_version_ids/"),
@@ -471,22 +612,41 @@ export const appCoreJourneys = [
         },
       );
       assert(
-        (runIds.project_version_ids || []).some((row) => row.id === alphaVersion.id) &&
-          (runIds.project_version_ids || []).some((row) => row.id === betaVersion.id),
+        (runIds.project_version_ids || []).some(
+          (row) => row.id === alphaVersion.id,
+        ) &&
+          (runIds.project_version_ids || []).some(
+            (row) => row.id === betaVersion.id,
+          ),
         "Project-version id catalog omitted a disposable run.",
       );
 
-      const exportCsv = await client.post(apiPath("/tracer/project-version/get_export_data/"), {
-        project_id: projectId,
-        runs_ids: [alphaVersion.id, betaVersion.id],
-      });
-      assert(typeof exportCsv === "string", "Project-version export did not return CSV text.");
-      assert(exportCsv.includes(alphaPatchedName), "Project-version export omitted alpha run.");
-      assert(exportCsv.includes(betaPutName), "Project-version export omitted beta run.");
+      const exportCsv = await client.post(
+        apiPath("/tracer/project-version/get_export_data/"),
+        {
+          project_id: projectId,
+          runs_ids: [alphaVersion.id, betaVersion.id],
+        },
+      );
+      assert(
+        typeof exportCsv === "string",
+        "Project-version export did not return CSV text.",
+      );
+      assert(
+        exportCsv.includes(alphaPatchedName),
+        "Project-version export omitted alpha run.",
+      );
+      assert(
+        exportCsv.includes(betaPutName),
+        "Project-version export omitted beta run.",
+      );
 
-      const alphaInsights = await client.get(apiPath("/tracer/project-version/get_run_insights/"), {
-        query: { project_version_id: alphaVersion.id },
-      });
+      const alphaInsights = await client.get(
+        apiPath("/tracer/project-version/get_run_insights/"),
+        {
+          query: { project_version_id: alphaVersion.id },
+        },
+      );
       assert(
         (alphaInsights.trace_ids || []).includes(alphaSeed.traceId),
         "Run insights omitted alpha trace id.",
@@ -503,21 +663,33 @@ export const appCoreJourneys = [
           visibility: { latency: false },
         },
       );
-      assert(configUpdate.project_version_id === alphaVersion.id, "Config update response id mismatch.");
+      assert(
+        configUpdate.project_version_id === alphaVersion.id,
+        "Config update response id mismatch.",
+      );
 
-      const annotation = await client.post(apiPath("/tracer/project-version/add_annotations/"), {
-        project_version_id: alphaVersion.id,
-        annotation_values: {
-          name: `api journey pv annotation ${marker}`,
+      const annotation = await client.post(
+        apiPath("/tracer/project-version/add_annotations/"),
+        {
+          project_version_id: alphaVersion.id,
+          annotation_values: {
+            name: `api journey pv annotation ${marker}`,
+          },
         },
-      });
+      );
       const annotationId = annotation.annotation_id;
-      assert(isUuid(annotationId), "Project-version add_annotations did not return annotation_id.");
+      assert(
+        isUuid(annotationId),
+        "Project-version add_annotations did not return annotation_id.",
+      );
 
-      const winner = await client.post(apiPath("/tracer/project-version/project_version_winner/"), {
-        project_id: projectId,
-        config: { avg_latency_ms: 1 },
-      });
+      const winner = await client.post(
+        apiPath("/tracer/project-version/project_version_winner/"),
+        {
+          project_id: projectId,
+          config: { avg_latency_ms: 1 },
+        },
+      );
       assert(
         winner.project_version_winner === alphaVersion.id,
         "Project-version winner did not choose the lower-latency alpha run.",
@@ -554,12 +726,18 @@ export const appCoreJourneys = [
         latencyVisible: false,
       });
 
-      await client.delete(apiPath("/tracer/project-version/{id}/", { id: alphaVersion.id }), {
-        okStatuses: [204],
-      });
-      const deleteRuns = await client.post(apiPath("/tracer/project-version/delete_runs/"), {
-        ids: [betaVersion.id],
-      });
+      await client.delete(
+        apiPath("/tracer/project-version/{id}/", { id: alphaVersion.id }),
+        {
+          okStatuses: [204],
+        },
+      );
+      const deleteRuns = await client.post(
+        apiPath("/tracer/project-version/delete_runs/"),
+        {
+          ids: [betaVersion.id],
+        },
+      );
       assert(
         (deleteRuns.deleted_ids || []).includes(betaVersion.id),
         "delete_runs did not report the beta run as deleted.",
@@ -596,11 +774,26 @@ export const appCoreJourneys = [
         latencyVisible: false,
       });
 
-      const cleanupAudit = await hardDeleteProjectVersionJourneyArtifacts({ projectId, projectName });
-      assert(cleanupAudit.project_count === 0, "Disposable project remained after hard cleanup.");
-      assert(cleanupAudit.project_version_count === 0, "Disposable project versions remained after hard cleanup.");
-      assert(cleanupAudit.trace_count === 0, "Disposable traces remained after hard cleanup.");
-      assert(cleanupAudit.span_count === 0, "Disposable spans remained after hard cleanup.");
+      const cleanupAudit = await hardDeleteProjectVersionJourneyArtifacts({
+        projectId,
+        projectName,
+      });
+      assert(
+        cleanupAudit.project_count === 0,
+        "Disposable project remained after hard cleanup.",
+      );
+      assert(
+        cleanupAudit.project_version_count === 0,
+        "Disposable project versions remained after hard cleanup.",
+      );
+      assert(
+        cleanupAudit.trace_count === 0,
+        "Disposable traces remained after hard cleanup.",
+      );
+      assert(
+        cleanupAudit.span_count === 0,
+        "Disposable spans remained after hard cleanup.",
+      );
 
       evidence.push({
         project_id: projectId,
@@ -614,20 +807,36 @@ export const appCoreJourneys = [
         exported_csv_bytes: exportCsv.length,
         run_list_rows: runRows.length,
         winner_project_version_id: winner.project_version_winner,
-        generic_delete_cascaded: postDeleteAudit.trace_deleted?.[alphaSeed.traceId] === true,
-        delete_runs_cascaded: postDeleteAudit.trace_deleted?.[betaSeed.traceId] === true,
+        generic_delete_cascaded:
+          postDeleteAudit.trace_deleted?.[alphaSeed.traceId] === true,
+        delete_runs_cascaded:
+          postDeleteAudit.trace_deleted?.[betaSeed.traceId] === true,
         cleanup_project_count: cleanupAudit.project_count,
       });
     },
   },
   {
     id: "PRT-API-003",
-    title: "Prototype project detail PUT, PATCH, tags, config, graph reads, and detail delete lifecycle",
+    title:
+      "Prototype project detail PUT, PATCH, tags, config, graph reads, and detail delete lifecycle",
     tags: ["prototype", "projects", "mutating", "data-integrity"],
-    async run({ client, cleanup, runId, organizationId, workspaceId, evidence }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 20);
       const projectName = `api journey project crud ${marker}`;
@@ -636,20 +845,37 @@ export const appCoreJourneys = [
       const tag = `api-journey-${marker}`;
       const config = [
         { id: "run_name", name: "Run Name", is_visible: true, group_by: null },
-        { id: "avg_cost", name: "Avg. Cost", is_visible: true, group_by: "System Metrics" },
+        {
+          id: "avg_cost",
+          name: "Avg. Cost",
+          is_visible: true,
+          group_by: "System Metrics",
+        },
       ];
       const sessionConfig = [
-        { id: "session_input", name: "Session Input", is_visible: true, group_by: null },
+        {
+          id: "session_input",
+          name: "Session Input",
+          is_visible: true,
+          group_by: null,
+        },
       ];
 
       const created = await client.post(apiPath("/tracer/project/"), {
         name: projectName,
         model_type: "GenerativeLLM",
         trace_type: "experiment",
-        metadata: { api_journey: "PRT-API-003", run_id: runId, phase: "create" },
+        metadata: {
+          api_journey: "PRT-API-003",
+          run_id: runId,
+          phase: "create",
+        },
       });
       const projectId = created.project_id;
-      assert(isUuid(projectId), "Project create did not return a valid project_id.");
+      assert(
+        isUuid(projectId),
+        "Project create did not return a valid project_id.",
+      );
       cleanup.defer("hard delete PRT-API-003 project artifacts", () =>
         hardDeletePrototypeProject({
           projectId,
@@ -662,43 +888,85 @@ export const appCoreJourneys = [
       const systemMetrics = asArray(
         await client.get(apiPath("/tracer/project/fetch_system_metrics/")),
       );
-      assert(systemMetrics.includes("latency"), "Project system metrics omitted latency.");
-      assert(systemMetrics.includes("cost"), "Project system metrics omitted cost.");
+      assert(
+        systemMetrics.includes("latency"),
+        "Project system metrics omitted latency.",
+      );
+      assert(
+        systemMetrics.includes("cost"),
+        "Project system metrics omitted cost.",
+      );
 
-      const initialDetail = await client.get(apiPath("/tracer/project/{id}/", { id: projectId }));
-      assert(initialDetail.id === projectId, "Project detail id mismatch after create.");
-      assert(initialDetail.workspace === workspaceId, "Project detail workspace mismatch after create.");
+      const initialDetail = await client.get(
+        apiPath("/tracer/project/{id}/", { id: projectId }),
+      );
+      assert(
+        initialDetail.id === projectId,
+        "Project detail id mismatch after create.",
+      );
+      assert(
+        initialDetail.workspace === workspaceId,
+        "Project detail workspace mismatch after create.",
+      );
 
-      const emptyGraph = await client.get(apiPath("/tracer/project/get_graph_data/"), {
-        query: { project_id: projectId, interval: "hour", filters: [] },
-      });
-      assert(emptyGraph?.system_metrics, "Project graph response omitted system_metrics.");
-      assert(emptyGraph?.evaluations, "Project graph response omitted evaluations.");
+      const emptyGraph = await client.get(
+        apiPath("/tracer/project/get_graph_data/"),
+        {
+          query: { project_id: projectId, interval: "hour", filters: [] },
+        },
+      );
+      assert(
+        emptyGraph?.system_metrics,
+        "Project graph response omitted system_metrics.",
+      );
+      assert(
+        emptyGraph?.evaluations,
+        "Project graph response omitted evaluations.",
+      );
 
-      const put = await client.put(apiPath("/tracer/project/{id}/", { id: projectId }), {
-        name: putName,
-        model_type: "GenerativeLLM",
-        trace_type: "experiment",
-        metadata: { api_journey: "PRT-API-003", run_id: runId, phase: "put" },
-        config,
-        session_config: sessionConfig,
-        tags: [],
-      });
+      const put = await client.put(
+        apiPath("/tracer/project/{id}/", { id: projectId }),
+        {
+          name: putName,
+          model_type: "GenerativeLLM",
+          trace_type: "experiment",
+          metadata: { api_journey: "PRT-API-003", run_id: runId, phase: "put" },
+          config,
+          session_config: sessionConfig,
+          tags: [],
+        },
+      );
       assert(put.id === projectId, "Project PUT response id mismatch.");
       assert(put.name === putName, "Project PUT did not persist the new name.");
 
-      const patch = await client.patch(apiPath("/tracer/project/{id}/", { id: projectId }), {
-        name: patchName,
-        metadata: { api_journey: "PRT-API-003", run_id: runId, phase: "patch" },
-      });
+      const patch = await client.patch(
+        apiPath("/tracer/project/{id}/", { id: projectId }),
+        {
+          name: patchName,
+          metadata: {
+            api_journey: "PRT-API-003",
+            run_id: runId,
+            phase: "patch",
+          },
+        },
+      );
       assert(patch.id === projectId, "Project PATCH response id mismatch.");
-      assert(patch.name === patchName, "Project PATCH did not persist the new name.");
+      assert(
+        patch.name === patchName,
+        "Project PATCH did not persist the new name.",
+      );
 
-      const configUpdate = await client.post(apiPath("/tracer/project/update_project_config/"), {
-        project_id: projectId,
-        visibility: { avg_cost: false },
-      });
-      assert(configUpdate.project_id === projectId, "Project config update response id mismatch.");
+      const configUpdate = await client.post(
+        apiPath("/tracer/project/update_project_config/"),
+        {
+          project_id: projectId,
+          visibility: { avg_cost: false },
+        },
+      );
+      assert(
+        configUpdate.project_id === projectId,
+        "Project config update response id mismatch.",
+      );
 
       const sessionConfigUpdate = await client.post(
         apiPath("/tracer/project/update_project_session_config/"),
@@ -712,10 +980,16 @@ export const appCoreJourneys = [
         "Project session config update response id mismatch.",
       );
 
-      const tags = await client.patch(apiPath("/tracer/project/{id}/tags/", { id: projectId }), {
-        tags: ["api-journey", tag],
-      });
-      assert((tags.tags || []).includes(tag), "Project tag update did not return the new tag.");
+      const tags = await client.patch(
+        apiPath("/tracer/project/{id}/tags/", { id: projectId }),
+        {
+          tags: ["api-journey", tag],
+        },
+      );
+      assert(
+        (tags.tags || []).includes(tag),
+        "Project tag update did not return the new tag.",
+      );
 
       const preDeleteAudit = await loadProjectCrudDbAudit({
         projectId,
@@ -757,14 +1031,18 @@ export const appCoreJourneys = [
         updatedProjectName: patchName,
         extraNames: [putName],
       });
-      assert(cleanupAudit.project_count === 0, "Disposable project remained after hard cleanup.");
+      assert(
+        cleanupAudit.project_count === 0,
+        "Disposable project remained after hard cleanup.",
+      );
 
       evidence.push({
         project_id: projectId,
         system_metrics: systemMetrics,
         graph_metric_keys: Object.keys(emptyGraph.system_metrics || {}),
         config_avg_cost_visible: preDeleteAudit.config_visibility?.avg_cost,
-        session_input_visible: preDeleteAudit.session_config_visibility?.session_input,
+        session_input_visible:
+          preDeleteAudit.session_config_visibility?.session_input,
         tags: preDeleteAudit.tags,
         detail_delete_deleted_at_set: deletedAudit.deleted_at_set,
         cleanup_project_count: cleanupAudit.project_count,
@@ -773,46 +1051,90 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-004",
-    title: "Account user-info, workspace list, user list, team search, auth refresh, and guards",
-    tags: ["core", "accounts", "team", "workspace", "auth", "mutating", "data-integrity"],
+    title:
+      "Account user-info, workspace list, user list, team search, auth refresh, and guards",
+    tags: [
+      "core",
+      "accounts",
+      "team",
+      "workspace",
+      "auth",
+      "mutating",
+      "data-integrity",
+    ],
     async run({ client, user, tokens, organizationId, workspaceId, evidence }) {
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
       const email = currentUserEmail(userInfo) || currentUserEmail(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(email.includes("@"), "Authenticated user-info did not include an email.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        email.includes("@"),
+        "Authenticated user-info did not include an email.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
-      const workspacesPayload = await client.get(apiPath("/accounts/workspace/list/"));
+      const workspacesPayload = await client.get(
+        apiPath("/accounts/workspace/list/"),
+      );
       const workspaces = asArray(workspacesPayload);
       assert(workspaces.length > 0, "Workspace list returned no workspaces.");
       const currentWorkspace = workspaces.find(
-        (workspace) => workspace?.id === workspaceId || workspace?.workspace_id === workspaceId,
+        (workspace) =>
+          workspace?.id === workspaceId ||
+          workspace?.workspace_id === workspaceId,
       );
-      assert(currentWorkspace, "Workspace list did not include the active workspace.");
+      assert(
+        currentWorkspace,
+        "Workspace list did not include the active workspace.",
+      );
 
-      const userListByEmail = await client.get(apiPath("/accounts/user/list/"), {
-        query: {
-          page: 1,
-          limit: 10,
-          search: email,
-          workspace_id: workspaceId,
-          filter_status: ["Active"],
-          sort: "email",
+      const userListByEmail = await client.get(
+        apiPath("/accounts/user/list/"),
+        {
+          query: {
+            page: 1,
+            limit: 10,
+            search: email,
+            workspace_id: workspaceId,
+            filter_status: ["Active"],
+            sort: "email",
+          },
         },
-      });
+      );
       const userRows = asArray(userListByEmail);
       const userListRow = findUserRow(userRows, userId, email);
-      assert(userListRow, "User list search by email did not return the current user.");
+      assert(
+        userListRow,
+        "User list search by email did not return the current user.",
+      );
       assert(
         String(userListRow.status || "").toLowerCase() === "active",
         "User list active-status filter returned a non-active current user row.",
       );
 
-      const audit = await loadAccountContextDbAudit({ userId, organizationId, workspaceId });
-      assert(audit.user_id === userId, "DB audit did not resolve the current user row.");
-      assert(audit.email === email, "DB audit user email did not match user-info.");
+      const audit = await loadAccountContextDbAudit({
+        userId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        audit.user_id === userId,
+        "DB audit did not resolve the current user row.",
+      );
+      assert(
+        audit.email === email,
+        "DB audit user email did not match user-info.",
+      );
       assert(
         audit.active_org_membership_count >= 1,
         "DB audit did not find an active organization membership for the current user.",
@@ -821,17 +1143,25 @@ export const appCoreJourneys = [
         audit.workspace_organization_id === organizationId,
         "DB audit workspace organization did not match the active organization.",
       );
-      assert(audit.workspace_active === true, "DB audit active workspace was not active.");
+      assert(
+        audit.workspace_active === true,
+        "DB audit active workspace was not active.",
+      );
       assert(
         audit.active_workspace_membership_count >= 1,
         "DB audit did not find an active workspace membership for the current user.",
       );
 
-      const refreshEvidence = { refresh_token_available: Boolean(tokens?.refresh) };
+      const refreshEvidence = {
+        refresh_token_available: Boolean(tokens?.refresh),
+      };
       if (tokens?.refresh) {
-        const refreshed = await client.post(apiPath("/accounts/token/refresh/"), {
-          refresh: tokens.refresh,
-        });
+        const refreshed = await client.post(
+          apiPath("/accounts/token/refresh/"),
+          {
+            refresh: tokens.refresh,
+          },
+        );
         assert(
           typeof refreshed?.access === "string" && refreshed.access.length > 20,
           "Refresh token endpoint did not return a new access token.",
@@ -886,7 +1216,11 @@ export const appCoreJourneys = [
 
         const selfDeleteError = await expectApiError(
           () =>
-            client.delete(apiPath("/accounts/team/users/{member_id}/", { member_id: userId })),
+            client.delete(
+              apiPath("/accounts/team/users/{member_id}/", {
+                member_id: userId,
+              }),
+            ),
           [400],
           "Self-removal through team member delete unexpectedly succeeded.",
         );
@@ -913,7 +1247,8 @@ export const appCoreJourneys = [
           user_list_email_matches: userRows.length,
           team_email_matches: teamRows.length,
           db_active_org_memberships: audit.active_org_membership_count,
-          db_active_workspace_memberships: audit.active_workspace_membership_count,
+          db_active_workspace_memberships:
+            audit.active_workspace_membership_count,
           invalid_invite_status: invalidInviteError.status,
           self_delete_status: selfDeleteError.status,
           missing_delete_status: missingDeleteError.status,
@@ -931,7 +1266,8 @@ export const appCoreJourneys = [
           workspace_count: workspaces.length,
           user_list_email_matches: userRows.length,
           db_active_org_memberships: audit.active_org_membership_count,
-          db_active_workspace_memberships: audit.active_workspace_membership_count,
+          db_active_workspace_memberships:
+            audit.active_workspace_membership_count,
           team_owner_only_status: teamForbidden.status,
           ...refreshEvidence,
         });
@@ -940,19 +1276,46 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-005",
-    title: "RBAC team invite, accept, role update, remove, reactivate, and cleanup lifecycle",
-    tags: ["core", "accounts", "team", "rbac", "workspace", "mutating", "data-integrity"],
-    async run({ client, user, cleanup, runId, organizationId, workspaceId, apiBase, evidence }) {
+    title:
+      "RBAC team invite, accept, role update, remove, reactivate, and cleanup lifecycle",
+    tags: [
+      "core",
+      "accounts",
+      "team",
+      "rbac",
+      "workspace",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      user,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      apiBase,
+      evidence,
+    }) {
       requireMutations();
       if (!isOrgOwner(user)) {
-        skip("Current user is not an org owner; RBAC invite lifecycle cleanup is unsafe.");
+        skip(
+          "Current user is not an org owner; RBAC invite lifecycle cleanup is unsafe.",
+        );
       }
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 20);
       const email = `api.journey.rbac.${marker}@futureagi.local`.toLowerCase();
-      const cancelEmail = `api.journey.rbac.cancel.${marker}@futureagi.local`.toLowerCase();
+      const cancelEmail =
+        `api.journey.rbac.cancel.${marker}@futureagi.local`.toLowerCase();
       const password = `ApiJourney${marker.slice(0, 8)}123!`;
 
       cleanup.defer("delete disposable RBAC team user artifacts", () =>
@@ -962,11 +1325,14 @@ export const appCoreJourneys = [
         deleteDisposableRbacUserArtifacts(cancelEmail),
       );
 
-      const invited = await client.post(apiPath("/accounts/organization/invite/"), {
-        emails: [email],
-        org_level: 3,
-        workspace_access: [{ workspace_id: workspaceId, level: 3 }],
-      });
+      const invited = await client.post(
+        apiPath("/accounts/organization/invite/"),
+        {
+          emails: [email],
+          org_level: 3,
+          workspace_access: [{ workspace_id: workspaceId, level: 3 }],
+        },
+      );
       assert(
         asArray(invited?.invited).includes(email),
         "RBAC invite create did not report the disposable email as invited.",
@@ -978,26 +1344,57 @@ export const appCoreJourneys = [
         }),
       );
       const pendingInvite = findUserRow(memberRows, null, email);
-      assert(pendingInvite?.type === "invite", "Pending invite did not appear in member list.");
-      assert(pendingInvite?.status === "Pending", "New invite did not have Pending status.");
-      assert(isUuid(pendingInvite.id), "Pending invite row did not include an invite id.");
-
-      let audit = await loadRbacMemberLifecycleAudit({ email, organizationId, workspaceId });
-      assert(audit.user_count === 1, "RBAC invite did not dual-write a user row.");
-      assert(audit.user_active === false, "New invite user should remain inactive before acceptance.");
       assert(
-        audit.pending_invite_count === 1 && audit.invite_statuses.includes("Pending"),
-        "RBAC invite DB audit did not find exactly one pending invite.",
+        pendingInvite?.type === "invite",
+        "Pending invite did not appear in member list.",
       );
-      assert(audit.org_membership_count === 1, "RBAC invite did not dual-write org membership.");
-      assert(audit.workspace_membership_count === 1, "RBAC invite did not dual-write workspace membership.");
+      assert(
+        pendingInvite?.status === "Pending",
+        "New invite did not have Pending status.",
+      );
+      assert(
+        isUuid(pendingInvite.id),
+        "Pending invite row did not include an invite id.",
+      );
 
-      const resent = await client.post(apiPath("/accounts/organization/invite/resend/"), {
-        invite_id: pendingInvite.id,
-        org_level: 1,
+      let audit = await loadRbacMemberLifecycleAudit({
+        email,
+        organizationId,
+        workspaceId,
       });
       assert(
-        String(resent?.message || "").toLowerCase().includes("resent"),
+        audit.user_count === 1,
+        "RBAC invite did not dual-write a user row.",
+      );
+      assert(
+        audit.user_active === false,
+        "New invite user should remain inactive before acceptance.",
+      );
+      assert(
+        audit.pending_invite_count === 1 &&
+          audit.invite_statuses.includes("Pending"),
+        "RBAC invite DB audit did not find exactly one pending invite.",
+      );
+      assert(
+        audit.org_membership_count === 1,
+        "RBAC invite did not dual-write org membership.",
+      );
+      assert(
+        audit.workspace_membership_count === 1,
+        "RBAC invite did not dual-write workspace membership.",
+      );
+
+      const resent = await client.post(
+        apiPath("/accounts/organization/invite/resend/"),
+        {
+          invite_id: pendingInvite.id,
+          org_level: 1,
+        },
+      );
+      assert(
+        String(resent?.message || "")
+          .toLowerCase()
+          .includes("resent"),
         "Invite resend did not return success message.",
       );
 
@@ -1007,25 +1404,50 @@ export const appCoreJourneys = [
         }),
       );
       const resentInvite = findUserRow(memberRows, null, email);
-      assert(resentInvite?.org_level === 1, "Invite resend org_level update did not reload in member list.");
+      assert(
+        resentInvite?.org_level === 1,
+        "Invite resend org_level update did not reload in member list.",
+      );
 
       const tokenInfo = await resolveInviteAcceptanceToken(email);
-      assert(isUuid(tokenInfo.user_id), "Invite token resolver did not return a user id.");
-      assert(tokenInfo.uidb64 && tokenInfo.token, "Invite token resolver returned incomplete token data.");
-
-      const acceptPath = apiPath("/accounts/accept-invitation/{uidb64}/{token}/", {
-        uidb64: tokenInfo.uidb64,
-        token: tokenInfo.token,
-      });
-      const preview = await unauthenticatedApiRequest(apiBase, "GET", acceptPath);
-      assert(preview?.valid === true && preview?.email === email, "Invite preview did not validate the disposable invite.");
-
-      const accepted = await unauthenticatedApiRequest(apiBase, "POST", acceptPath, {
-        new_password: password,
-        repeat_password: password,
-      });
       assert(
-        typeof accepted?.access === "string" && typeof accepted?.refresh === "string",
+        isUuid(tokenInfo.user_id),
+        "Invite token resolver did not return a user id.",
+      );
+      assert(
+        tokenInfo.uidb64 && tokenInfo.token,
+        "Invite token resolver returned incomplete token data.",
+      );
+
+      const acceptPath = apiPath(
+        "/accounts/accept-invitation/{uidb64}/{token}/",
+        {
+          uidb64: tokenInfo.uidb64,
+          token: tokenInfo.token,
+        },
+      );
+      const preview = await unauthenticatedApiRequest(
+        apiBase,
+        "GET",
+        acceptPath,
+      );
+      assert(
+        preview?.valid === true && preview?.email === email,
+        "Invite preview did not validate the disposable invite.",
+      );
+
+      const accepted = await unauthenticatedApiRequest(
+        apiBase,
+        "POST",
+        acceptPath,
+        {
+          new_password: password,
+          repeat_password: password,
+        },
+      );
+      assert(
+        typeof accepted?.access === "string" &&
+          typeof accepted?.refresh === "string",
         "Invite accept did not return access and refresh tokens.",
       );
 
@@ -1035,23 +1457,46 @@ export const appCoreJourneys = [
         }),
       );
       const activeMember = findUserRow(memberRows, tokenInfo.user_id, email);
-      assert(activeMember?.type === "member", "Accepted invite did not become a member row.");
-      assert(activeMember?.status === "Active", "Accepted invite member did not become Active.");
-      assert(activeMember?.org_level === 1, "Accepted invite did not preserve resent org level.");
-
-      audit = await loadRbacMemberLifecycleAudit({ email, organizationId, workspaceId });
-      assert(audit.user_active === true, "Accepted invite user did not become active.");
       assert(
-        audit.accepted_invite_count === 1 && audit.active_org_membership_count === 1,
+        activeMember?.type === "member",
+        "Accepted invite did not become a member row.",
+      );
+      assert(
+        activeMember?.status === "Active",
+        "Accepted invite member did not become Active.",
+      );
+      assert(
+        activeMember?.org_level === 1,
+        "Accepted invite did not preserve resent org level.",
+      );
+
+      audit = await loadRbacMemberLifecycleAudit({
+        email,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        audit.user_active === true,
+        "Accepted invite user did not become active.",
+      );
+      assert(
+        audit.accepted_invite_count === 1 &&
+          audit.active_org_membership_count === 1,
         "Accepted invite DB audit did not find accepted invite plus active org membership.",
       );
-      assert(audit.active_workspace_membership_count === 1, "Accepted invite did not activate workspace membership.");
+      assert(
+        audit.active_workspace_membership_count === 1,
+        "Accepted invite did not activate workspace membership.",
+      );
 
-      const roleUpdated = await client.post(apiPath("/accounts/organization/members/role/"), {
-        user_id: tokenInfo.user_id,
-        org_level: 3,
-        workspace_access: [{ workspace_id: workspaceId, level: 1 }],
-      });
+      const roleUpdated = await client.post(
+        apiPath("/accounts/organization/members/role/"),
+        {
+          user_id: tokenInfo.user_id,
+          org_level: 3,
+          workspace_access: [{ workspace_id: workspaceId, level: 1 }],
+        },
+      );
       assert(
         roleUpdated?.changes?.org_level?.new === 3,
         "Org member role update did not report the new org level.",
@@ -1063,14 +1508,23 @@ export const appCoreJourneys = [
         }),
       );
       let updatedMember = findUserRow(memberRows, tokenInfo.user_id, email);
-      assert(updatedMember?.org_level === 3, "Member list did not show updated org level.");
-      assert(updatedMember?.ws_level === 1, "Member list did not show updated workspace access level.");
+      assert(
+        updatedMember?.org_level === 3,
+        "Member list did not show updated org level.",
+      );
+      assert(
+        updatedMember?.ws_level === 1,
+        "Member list did not show updated workspace access level.",
+      );
 
-      const wsRoleUpdated = await client.post(apiPath("/accounts/organization/members/role/"), {
-        user_id: tokenInfo.user_id,
-        ws_level: 3,
-        workspace_id: workspaceId,
-      });
+      const wsRoleUpdated = await client.post(
+        apiPath("/accounts/organization/members/role/"),
+        {
+          user_id: tokenInfo.user_id,
+          ws_level: 3,
+          workspace_id: workspaceId,
+        },
+      );
       assert(
         wsRoleUpdated?.changes?.ws_level?.new === 3,
         "Workspace member role update did not report the new workspace level.",
@@ -1082,13 +1536,21 @@ export const appCoreJourneys = [
         }),
       );
       updatedMember = findUserRow(memberRows, tokenInfo.user_id, email);
-      assert(updatedMember?.ws_level === 3, "Member list did not show restored workspace member level.");
-
-      const removed = await client.delete(apiPath("/accounts/organization/members/remove/"), {
-        body: { user_id: tokenInfo.user_id },
-      });
       assert(
-        String(removed?.message || "").toLowerCase().includes("removed"),
+        updatedMember?.ws_level === 3,
+        "Member list did not show restored workspace member level.",
+      );
+
+      const removed = await client.delete(
+        apiPath("/accounts/organization/members/remove/"),
+        {
+          body: { user_id: tokenInfo.user_id },
+        },
+      );
+      assert(
+        String(removed?.message || "")
+          .toLowerCase()
+          .includes("removed"),
         "Member removal did not return success message.",
       );
 
@@ -1097,14 +1559,26 @@ export const appCoreJourneys = [
           query: { search: email, page: 1, limit: 10 },
         }),
       );
-      const deactivatedMember = findUserRow(memberRows, tokenInfo.user_id, email);
-      assert(deactivatedMember?.status === "Deactivated", "Removed member did not reload as Deactivated.");
-
-      const reactivated = await client.post(apiPath("/accounts/organization/members/reactivate/"), {
-        user_id: tokenInfo.user_id,
-      });
+      const deactivatedMember = findUserRow(
+        memberRows,
+        tokenInfo.user_id,
+        email,
+      );
       assert(
-        String(reactivated?.message || "").toLowerCase().includes("reactivated"),
+        deactivatedMember?.status === "Deactivated",
+        "Removed member did not reload as Deactivated.",
+      );
+
+      const reactivated = await client.post(
+        apiPath("/accounts/organization/members/reactivate/"),
+        {
+          user_id: tokenInfo.user_id,
+        },
+      );
+      assert(
+        String(reactivated?.message || "")
+          .toLowerCase()
+          .includes("reactivated"),
         "Member reactivation did not return success message.",
       );
 
@@ -1113,14 +1587,24 @@ export const appCoreJourneys = [
           query: { search: email, page: 1, limit: 10 },
         }),
       );
-      const reactivatedMember = findUserRow(memberRows, tokenInfo.user_id, email);
-      assert(reactivatedMember?.status === "Active", "Reactivated member did not reload as Active.");
+      const reactivatedMember = findUserRow(
+        memberRows,
+        tokenInfo.user_id,
+        email,
+      );
+      assert(
+        reactivatedMember?.status === "Active",
+        "Reactivated member did not reload as Active.",
+      );
 
-      const cancelCreated = await client.post(apiPath("/accounts/organization/invite/"), {
-        emails: [cancelEmail],
-        org_level: 1,
-        workspace_access: [{ workspace_id: workspaceId, level: 1 }],
-      });
+      const cancelCreated = await client.post(
+        apiPath("/accounts/organization/invite/"),
+        {
+          emails: [cancelEmail],
+          org_level: 1,
+          workspace_access: [{ workspace_id: workspaceId, level: 1 }],
+        },
+      );
       assert(
         asArray(cancelCreated?.invited).includes(cancelEmail),
         "RBAC cancel-path invite create did not report the disposable email as invited.",
@@ -1130,15 +1614,30 @@ export const appCoreJourneys = [
           query: { search: cancelEmail, page: 1, limit: 10 },
         }),
       );
-      const cancellableInvite = findUserRow(cancelRowsBefore, null, cancelEmail);
-      assert(cancellableInvite?.type === "invite", "Cancel-path invite did not appear as an invite row.");
-      assert(cancellableInvite?.status === "Pending", "Cancel-path invite was not Pending before cancel.");
-
-      const cancelled = await client.delete(apiPath("/accounts/organization/invite/cancel/"), {
-        body: { invite_id: cancellableInvite.id },
-      });
+      const cancellableInvite = findUserRow(
+        cancelRowsBefore,
+        null,
+        cancelEmail,
+      );
       assert(
-        String(cancelled?.message || "").toLowerCase().includes("cancel"),
+        cancellableInvite?.type === "invite",
+        "Cancel-path invite did not appear as an invite row.",
+      );
+      assert(
+        cancellableInvite?.status === "Pending",
+        "Cancel-path invite was not Pending before cancel.",
+      );
+
+      const cancelled = await client.delete(
+        apiPath("/accounts/organization/invite/cancel/"),
+        {
+          body: { invite_id: cancellableInvite.id },
+        },
+      );
+      assert(
+        String(cancelled?.message || "")
+          .toLowerCase()
+          .includes("cancel"),
         "Invite cancel did not return success message.",
       );
       const cancelRowsAfter = asArray(
@@ -1155,24 +1654,60 @@ export const appCoreJourneys = [
         organizationId,
         workspaceId,
       });
-      assert(cancelAudit.cancelled_invite_count === 1, "Cancelled invite DB audit did not preserve cancelled status.");
-      assert(cancelAudit.deleted_org_membership_count === 1, "Cancel did not soft-delete dual-written org membership.");
+      assert(
+        cancelAudit.cancelled_invite_count === 1,
+        "Cancelled invite DB audit did not preserve cancelled status.",
+      );
+      assert(
+        cancelAudit.deleted_org_membership_count === 1,
+        "Cancel did not soft-delete dual-written org membership.",
+      );
       assert(
         cancelAudit.deleted_workspace_membership_count === 1,
         "Cancel did not soft-delete dual-written workspace membership.",
       );
 
-      await client.delete(apiPath("/accounts/team/users/{member_id}/", { member_id: tokenInfo.user_id }));
+      await client.delete(
+        apiPath("/accounts/team/users/{member_id}/", {
+          member_id: tokenInfo.user_id,
+        }),
+      );
       await deleteDisposableRbacUserArtifacts(email);
       await deleteDisposableRbacUserArtifacts(cancelEmail);
-      audit = await loadRbacMemberLifecycleAudit({ email, organizationId, workspaceId });
-      assert(audit.user_count === 0, "Disposable RBAC user row remained after cleanup.");
-      assert(audit.invite_count === 0, "Disposable RBAC invite row remained after cleanup.");
-      assert(audit.org_membership_count === 0, "Disposable RBAC org membership remained after cleanup.");
-      assert(audit.workspace_membership_count === 0, "Disposable RBAC workspace membership remained after cleanup.");
-      const cancelCleanupAudit = await loadRbacMemberLifecycleAudit({ email: cancelEmail, organizationId, workspaceId });
-      assert(cancelCleanupAudit.user_count === 0, "Disposable cancelled invite user row remained after cleanup.");
-      assert(cancelCleanupAudit.invite_count === 0, "Disposable cancelled invite row remained after cleanup.");
+      audit = await loadRbacMemberLifecycleAudit({
+        email,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        audit.user_count === 0,
+        "Disposable RBAC user row remained after cleanup.",
+      );
+      assert(
+        audit.invite_count === 0,
+        "Disposable RBAC invite row remained after cleanup.",
+      );
+      assert(
+        audit.org_membership_count === 0,
+        "Disposable RBAC org membership remained after cleanup.",
+      );
+      assert(
+        audit.workspace_membership_count === 0,
+        "Disposable RBAC workspace membership remained after cleanup.",
+      );
+      const cancelCleanupAudit = await loadRbacMemberLifecycleAudit({
+        email: cancelEmail,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        cancelCleanupAudit.user_count === 0,
+        "Disposable cancelled invite user row remained after cleanup.",
+      );
+      assert(
+        cancelCleanupAudit.invite_count === 0,
+        "Disposable cancelled invite row remained after cleanup.",
+      );
 
       evidence.push({
         email,
@@ -1195,33 +1730,352 @@ export const appCoreJourneys = [
     },
   },
   {
+    id: "CORE-API-014",
+    title: "Legacy team aliases, direct login, and cleanup guards",
+    tags: [
+      "core",
+      "accounts",
+      "team",
+      "auth",
+      "legacy",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      user,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      apiBase,
+      evidence,
+    }) {
+      requireMutations();
+      if (!isOrgOwner(user)) {
+        skip(
+          "Current user is not an org owner; legacy team mutation coverage is unsafe.",
+        );
+      }
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
+
+      const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 20);
+      const legacyEmail =
+        `api.journey.legacy-team.${marker}@futureagi.local`.toLowerCase();
+      const aliasEmail =
+        `api.journey.legacy-team-alias.${marker}@futureagi.local`.toLowerCase();
+      const loginEmail =
+        `api.journey.login.${marker}@futureagi.local`.toLowerCase();
+      const loginPassword = `ApiJourney${marker.slice(0, 8)}123!`;
+
+      cleanup.defer("delete disposable legacy team user artifacts", () =>
+        deleteDisposableRbacUserArtifacts(legacyEmail),
+      );
+      cleanup.defer("delete disposable legacy alias guard artifacts", () =>
+        deleteDisposableRbacUserArtifacts(aliasEmail),
+      );
+      cleanup.defer("delete disposable login user artifacts", () =>
+        deleteDisposableRbacUserArtifacts(loginEmail),
+      );
+
+      const legacyCreated = await client.post(
+        apiPath("/accounts/team/users/"),
+        {
+          members: [
+            {
+              email: legacyEmail,
+              name: "API Journey Legacy Team",
+              role: "Member",
+            },
+          ],
+        },
+      );
+      const legacyMember = asArray(legacyCreated?.created_members).find(
+        (row) => String(row?.email || "").toLowerCase() === legacyEmail,
+      );
+      assert(
+        isUuid(legacyMember?.id),
+        "Legacy team create did not return a created member id.",
+      );
+
+      let legacyAudit = await loadLegacyTeamMemberAudit({
+        email: legacyEmail,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        legacyAudit.user_count === 1,
+        "Legacy team create did not persist one disposable user.",
+      );
+      assert(
+        legacyAudit.user_active === false,
+        "Legacy team create should leave invited user inactive.",
+      );
+      assert(
+        legacyAudit.active_workspace_membership_count === 1,
+        "Legacy team create did not persist active workspace membership.",
+      );
+
+      const memberDetail = await client.get(
+        apiPath("/accounts/team/users/{member_id}/", {
+          member_id: legacyMember.id,
+        }),
+        {
+          query: {
+            workspace_id: workspaceId,
+            is_active: "false",
+            page: 1,
+            page_size: 10,
+          },
+        },
+      );
+      const detailRows = asArray(memberDetail);
+      assert(
+        getPayloadTotal(memberDetail) === 1,
+        "Member detail alias did not return exactly one row.",
+      );
+      assert(
+        detailRows.length === 1 && detailRows[0]?.id === legacyMember.id,
+        "Member detail alias did not filter to the requested member id.",
+      );
+      assert(
+        detailRows[0]?.workspace_member === true,
+        "Member detail alias did not report the active workspace membership.",
+      );
+
+      const missingMemberDetail = await expectApiError(
+        () =>
+          client.get(
+            apiPath("/accounts/team/users/{member_id}/", {
+              member_id: "00000000-0000-0000-0000-000000000000",
+            }),
+          ),
+        [404],
+        "Legacy team member detail unexpectedly returned the full team for a missing id.",
+      );
+
+      const memberSpecificCreate = await expectApiError(
+        () =>
+          client.post(
+            apiPath("/accounts/team/users/{member_id}/", {
+              member_id: legacyMember.id,
+            }),
+            {
+              members: [
+                {
+                  email: aliasEmail,
+                  name: "API Journey Alias Guard",
+                  role: "Member",
+                },
+              ],
+            },
+          ),
+        [400],
+        "Member-specific team create unexpectedly mutated while ignoring member_id.",
+      );
+      const aliasAudit = await loadLegacyTeamMemberAudit({
+        email: aliasEmail,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        aliasAudit.user_count === 0,
+        "Member-specific team create guard still created a user.",
+      );
+
+      const collectionDelete = await expectApiError(
+        () => client.delete(apiPath("/accounts/team/users/")),
+        [400],
+        "Collection team delete unexpectedly succeeded without a member id.",
+      );
+
+      const loginInvite = await client.post(
+        apiPath("/accounts/organization/invite/"),
+        {
+          emails: [loginEmail],
+          org_level: 3,
+          workspace_access: [{ workspace_id: workspaceId, level: 3 }],
+        },
+      );
+      assert(
+        asArray(loginInvite?.invited).includes(loginEmail),
+        "Login invite did not create disposable user.",
+      );
+
+      const loginTokenInfo = await resolveInviteAcceptanceToken(loginEmail);
+      const acceptPath = apiPath(
+        "/accounts/accept-invitation/{uidb64}/{token}/",
+        {
+          uidb64: loginTokenInfo.uidb64,
+          token: loginTokenInfo.token,
+        },
+      );
+      await unauthenticatedApiRequest(apiBase, "POST", acceptPath, {
+        new_password: loginPassword,
+        repeat_password: loginPassword,
+      });
+
+      const directLogin = await unauthenticatedApiRequest(
+        apiBase,
+        "POST",
+        apiPath("/accounts/token/"),
+        {
+          email: loginEmail.toUpperCase(),
+          password: loginPassword,
+          remember_me: true,
+        },
+      );
+      assert(
+        typeof directLogin?.access === "string" &&
+          directLogin.access.length > 20,
+        "Direct login did not return an access token.",
+      );
+      assert(
+        typeof directLogin?.refresh === "string" &&
+          directLogin.refresh.length > 20,
+        "Direct login did not return a refresh token.",
+      );
+
+      const loginAudit = await loadLegacyTeamMemberAudit({
+        email: loginEmail,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        loginAudit.user_active === true,
+        "Direct-login user was not active after invite acceptance.",
+      );
+      assert(
+        loginAudit.active_access_token_count >= 1,
+        "Direct login did not persist an active access token.",
+      );
+      assert(
+        loginAudit.active_refresh_token_count >= 1,
+        "Direct login did not persist an active refresh token.",
+      );
+      assert(
+        loginAudit.selected_organization_id === organizationId,
+        "Direct login did not persist selected organization context.",
+      );
+
+      await client.delete(
+        apiPath("/accounts/team/users/{member_id}/", {
+          member_id: legacyMember.id,
+        }),
+      );
+      await deleteDisposableRbacUserArtifacts(legacyEmail);
+      await deleteDisposableRbacUserArtifacts(aliasEmail);
+      await deleteDisposableRbacUserArtifacts(loginEmail);
+      legacyAudit = await loadLegacyTeamMemberAudit({
+        email: legacyEmail,
+        organizationId,
+        workspaceId,
+      });
+      const loginCleanupAudit = await loadLegacyTeamMemberAudit({
+        email: loginEmail,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        legacyAudit.user_count === 0,
+        "Disposable legacy team user remained after cleanup.",
+      );
+      assert(
+        loginCleanupAudit.user_count === 0,
+        "Disposable login user remained after cleanup.",
+      );
+
+      evidence.push({
+        legacy_email: legacyEmail,
+        legacy_user_id: legacyMember.id,
+        legacy_detail_total: getPayloadTotal(memberDetail),
+        missing_member_detail_status: missingMemberDetail.status,
+        member_specific_create_status: memberSpecificCreate.status,
+        collection_delete_status: collectionDelete.status,
+        login_email: loginEmail,
+        login_user_id: loginTokenInfo.user_id,
+        active_access_token_count: loginAudit.active_access_token_count,
+        active_refresh_token_count: loginAudit.active_refresh_token_count,
+        cleanup_legacy_user_count: legacyAudit.user_count,
+        cleanup_login_user_count: loginCleanupAudit.user_count,
+      });
+    },
+  },
+  {
     id: "CORE-API-006",
-    title: "Profile name revert, timezone capture, 2FA status, passkey list, and org security policy",
-    tags: ["core", "accounts", "settings", "profile", "security", "mutating", "data-integrity"],
+    title:
+      "Profile name revert, timezone capture, 2FA status, passkey list, and org security policy",
+    tags: [
+      "core",
+      "accounts",
+      "settings",
+      "profile",
+      "security",
+      "mutating",
+      "data-integrity",
+    ],
     async run({ client, user, cleanup, runId, organizationId, evidence }) {
       requireMutations();
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
       const email = currentUserEmail(userInfo) || currentUserEmail(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(email.includes("@"), "Authenticated user-info did not include an email.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        email.includes("@"),
+        "Authenticated user-info did not include an email.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
 
-      const originalProfile = await client.get(apiPath("/accounts/get-user-profile-details/"));
+      const originalProfile = await client.get(
+        apiPath("/accounts/get-user-profile-details/"),
+      );
       const originalName = String(originalProfile?.name || "").trim();
       assert(originalName, "Profile details did not include a current name.");
-      assert(originalProfile?.email === email, "Profile details email did not match user-info.");
+      assert(
+        originalProfile?.email === email,
+        "Profile details email did not match user-info.",
+      );
 
-      const originalAudit = await loadProfileSecurityDbAudit({ userId, organizationId });
-      assert(originalAudit.user_id === userId, "Profile DB audit did not resolve the current user row.");
-      assert(originalAudit.email === email, "Profile DB audit user email did not match user-info.");
-      assert(originalAudit.name === originalName, "Profile DB audit name did not match profile details.");
+      const originalAudit = await loadProfileSecurityDbAudit({
+        userId,
+        organizationId,
+      });
+      assert(
+        originalAudit.user_id === userId,
+        "Profile DB audit did not resolve the current user row.",
+      );
+      assert(
+        originalAudit.email === email,
+        "Profile DB audit user email did not match user-info.",
+      );
+      assert(
+        originalAudit.name === originalName,
+        "Profile DB audit name did not match profile details.",
+      );
 
       cleanup.defer("restore current user profile name", async () => {
-        await client.post(apiPath("/accounts/update-user-full-name/"), { name: originalName });
+        await client.post(apiPath("/accounts/update-user-full-name/"), {
+          name: originalName,
+        });
       });
       cleanup.defer("restore current user timezone", async () => {
-        await restoreUserTimezoneDb({ userId, timezone: originalAudit.last_timezone });
+        await restoreUserTimezoneDb({
+          userId,
+          timezone: originalAudit.last_timezone,
+        });
       });
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 12);
@@ -1229,10 +2083,18 @@ export const appCoreJourneys = [
       await client.post(apiPath("/accounts/update-user-full-name/"), {
         name: updatedName,
       });
-      let profile = await client.get(apiPath("/accounts/get-user-profile-details/"));
-      assert(profile?.name === updatedName, "Profile details did not reflect updated full name.");
+      let profile = await client.get(
+        apiPath("/accounts/get-user-profile-details/"),
+      );
+      assert(
+        profile?.name === updatedName,
+        "Profile details did not reflect updated full name.",
+      );
       let audit = await loadProfileSecurityDbAudit({ userId, organizationId });
-      assert(audit.name === updatedName, "DB audit did not persist updated full name.");
+      assert(
+        audit.name === updatedName,
+        "DB audit did not persist updated full name.",
+      );
 
       const invalidTimezoneError = await expectApiError(
         () =>
@@ -1243,23 +2105,41 @@ export const appCoreJourneys = [
         "Invalid timezone unexpectedly succeeded.",
       );
       const timezone = "Asia/Kolkata";
-      const timezoneResponse = await client.post(apiPath("/accounts/me/timezone/"), {
-        timezone,
-      });
-      assert(timezoneResponse?.timezone === timezone, "Timezone capture did not echo the saved timezone.");
+      const timezoneResponse = await client.post(
+        apiPath("/accounts/me/timezone/"),
+        {
+          timezone,
+        },
+      );
+      assert(
+        timezoneResponse?.timezone === timezone,
+        "Timezone capture did not echo the saved timezone.",
+      );
       audit = await loadProfileSecurityDbAudit({ userId, organizationId });
-      assert(audit.last_timezone === timezone, "DB audit did not persist last_timezone.");
+      assert(
+        audit.last_timezone === timezone,
+        "DB audit did not persist last_timezone.",
+      );
 
-      const twoFactorStatus = await client.get(apiPath("/accounts/2fa/status/"), {
-        unwrap: false,
-      });
+      const twoFactorStatus = await client.get(
+        apiPath("/accounts/2fa/status/"),
+        {
+          unwrap: false,
+        },
+      );
       assert(
         typeof twoFactorStatus?.two_factor_enabled === "boolean",
         "2FA status did not return canonical two_factor_enabled boolean.",
       );
-      assert(twoFactorStatus?.twoFactorEnabled === undefined, "2FA status returned stale camelCase alias.");
       assert(
-        Object.prototype.hasOwnProperty.call(twoFactorStatus ?? {}, "recovery_codes_remaining"),
+        twoFactorStatus?.twoFactorEnabled === undefined,
+        "2FA status returned stale camelCase alias.",
+      );
+      assert(
+        Object.prototype.hasOwnProperty.call(
+          twoFactorStatus ?? {},
+          "recovery_codes_remaining",
+        ),
         "2FA status did not return canonical recovery_codes_remaining key.",
       );
       assert(
@@ -1276,7 +2156,9 @@ export const appCoreJourneys = [
         "2FA status did not include passkey enabled/count fields.",
       );
 
-      const passkeys = asArray(await client.get(apiPath("/accounts/passkeys/")));
+      const passkeys = asArray(
+        await client.get(apiPath("/accounts/passkeys/")),
+      );
       assert(
         passkeys.every((passkey) => passkey?.id && passkey?.name),
         "Passkey list returned a row without id/name.",
@@ -1286,9 +2168,12 @@ export const appCoreJourneys = [
         "Passkey API count did not match DB audit count.",
       );
 
-      const orgPolicy = await client.get(apiPath("/accounts/organization/2fa-policy/"), {
-        unwrap: false,
-      });
+      const orgPolicy = await client.get(
+        apiPath("/accounts/organization/2fa-policy/"),
+        {
+          unwrap: false,
+        },
+      );
       assert(
         typeof orgPolicy?.require_2fa === "boolean",
         "Organization 2FA policy did not return require_2fa boolean.",
@@ -1297,14 +2182,30 @@ export const appCoreJourneys = [
         Number.isInteger(orgPolicy?.require_2fa_grace_period_days),
         "Organization 2FA policy did not return grace period days.",
       );
-      assert(orgPolicy?.require2fa === undefined, "Organization 2FA policy returned stale camelCase alias.");
+      assert(
+        orgPolicy?.require2fa === undefined,
+        "Organization 2FA policy returned stale camelCase alias.",
+      );
 
-      await client.post(apiPath("/accounts/update-user-full-name/"), { name: originalName });
-      profile = await client.get(apiPath("/accounts/get-user-profile-details/"));
-      assert(profile?.name === originalName, "Profile full name did not revert through public API.");
-      await restoreUserTimezoneDb({ userId, timezone: originalAudit.last_timezone });
+      await client.post(apiPath("/accounts/update-user-full-name/"), {
+        name: originalName,
+      });
+      profile = await client.get(
+        apiPath("/accounts/get-user-profile-details/"),
+      );
+      assert(
+        profile?.name === originalName,
+        "Profile full name did not revert through public API.",
+      );
+      await restoreUserTimezoneDb({
+        userId,
+        timezone: originalAudit.last_timezone,
+      });
       audit = await loadProfileSecurityDbAudit({ userId, organizationId });
-      assert(audit.name === originalName, "DB audit did not show reverted full name.");
+      assert(
+        audit.name === originalName,
+        "DB audit did not show reverted full name.",
+      );
       assert(
         audit.last_timezone === originalAudit.last_timezone,
         "DB audit did not show restored last_timezone.",
@@ -1329,26 +2230,60 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-007",
-    title: "Workspace display name revert, workspace list, and member list contracts",
-    tags: ["core", "accounts", "settings", "workspace", "members", "mutating", "data-integrity"],
-    async run({ client, user, cleanup, runId, organizationId, workspaceId, evidence }) {
+    title:
+      "Workspace display name revert, workspace list, and member list contracts",
+    tags: [
+      "core",
+      "accounts",
+      "settings",
+      "workspace",
+      "members",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      user,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
       const email = currentUserEmail(userInfo) || currentUserEmail(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(email.includes("@"), "Authenticated user-info did not include an email.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        email.includes("@"),
+        "Authenticated user-info did not include an email.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
-      const workspacesPayload = await client.get(apiPath("/accounts/workspace/list/"));
+      const workspacesPayload = await client.get(
+        apiPath("/accounts/workspace/list/"),
+      );
       const workspaces = asArray(workspacesPayload);
       const workspace = workspaces.find((row) => row?.id === workspaceId);
       assert(workspace, "Workspace list did not include the active workspace.");
       const originalDisplayName = String(
         workspace.display_name || workspace.name || "",
       ).trim();
-      assert(originalDisplayName, "Workspace list did not include a display name or name.");
+      assert(
+        originalDisplayName,
+        "Workspace list did not include a display name or name.",
+      );
       assert(
         Number(workspace.user_ws_level ?? 0) >= 8,
         "Current user is not workspace admin for the active workspace.",
@@ -1378,9 +2313,14 @@ export const appCoreJourneys = [
 
       cleanup.defer("restore workspace display name", async () => {
         try {
-          await client.put(apiPath("/accounts/workspaces/{workspace_id}/", { workspace_id: workspaceId }), {
-            display_name: originalDisplayName,
-          });
+          await client.put(
+            apiPath("/accounts/workspaces/{workspace_id}/", {
+              workspace_id: workspaceId,
+            }),
+            {
+              display_name: originalDisplayName,
+            },
+          );
         } finally {
           await restoreWorkspaceDisplayNameDb({
             workspaceId,
@@ -1390,9 +2330,14 @@ export const appCoreJourneys = [
       });
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 12);
-      const updatedDisplayName = `${originalDisplayName} API ${marker}`.slice(0, 120);
+      const updatedDisplayName = `${originalDisplayName} API ${marker}`.slice(
+        0,
+        120,
+      );
       const updateResponse = await client.put(
-        apiPath("/accounts/workspaces/{workspace_id}/", { workspace_id: workspaceId }),
+        apiPath("/accounts/workspaces/{workspace_id}/", {
+          workspace_id: workspaceId,
+        }),
         { display_name: updatedDisplayName },
       );
       assert(
@@ -1425,7 +2370,9 @@ export const appCoreJourneys = [
           workspace_id: workspaceId,
         }),
       );
-      const legacyMembers = asArray(legacyMembersPayload?.members || legacyMembersPayload);
+      const legacyMembers = asArray(
+        legacyMembersPayload?.members || legacyMembersPayload,
+      );
       const legacyCurrentUser = findUserRow(legacyMembers, userId, email);
       assert(
         legacyCurrentUser,
@@ -1461,11 +2408,23 @@ export const appCoreJourneys = [
         "Current RBAC workspace member row did not expose workspace-admin level.",
       );
 
-      await client.put(apiPath("/accounts/workspaces/{workspace_id}/", { workspace_id: workspaceId }), {
-        display_name: originalDisplayName,
+      await client.put(
+        apiPath("/accounts/workspaces/{workspace_id}/", {
+          workspace_id: workspaceId,
+        }),
+        {
+          display_name: originalDisplayName,
+        },
+      );
+      await restoreWorkspaceDisplayNameDb({
+        workspaceId,
+        displayName: originalDisplayName,
       });
-      await restoreWorkspaceDisplayNameDb({ workspaceId, displayName: originalDisplayName });
-      audit = await loadWorkspaceSettingsDbAudit({ userId, organizationId, workspaceId });
+      audit = await loadWorkspaceSettingsDbAudit({
+        userId,
+        organizationId,
+        workspaceId,
+      });
       assert(
         audit.display_name === originalDisplayName,
         "Workspace display name did not revert.",
@@ -1487,22 +2446,51 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-008",
-    title: "Workspace usage summary, eval breakdown, month-boundary guard, and strict query contracts",
-    tags: ["core", "settings", "workspace", "usage", "billing", "mutating", "data-integrity"],
-    async run({ client, user, cleanup, runId, organizationId, workspaceId, evidence }) {
+    title:
+      "Workspace usage summary, eval breakdown, month-boundary guard, and strict query contracts",
+    tags: [
+      "core",
+      "settings",
+      "workspace",
+      "usage",
+      "billing",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      user,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const now = new Date();
       const currentMonth = now.getUTCMonth() + 1;
       const currentYear = now.getUTCFullYear();
-      const usageSummary = await client.get(apiPath("/usage/workspace-usage-summary/"), {
-        query: { month: currentMonth, year: currentYear },
-      });
+      const usageSummary = await client.get(
+        apiPath("/usage/workspace-usage-summary/"),
+        {
+          query: { month: currentMonth, year: currentYear },
+        },
+      );
       assert(
         usageSummary?.organization_id === organizationId,
         "Workspace usage summary organization_id did not match context.",
@@ -1512,14 +2500,27 @@ export const appCoreJourneys = [
         "Workspace usage summary did not return total_workspaces.",
       );
       const workspaces = asArray(usageSummary?.workspaces);
-      assert(workspaces.length > 0, "Workspace usage summary returned no workspaces.");
+      assert(
+        workspaces.length > 0,
+        "Workspace usage summary returned no workspaces.",
+      );
       const activeWorkspace = workspaces.find((row) => row?.id === workspaceId);
-      assert(activeWorkspace, "Workspace usage summary did not include the active workspace.");
+      assert(
+        activeWorkspace,
+        "Workspace usage summary did not include the active workspace.",
+      );
       assertUsageWorkspaceRow(activeWorkspace, "active workspace usage row");
 
-      const evalSummary = await client.get(apiPath("/usage/workspace-eval-summary/"), {
-        query: { workspace_id: workspaceId, month: currentMonth, year: currentYear },
-      });
+      const evalSummary = await client.get(
+        apiPath("/usage/workspace-eval-summary/"),
+        {
+          query: {
+            workspace_id: workspaceId,
+            month: currentMonth,
+            year: currentYear,
+          },
+        },
+      );
       assertEvalSummaryPayload(evalSummary, "active workspace eval summary");
 
       const invalidMonthError = await expectApiError(
@@ -1581,39 +2582,64 @@ export const appCoreJourneys = [
         targetYear: boundary.target_year,
       });
       assert(
-        boundaryAudit.month_log_count === 1 && boundaryAudit.next_month_log_count === 1,
+        boundaryAudit.month_log_count === 1 &&
+          boundaryAudit.next_month_log_count === 1,
         "DB audit did not create one in-month and one next-month usage log.",
       );
       assert(
-        numbersClose(boundaryAudit.month_deducted_cost, boundary.expected_month_cost),
+        numbersClose(
+          boundaryAudit.month_deducted_cost,
+          boundary.expected_month_cost,
+        ),
         "DB audit in-month usage cost did not match seed data.",
       );
 
-      const boundaryUsageSummary = await client.get(apiPath("/usage/workspace-usage-summary/"), {
-        query: { month: boundary.target_month, year: boundary.target_year },
-      });
+      const boundaryUsageSummary = await client.get(
+        apiPath("/usage/workspace-usage-summary/"),
+        {
+          query: { month: boundary.target_month, year: boundary.target_year },
+        },
+      );
       const boundaryWorkspace = asArray(boundaryUsageSummary?.workspaces).find(
         (row) => row?.id === boundary.workspace_id,
       );
-      assert(boundaryWorkspace, "Boundary workspace did not appear in workspace usage summary.");
-      assertUsageWorkspaceRow(boundaryWorkspace, "boundary workspace usage row");
+      assert(
+        boundaryWorkspace,
+        "Boundary workspace did not appear in workspace usage summary.",
+      );
+      assertUsageWorkspaceRow(
+        boundaryWorkspace,
+        "boundary workspace usage row",
+      );
       assert(
         boundaryWorkspace.evaluations.count === 1 &&
-          numbersClose(boundaryWorkspace.evaluations.cost, boundary.expected_month_cost),
+          numbersClose(
+            boundaryWorkspace.evaluations.cost,
+            boundary.expected_month_cost,
+          ),
         "Workspace usage summary did not isolate the seeded calendar month.",
       );
 
-      const boundaryEvalSummary = await client.get(apiPath("/usage/workspace-eval-summary/"), {
-        query: {
-          workspace_id: boundary.workspace_id,
-          month: boundary.target_month,
-          year: boundary.target_year,
+      const boundaryEvalSummary = await client.get(
+        apiPath("/usage/workspace-eval-summary/"),
+        {
+          query: {
+            workspace_id: boundary.workspace_id,
+            month: boundary.target_month,
+            year: boundary.target_year,
+          },
         },
-      });
-      assertEvalSummaryPayload(boundaryEvalSummary, "boundary workspace eval summary");
+      );
+      assertEvalSummaryPayload(
+        boundaryEvalSummary,
+        "boundary workspace eval summary",
+      );
       assert(
         boundaryEvalSummary.total.count === 1 &&
-          numbersClose(boundaryEvalSummary.total.cost, boundary.expected_month_cost),
+          numbersClose(
+            boundaryEvalSummary.total.cost,
+            boundary.expected_month_cost,
+          ),
         "Workspace eval summary did not return exactly the seeded calendar-month usage.",
       );
 
@@ -1627,8 +2653,14 @@ export const appCoreJourneys = [
         targetMonth: boundary.target_month,
         targetYear: boundary.target_year,
       });
-      assert(cleanupAudit.total_log_count === 0, "Disposable workspace usage logs remained after cleanup.");
-      assert(cleanupAudit.workspace_count === 0, "Disposable usage workspace remained after cleanup.");
+      assert(
+        cleanupAudit.total_log_count === 0,
+        "Disposable workspace usage logs remained after cleanup.",
+      );
+      assert(
+        cleanupAudit.workspace_count === 0,
+        "Disposable usage workspace remained after cleanup.",
+      );
 
       evidence.push({
         workspace_id: workspaceId,
@@ -1653,15 +2685,40 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-009",
-    title: "Workspace integration list, detail masking, sync-log isolation, and cleanup",
-    tags: ["core", "settings", "workspace", "integrations", "mutating", "data-integrity"],
-    async run({ client, user, cleanup, runId, organizationId, workspaceId, evidence }) {
+    title:
+      "Workspace integration list, detail masking, sync-log isolation, and cleanup",
+    tags: [
+      "core",
+      "settings",
+      "workspace",
+      "integrations",
+      "mutating",
+      "data-integrity",
+    ],
+    async run({
+      client,
+      user,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 20);
       const seeded = await seedIntegrationConnectionData({
@@ -1674,9 +2731,12 @@ export const appCoreJourneys = [
         deleteIntegrationConnectionData({ connectionId: seeded.connection_id }),
       );
 
-      const connectionList = await client.get(apiPath("/integrations/connections/"), {
-        query: { page_number: 0, page_size: 100 },
-      });
+      const connectionList = await client.get(
+        apiPath("/integrations/connections/"),
+        {
+          query: { page_number: 0, page_size: 100 },
+        },
+      );
       assert(
         Number.isInteger(connectionList?.metadata?.total_count),
         "Integration connection list did not return metadata.total_count.",
@@ -1684,8 +2744,13 @@ export const appCoreJourneys = [
       const connections = Array.isArray(connectionList?.connections)
         ? connectionList.connections
         : [];
-      const seededRow = connections.find((row) => row?.id === seeded.connection_id);
-      assert(seededRow, "Integration connection list did not include the seeded connection.");
+      const seededRow = connections.find(
+        (row) => row?.id === seeded.connection_id,
+      );
+      assert(
+        seededRow,
+        "Integration connection list did not include the seeded connection.",
+      );
       assert(
         seededRow.display_name === seeded.display_name,
         "Integration list row did not return seeded display_name.",
@@ -1705,23 +2770,46 @@ export const appCoreJourneys = [
       assertNoCredentialLeak(seededRow, seeded, "integration list row");
 
       const detail = await client.get(
-        apiPath("/integrations/connections/{id}/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/", {
+          id: seeded.connection_id,
+        }),
       );
-      assert(detail?.id === seeded.connection_id, "Integration detail returned the wrong id.");
-      assert(detail?.display_name === seeded.display_name, "Integration detail display_name mismatch.");
-      assert(detail?.host_url === seeded.host_url, "Integration detail host_url mismatch.");
-      assert(detail?.public_key_display === seeded.expected_public_key_display, "Public key was not masked as expected.");
-      assert(detail?.secret_key_display === seeded.expected_secret_key_display, "Secret key was not masked as expected.");
-      assert(detail?.public_key === undefined && detail?.secret_key === undefined, "Integration detail leaked raw credential fields.");
+      assert(
+        detail?.id === seeded.connection_id,
+        "Integration detail returned the wrong id.",
+      );
+      assert(
+        detail?.display_name === seeded.display_name,
+        "Integration detail display_name mismatch.",
+      );
+      assert(
+        detail?.host_url === seeded.host_url,
+        "Integration detail host_url mismatch.",
+      );
+      assert(
+        detail?.public_key_display === seeded.expected_public_key_display,
+        "Public key was not masked as expected.",
+      );
+      assert(
+        detail?.secret_key_display === seeded.expected_secret_key_display,
+        "Secret key was not masked as expected.",
+      );
+      assert(
+        detail?.public_key === undefined && detail?.secret_key === undefined,
+        "Integration detail leaked raw credential fields.",
+      );
       assertNoCredentialLeak(detail, seeded, "integration detail");
 
-      const syncLogsPayload = await client.get(apiPath("/integrations/sync-logs/"), {
-        query: {
-          connection_id: seeded.connection_id,
-          page_number: 0,
-          page_size: 10,
+      const syncLogsPayload = await client.get(
+        apiPath("/integrations/sync-logs/"),
+        {
+          query: {
+            connection_id: seeded.connection_id,
+            page_number: 0,
+            page_size: 10,
+          },
         },
-      });
+      );
       assert(
         syncLogsPayload?.metadata?.total_count === 1,
         "Filtered sync-log list did not return exactly the seeded log.",
@@ -1729,10 +2817,19 @@ export const appCoreJourneys = [
       const syncLogs = Array.isArray(syncLogsPayload?.sync_logs)
         ? syncLogsPayload.sync_logs
         : [];
-      assert(syncLogs.length === 1, "Filtered sync-log page did not include one row.");
+      assert(
+        syncLogs.length === 1,
+        "Filtered sync-log page did not include one row.",
+      );
       const syncLog = syncLogs[0];
-      assert(syncLog.connection === seeded.connection_id, "Sync log row did not belong to seeded connection.");
-      assert(syncLog.status === "failed", "Seeded sync log did not reload with failed status.");
+      assert(
+        syncLog.connection === seeded.connection_id,
+        "Sync log row did not belong to seeded connection.",
+      );
+      assert(
+        syncLog.status === "failed",
+        "Seeded sync log did not reload with failed status.",
+      );
       assertNoCredentialLeak(syncLog, seeded, "sync log row");
 
       const unknownQueryError = await expectApiError(
@@ -1767,20 +2864,43 @@ export const appCoreJourneys = [
         organizationId,
         workspaceId,
       });
-      assert(audit.connection_count === 1, "DB audit did not find the seeded integration connection.");
-      assert(audit.sync_log_count === 1, "DB audit did not find the seeded integration sync log.");
-      assert(audit.workspace_id === workspaceId, "DB audit integration workspace did not match context.");
-      assert(audit.organization_id === organizationId, "DB audit integration organization did not match context.");
-      assert(audit.encrypted_credentials_bytes > 0, "DB audit found empty encrypted credentials.");
+      assert(
+        audit.connection_count === 1,
+        "DB audit did not find the seeded integration connection.",
+      );
+      assert(
+        audit.sync_log_count === 1,
+        "DB audit did not find the seeded integration sync log.",
+      );
+      assert(
+        audit.workspace_id === workspaceId,
+        "DB audit integration workspace did not match context.",
+      );
+      assert(
+        audit.organization_id === organizationId,
+        "DB audit integration organization did not match context.",
+      );
+      assert(
+        audit.encrypted_credentials_bytes > 0,
+        "DB audit found empty encrypted credentials.",
+      );
 
-      await deleteIntegrationConnectionData({ connectionId: seeded.connection_id });
+      await deleteIntegrationConnectionData({
+        connectionId: seeded.connection_id,
+      });
       const cleanupAudit = await loadIntegrationConnectionDbAudit({
         connectionId: seeded.connection_id,
         organizationId,
         workspaceId,
       });
-      assert(cleanupAudit.connection_count === 0, "Disposable integration connection remained after cleanup.");
-      assert(cleanupAudit.sync_log_count === 0, "Disposable integration sync log remained after cleanup.");
+      assert(
+        cleanupAudit.connection_count === 0,
+        "Disposable integration connection remained after cleanup.",
+      );
+      assert(
+        cleanupAudit.sync_log_count === 0,
+        "Disposable integration sync log remained after cleanup.",
+      );
 
       evidence.push({
         connection_id: seeded.connection_id,
@@ -1802,15 +2922,33 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-013",
-    title: "Global settings integration detail update, pause, resume, sync guards, and delete lifecycle",
+    title:
+      "Global settings integration detail update, pause, resume, sync guards, and delete lifecycle",
     tags: ["core", "settings", "integrations", "mutating", "data-integrity"],
-    async run({ client, user, cleanup, runId, organizationId, workspaceId, evidence }) {
+    async run({
+      client,
+      user,
+      cleanup,
+      runId,
+      organizationId,
+      workspaceId,
+      evidence,
+    }) {
       requireMutations();
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const marker = runId.replace(/[^a-z0-9-]/gi, "").slice(0, 20);
       const seeded = await seedIntegrationConnectionData({
@@ -1823,46 +2961,82 @@ export const appCoreJourneys = [
         lastSyncedSecondsAgo: 20,
         displayNamePrefix: "API Journey Global Integration",
       });
-      cleanup.defer("delete disposable global integration connection data", () =>
-        deleteIntegrationConnectionData({ connectionId: seeded.connection_id }),
+      cleanup.defer(
+        "delete disposable global integration connection data",
+        () =>
+          deleteIntegrationConnectionData({
+            connectionId: seeded.connection_id,
+          }),
       );
 
       const detail = await client.get(
-        apiPath("/integrations/connections/{id}/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/", {
+          id: seeded.connection_id,
+        }),
       );
-      assert(detail?.id === seeded.connection_id, "Global integration detail returned the wrong id.");
-      assert(detail?.status === "active", "Seeded global integration was not active.");
-      assert(detail?.project_name, "Seeded global integration detail did not include linked project name.");
+      assert(
+        detail?.id === seeded.connection_id,
+        "Global integration detail returned the wrong id.",
+      );
+      assert(
+        detail?.status === "active",
+        "Seeded global integration was not active.",
+      );
+      assert(
+        detail?.project_name,
+        "Seeded global integration detail did not include linked project name.",
+      );
       assertNoCredentialLeak(detail, seeded, "global integration detail");
 
       const patchName = `${seeded.display_name} patched`;
       const patched = await client.patch(
-        apiPath("/integrations/connections/{id}/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/", {
+          id: seeded.connection_id,
+        }),
         {
           display_name: patchName,
           sync_interval_seconds: 600,
         },
       );
-      assert(patched?.display_name === patchName, "PATCH integration display_name did not persist.");
-      assert(patched?.sync_interval_seconds === 600, "PATCH integration sync interval did not persist.");
-      assert(patched?.status === "active", "PATCH unexpectedly changed integration status.");
+      assert(
+        patched?.display_name === patchName,
+        "PATCH integration display_name did not persist.",
+      );
+      assert(
+        patched?.sync_interval_seconds === 600,
+        "PATCH integration sync interval did not persist.",
+      );
+      assert(
+        patched?.status === "active",
+        "PATCH unexpectedly changed integration status.",
+      );
       assertNoCredentialLeak(patched, seeded, "patched integration response");
 
       const putName = `${seeded.display_name} put`;
       const putUpdated = await client.put(
-        apiPath("/integrations/connections/{id}/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/", {
+          id: seeded.connection_id,
+        }),
         {
           display_name: putName,
         },
       );
-      assert(putUpdated?.display_name === putName, "PUT integration display_name did not persist.");
-      assert(putUpdated?.status === "active", "PUT unexpectedly changed integration status.");
+      assert(
+        putUpdated?.display_name === putName,
+        "PUT integration display_name did not persist.",
+      );
+      assert(
+        putUpdated?.status === "active",
+        "PUT unexpectedly changed integration status.",
+      );
       assertNoCredentialLeak(putUpdated, seeded, "put integration response");
 
       const forbiddenPutError = await expectApiError(
         () =>
           client.put(
-            apiPath("/integrations/connections/{id}/", { id: seeded.connection_id }),
+            apiPath("/integrations/connections/{id}/", {
+              id: seeded.connection_id,
+            }),
             {
               display_name: "should not persist",
               status: "paused",
@@ -1877,9 +3051,14 @@ export const appCoreJourneys = [
       );
 
       const paused = await client.post(
-        apiPath("/integrations/connections/{id}/pause/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/pause/", {
+          id: seeded.connection_id,
+        }),
       );
-      assert(paused?.status === "paused", "Pause integration did not return paused status.");
+      assert(
+        paused?.status === "paused",
+        "Pause integration did not return paused status.",
+      );
 
       const pausedSyncError = await expectApiError(
         () =>
@@ -1897,9 +3076,14 @@ export const appCoreJourneys = [
       );
 
       const resumed = await client.post(
-        apiPath("/integrations/connections/{id}/resume/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/resume/", {
+          id: seeded.connection_id,
+        }),
       );
-      assert(resumed?.status === "active", "Resume integration did not return active status.");
+      assert(
+        resumed?.status === "active",
+        "Resume integration did not return active status.",
+      );
 
       const duplicateResumeError = await expectApiError(
         () =>
@@ -1936,17 +3120,40 @@ export const appCoreJourneys = [
         organizationId,
         workspaceId,
       });
-      assert(audit.connection_count === 1, "DB audit did not find global integration connection.");
-      assert(audit.sync_log_count === 1, "DB audit did not find global integration sync log.");
-      assert(audit.display_name === putName, "DB audit display_name did not match PUT update.");
-      assert(audit.status === "active", "DB audit status did not match resumed active state.");
-      assert(audit.sync_interval_seconds === 600, "DB audit sync interval did not match PATCH update.");
-      assert(audit.deleted === false, "DB audit found integration deleted before delete call.");
+      assert(
+        audit.connection_count === 1,
+        "DB audit did not find global integration connection.",
+      );
+      assert(
+        audit.sync_log_count === 1,
+        "DB audit did not find global integration sync log.",
+      );
+      assert(
+        audit.display_name === putName,
+        "DB audit display_name did not match PUT update.",
+      );
+      assert(
+        audit.status === "active",
+        "DB audit status did not match resumed active state.",
+      );
+      assert(
+        audit.sync_interval_seconds === 600,
+        "DB audit sync interval did not match PATCH update.",
+      );
+      assert(
+        audit.deleted === false,
+        "DB audit found integration deleted before delete call.",
+      );
 
       const deleted = await client.delete(
-        apiPath("/integrations/connections/{id}/", { id: seeded.connection_id }),
+        apiPath("/integrations/connections/{id}/", {
+          id: seeded.connection_id,
+        }),
       );
-      assert(deleted?.deleted === true, "Integration delete did not return deleted=true.");
+      assert(
+        deleted?.deleted === true,
+        "Integration delete did not return deleted=true.",
+      );
 
       const deletedDetailError = await expectApiError(
         () =>
@@ -1964,18 +3171,35 @@ export const appCoreJourneys = [
         organizationId,
         workspaceId,
       });
-      assert(deleteAudit.connection_count === 1, "Deleted integration row was not retained for soft-delete audit.");
-      assert(deleteAudit.deleted === true, "Public delete did not soft-delete the integration row.");
-      assert(deleteAudit.deleted_at_set === true, "Public delete did not set deleted_at.");
+      assert(
+        deleteAudit.connection_count === 1,
+        "Deleted integration row was not retained for soft-delete audit.",
+      );
+      assert(
+        deleteAudit.deleted === true,
+        "Public delete did not soft-delete the integration row.",
+      );
+      assert(
+        deleteAudit.deleted_at_set === true,
+        "Public delete did not set deleted_at.",
+      );
 
-      await deleteIntegrationConnectionData({ connectionId: seeded.connection_id });
+      await deleteIntegrationConnectionData({
+        connectionId: seeded.connection_id,
+      });
       const cleanupAudit = await loadIntegrationConnectionDbAudit({
         connectionId: seeded.connection_id,
         organizationId,
         workspaceId,
       });
-      assert(cleanupAudit.connection_count === 0, "Disposable global integration connection remained after cleanup.");
-      assert(cleanupAudit.sync_log_count === 0, "Disposable global integration sync log remained after cleanup.");
+      assert(
+        cleanupAudit.connection_count === 0,
+        "Disposable global integration connection remained after cleanup.",
+      );
+      assert(
+        cleanupAudit.sync_log_count === 0,
+        "Disposable global integration sync log remained after cleanup.",
+      );
 
       evidence.push({
         connection_id: seeded.connection_id,
@@ -1997,21 +3221,42 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-010",
-    title: "Workspace AI provider status, masking, custom model list, and DB parity",
-    tags: ["core", "settings", "workspace", "ai-providers", "data-integrity", "safe"],
+    title:
+      "Workspace AI provider status, masking, custom model list, and DB parity",
+    tags: [
+      "core",
+      "settings",
+      "workspace",
+      "ai-providers",
+      "data-integrity",
+      "safe",
+    ],
     async run({ client, organizationId, workspaceId, evidence }) {
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
-      const providerStatus = await client.get(apiPath("/model-hub/develops/provider-status/"));
+      const providerStatus = await client.get(
+        apiPath("/model-hub/develops/provider-status/"),
+      );
       const providers = Array.isArray(providerStatus?.providers)
         ? providerStatus.providers
         : [];
       assert(providers.length > 0, "Provider status did not return providers.");
       assertNoRawProviderSecretLeak(providerStatus, "provider status");
 
-      const configuredProviders = providers.filter((provider) => provider?.has_key);
-      assert(configuredProviders.length > 0, "Provider status did not report any configured providers.");
+      const configuredProviders = providers.filter(
+        (provider) => provider?.has_key,
+      );
+      assert(
+        configuredProviders.length > 0,
+        "Provider status did not report any configured providers.",
+      );
       for (const provider of providers) {
         assertProviderStatusRow(provider);
       }
@@ -2031,10 +3276,16 @@ export const appCoreJourneys = [
           typeof provider.masked_key === "string" &&
           provider.masked_key.includes("*"),
       );
-      assert(configuredTextProvider, "No configured text provider exposed a masked string key.");
+      assert(
+        configuredTextProvider,
+        "No configured text provider exposed a masked string key.",
+      );
 
       const configuredJsonProvider = configuredProviders.find(
-        (provider) => provider.type === "json" && provider.masked_key && typeof provider.masked_key === "object",
+        (provider) =>
+          provider.type === "json" &&
+          provider.masked_key &&
+          typeof provider.masked_key === "object",
       );
       if (configuredJsonProvider) {
         assert(
@@ -2043,14 +3294,20 @@ export const appCoreJourneys = [
         );
       }
 
-      const customModelsRaw = await client.get(apiPath("/model-hub/custom-models/"), {
-        query: { page_number: 0, page_size: 20 },
-        unwrap: false,
-      });
+      const customModelsRaw = await client.get(
+        apiPath("/model-hub/custom-models/"),
+        {
+          query: { page_number: 0, page_size: 20 },
+          unwrap: false,
+        },
+      );
       assertNoRawProviderSecretLeak(customModelsRaw, "custom model list");
       const customModelRows = asArray(customModelsRaw);
       for (const model of customModelRows) {
-        assert(isUuid(model?.id), "Custom model list row did not include a valid id.");
+        assert(
+          isUuid(model?.id),
+          "Custom model list row did not include a valid id.",
+        );
         assert(
           String(model?.user_model_id || model?.userModelId || "").trim(),
           "Custom model list row did not include a user model id.",
@@ -2063,7 +3320,10 @@ export const appCoreJourneys = [
       });
       assertNoRawProviderSecretLeak(apiKeysRaw, "api key list");
 
-      const audit = await loadProviderKeyDbAudit({ organizationId, workspaceId });
+      const audit = await loadProviderKeyDbAudit({
+        organizationId,
+        workspaceId,
+      });
       assert(
         audit.active_key_count >= configuredProviders.length,
         "Provider status reported more configured providers than scoped active key rows.",
@@ -2084,7 +3344,8 @@ export const appCoreJourneys = [
         configured_json_provider: configuredJsonProvider?.provider || null,
         custom_model_count: getPayloadTotal(customModelsRaw),
         api_key_list_rows: getPayloadTotal(apiKeysRaw),
-        api_key_list_has_key_field: JSON.stringify(apiKeysRaw).includes('"key"'),
+        api_key_list_has_key_field:
+          JSON.stringify(apiKeysRaw).includes('"key"'),
         db_active_key_count: audit.active_key_count,
         db_distinct_provider_count: audit.distinct_provider_count,
         db_duplicate_provider_row_count: audit.duplicate_provider_row_count,
@@ -2093,21 +3354,54 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-011",
-    title: "Billing pricing, invoices, budgets, payment methods, and EE license read contracts",
-    tags: ["core", "settings", "billing", "pricing", "licenses", "data-integrity", "safe"],
+    title:
+      "Billing pricing, invoices, budgets, payment methods, and EE license read contracts",
+    tags: [
+      "core",
+      "settings",
+      "billing",
+      "pricing",
+      "licenses",
+      "data-integrity",
+      "safe",
+    ],
     async run({ client, user, organizationId, workspaceId, evidence }) {
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const email = currentUserEmail(userInfo) || currentUserEmail(user);
-      assert(email.includes("@"), "Authenticated user-info did not include an email.");
+      assert(
+        email.includes("@"),
+        "Authenticated user-info did not include an email.",
+      );
 
       const plans = await client.get(apiPath("/usage/v2/plans-and-addons/"));
-      assert(String(plans?.current_plan || "").trim(), "Plans response omitted current_plan.");
-      assert(String(plans?.billing_interval || "").trim(), "Plans response omitted billing_interval.");
-      assert(Array.isArray(plans?.tiers) && plans.tiers.length >= 2, "Plans response did not include pricing tiers.");
-      assert(Array.isArray(plans?.addons) && plans.addons.length >= 3, "Plans response did not include add-ons.");
-      assert(plans?.pricing && typeof plans.pricing === "object", "Plans response omitted pricing dimensions.");
+      assert(
+        String(plans?.current_plan || "").trim(),
+        "Plans response omitted current_plan.",
+      );
+      assert(
+        String(plans?.billing_interval || "").trim(),
+        "Plans response omitted billing_interval.",
+      );
+      assert(
+        Array.isArray(plans?.tiers) && plans.tiers.length >= 2,
+        "Plans response did not include pricing tiers.",
+      );
+      assert(
+        Array.isArray(plans?.addons) && plans.addons.length >= 3,
+        "Plans response did not include add-ons.",
+      );
+      assert(
+        plans?.pricing && typeof plans.pricing === "object",
+        "Plans response omitted pricing dimensions.",
+      );
       assert(
         Object.prototype.hasOwnProperty.call(plans, "isCustomPricing"),
         "Plans response did not expose canonical isCustomPricing.",
@@ -2116,8 +3410,14 @@ export const appCoreJourneys = [
         Object.prototype.hasOwnProperty.call(plans, "customDetails"),
         "Plans response did not expose canonical customDetails.",
       );
-      assert(plans.is_custom_pricing === undefined, "Plans response returned stale is_custom_pricing alias.");
-      assert(plans.custom_details === undefined, "Plans response returned stale custom_details alias.");
+      assert(
+        plans.is_custom_pricing === undefined,
+        "Plans response returned stale is_custom_pricing alias.",
+      );
+      assert(
+        plans.custom_details === undefined,
+        "Plans response returned stale custom_details alias.",
+      );
       for (const tier of [...plans.tiers, ...plans.addons]) {
         assertPlanOptionRow(tier);
       }
@@ -2127,11 +3427,23 @@ export const appCoreJourneys = [
       assertNoBillingCheckoutPayload(plans, "plans and add-ons");
 
       const billing = await client.get(apiPath("/usage/v2/billing-overview/"));
-      assert(billing?.org_id === organizationId, "Billing overview organization did not match context.");
-      assert(billing?.period && /^\d{4}-\d{2}$/.test(billing.period), "Billing overview omitted YYYY-MM period.");
-      assert(billing?.plan === plans.current_plan, "Billing overview plan did not match plans current_plan.");
+      assert(
+        billing?.org_id === organizationId,
+        "Billing overview organization did not match context.",
+      );
+      assert(
+        billing?.period && /^\d{4}-\d{2}$/.test(billing.period),
+        "Billing overview omitted YYYY-MM period.",
+      );
+      assert(
+        billing?.plan === plans.current_plan,
+        "Billing overview plan did not match plans current_plan.",
+      );
       assertBillingMoneyFields(billing, "billing overview");
-      assert(Array.isArray(billing?.line_items), "Billing overview did not include line_items array.");
+      assert(
+        Array.isArray(billing?.line_items),
+        "Billing overview did not include line_items array.",
+      );
       for (const item of billing.line_items) {
         assertBillingLineItem(item, "billing overview line item");
       }
@@ -2152,8 +3464,14 @@ export const appCoreJourneys = [
             invoice_id: invoices[0].id,
           }),
         );
-        assert(invoiceDetail?.invoice?.id === invoices[0].id, "Invoice detail returned the wrong invoice.");
-        assert(Array.isArray(invoiceDetail?.line_items), "Invoice detail did not include line_items array.");
+        assert(
+          invoiceDetail?.invoice?.id === invoices[0].id,
+          "Invoice detail returned the wrong invoice.",
+        );
+        assert(
+          Array.isArray(invoiceDetail?.line_items),
+          "Invoice detail did not include line_items array.",
+        );
         for (const item of invoiceDetail.line_items) {
           assertBillingLineItem(item, "invoice detail line item");
         }
@@ -2171,13 +3489,21 @@ export const appCoreJourneys = [
         "Missing invoice detail unexpectedly succeeded.",
       );
 
-      const notifications = await client.get(apiPath("/usage/v2/notifications/"));
+      const notifications = await client.get(
+        apiPath("/usage/v2/notifications/"),
+      );
       const banners = Array.isArray(notifications?.banners)
         ? notifications.banners
         : [];
       for (const banner of banners) {
-        assert(String(banner?.id || "").trim(), "Notification banner omitted id.");
-        assert(String(banner?.message || "").trim(), "Notification banner omitted message.");
+        assert(
+          String(banner?.id || "").trim(),
+          "Notification banner omitted id.",
+        );
+        assert(
+          String(banner?.message || "").trim(),
+          "Notification banner omitted message.",
+        );
       }
 
       const budgetsPayload = await client.get(apiPath("/usage/v2/budgets/"));
@@ -2187,10 +3513,15 @@ export const appCoreJourneys = [
       for (const budget of budgets) {
         assert(isUuid(budget?.id), "Budget row omitted a valid id.");
         assert(String(budget?.name || "").trim(), "Budget row omitted name.");
-        assert(["notify", "warn", "pause"].includes(budget?.action), "Budget row returned unsupported action.");
+        assert(
+          ["notify", "warn", "pause"].includes(budget?.action),
+          "Budget row returned unsupported action.",
+        );
       }
 
-      const paymentMethods = asArray(await client.get(apiPath("/usage/v2/payment-methods/")));
+      const paymentMethods = asArray(
+        await client.get(apiPath("/usage/v2/payment-methods/")),
+      );
       for (const method of paymentMethods) {
         assertPaymentMethodRow(method);
       }
@@ -2270,8 +3601,11 @@ export const appCoreJourneys = [
         budget_count: budgets.length,
         payment_method_count: paymentMethods.length,
         ee_license_count: licenses.length,
-        legacy_subscription_status: legacySubscriptionStatus.result.subscription_status,
-        legacy_billing_details_fields: Object.keys(legacyBillingDetails.billing_info).length,
+        legacy_subscription_status:
+          legacySubscriptionStatus.result.subscription_status,
+        legacy_billing_details_fields: Object.keys(
+          legacyBillingDetails.billing_info,
+        ).length,
         db_subscription_count: audit.subscription_count,
         db_invoice_count: audit.invoice_count,
         db_budget_count: audit.budget_count,
@@ -2281,14 +3615,31 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-012",
-    title: "MCP server config, tools, sessions, analytics, and tool-group persistence",
+    title:
+      "MCP server config, tools, sessions, analytics, and tool-group persistence",
     tags: ["core", "settings", "mcp", "data-integrity", "mutating"],
-    async run({ client, user, organizationId, workspaceId, cleanup, evidence }) {
+    async run({
+      client,
+      user,
+      organizationId,
+      workspaceId,
+      cleanup,
+      evidence,
+    }) {
       const userInfo = await client.get(apiPath("/accounts/user-info/"));
       const userId = currentUserId(userInfo) || currentUserId(user);
-      assert(isUuid(userId), "Authenticated user-info did not include a valid user id.");
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
-      assert(isUuid(workspaceId), "Authenticated context did not resolve a workspace id.");
+      assert(
+        isUuid(userId),
+        "Authenticated user-info did not include a valid user id.",
+      );
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
 
       const config = await client.get(apiPath("/mcp/config/"));
       assertMCPConnectionConfig(config);
@@ -2303,15 +3654,32 @@ export const appCoreJourneys = [
       );
 
       const health = await client.get(apiPath("/mcp/health/"));
-      assert(health?.healthy === true, "MCP health endpoint did not report healthy true.");
-      assert(Number.isInteger(health?.tool_count), "MCP health omitted integer tool_count.");
-      assert(String(health?.version || "").trim(), "MCP health omitted version.");
+      assert(
+        health?.healthy === true,
+        "MCP health endpoint did not report healthy true.",
+      );
+      assert(
+        Number.isInteger(health?.tool_count),
+        "MCP health omitted integer tool_count.",
+      );
+      assert(
+        String(health?.version || "").trim(),
+        "MCP health omitted version.",
+      );
 
       const toolsPayload = await client.get(apiPath("/mcp/internal/tools/"));
-      const tools = Array.isArray(toolsPayload?.tools) ? toolsPayload.tools : [];
+      const tools = Array.isArray(toolsPayload?.tools)
+        ? toolsPayload.tools
+        : [];
       assert(tools.length > 0, "MCP tool list returned no tools.");
-      assert(toolsPayload.total === tools.length, "MCP tool list total did not match tool rows.");
-      assert(health.tool_count >= tools.length, "MCP health tool_count was smaller than enabled tool list.");
+      assert(
+        toolsPayload.total === tools.length,
+        "MCP tool list total did not match tool rows.",
+      );
+      assert(
+        health.tool_count >= tools.length,
+        "MCP health tool_count was smaller than enabled tool list.",
+      );
       for (const tool of tools) {
         assertMCPToolRow(tool);
       }
@@ -2327,7 +3695,10 @@ export const appCoreJourneys = [
         }),
       );
       for (const session of activeSessions) {
-        assert(session.status === "active", "Active MCP session filter returned a non-active row.");
+        assert(
+          session.status === "active",
+          "Active MCP session filter returned a non-active row.",
+        );
       }
       const missingSessionError = await expectApiError(
         () =>
@@ -2340,9 +3711,12 @@ export const appCoreJourneys = [
         "Deleting a missing MCP session unexpectedly succeeded.",
       );
 
-      const analyticsSummary = await client.get(apiPath("/mcp/analytics/summary/"), {
-        query: { days: 30 },
-      });
+      const analyticsSummary = await client.get(
+        apiPath("/mcp/analytics/summary/"),
+        {
+          query: { days: 30 },
+        },
+      );
       assertMCPAnalyticsSummary(analyticsSummary);
       const analyticsTools = asArray(
         await client.get(apiPath("/mcp/analytics/tools/"), {
@@ -2361,12 +3735,31 @@ export const appCoreJourneys = [
         assertMCPAnalyticsTimelineRow(row);
       }
 
-      const audit = await loadMCPSettingsDbAudit({ userId, organizationId, workspaceId });
-      assert(audit.connection_count === 1, "DB audit did not find exactly one MCP connection for user/workspace.");
-      assert(audit.connection_id === config.id, "DB audit MCP connection did not match config response.");
-      assert(audit.connection_organization_id === organizationId, "DB audit MCP connection organization mismatch.");
-      assert(audit.connection_workspace_id === workspaceId, "DB audit MCP connection workspace mismatch.");
-      assert(audit.tool_config_count === 1, "DB audit did not find exactly one MCP tool config.");
+      const audit = await loadMCPSettingsDbAudit({
+        userId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        audit.connection_count === 1,
+        "DB audit did not find exactly one MCP connection for user/workspace.",
+      );
+      assert(
+        audit.connection_id === config.id,
+        "DB audit MCP connection did not match config response.",
+      );
+      assert(
+        audit.connection_organization_id === organizationId,
+        "DB audit MCP connection organization mismatch.",
+      );
+      assert(
+        audit.connection_workspace_id === workspaceId,
+        "DB audit MCP connection workspace mismatch.",
+      );
+      assert(
+        audit.tool_config_count === 1,
+        "DB audit did not find exactly one MCP tool config.",
+      );
       assertGroupSetsEqual(
         audit.enabled_groups,
         toolGroups.enabled_groups,
@@ -2381,7 +3774,8 @@ export const appCoreJourneys = [
         "DB audit active MCP session count did not match analytics summary.",
       );
       assert(
-        audit.encrypted_token_count === 0 && audit.encrypted_refresh_token_count === 0,
+        audit.encrypted_token_count === 0 &&
+          audit.encrypted_refresh_token_count === 0,
         "Dashboard MCP config unexpectedly exposed token-backed connection rows for this local user.",
       );
 
@@ -2401,7 +3795,9 @@ export const appCoreJourneys = [
       if (envFlag("API_JOURNEY_MUTATIONS")) {
         const originalEnabledGroups = [...toolGroups.enabled_groups];
         const originalDisabledTools = [...(toolGroups.disabled_tools || [])];
-        const availableSlugs = toolGroups.available_groups.map((group) => group.slug);
+        const availableSlugs = toolGroups.available_groups.map(
+          (group) => group.slug,
+        );
         const groupToAdd = availableSlugs.find(
           (slug) => !originalEnabledGroups.includes(slug),
         );
@@ -2419,32 +3815,43 @@ export const appCoreJourneys = [
           }),
         );
 
-        const updatedGroups = await client.put(apiPath("/mcp/config/tool-groups/"), {
-          enabled_groups: nextEnabledGroups,
-          disabled_tools: originalDisabledTools,
-        });
+        const updatedGroups = await client.put(
+          apiPath("/mcp/config/tool-groups/"),
+          {
+            enabled_groups: nextEnabledGroups,
+            disabled_tools: originalDisabledTools,
+          },
+        );
         assertGroupSetsEqual(
           updatedGroups.enabled_groups,
           nextEnabledGroups,
           "MCP tool-group update response did not persist selected groups.",
         );
 
-        const updateAudit = await loadMCPSettingsDbAudit({ userId, organizationId, workspaceId });
+        const updateAudit = await loadMCPSettingsDbAudit({
+          userId,
+          organizationId,
+          workspaceId,
+        });
         assertGroupSetsEqual(
           updateAudit.enabled_groups,
           nextEnabledGroups,
           "DB audit did not persist MCP tool-group update.",
         );
-        const toolsAfterUpdatePayload = await client.get(apiPath("/mcp/internal/tools/"));
+        const toolsAfterUpdatePayload = await client.get(
+          apiPath("/mcp/internal/tools/"),
+        );
         const toolsAfterUpdate = Array.isArray(toolsAfterUpdatePayload?.tools)
           ? toolsAfterUpdatePayload.tools
           : [];
         assertMCPToolsRespectEnabledGroups(toolsAfterUpdate, nextEnabledGroups);
 
         mutationEvidence.tool_group_update_exercised = true;
-        mutationEvidence.original_enabled_group_count = originalEnabledGroups.length;
+        mutationEvidence.original_enabled_group_count =
+          originalEnabledGroups.length;
         mutationEvidence.updated_enabled_group_count = nextEnabledGroups.length;
-        mutationEvidence.changed_group = groupToAdd || originalEnabledGroups.at(-1);
+        mutationEvidence.changed_group =
+          groupToAdd || originalEnabledGroups.at(-1);
       }
 
       evidence.push({
@@ -2471,25 +3878,43 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-002",
-    title: "Developer secret key create, masked list, disable, enable, and delete lifecycle",
+    title:
+      "Developer secret key create, masked list, disable, enable, and delete lifecycle",
     tags: ["core", "keys", "mutating", "data-roundtrip", "security"],
     async run({ client, user, organizationId, cleanup, runId, evidence }) {
       requireMutations();
       if (!canManageOrgSecrets(user)) {
-        skip("Current user is not an org owner/admin; secret key cleanup is unsafe.");
+        skip(
+          "Current user is not an org owner/admin; secret key cleanup is unsafe.",
+        );
       }
-      assert(isUuid(organizationId), "Authenticated context did not resolve an organization id.");
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
 
       const keyName = `api journey key ${runId}`;
-      const created = await client.post(apiPath("/accounts/key/generate_secret_key/"), {
-        key_name: keyName,
-      });
+      const created = await client.post(
+        apiPath("/accounts/key/generate_secret_key/"),
+        {
+          key_name: keyName,
+        },
+      );
       assert(created?.key_id, "Secret key create did not return key_id.");
-      assert(created.key_name === keyName, "Secret key create response returned the wrong key_name.");
+      assert(
+        created.key_name === keyName,
+        "Secret key create response returned the wrong key_name.",
+      );
       assertRawDeveloperKeyMaterial(created.api_key, "created api_key");
       assertRawDeveloperKeyMaterial(created.secret_key, "created secret_key");
-      assertMaskedDeveloperKey(created.masked_api_key, "created masked_api_key");
-      assertMaskedDeveloperKey(created.masked_secret_key, "created masked_secret_key");
+      assertMaskedDeveloperKey(
+        created.masked_api_key,
+        "created masked_api_key",
+      );
+      assertMaskedDeveloperKey(
+        created.masked_secret_key,
+        "created masked_secret_key",
+      );
 
       cleanup.defer("delete developer secret key", () =>
         ignoreNotFound(() =>
@@ -2499,14 +3924,35 @@ export const appCoreJourneys = [
         ),
       );
 
-      let dbAudit = await loadDeveloperSecretKeyDbAudit(created.key_id, organizationId);
-      assert(dbAudit.id === created.key_id, "DB audit did not find created developer key.");
+      let dbAudit = await loadDeveloperSecretKeyDbAudit(
+        created.key_id,
+        organizationId,
+      );
+      assert(
+        dbAudit.id === created.key_id,
+        "DB audit did not find created developer key.",
+      );
       assert(dbAudit.name === keyName, "DB audit developer key name mismatch.");
-      assert(dbAudit.organization_id === organizationId, "DB audit developer key organization mismatch.");
-      assert(dbAudit.type === "user", "DB audit developer key type was not user.");
-      assert(dbAudit.enabled === true, "DB audit developer key was not enabled after create.");
-      assert(dbAudit.deleted === false, "DB audit developer key was deleted after create.");
-      assert(dbAudit.api_key === created.api_key, "DB audit raw api_key did not match one-time create response.");
+      assert(
+        dbAudit.organization_id === organizationId,
+        "DB audit developer key organization mismatch.",
+      );
+      assert(
+        dbAudit.type === "user",
+        "DB audit developer key type was not user.",
+      );
+      assert(
+        dbAudit.enabled === true,
+        "DB audit developer key was not enabled after create.",
+      );
+      assert(
+        dbAudit.deleted === false,
+        "DB audit developer key was deleted after create.",
+      );
+      assert(
+        dbAudit.api_key === created.api_key,
+        "DB audit raw api_key did not match one-time create response.",
+      );
       assert(
         dbAudit.secret_key === created.secret_key,
         "DB audit raw secret_key did not match one-time create response.",
@@ -2528,8 +3974,14 @@ export const appCoreJourneys = [
       await client.post(apiPath("/accounts/key/disable_key/"), {
         key_id: created.key_id,
       });
-      dbAudit = await loadDeveloperSecretKeyDbAudit(created.key_id, organizationId);
-      assert(dbAudit.enabled === false, "DB audit developer key was not disabled.");
+      dbAudit = await loadDeveloperSecretKeyDbAudit(
+        created.key_id,
+        organizationId,
+      );
+      assert(
+        dbAudit.enabled === false,
+        "DB audit developer key was not disabled.",
+      );
       listed = asArray(
         await client.get(apiPath("/accounts/key/get_secret_keys/"), {
           query: { search: keyName, page_size: 10 },
@@ -2546,8 +3998,14 @@ export const appCoreJourneys = [
       await client.post(apiPath("/accounts/key/enable_key/"), {
         key_id: created.key_id,
       });
-      dbAudit = await loadDeveloperSecretKeyDbAudit(created.key_id, organizationId);
-      assert(dbAudit.enabled === true, "DB audit developer key was not re-enabled.");
+      dbAudit = await loadDeveloperSecretKeyDbAudit(
+        created.key_id,
+        organizationId,
+      );
+      assert(
+        dbAudit.enabled === true,
+        "DB audit developer key was not re-enabled.",
+      );
       listed = asArray(
         await client.get(apiPath("/accounts/key/get_secret_keys/"), {
           query: { search: keyName, page_size: 10 },
@@ -2564,9 +4022,18 @@ export const appCoreJourneys = [
       await client.delete(apiPath("/accounts/key/delete_secret_key/"), {
         body: { key_id: created.key_id },
       });
-      dbAudit = await loadDeveloperSecretKeyDbAudit(created.key_id, organizationId);
-      assert(dbAudit.deleted === true, "DB audit developer key was not soft-deleted.");
-      assert(dbAudit.deleted_at_set === true, "DB audit developer key deleted_at was not set.");
+      dbAudit = await loadDeveloperSecretKeyDbAudit(
+        created.key_id,
+        organizationId,
+      );
+      assert(
+        dbAudit.deleted === true,
+        "DB audit developer key was not soft-deleted.",
+      );
+      assert(
+        dbAudit.deleted_at_set === true,
+        "DB audit developer key deleted_at was not set.",
+      );
       const afterDelete = asArray(
         await client.get(apiPath("/accounts/key/get_secret_keys/"), {
           query: { search: keyName, page_size: 10 },
@@ -2589,12 +4056,17 @@ export const appCoreJourneys = [
   },
   {
     id: "CORE-API-003",
-    title: "Model provider API key create, retrieve, update, list, and delete lifecycle",
+    title:
+      "Model provider API key create, retrieve, update, list, and delete lifecycle",
     tags: ["core", "provider-keys", "mutating", "data-roundtrip"],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
-      const existingKeys = asArray(await client.get(apiPath("/model-hub/api-keys/")));
-      const existingProviders = new Set(existingKeys.map((key) => key.provider));
+      const existingKeys = asArray(
+        await client.get(apiPath("/model-hub/api-keys/")),
+      );
+      const existingProviders = new Set(
+        existingKeys.map((key) => key.provider),
+      );
       const provider = [
         "lmnt",
         "cartesia",
@@ -2610,7 +4082,9 @@ export const appCoreJourneys = [
         "groq",
       ].find((candidate) => !existingProviders.has(candidate));
       if (!provider) {
-        skip("Every safe provider-key candidate already exists; refusing to overwrite a real provider key.");
+        skip(
+          "Every safe provider-key candidate already exists; refusing to overwrite a real provider key.",
+        );
       }
 
       const created = await client.post(apiPath("/model-hub/api-keys/"), {
@@ -2620,14 +4094,19 @@ export const appCoreJourneys = [
       assert(created?.id, "Model provider key create did not return id.");
       cleanup.defer("delete model provider key", () =>
         ignoreNotFound(() =>
-          client.delete(apiPath("/model-hub/api-keys/{id}/", { id: created.id })),
+          client.delete(
+            apiPath("/model-hub/api-keys/{id}/", { id: created.id }),
+          ),
         ),
       );
 
       const detail = await client.get(
         apiPath("/model-hub/api-keys/{id}/", { id: created.id }),
       );
-      assert(detail?.provider === provider, "Provider key detail returned wrong provider.");
+      assert(
+        detail?.provider === provider,
+        "Provider key detail returned wrong provider.",
+      );
       assert(
         typeof detail.masked_actual_key === "string",
         "Provider key detail did not include a masked key.",
@@ -2644,12 +4123,18 @@ export const appCoreJourneys = [
 
       const listed = asArray(await client.get(apiPath("/model-hub/api-keys/")));
       assert(
-        listed.some((key) => key.id === created.id && key.provider === provider),
+        listed.some(
+          (key) => key.id === created.id && key.provider === provider,
+        ),
         "Updated provider key was not visible in list.",
       );
 
-      await client.delete(apiPath("/model-hub/api-keys/{id}/", { id: created.id }));
-      const afterDelete = asArray(await client.get(apiPath("/model-hub/api-keys/")));
+      await client.delete(
+        apiPath("/model-hub/api-keys/{id}/", { id: created.id }),
+      );
+      const afterDelete = asArray(
+        await client.get(apiPath("/model-hub/api-keys/")),
+      );
       assert(
         !afterDelete.some((key) => key.id === created.id),
         "Deleted provider key was still visible in list.",
@@ -2661,12 +4146,21 @@ export const appCoreJourneys = [
 ];
 
 function canManageOrgSecrets(user) {
-  const role = String(user?.organization_role || user?.role || "").toLowerCase();
-  return role.includes("owner") || role.includes("admin") || Number(user?.org_level) >= 10;
+  const role = String(
+    user?.organization_role || user?.role || "",
+  ).toLowerCase();
+  return (
+    role.includes("owner") ||
+    role.includes("admin") ||
+    Number(user?.org_level) >= 10
+  );
 }
 
 function assertRawDeveloperKeyMaterial(value, label) {
-  assert(/^[0-9a-f]{32}$/i.test(String(value || "")), `${label} was not one-time raw key material.`);
+  assert(
+    /^[0-9a-f]{32}$/i.test(String(value || "")),
+    `${label} was not one-time raw key material.`,
+  );
 }
 
 function assertMaskedDeveloperKey(value, label) {
@@ -2675,18 +4169,35 @@ function assertMaskedDeveloperKey(value, label) {
   assert(!/^[0-9a-f]{32}$/i.test(text), `${label} exposed raw key material.`);
 }
 
-function assertDeveloperKeyListRow(row, { keyName, enabled, rawApiKey, rawSecretKey }) {
+function assertDeveloperKeyListRow(
+  row,
+  { keyName, enabled, rawApiKey, rawSecretKey },
+) {
   assert(row, "Developer key was not visible through list/search.");
-  assert(row.key_name === keyName, "Developer key list row returned the wrong key_name.");
-  assert(row.enabled === enabled, "Developer key list row returned the wrong enabled state.");
-  assert(row.api_key !== rawApiKey, "Developer key list row exposed the raw api_key.");
-  assert(row.secret_key !== rawSecretKey, "Developer key list row exposed the raw secret_key.");
+  assert(
+    row.key_name === keyName,
+    "Developer key list row returned the wrong key_name.",
+  );
+  assert(
+    row.enabled === enabled,
+    "Developer key list row returned the wrong enabled state.",
+  );
+  assert(
+    row.api_key !== rawApiKey,
+    "Developer key list row exposed the raw api_key.",
+  );
+  assert(
+    row.secret_key !== rawSecretKey,
+    "Developer key list row exposed the raw secret_key.",
+  );
   assertMaskedDeveloperKey(row.api_key, "developer key list api_key");
   assertMaskedDeveloperKey(row.secret_key, "developer key list secret_key");
 }
 
 function isOrgOwner(user) {
-  const role = String(user?.organization_role || user?.role || "").toLowerCase();
+  const role = String(
+    user?.organization_role || user?.role || "",
+  ).toLowerCase();
   return role.includes("owner") || Number(user?.org_level) >= 15;
 }
 
@@ -2694,7 +4205,8 @@ function findUserRow(rows, userId, email) {
   const normalizedEmail = String(email || "").toLowerCase();
   return asArray(rows).find(
     (row) =>
-      row?.id === userId || String(row?.email || "").toLowerCase() === normalizedEmail,
+      row?.id === userId ||
+      String(row?.email || "").toLowerCase() === normalizedEmail,
   );
 }
 
@@ -2705,17 +4217,44 @@ function getPayloadTotal(payload) {
 }
 
 function assertPrototypeProjectListRow(project) {
-  assert(isUuid(project?.id), "Prototype project list row did not include a valid id.");
-  assert(String(project?.name || "").trim(), "Prototype project list row omitted name.");
-  assert(project.trace_type === "experiment", "Prototype project list row was not trace_type=experiment.");
-  assert(isUuid(project.organization), "Prototype project list row omitted organization id.");
+  assert(
+    isUuid(project?.id),
+    "Prototype project list row did not include a valid id.",
+  );
+  assert(
+    String(project?.name || "").trim(),
+    "Prototype project list row omitted name.",
+  );
+  assert(
+    project.trace_type === "experiment",
+    "Prototype project list row was not trace_type=experiment.",
+  );
+  assert(
+    isUuid(project.organization),
+    "Prototype project list row omitted organization id.",
+  );
   if (project.workspace != null) {
-    assert(isUuid(project.workspace), "Prototype project list row returned an invalid workspace id.");
+    assert(
+      isUuid(project.workspace),
+      "Prototype project list row returned an invalid workspace id.",
+    );
   }
-  assert(typeof project.created_at === "string", "Prototype project list row omitted created_at.");
-  assert(typeof project.updated_at === "string", "Prototype project list row omitted updated_at.");
-  assert(Number.isFinite(Number(project.trace_count)), "Prototype project list row omitted trace_count.");
-  assert(Number.isFinite(Number(project.run_count)), "Prototype project list row omitted run_count.");
+  assert(
+    typeof project.created_at === "string",
+    "Prototype project list row omitted created_at.",
+  );
+  assert(
+    typeof project.updated_at === "string",
+    "Prototype project list row omitted updated_at.",
+  );
+  assert(
+    Number.isFinite(Number(project.trace_count)),
+    "Prototype project list row omitted trace_count.",
+  );
+  assert(
+    Number.isFinite(Number(project.run_count)),
+    "Prototype project list row omitted run_count.",
+  );
 }
 
 function assertSortedByName(projects, direction) {
@@ -2733,21 +4272,42 @@ function assertSortedByName(projects, direction) {
   );
 }
 
-function assertPrototypeProjectDetail(project, { projectId, organizationId, workspaceId }) {
+function assertPrototypeProjectDetail(
+  project,
+  { projectId, organizationId, workspaceId },
+) {
   assert(project?.id === projectId, "Prototype project detail id mismatch.");
-  assert(project.trace_type === "experiment", "Prototype project detail was not trace_type=experiment.");
-  assert(project.organization === organizationId, "Prototype project detail organization mismatch.");
-  assert(project.workspace === workspaceId, "Prototype project detail workspace mismatch.");
-  assert(Array.isArray(project.config), "Prototype project detail config was not an array.");
+  assert(
+    project.trace_type === "experiment",
+    "Prototype project detail was not trace_type=experiment.",
+  );
+  assert(
+    project.organization === organizationId,
+    "Prototype project detail organization mismatch.",
+  );
+  assert(
+    project.workspace === workspaceId,
+    "Prototype project detail workspace mismatch.",
+  );
+  assert(
+    Array.isArray(project.config),
+    "Prototype project detail config was not an array.",
+  );
   assert(
     project.config.some((column) => column?.id === "run_name"),
     "Prototype project detail config omitted run_name.",
   );
-  assert(Number.isFinite(Number(project.sampling_rate)), "Prototype project detail omitted sampling_rate.");
+  assert(
+    Number.isFinite(Number(project.sampling_rate)),
+    "Prototype project detail omitted sampling_rate.",
+  );
 }
 
 function assertPrototypeRunList(payload) {
-  assert(Array.isArray(payload?.column_config), "Prototype run list omitted column_config.");
+  assert(
+    Array.isArray(payload?.column_config),
+    "Prototype run list omitted column_config.",
+  );
   assert(Array.isArray(payload?.table), "Prototype run list omitted table.");
   assert(
     Number.isFinite(Number(payload?.metadata?.total_rows)),
@@ -2759,28 +4319,56 @@ function assertPrototypeRunList(payload) {
   );
   for (const row of payload.table) {
     assert(isUuid(row?.id), "Prototype run list row omitted id.");
-    assert(String(row?.run_name || "").trim(), "Prototype run list row omitted run_name.");
-    assert(Object.prototype.hasOwnProperty.call(row, "avg_cost"), "Prototype run list row omitted avg_cost.");
-    assert(Object.prototype.hasOwnProperty.call(row, "avg_latency"), "Prototype run list row omitted avg_latency.");
-    assert(Object.prototype.hasOwnProperty.call(row, "rank"), "Prototype run list row omitted rank.");
+    assert(
+      String(row?.run_name || "").trim(),
+      "Prototype run list row omitted run_name.",
+    );
+    assert(
+      Object.prototype.hasOwnProperty.call(row, "avg_cost"),
+      "Prototype run list row omitted avg_cost.",
+    );
+    assert(
+      Object.prototype.hasOwnProperty.call(row, "avg_latency"),
+      "Prototype run list row omitted avg_latency.",
+    );
+    assert(
+      Object.prototype.hasOwnProperty.call(row, "rank"),
+      "Prototype run list row omitted rank.",
+    );
   }
 }
 
 function assertPrototypeSdkCode(payload) {
-  assert(payload?.installation_guide?.Python, "Prototype SDK code omitted Python install guide.");
-  assert(payload?.project_add_code?.Python, "Prototype SDK code omitted Python project_add_code.");
+  assert(
+    payload?.installation_guide?.Python,
+    "Prototype SDK code omitted Python install guide.",
+  );
+  assert(
+    payload?.project_add_code?.Python,
+    "Prototype SDK code omitted Python project_add_code.",
+  );
   assert(payload?.keys?.Python, "Prototype SDK code omitted Python key setup.");
-  assert(payload?.instruments?.openai?.Python, "Prototype SDK code omitted OpenAI Python instrument.");
+  assert(
+    payload?.instruments?.openai?.Python,
+    "Prototype SDK code omitted OpenAI Python instrument.",
+  );
 }
 
 function prototypeSdkCodeHasRawFiKeys(payload) {
   const text = JSON.stringify(payload || {});
-  return /FI_API_KEY/.test(text) && /FI_SECRET_KEY/.test(text) && /[a-f0-9]{32}/i.test(text);
+  return (
+    /FI_API_KEY/.test(text) &&
+    /FI_SECRET_KEY/.test(text) &&
+    /[a-f0-9]{32}/i.test(text)
+  );
 }
 
 function assertUsageWorkspaceRow(row, label) {
   assert(isUuid(row?.id), `${label} did not include a valid workspace id.`);
-  assert(String(row?.name || "").trim(), `${label} did not include a workspace name.`);
+  assert(
+    String(row?.name || "").trim(),
+    `${label} did not include a workspace name.`,
+  );
   for (const key of [
     "overall",
     "traces",
@@ -2806,18 +4394,30 @@ function assertUsageMetric(metric, label) {
 
 function assertEvalSummaryPayload(payload, label) {
   const evaluations = asArray(payload?.evaluations);
-  assert(Array.isArray(payload?.evaluations), `${label} did not include evaluations array.`);
+  assert(
+    Array.isArray(payload?.evaluations),
+    `${label} did not include evaluations array.`,
+  );
   assertUsageMetric(payload?.total, `${label}.total`);
   let summedCost = 0;
   let summedCount = 0;
   for (const evaluation of evaluations) {
-    assert(String(evaluation?.name || "").trim(), `${label} included an evaluation without name.`);
+    assert(
+      String(evaluation?.name || "").trim(),
+      `${label} included an evaluation without name.`,
+    );
     assertUsageMetric(evaluation, `${label}.${evaluation.name}`);
     summedCost += evaluation.cost;
     summedCount += evaluation.count;
   }
-  assert(summedCount === payload.total.count, `${label} total count did not match evaluation rows.`);
-  assert(numbersClose(summedCost, payload.total.cost), `${label} total cost did not match evaluation rows.`);
+  assert(
+    summedCount === payload.total.count,
+    `${label} total count did not match evaluation rows.`,
+  );
+  assert(
+    numbersClose(summedCost, payload.total.cost),
+    `${label} total cost did not match evaluation rows.`,
+  );
 }
 
 function numbersClose(left, right, tolerance = 0.000001) {
@@ -2826,19 +4426,37 @@ function numbersClose(left, right, tolerance = 0.000001) {
 
 function assertNoCredentialLeak(payload, seeded, label) {
   const text = JSON.stringify(payload ?? {});
-  assert(!text.includes(seeded.plain_public_key), `${label} leaked the raw public key.`);
-  assert(!text.includes(seeded.plain_secret_key), `${label} leaked the raw secret key.`);
-  assert(!/"public_key"|"secret_key"/.test(text), `${label} exposed raw credential field names.`);
+  assert(
+    !text.includes(seeded.plain_public_key),
+    `${label} leaked the raw public key.`,
+  );
+  assert(
+    !text.includes(seeded.plain_secret_key),
+    `${label} leaked the raw secret key.`,
+  );
+  assert(
+    !/"public_key"|"secret_key"/.test(text),
+    `${label} exposed raw credential field names.`,
+  );
 }
 
 function assertProviderStatusRow(provider) {
-  assert(String(provider?.provider || "").trim(), "Provider status row omitted provider.");
-  assert(String(provider?.display_name || "").trim(), `Provider ${provider?.provider} omitted display_name.`);
+  assert(
+    String(provider?.provider || "").trim(),
+    "Provider status row omitted provider.",
+  );
+  assert(
+    String(provider?.display_name || "").trim(),
+    `Provider ${provider?.provider} omitted display_name.`,
+  );
   assert(
     provider.type === "text" || provider.type === "json",
     `Provider ${provider?.provider} returned unsupported type ${provider?.type}.`,
   );
-  assert(typeof provider.has_key === "boolean", `Provider ${provider.provider} omitted boolean has_key.`);
+  assert(
+    typeof provider.has_key === "boolean",
+    `Provider ${provider.provider} omitted boolean has_key.`,
+  );
   assert(
     provider.masked_key === null ||
       typeof provider.masked_key === "string" ||
@@ -2846,8 +4464,14 @@ function assertProviderStatusRow(provider) {
     `Provider ${provider.provider} returned invalid masked_key type.`,
   );
   if (provider.has_key) {
-    assert(isUuid(provider.id), `Configured provider ${provider.provider} omitted valid id.`);
-    assert(provider.masked_key !== null, `Configured provider ${provider.provider} omitted masked_key.`);
+    assert(
+      isUuid(provider.id),
+      `Configured provider ${provider.provider} omitted valid id.`,
+    );
+    assert(
+      provider.masked_key !== null,
+      `Configured provider ${provider.provider} omitted masked_key.`,
+    );
   }
 }
 
@@ -2860,9 +4484,15 @@ function assertNoRawProviderSecretLeak(payload, label) {
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   ];
   for (const pattern of secretPatterns) {
-    assert(!pattern.test(text), `${label} appears to contain a raw provider credential.`);
+    assert(
+      !pattern.test(text),
+      `${label} appears to contain a raw provider credential.`,
+    );
   }
-  assert(!/"actual_key"|"actual_json"/.test(text), `${label} exposed decrypted key field names.`);
+  assert(
+    !/"actual_key"|"actual_json"/.test(text),
+    `${label} exposed decrypted key field names.`,
+  );
 }
 
 function firstMaskedScalar(value) {
@@ -2885,7 +4515,10 @@ function firstMaskedScalar(value) {
 
 function assertPlanOptionRow(row) {
   assert(String(row?.key || "").trim(), "Plan option omitted key.");
-  assert(String(row?.display_name || "").trim(), `Plan option ${row?.key} omitted display_name.`);
+  assert(
+    String(row?.display_name || "").trim(),
+    `Plan option ${row?.key} omitted display_name.`,
+  );
   assert(
     typeof row?.platform_fee_monthly === "number" &&
       Number.isFinite(row.platform_fee_monthly),
@@ -2899,8 +4532,14 @@ function assertPlanOptionRow(row) {
 
 function assertPricingDimension(dimension, pricing) {
   assert(String(dimension || "").trim(), "Pricing dimension omitted key.");
-  assert(String(pricing?.display_name || "").trim(), `Pricing dimension ${dimension} omitted display_name.`);
-  assert(String(pricing?.display_unit || "").trim(), `Pricing dimension ${dimension} omitted display_unit.`);
+  assert(
+    String(pricing?.display_name || "").trim(),
+    `Pricing dimension ${dimension} omitted display_name.`,
+  );
+  assert(
+    String(pricing?.display_unit || "").trim(),
+    `Pricing dimension ${dimension} omitted display_unit.`,
+  );
   assert(
     Array.isArray(pricing?.tiers) && pricing.tiers.length > 0,
     `Pricing dimension ${dimension} omitted tier rows.`,
@@ -2937,7 +4576,10 @@ function assertBillingMoneyFields(row, label) {
 
 function assertBillingLineItem(item, label) {
   assert(String(item?.line_type || "").trim(), `${label} omitted line_type.`);
-  assert(String(item?.description || "").trim(), `${label} omitted description.`);
+  assert(
+    String(item?.description || "").trim(),
+    `${label} omitted description.`,
+  );
   assert(
     typeof item?.amount === "number" && Number.isFinite(item.amount),
     `${label} omitted numeric amount.`,
@@ -2946,50 +4588,119 @@ function assertBillingLineItem(item, label) {
 
 function assertInvoiceRow(invoice) {
   assert(isUuid(invoice?.id), "Invoice row omitted a valid id.");
-  assert(String(invoice?.period_start || "").trim(), `Invoice ${invoice?.id} omitted period_start.`);
-  assert(String(invoice?.period_end || "").trim(), `Invoice ${invoice?.id} omitted period_end.`);
-  assert(String(invoice?.plan || "").trim(), `Invoice ${invoice?.id} omitted plan.`);
+  assert(
+    String(invoice?.period_start || "").trim(),
+    `Invoice ${invoice?.id} omitted period_start.`,
+  );
+  assert(
+    String(invoice?.period_end || "").trim(),
+    `Invoice ${invoice?.id} omitted period_end.`,
+  );
+  assert(
+    String(invoice?.plan || "").trim(),
+    `Invoice ${invoice?.id} omitted plan.`,
+  );
   assertBillingMoneyFields(invoice, `invoice ${invoice?.id}`);
-  assert(String(invoice?.status || "").trim(), `Invoice ${invoice?.id} omitted status.`);
+  assert(
+    String(invoice?.status || "").trim(),
+    `Invoice ${invoice?.id} omitted status.`,
+  );
 }
 
 function assertPaymentMethodRow(method) {
   assert(String(method?.id || "").trim(), "Payment method row omitted id.");
-  assert(String(method?.brand || "").trim(), `Payment method ${method?.id} omitted brand.`);
-  assert(/^\d{4}$/.test(String(method?.last4 || "")), `Payment method ${method?.id} omitted last4.`);
-  assert(Number.isInteger(method?.exp_month), `Payment method ${method?.id} omitted exp_month.`);
-  assert(Number.isInteger(method?.exp_year), `Payment method ${method?.id} omitted exp_year.`);
-  assert(typeof method?.is_default === "boolean", `Payment method ${method?.id} omitted is_default.`);
+  assert(
+    String(method?.brand || "").trim(),
+    `Payment method ${method?.id} omitted brand.`,
+  );
+  assert(
+    /^\d{4}$/.test(String(method?.last4 || "")),
+    `Payment method ${method?.id} omitted last4.`,
+  );
+  assert(
+    Number.isInteger(method?.exp_month),
+    `Payment method ${method?.id} omitted exp_month.`,
+  );
+  assert(
+    Number.isInteger(method?.exp_year),
+    `Payment method ${method?.id} omitted exp_year.`,
+  );
+  assert(
+    typeof method?.is_default === "boolean",
+    `Payment method ${method?.id} omitted is_default.`,
+  );
 }
 
 function assertEELicenseRow(license) {
   assert(isUuid(license?.id), "EE license row omitted valid id.");
-  assert(String(license?.customer_name || "").trim(), `EE license ${license?.id} omitted customer_name.`);
-  assert(String(license?.band || "").trim(), `EE license ${license?.id} omitted band.`);
-  assert(String(license?.billing_interval || "").trim(), `EE license ${license?.id} omitted billing_interval.`);
-  assert(Array.isArray(license?.features), `EE license ${license?.id} omitted features array.`);
-  assert(String(license?.issued_at || "").trim(), `EE license ${license?.id} omitted issued_at.`);
-  assert(String(license?.expires_at || "").trim(), `EE license ${license?.id} omitted expires_at.`);
-  assert(String(license?.status || "").trim(), `EE license ${license?.id} omitted status.`);
-  assert(license.jwt_key === undefined, `EE license ${license?.id} exposed jwt_key.`);
-  assert(license.license_key_hash === undefined, `EE license ${license?.id} exposed license_key_hash.`);
+  assert(
+    String(license?.customer_name || "").trim(),
+    `EE license ${license?.id} omitted customer_name.`,
+  );
+  assert(
+    String(license?.band || "").trim(),
+    `EE license ${license?.id} omitted band.`,
+  );
+  assert(
+    String(license?.billing_interval || "").trim(),
+    `EE license ${license?.id} omitted billing_interval.`,
+  );
+  assert(
+    Array.isArray(license?.features),
+    `EE license ${license?.id} omitted features array.`,
+  );
+  assert(
+    String(license?.issued_at || "").trim(),
+    `EE license ${license?.id} omitted issued_at.`,
+  );
+  assert(
+    String(license?.expires_at || "").trim(),
+    `EE license ${license?.id} omitted expires_at.`,
+  );
+  assert(
+    String(license?.status || "").trim(),
+    `EE license ${license?.id} omitted status.`,
+  );
+  assert(
+    license.jwt_key === undefined,
+    `EE license ${license?.id} exposed jwt_key.`,
+  );
+  assert(
+    license.license_key_hash === undefined,
+    `EE license ${license?.id} exposed license_key_hash.`,
+  );
 }
 
 function assertNoBillingCheckoutPayload(payload, label) {
   const text = JSON.stringify(payload ?? {});
-  assert(!/"checkout_url"/.test(text), `${label} exposed a checkout_url in a read response.`);
+  assert(
+    !/"checkout_url"/.test(text),
+    `${label} exposed a checkout_url in a read response.`,
+  );
 }
 
 function assertNoFullPaymentCardLeak(payload, label) {
   const text = JSON.stringify(payload ?? {});
-  assert(!/\b(?:\d[ -]*?){12,19}\b/.test(text), `${label} appears to contain a full card number.`);
-  assert(!/"number"|"cvc"|"cvv"/i.test(text), `${label} exposed raw card field names.`);
+  assert(
+    !/\b(?:\d[ -]*?){12,19}\b/.test(text),
+    `${label} appears to contain a full card number.`,
+  );
+  assert(
+    !/"number"|"cvc"|"cvv"/i.test(text),
+    `${label} exposed raw card field names.`,
+  );
 }
 
 function assertNoEELicenseSecretLeak(payload, label) {
   const text = JSON.stringify(payload ?? {});
-  assert(!/"jwt_key"|"license_key_hash"/.test(text), `${label} exposed license secret fields.`);
-  assert(!/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(text), `${label} appears to contain a JWT license key.`);
+  assert(
+    !/"jwt_key"|"license_key_hash"/.test(text),
+    `${label} exposed license secret fields.`,
+  );
+  assert(
+    !/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(text),
+    `${label} appears to contain a JWT license key.`,
+  );
 }
 
 const MCP_CATEGORY_TO_GROUP = {
@@ -3015,12 +4726,27 @@ function assertMCPConnectionConfig(config) {
     ["remote", "stdio"].includes(config?.connection_mode),
     `MCP config returned unsupported connection_mode ${config?.connection_mode}.`,
   );
-  assert(typeof config?.is_active === "boolean", "MCP config omitted boolean is_active.");
-  assert(String(config?.created_at || "").trim(), "MCP config omitted created_at.");
-  assert(String(config?.updated_at || "").trim(), "MCP config omitted updated_at.");
-  assert(config?.tool_config && typeof config.tool_config === "object", "MCP config omitted tool_config.");
+  assert(
+    typeof config?.is_active === "boolean",
+    "MCP config omitted boolean is_active.",
+  );
+  assert(
+    String(config?.created_at || "").trim(),
+    "MCP config omitted created_at.",
+  );
+  assert(
+    String(config?.updated_at || "").trim(),
+    "MCP config omitted updated_at.",
+  );
+  assert(
+    config?.tool_config && typeof config.tool_config === "object",
+    "MCP config omitted tool_config.",
+  );
   assertMCPToolGroupConfig(config.tool_config);
-  assert(String(config?.mcp_url || "").startsWith("http"), "MCP config omitted absolute mcp_url.");
+  assert(
+    String(config?.mcp_url || "").startsWith("http"),
+    "MCP config omitted absolute mcp_url.",
+  );
   assert(
     new URL(config.mcp_url).pathname.replace(/\/$/, "") === "/mcp",
     "MCP config mcp_url did not point at /mcp.",
@@ -3028,10 +4754,22 @@ function assertMCPConnectionConfig(config) {
 }
 
 function assertMCPToolGroupConfig(config) {
-  assert(Array.isArray(config?.enabled_groups), "MCP tool config omitted enabled_groups array.");
-  assert(Array.isArray(config?.disabled_tools), "MCP tool config omitted disabled_tools array.");
-  assert(Array.isArray(config?.available_groups), "MCP tool config omitted available_groups array.");
-  assert(config.available_groups.length > 0, "MCP tool config returned no available groups.");
+  assert(
+    Array.isArray(config?.enabled_groups),
+    "MCP tool config omitted enabled_groups array.",
+  );
+  assert(
+    Array.isArray(config?.disabled_tools),
+    "MCP tool config omitted disabled_tools array.",
+  );
+  assert(
+    Array.isArray(config?.available_groups),
+    "MCP tool config omitted available_groups array.",
+  );
+  assert(
+    config.available_groups.length > 0,
+    "MCP tool config returned no available groups.",
+  );
   const availableSlugs = new Set();
   for (const group of config.available_groups) {
     assertMCPToolGroupRow(group);
@@ -3042,25 +4780,45 @@ function assertMCPToolGroupConfig(config) {
     );
   }
   for (const group of config.enabled_groups) {
-    assert(availableSlugs.has(group), `MCP enabled group ${group} was not in available_groups.`);
+    assert(
+      availableSlugs.has(group),
+      `MCP enabled group ${group} was not in available_groups.`,
+    );
   }
 }
 
 function assertMCPToolGroupRow(group) {
   assert(String(group?.slug || "").trim(), "MCP tool group row omitted slug.");
-  assert(String(group?.name || "").trim(), `MCP tool group ${group?.slug} omitted name.`);
-  assert(String(group?.description || "").trim(), `MCP tool group ${group?.slug} omitted description.`);
-  assert(typeof group?.enabled === "boolean", `MCP tool group ${group?.slug} omitted boolean enabled.`);
   assert(
-    !String(group.description).toLowerCase().includes("eval templates and groups"),
+    String(group?.name || "").trim(),
+    `MCP tool group ${group?.slug} omitted name.`,
+  );
+  assert(
+    String(group?.description || "").trim(),
+    `MCP tool group ${group?.slug} omitted description.`,
+  );
+  assert(
+    typeof group?.enabled === "boolean",
+    `MCP tool group ${group?.slug} omitted boolean enabled.`,
+  );
+  assert(
+    !String(group.description)
+      .toLowerCase()
+      .includes("eval templates and groups"),
     `MCP tool group ${group.slug} still references legacy eval groups copy.`,
   );
 }
 
 function assertMCPToolRow(tool) {
   assert(String(tool?.name || "").trim(), "MCP tool row omitted name.");
-  assert(String(tool?.description || "").trim(), `MCP tool ${tool?.name} omitted description.`);
-  assert(String(tool?.category || "").trim(), `MCP tool ${tool?.name} omitted category.`);
+  assert(
+    String(tool?.description || "").trim(),
+    `MCP tool ${tool?.name} omitted description.`,
+  );
+  assert(
+    String(tool?.category || "").trim(),
+    `MCP tool ${tool?.name} omitted category.`,
+  );
   assert(
     tool?.input_schema && typeof tool.input_schema === "object",
     `MCP tool ${tool?.name} omitted input_schema object.`,
@@ -3088,10 +4846,22 @@ function assertMCPSessionRow(session) {
     ["streamable_http", "sse", "stdio"].includes(session?.transport),
     `MCP session ${session?.id} returned unsupported transport ${session?.transport}.`,
   );
-  assert(String(session?.started_at || "").trim(), `MCP session ${session?.id} omitted started_at.`);
-  assert(String(session?.last_activity_at || "").trim(), `MCP session ${session?.id} omitted last_activity_at.`);
-  assert(Number.isInteger(session?.tool_call_count), `MCP session ${session?.id} omitted integer tool_call_count.`);
-  assert(Number.isInteger(session?.error_count), `MCP session ${session?.id} omitted integer error_count.`);
+  assert(
+    String(session?.started_at || "").trim(),
+    `MCP session ${session?.id} omitted started_at.`,
+  );
+  assert(
+    String(session?.last_activity_at || "").trim(),
+    `MCP session ${session?.id} omitted last_activity_at.`,
+  );
+  assert(
+    Number.isInteger(session?.tool_call_count),
+    `MCP session ${session?.id} omitted integer tool_call_count.`,
+  );
+  assert(
+    Number.isInteger(session?.error_count),
+    `MCP session ${session?.id} omitted integer error_count.`,
+  );
 }
 
 function assertMCPAnalyticsSummary(summary) {
@@ -3110,10 +4880,17 @@ function assertMCPAnalyticsSummary(summary) {
 }
 
 function assertMCPAnalyticsToolRow(row) {
-  assert(String(row?.tool_name || "").trim(), "MCP analytics tool row omitted tool_name.");
-  assert(Number.isInteger(row?.call_count), `MCP analytics ${row?.tool_name} omitted integer call_count.`);
   assert(
-    typeof row?.avg_latency_ms === "number" && Number.isFinite(row.avg_latency_ms),
+    String(row?.tool_name || "").trim(),
+    "MCP analytics tool row omitted tool_name.",
+  );
+  assert(
+    Number.isInteger(row?.call_count),
+    `MCP analytics ${row?.tool_name} omitted integer call_count.`,
+  );
+  assert(
+    typeof row?.avg_latency_ms === "number" &&
+      Number.isFinite(row.avg_latency_ms),
     `MCP analytics ${row?.tool_name} omitted numeric avg_latency_ms.`,
   );
   assert(
@@ -3123,8 +4900,14 @@ function assertMCPAnalyticsToolRow(row) {
 }
 
 function assertMCPAnalyticsTimelineRow(row) {
-  assert(String(row?.timestamp || "").trim(), "MCP analytics timeline row omitted timestamp.");
-  assert(Number.isInteger(row?.call_count), "MCP analytics timeline row omitted integer call_count.");
+  assert(
+    String(row?.timestamp || "").trim(),
+    "MCP analytics timeline row omitted timestamp.",
+  );
+  assert(
+    Number.isInteger(row?.call_count),
+    "MCP analytics timeline row omitted integer call_count.",
+  );
 }
 
 function assertNoMCPConnectionSecretLeak(config, label) {
@@ -3138,8 +4921,14 @@ function assertNoMCPConnectionSecretLeak(config, label) {
     assert(config?.[key] === undefined, `${label} exposed ${key}.`);
   }
   const text = JSON.stringify(config ?? {});
-  assert(!/Bearer\s+[A-Za-z0-9._-]+/.test(text), `${label} appears to contain a bearer token.`);
-  assert(!/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(text), `${label} appears to contain a JWT.`);
+  assert(
+    !/Bearer\s+[A-Za-z0-9._-]+/.test(text),
+    `${label} appears to contain a bearer token.`,
+  );
+  assert(
+    !/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(text),
+    `${label} appears to contain a JWT.`,
+  );
 }
 
 function assertGroupSetsEqual(left, right, message) {
@@ -3187,7 +4976,11 @@ WHERE id = ${sqlUuid(keyId)}
   return runPostgresJson(sql);
 }
 
-async function loadPrototypeProjectDbAudit({ projectId, organizationId, workspaceId }) {
+async function loadPrototypeProjectDbAudit({
+  projectId,
+  organizationId,
+  workspaceId,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -3225,7 +5018,11 @@ SELECT COALESCE(
   return runPostgresJson(sql);
 }
 
-async function loadProjectCrudDbAudit({ projectId, organizationId, workspaceId }) {
+async function loadProjectCrudDbAudit({
+  projectId,
+  organizationId,
+  workspaceId,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -3286,16 +5083,37 @@ function assertProjectCrudDbAudit(
     sessionConfigVisibility,
   },
 ) {
-  assert(audit?.exists === true, "Project CRUD DB audit did not find the project.");
+  assert(
+    audit?.exists === true,
+    "Project CRUD DB audit did not find the project.",
+  );
   assert(audit.project_id === projectId, "Project CRUD DB audit id mismatch.");
-  assert(audit.organization_id === organizationId, "Project CRUD DB audit organization mismatch.");
-  assert(audit.workspace_id === workspaceId, "Project CRUD DB audit workspace mismatch.");
+  assert(
+    audit.organization_id === organizationId,
+    "Project CRUD DB audit organization mismatch.",
+  );
+  assert(
+    audit.workspace_id === workspaceId,
+    "Project CRUD DB audit workspace mismatch.",
+  );
   assert(audit.name === name, "Project CRUD DB audit name mismatch.");
-  assert(audit.trace_type === "experiment", "Project CRUD DB audit trace_type mismatch.");
-  assert(audit.model_type === "GenerativeLLM", "Project CRUD DB audit model_type mismatch.");
-  assert(audit.deleted === deleted, "Project CRUD DB audit deleted state mismatch.");
+  assert(
+    audit.trace_type === "experiment",
+    "Project CRUD DB audit trace_type mismatch.",
+  );
+  assert(
+    audit.model_type === "GenerativeLLM",
+    "Project CRUD DB audit model_type mismatch.",
+  );
+  assert(
+    audit.deleted === deleted,
+    "Project CRUD DB audit deleted state mismatch.",
+  );
   if (deletedAtSet !== undefined) {
-    assert(audit.deleted_at_set === deletedAtSet, "Project CRUD DB audit deleted_at mismatch.");
+    assert(
+      audit.deleted_at_set === deletedAtSet,
+      "Project CRUD DB audit deleted_at mismatch.",
+    );
   }
   for (const [key, expected] of Object.entries(configVisibility || {})) {
     assert(
@@ -3310,7 +5128,11 @@ function assertProjectCrudDbAudit(
     );
   }
   if (tags) {
-    assertGroupSetsEqual(audit.tags || [], tags, "Project CRUD DB audit tags mismatch.");
+    assertGroupSetsEqual(
+      audit.tags || [],
+      tags,
+      "Project CRUD DB audit tags mismatch.",
+    );
   }
 }
 
@@ -3318,17 +5140,44 @@ function assertPrototypeProjectDbAudit(
   audit,
   { projectId, name, organizationId, workspaceId, deleted, samplingRate },
 ) {
-  assert(audit?.exists === true, "Prototype project DB audit did not find the project.");
-  assert(audit.project_id === projectId, "Prototype project DB audit id mismatch.");
+  assert(
+    audit?.exists === true,
+    "Prototype project DB audit did not find the project.",
+  );
+  assert(
+    audit.project_id === projectId,
+    "Prototype project DB audit id mismatch.",
+  );
   assert(audit.name === name, "Prototype project DB audit name mismatch.");
-  assert(audit.trace_type === "experiment", "Prototype project DB audit trace_type mismatch.");
-  assert(audit.model_type === "GenerativeLLM", "Prototype project DB audit model_type mismatch.");
-  assert(audit.organization_id === organizationId, "Prototype project DB audit organization mismatch.");
-  assert(audit.workspace_id === workspaceId, "Prototype project DB audit workspace mismatch.");
-  assert(audit.deleted === deleted, "Prototype project DB audit deleted state mismatch.");
-  assert(Number(audit.config_length || 0) > 0, "Prototype project DB audit config was empty.");
+  assert(
+    audit.trace_type === "experiment",
+    "Prototype project DB audit trace_type mismatch.",
+  );
+  assert(
+    audit.model_type === "GenerativeLLM",
+    "Prototype project DB audit model_type mismatch.",
+  );
+  assert(
+    audit.organization_id === organizationId,
+    "Prototype project DB audit organization mismatch.",
+  );
+  assert(
+    audit.workspace_id === workspaceId,
+    "Prototype project DB audit workspace mismatch.",
+  );
+  assert(
+    audit.deleted === deleted,
+    "Prototype project DB audit deleted state mismatch.",
+  );
+  assert(
+    Number(audit.config_length || 0) > 0,
+    "Prototype project DB audit config was empty.",
+  );
   if (samplingRate !== undefined) {
-    assert(Number(audit.sampling_rate) === samplingRate, "Prototype project DB audit sampling_rate mismatch.");
+    assert(
+      Number(audit.sampling_rate) === samplingRate,
+      "Prototype project DB audit sampling_rate mismatch.",
+    );
   }
 }
 
@@ -3379,15 +5228,26 @@ SELECT jsonb_build_object(
   return runPostgresJson(sql);
 }
 
-async function createProjectVersionJourneyRun({ client, projectId, name, metadata }) {
+async function createProjectVersionJourneyRun({
+  client,
+  projectId,
+  name,
+  metadata,
+}) {
   const created = await client.post(apiPath("/tracer/project-version/"), {
     project: projectId,
     name,
     metadata,
   });
   const projectVersionId = created.project_version_id || created.id;
-  assert(isUuid(projectVersionId), "Project-version create did not return a valid id.");
-  assert(String(created.version || "").trim(), "Project-version create did not return version.");
+  assert(
+    isUuid(projectVersionId),
+    "Project-version create did not return a valid id.",
+  );
+  assert(
+    String(created.version || "").trim(),
+    "Project-version create did not return version.",
+  );
   return { id: projectVersionId, version: created.version };
 }
 
@@ -3410,7 +5270,10 @@ async function seedProjectVersionJourneyTraceAndSpan({
     tags: ["api-journey", label],
   });
   const traceId = trace.id || trace.trace_id || trace.trace?.id;
-  assert(isUuid(traceId), "Project-version trace seed did not return a trace id.");
+  assert(
+    isUuid(traceId),
+    "Project-version trace seed did not return a trace id.",
+  );
 
   const spanId = `api_journey_pv_${label}_${marker}`;
   const startTime = new Date(Date.now() - latencyMs).toISOString();
@@ -3436,7 +5299,10 @@ async function seedProjectVersionJourneyTraceAndSpan({
     tags: ["api-journey", label],
     metadata: { source: "api-journey", marker, label },
   });
-  assert((span.id || spanId) === spanId, "Project-version span seed returned the wrong id.");
+  assert(
+    (span.id || spanId) === spanId,
+    "Project-version span seed returned the wrong id.",
+  );
 
   return { traceId, spanId };
 }
@@ -3557,31 +5423,84 @@ function assertProjectVersionJourneyDbAudit(
     latencyVisible,
   },
 ) {
-  assert(audit?.project?.id === projectId, "Project-version DB audit project id mismatch.");
-  assert(audit.project.organization_id === organizationId, "Project-version DB audit organization mismatch.");
-  assert(audit.project.workspace_id === workspaceId, "Project-version DB audit workspace mismatch.");
-  assert(audit.project.trace_type === "experiment", "Project-version DB audit trace_type mismatch.");
+  assert(
+    audit?.project?.id === projectId,
+    "Project-version DB audit project id mismatch.",
+  );
+  assert(
+    audit.project.organization_id === organizationId,
+    "Project-version DB audit organization mismatch.",
+  );
+  assert(
+    audit.project.workspace_id === workspaceId,
+    "Project-version DB audit workspace mismatch.",
+  );
+  assert(
+    audit.project.trace_type === "experiment",
+    "Project-version DB audit trace_type mismatch.",
+  );
 
   const alpha = findAuditRow(audit.versions, alphaVersionId);
   const beta = findAuditRow(audit.versions, betaVersionId);
-  assert(alpha?.name === alphaName, "Project-version DB audit alpha name mismatch.");
-  assert(beta?.name === betaName, "Project-version DB audit beta name mismatch.");
-  assert(alpha?.deleted === alphaDeleted, "Project-version DB audit alpha deleted mismatch.");
-  assert(beta?.deleted === betaDeleted, "Project-version DB audit beta deleted mismatch.");
-  assert(alpha?.annotations_id === annotationId, "Project-version DB audit annotation link mismatch.");
+  assert(
+    alpha?.name === alphaName,
+    "Project-version DB audit alpha name mismatch.",
+  );
+  assert(
+    beta?.name === betaName,
+    "Project-version DB audit beta name mismatch.",
+  );
+  assert(
+    alpha?.deleted === alphaDeleted,
+    "Project-version DB audit alpha deleted mismatch.",
+  );
+  assert(
+    beta?.deleted === betaDeleted,
+    "Project-version DB audit beta deleted mismatch.",
+  );
+  assert(
+    alpha?.annotations_id === annotationId,
+    "Project-version DB audit annotation link mismatch.",
+  );
 
-  assert(audit.trace_deleted?.[alphaTraceId] === traceDeleted, "Alpha trace deleted state mismatch.");
-  assert(audit.trace_deleted?.[betaTraceId] === traceDeleted, "Beta trace deleted state mismatch.");
-  assert(audit.span_deleted?.[alphaSpanId] === spanDeleted, "Alpha span deleted state mismatch.");
-  assert(audit.span_deleted?.[betaSpanId] === spanDeleted, "Beta span deleted state mismatch.");
-  assert(audit.annotation?.id === annotationId, "Project-version DB audit annotation mismatch.");
-  assert(audit.winner?.winner_version_id === winnerVersionId, "Project-version DB audit winner mismatch.");
+  assert(
+    audit.trace_deleted?.[alphaTraceId] === traceDeleted,
+    "Alpha trace deleted state mismatch.",
+  );
+  assert(
+    audit.trace_deleted?.[betaTraceId] === traceDeleted,
+    "Beta trace deleted state mismatch.",
+  );
+  assert(
+    audit.span_deleted?.[alphaSpanId] === spanDeleted,
+    "Alpha span deleted state mismatch.",
+  );
+  assert(
+    audit.span_deleted?.[betaSpanId] === spanDeleted,
+    "Beta span deleted state mismatch.",
+  );
+  assert(
+    audit.annotation?.id === annotationId,
+    "Project-version DB audit annotation mismatch.",
+  );
+  assert(
+    audit.winner?.winner_version_id === winnerVersionId,
+    "Project-version DB audit winner mismatch.",
+  );
 
-  const latencyConfig = (alpha.config || []).find((item) => item?.id === "latency");
-  assert(latencyConfig?.is_visible === latencyVisible, "Project-version config latency visibility mismatch.");
+  const latencyConfig = (alpha.config || []).find(
+    (item) => item?.id === "latency",
+  );
+  assert(
+    latencyConfig?.is_visible === latencyVisible,
+    "Project-version config latency visibility mismatch.",
+  );
 }
 
-async function hardDeleteProjectVersionJourneyArtifacts({ projectId, projectName }) {
+async function hardDeleteProjectVersionJourneyArtifacts({
+  projectId,
+  projectName,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -3693,7 +5612,11 @@ function findAuditRow(rows, id) {
   return (rows || []).find((row) => row?.id === id);
 }
 
-async function loadAccountContextDbAudit({ userId, organizationId, workspaceId }) {
+async function loadAccountContextDbAudit({
+  userId,
+  organizationId,
+  workspaceId,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -3750,7 +5673,75 @@ CROSS JOIN workspace_membership_counts;
   return runPostgresJson(sql);
 }
 
-async function loadWorkspaceSettingsDbAudit({ userId, organizationId, workspaceId }) {
+async function loadLegacyTeamMemberAudit({
+  email,
+  organizationId,
+  workspaceId,
+}) {
+  const sql = `
+WITH requested AS (
+  SELECT
+    lower(${sqlTextLiteral(email)}) AS email,
+    ${sqlUuid(organizationId)} AS organization_id,
+    ${sqlUuid(workspaceId)} AS workspace_id
+),
+user_rows AS (
+  SELECT u.id, u.email, u.organization_id, u.organization_role, u.is_active, u.config
+  FROM accounts_user u
+  JOIN requested r ON lower(u.email) = r.email
+),
+workspace_memberships AS (
+  SELECT wm.id, wm.user_id, wm.role, wm.level, wm.is_active, wm.deleted
+  FROM accounts_workspacemembership wm
+  JOIN user_rows u ON wm.user_id = u.id
+  JOIN requested r ON wm.workspace_id = r.workspace_id
+),
+org_memberships AS (
+  SELECT om.id, om.user_id, om.role, om.level, om.is_active, om.deleted
+  FROM accounts_organization_membership om
+  JOIN user_rows u ON om.user_id = u.id
+  JOIN requested r ON om.organization_id = r.organization_id
+),
+auth_tokens AS (
+  SELECT token.id, token.auth_type, token.is_active
+  FROM accounts_auth_token token
+  JOIN user_rows u ON token.user_id = u.id
+)
+SELECT json_build_object(
+  'email', (SELECT email FROM requested),
+  'user_count', (SELECT count(*) FROM user_rows),
+  'user_id', (SELECT id::text FROM user_rows LIMIT 1),
+  'user_active', (SELECT is_active FROM user_rows LIMIT 1),
+  'user_organization_id', (SELECT organization_id::text FROM user_rows LIMIT 1),
+  'user_organization_role', (SELECT organization_role FROM user_rows LIMIT 1),
+  'selected_organization_id', (SELECT config->>'selected_organization_id' FROM user_rows LIMIT 1),
+  'workspace_membership_count', (SELECT count(*) FROM workspace_memberships),
+  'active_workspace_membership_count', (
+    SELECT count(*) FROM workspace_memberships WHERE is_active = true AND deleted = false
+  ),
+  'inactive_workspace_membership_count', (
+    SELECT count(*) FROM workspace_memberships WHERE is_active = false AND deleted = false
+  ),
+  'org_membership_count', (SELECT count(*) FROM org_memberships),
+  'active_org_membership_count', (
+    SELECT count(*) FROM org_memberships WHERE is_active = true AND deleted = false
+  ),
+  'active_access_token_count', (
+    SELECT count(*) FROM auth_tokens WHERE auth_type = 'access' AND is_active = true
+  ),
+  'active_refresh_token_count', (
+    SELECT count(*) FROM auth_tokens WHERE auth_type = 'refresh' AND is_active = true
+  )
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadWorkspaceSettingsDbAudit({
+  userId,
+  organizationId,
+  workspaceId,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -3821,8 +5812,15 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
-async function seedWorkspaceUsageBoundaryData({ marker, organizationId, userId }) {
-  assert(isUuid(organizationId), "Usage boundary seed organization id must be a UUID.");
+async function seedWorkspaceUsageBoundaryData({
+  marker,
+  organizationId,
+  userId,
+}) {
+  assert(
+    isUuid(organizationId),
+    "Usage boundary seed organization id must be a UUID.",
+  );
   assert(isUuid(userId), "Usage boundary seed user id must be a UUID.");
   const sourceIdPrefix = `api-journey-usage-${marker}`;
   const script = `
@@ -3932,7 +5930,10 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
-async function deleteWorkspaceUsageBoundaryData({ workspaceId, sourceIdPrefix }) {
+async function deleteWorkspaceUsageBoundaryData({
+  workspaceId,
+  sourceIdPrefix,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -3969,7 +5970,10 @@ async function seedIntegrationConnectionData({
   lastSyncedSecondsAgo = 420,
   displayNamePrefix = "API Journey Langfuse",
 }) {
-  assert(isUuid(organizationId), "Integration seed organization id must be a UUID.");
+  assert(
+    isUuid(organizationId),
+    "Integration seed organization id must be a UUID.",
+  );
   assert(isUuid(workspaceId), "Integration seed workspace id must be a UUID.");
   assert(isUuid(userId), "Integration seed user id must be a UUID.");
   const displayName = `${displayNamePrefix} ${marker}`;
@@ -4359,9 +6363,7 @@ async function restoreUserTimezoneDb({ userId, timezone }) {
   const sql = `
 WITH updated_user AS (
   UPDATE accounts_user
-  SET last_timezone = ${
-    timezone ? sqlTextLiteral(timezone) : "NULL"
-  }
+  SET last_timezone = ${timezone ? sqlTextLiteral(timezone) : "NULL"}
   WHERE id = ${sqlUuid(userId)}
   RETURNING id, last_timezone
 )
@@ -4373,7 +6375,11 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
-async function loadRbacMemberLifecycleAudit({ email, organizationId, workspaceId }) {
+async function loadRbacMemberLifecycleAudit({
+  email,
+  organizationId,
+  workspaceId,
+}) {
   const sql = `
 WITH requested AS (
   SELECT
@@ -4546,16 +6552,40 @@ print(json.dumps({
 }
 
 async function runBackendShellJson(script) {
-  const container = process.env.API_JOURNEY_BACKEND_CONTAINER || "ws2-backend";
-  const command = [
-    "cd /app/backend",
-    `UV_PROJECT_ENVIRONMENT=/tmp/ws2-backend-container-venv uv run --no-sync --python /usr/local/bin/python --no-managed-python --no-python-downloads python manage.py shell -c ${shellQuote(script)}`,
-  ].join(" && ");
-  const { stdout } = await execFileAsync(
-    "docker",
-    ["exec", container, "sh", "-lc", command],
-    { maxBuffer: 20 * 1024 * 1024 },
-  );
+  let stdout;
+  const container = process.env.API_JOURNEY_BACKEND_CONTAINER;
+  if (container) {
+    const command = [
+      "cd /app/backend",
+      `UV_PROJECT_ENVIRONMENT=/tmp/ws2-backend-container-venv uv run --no-sync --python /usr/local/bin/python --no-managed-python --no-python-downloads python manage.py shell -c ${shellQuote(script)}`,
+    ].join(" && ");
+    ({ stdout } = await execFileAsync(
+      "docker",
+      ["exec", container, "sh", "-lc", command],
+      { maxBuffer: 20 * 1024 * 1024 },
+    ));
+  } else {
+    const backendDir = process.env.API_JOURNEY_BACKEND_DIR || "futureagi";
+    ({ stdout } = await execFileAsync(
+      "uv",
+      ["run", "python", "manage.py", "shell", "-c", script],
+      {
+        cwd: backendDir,
+        env: {
+          ...process.env,
+          EE_LICENSE_KEY: process.env.EE_LICENSE_KEY || "test-license-key",
+          PGBOUNCER_HOST: process.env.PGBOUNCER_HOST || "127.0.0.1",
+          PGBOUNCER_PORT: process.env.PGBOUNCER_PORT || "5436",
+          REDIS_URL: process.env.REDIS_URL || "redis://127.0.0.1:6382/0",
+          REDIS_CACHE_URL:
+            process.env.REDIS_CACHE_URL || "redis://127.0.0.1:6382/0",
+          UV_PROJECT_ENVIRONMENT:
+            process.env.UV_PROJECT_ENVIRONMENT || ".venv-th5064-py311",
+        },
+        maxBuffer: 20 * 1024 * 1024,
+      },
+    ));
+  }
   const jsonLine = stdout
     .trim()
     .split(/\r?\n/)
@@ -4581,10 +6611,14 @@ async function unauthenticatedApiRequest(apiBase, method, pathName, body) {
     }
   }
   if (!response.ok) {
-    throw new Error(`${method} ${pathName} failed with HTTP ${response.status}: ${text.slice(0, 1000)}`);
+    throw new Error(
+      `${method} ${pathName} failed with HTTP ${response.status}: ${text.slice(0, 1000)}`,
+    );
   }
   if (payload && typeof payload === "object" && payload.status === false) {
-    throw new Error(`${method} ${pathName} returned status:false: ${JSON.stringify(payload).slice(0, 1000)}`);
+    throw new Error(
+      `${method} ${pathName} returned status:false: ${JSON.stringify(payload).slice(0, 1000)}`,
+    );
   }
   return payload?.result ?? payload;
 }

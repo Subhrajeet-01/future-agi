@@ -240,9 +240,7 @@ class TestExperimentsTableView:
             "prompt_config": {"model": "gpt-4", "temperature": 0.7},
         }
 
-        with patch(
-            "tfc.temporal.experiments.start_experiment_workflow"
-        ) as mock_workflow:
+        with patch("tfc.temporal.experiments.start_experiment_workflow"):
             response = auth_client.post(
                 "/model-hub/experiments/",
                 payload,
@@ -250,6 +248,31 @@ class TestExperimentsTableView:
             )
 
         assert response.status_code == status.HTTP_200_OK, response.data
+
+    def test_update_experiment_success(
+        self, auth_client, experiment, dataset, output_column
+    ):
+        """Test successfully updating a legacy experiment."""
+        payload = {
+            "experiment_id": str(experiment.id),
+            "name": "Updated Legacy Experiment",
+            "dataset_id": str(dataset.id),
+            "column_id": str(output_column.id),
+            "prompt_config": {"model": "gpt-4"},
+            "re_run": False,
+        }
+
+        response = auth_client.put(
+            "/model-hub/experiments/",
+            payload,
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        experiment.refresh_from_db()
+        assert experiment.name == "Updated Legacy Experiment"
+        assert experiment.dataset_id == dataset.id
+        assert experiment.column_id == output_column.id
 
     def test_create_experiment_missing_name(self, auth_client, dataset, output_column):
         """Test that missing name returns error."""
@@ -356,9 +379,7 @@ class TestExperimentRerunView:
             "experiment_ids": [str(experiment.id)],
         }
 
-        with patch(
-            "tfc.temporal.experiments.start_experiment_workflow"
-        ) as mock_workflow:
+        with patch("tfc.temporal.experiments.start_experiment_workflow"):
             response = auth_client.post(
                 "/model-hub/experiments/re-run/",
                 payload,
@@ -385,9 +406,7 @@ class TestExperimentRerunView:
             "experiment_ids": [str(uuid.uuid4())],
         }
 
-        with patch(
-            "tfc.temporal.experiments.start_experiment_workflow"
-        ) as mock_workflow:
+        with patch("tfc.temporal.experiments.start_experiment_workflow"):
             response = auth_client.post(
                 "/model-hub/experiments/re-run/",
                 payload,
@@ -443,7 +462,7 @@ class TestExperimentDeleteView:
             column=output_column,
             status=StatusType.COMPLETED.value,
         )
-        exp_ds1 = ExperimentDatasetTable.objects.create(
+        ExperimentDatasetTable.objects.create(
             name="Exp Dataset 1",
             status=StatusType.COMPLETED.value,
             experiment=exp1,
@@ -455,7 +474,7 @@ class TestExperimentDeleteView:
             column=output_column,
             status=StatusType.COMPLETED.value,
         )
-        exp_ds2 = ExperimentDatasetTable.objects.create(
+        ExperimentDatasetTable.objects.create(
             name="Exp Dataset 2",
             status=StatusType.COMPLETED.value,
             experiment=exp2,
@@ -638,6 +657,199 @@ class TestExperimentActionWorkspaceIsolation:
         other_experiment.refresh_from_db()
         assert other_experiment.deleted is False
 
+    def test_legacy_get_rejects_other_workspace_experiment(
+        self, auth_client, organization, user, other_workspace
+    ):
+        other_experiment, _, _, _ = self._create_experiment_in_workspace(
+            organization, user, other_workspace
+        )
+
+        response = auth_client.get(
+            f"/model-hub/experiments/?experiment_id={other_experiment.id}"
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @patch("tfc.temporal.experiments.start_experiment_workflow")
+    def test_legacy_create_rejects_column_from_another_dataset(
+        self, mock_workflow, auth_client, organization, user, workspace, dataset
+    ):
+        other_dataset = Dataset.objects.create(
+            name="Other Same Workspace Dataset",
+            organization=organization,
+            workspace=workspace,
+            source=DatasetSourceChoices.BUILD.value,
+        )
+        other_column = Column.objects.create(
+            name="Other Dataset Column",
+            dataset=other_dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.OTHERS.value,
+        )
+
+        response = auth_client.post(
+            "/model-hub/experiments/",
+            {
+                "name": "Blocked Legacy Create",
+                "dataset_id": str(dataset.id),
+                "column_id": str(other_column.id),
+                "prompt_config": {"model": "gpt-4"},
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        mock_workflow.assert_not_called()
+        assert not ExperimentsTable.objects.filter(
+            name="Blocked Legacy Create"
+        ).exists()
+
+    @patch("tfc.temporal.experiments.start_experiment_workflow")
+    def test_legacy_create_rejects_metric_from_another_dataset(
+        self,
+        mock_workflow,
+        auth_client,
+        organization,
+        user,
+        workspace,
+        dataset,
+        eval_template,
+    ):
+        output_column = Column.objects.create(
+            name="Output Column",
+            dataset=dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.RUN_PROMPT.value,
+        )
+        other_dataset = Dataset.objects.create(
+            name="Other Metric Dataset",
+            organization=organization,
+            workspace=workspace,
+            source=DatasetSourceChoices.BUILD.value,
+        )
+        other_metric = UserEvalMetric.objects.create(
+            name="Other Dataset Metric",
+            organization=organization,
+            workspace=workspace,
+            dataset=other_dataset,
+            template=eval_template,
+            config={},
+            status=StatusType.NOT_STARTED.value,
+        )
+
+        response = auth_client.post(
+            "/model-hub/experiments/",
+            {
+                "name": "Blocked Metric Legacy Create",
+                "dataset_id": str(dataset.id),
+                "column_id": str(output_column.id),
+                "prompt_config": {"model": "gpt-4"},
+                "user_eval_template_ids": [str(other_metric.id)],
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        mock_workflow.assert_not_called()
+        assert not ExperimentsTable.objects.filter(
+            name="Blocked Metric Legacy Create"
+        ).exists()
+
+    @patch("tfc.temporal.experiments.start_experiment_workflow")
+    def test_legacy_create_rejects_other_workspace_dataset_before_mutation(
+        self, mock_workflow, auth_client, organization, user, other_workspace
+    ):
+        other_dataset = Dataset.objects.create(
+            name="Other Workspace Create Dataset",
+            organization=organization,
+            workspace=other_workspace,
+            source=DatasetSourceChoices.BUILD.value,
+        )
+        other_column = Column.objects.create(
+            name="Other Workspace Column",
+            dataset=other_dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.OTHERS.value,
+        )
+
+        response = auth_client.post(
+            "/model-hub/experiments/",
+            {
+                "name": "Blocked Other Workspace Legacy Create",
+                "dataset_id": str(other_dataset.id),
+                "column_id": str(other_column.id),
+                "prompt_config": {"model": "gpt-4"},
+            },
+            format="json",
+        )
+
+        assert response.status_code in (
+            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_404_NOT_FOUND,
+        )
+        mock_workflow.assert_not_called()
+        assert not ExperimentsTable.objects.filter(
+            name="Blocked Other Workspace Legacy Create"
+        ).exists()
+
+    def test_legacy_update_rejects_other_workspace_experiment(
+        self, auth_client, organization, user, other_workspace, dataset, output_column
+    ):
+        other_experiment, _, _, _ = self._create_experiment_in_workspace(
+            organization, user, other_workspace
+        )
+
+        response = auth_client.put(
+            "/model-hub/experiments/",
+            {
+                "experiment_id": str(other_experiment.id),
+                "name": "Should Not Update",
+                "dataset_id": str(dataset.id),
+                "column_id": str(output_column.id),
+                "prompt_config": {"model": "gpt-4"},
+                "re_run": False,
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        other_experiment.refresh_from_db()
+        assert other_experiment.name != "Should Not Update"
+
+    def test_legacy_update_rejects_column_from_another_dataset(
+        self, auth_client, organization, workspace, experiment, dataset
+    ):
+        other_dataset = Dataset.objects.create(
+            name="Other Same Workspace Update Dataset",
+            organization=organization,
+            workspace=workspace,
+            source=DatasetSourceChoices.BUILD.value,
+        )
+        other_column = Column.objects.create(
+            name="Other Update Column",
+            dataset=other_dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.OTHERS.value,
+        )
+
+        response = auth_client.put(
+            "/model-hub/experiments/",
+            {
+                "experiment_id": str(experiment.id),
+                "name": "Blocked Update Name",
+                "dataset_id": str(dataset.id),
+                "column_id": str(other_column.id),
+                "prompt_config": {"model": "gpt-4"},
+                "re_run": False,
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        experiment.refresh_from_db()
+        assert experiment.name != "Blocked Update Name"
+        assert experiment.column_id != other_column.id
+
     @patch("tfc.temporal.experiments.start_experiment_workflow")
     def test_legacy_rerun_rejects_other_workspace_experiment(
         self, mock_workflow, auth_client, organization, user, other_workspace
@@ -740,9 +952,7 @@ class TestExperimentActionWorkspaceIsolation:
     def test_legacy_row_diff_returns_dataset_scoped_cells(
         self, auth_client, organization, user, workspace
     ):
-        fixture = self._create_legacy_row_diff_fixture(
-            organization, user, workspace
-        )
+        fixture = self._create_legacy_row_diff_fixture(organization, user, workspace)
 
         response = auth_client.post(
             "/model-hub/develops/get-row-diff/",
@@ -803,9 +1013,7 @@ class TestExperimentActionWorkspaceIsolation:
     def test_legacy_row_diff_rejects_rows_and_columns_outside_experiment_dataset(
         self, auth_client, organization, user, workspace
     ):
-        fixture = self._create_legacy_row_diff_fixture(
-            organization, user, workspace
-        )
+        fixture = self._create_legacy_row_diff_fixture(organization, user, workspace)
         outside_dataset = Dataset.objects.create(
             name="Outside Legacy Diff Dataset",
             organization=organization,
@@ -1456,9 +1664,7 @@ class TestRunAdditionalEvaluationsView:
             "eval_template_ids": [str(eval_metric.id)],
         }
 
-        with patch(
-            "tfc.temporal.experiments.start_experiment_workflow"
-        ) as mock_workflow:
+        with patch("tfc.temporal.experiments.start_experiment_workflow"):
             response = auth_client.post(
                 f"/model-hub/experiments/{experiment.id}/run-evaluations/",
                 payload,
