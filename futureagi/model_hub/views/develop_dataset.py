@@ -257,6 +257,7 @@ from sdk.utils.helpers import _get_api_call_type
 
 # Define a Temporal activity for running the evaluation
 from tfc.ee_gates import strip_turing_from_config_options
+from tfc.middleware.workspace_context import get_current_workspace
 from tfc.settings.settings import BASE_URL, HUGGINGFACE_API_TOKEN
 from tfc.telemetry import wrap_for_thread
 from tfc.temporal import temporal_activity
@@ -302,7 +303,7 @@ def _request_organization(request):
 
 
 def _request_workspace_filter(request, field_name="workspace"):
-    workspace = getattr(request, "workspace", None)
+    workspace = getattr(request, "workspace", None) or get_current_workspace()
     if not workspace:
         return Q()
 
@@ -325,6 +326,58 @@ def _request_dataset_queryset(request):
     return Dataset.objects.filter(
         _request_workspace_filter(request),
         organization=_request_organization(request),
+        deleted=False,
+    )
+
+
+def _request_user_eval_metric_queryset(request, dataset_id=None):
+    queryset = UserEvalMetric.objects.filter(
+        _request_workspace_filter(request, field_name="dataset__workspace"),
+        organization=_request_organization(request),
+        dataset__deleted=False,
+        deleted=False,
+    )
+    if dataset_id is not None:
+        queryset = queryset.filter(dataset_id=dataset_id)
+    return queryset
+
+
+def _request_experiment_dataset_queryset(request):
+    organization = _request_organization(request)
+    fk_scope = Q(experiment__dataset__organization=organization) & (
+        _request_workspace_filter(request, field_name="experiment__dataset__workspace")
+    )
+    legacy_scope = Q(experiments_datasets_created__dataset__organization=organization) & (
+        _request_workspace_filter(
+            request, field_name="experiments_datasets_created__dataset__workspace"
+        )
+    )
+    return ExperimentDatasetTable.objects.filter(
+        fk_scope | legacy_scope,
+        deleted=False,
+    ).distinct()
+
+
+def _experiment_for_dataset(experiment_dataset):
+    return (
+        experiment_dataset.experiment
+        or experiment_dataset.experiments_datasets_created.filter(deleted=False).first()
+    )
+
+
+def _request_eval_template_queryset(request, include_system=True):
+    organization_filter = Q(organization=_request_organization(request)) & (
+        _request_workspace_filter(request)
+    )
+    if not include_system:
+        return EvalTemplate.no_workspace_objects.filter(
+            organization_filter,
+            deleted=False,
+        )
+
+    return EvalTemplate.no_workspace_objects.filter(
+        Q(owner=OwnerChoices.SYSTEM.value, organization__isnull=True)
+        | organization_filter,
         deleted=False,
     )
 
@@ -3021,13 +3074,15 @@ class GetExperimentDatasetTableView(APIView):
             page_size = int(request.GET.get("page_size", 10))
             current_page = int(request.GET.get("current_page_index", 0))
 
-            # Get base dataset and rows
-            dataset = get_object_or_404(
-                ExperimentDatasetTable, id=experiment_dataset_id
+            dataset = (
+                _request_experiment_dataset_queryset(request)
+                .filter(id=experiment_dataset_id)
+                .first()
             )
-            rows = Row.objects.filter(dataset_id=experiment_dataset_id, deleted=False)
-            # logger.exception(f"rows : {rows}")
-            rows = rows.order_by("order")
+            if not dataset:
+                return self._gm.not_found(
+                    get_error_message("EXPERIMENT_DATASET_NOT_FOUND")
+                )
 
             # Calculate pagination offsets
             start = current_page * page_size
@@ -3036,7 +3091,9 @@ class GetExperimentDatasetTableView(APIView):
             # Get column configuration
             columns_in_experiment = list(dataset.columns.all())
 
-            experiment = dataset.experiment
+            experiment = _experiment_for_dataset(dataset)
+            if not experiment:
+                return self._gm.not_found(get_error_message("EXPERIMENT_NOT_FOUND"))
             user_eval_metric = list(experiment.user_eval_template_ids.all())
             total_columns = []
             for metric in user_eval_metric:
@@ -3250,14 +3307,25 @@ class GetExperimentDatasetTableView(APIView):
                             logger.error(e)
                             continue
 
-            # logger.info(f"cells_BY_ROW: {cells_by_row}")
-            table_data = list(cells_by_row.values())[start:end]
+            row_order_by_id = {
+                str(row.id): row.order
+                for row in Row.no_workspace_objects.filter(id__in=cells_by_row.keys())
+            }
+            all_table_data = sorted(
+                cells_by_row.values(),
+                key=lambda row: (
+                    row_order_by_id.get(str(row["row_id"]), float("inf")),
+                    str(row["row_id"]),
+                ),
+            )
+            total_rows = len(all_table_data)
+            table_data = all_table_data[start:end]
 
             response_data = {
                 "metadata": {
                     "dataset_name": dataset.name,
-                    "total_rows": len(table_data),
-                    "total_pages": (len(table_data) + page_size - 1) // page_size,
+                    "total_rows": total_rows,
+                    "total_pages": (total_rows + page_size - 1) // page_size,
                 },
                 "column_config": column_config,
                 "table": table_data,
@@ -6507,13 +6575,23 @@ class GetEvalsListView(APIView):
             eval_type = validated_data.get("eval_type")
             eval_tags = validated_data.get("eval_tags")
             use_cases = validated_data.get("use_cases")
+            organization = _request_organization(request)
+            dataset = None
+            if dataset_id:
+                dataset = (
+                    _request_dataset_queryset(request)
+                    .filter(id=dataset_id)
+                    .first()
+                )
+                if not dataset:
+                    return self._gm.not_found("Dataset not found")
 
             all_evals = []
 
             if experiment_id and dataset_id:
                 try:
                     experiment = ExperimentsTable.objects.get(
-                        id=experiment_id, dataset_id=dataset_id, deleted=False
+                        id=experiment_id, dataset=dataset, deleted=False
                     )
                 except ExperimentsTable.DoesNotExist:
                     return self._gm.bad_request(
@@ -6529,8 +6607,7 @@ class GetEvalsListView(APIView):
                     all_evals.extend(
                         self._get_user_evals(
                             validated_data,
-                            getattr(request, "organization", None)
-                            or request.user.organization,
+                            organization,
                             dataset_id,
                             search_text=search_text,
                             user_evals=user_evals,
@@ -6555,10 +6632,10 @@ class GetEvalsListView(APIView):
                         all_evals.extend(
                             self._get_user_evals(
                                 validated_data,
-                                getattr(request, "organization", None)
-                                or request.user.organization,
+                                organization,
                                 dataset_id,
                                 search_text=search_text,
+                                request=request,
                             )
                         )
                 elif eval_tags:
@@ -6576,8 +6653,7 @@ class GetEvalsListView(APIView):
                         all_evals.extend(
                             self._custom_build_evals(
                                 validated_data,
-                                getattr(request, "organization", None)
-                                or request.user.organization,
+                                organization,
                                 search_text=search_text,
                             )
                         )
@@ -6592,25 +6668,15 @@ class GetEvalsListView(APIView):
                         all_evals.extend(
                             self._custom_build_evals(
                                 validated_data,
-                                getattr(request, "organization", None)
-                                or request.user.organization,
+                                organization,
                                 search_text=search_text,
                             )
                         )
             eval_recommendations = ["Deterministic Evals"]
-            if dataset_id:
-                try:
-                    dataset = Dataset.objects.get(
-                        id=dataset_id,
-                        organization=getattr(request, "organization", None)
-                        or request.user.organization,
-                        deleted=False,
-                    )
-                    eval_recommendations = dataset.dataset_config.get(
-                        "eval_recommendations", ["Deterministic Evals"]
-                    )
-                except Dataset.DoesNotExist:
-                    pass
+            if dataset:
+                eval_recommendations = dataset.dataset_config.get(
+                    "eval_recommendations", ["Deterministic Evals"]
+                )
             if use_cases:
                 all_items = []
                 for use_case in use_cases:
@@ -6832,7 +6898,13 @@ class GetEvalsListView(APIView):
         return run_evals
 
     def _get_user_evals(
-        self, validated_data, organization, dataset_id, search_text, user_evals=None
+        self,
+        validated_data,
+        organization,
+        dataset_id,
+        search_text,
+        user_evals=None,
+        request=None,
     ):
         from model_hub.utils.eval_list import build_user_eval_list_items
 
@@ -6843,13 +6915,20 @@ class GetEvalsListView(APIView):
         is_experiment_scope = user_evals is not None
 
         if user_evals is None:
-            user_evals = UserEvalMetric.objects.select_related(
-                "template", "eval_group"
-            ).filter(
-                dataset_id=dataset_id,
+            if request is not None:
+                user_evals = _request_user_eval_metric_queryset(
+                    request, dataset_id
+                ).select_related("template", "eval_group")
+            else:
+                user_evals = UserEvalMetric.objects.select_related(
+                    "template", "eval_group"
+                ).filter(
+                    dataset_id=dataset_id,
+                    organization=organization,
+                    deleted=False,
+                )
+            user_evals = user_evals.filter(
                 show_in_sidebar=True,
-                organization=organization,
-                deleted=False,
                 template__deleted=False,
                 template__visible_ui=True,
             )
@@ -7157,19 +7236,21 @@ class GetEvalStructureView(APIView):
     ):  # Changed from 'post' to 'get'
         try:
             eval_type = request.validated_query_data["eval_type"]
+            dataset = None
+            if dataset_id:
+                dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+                if not dataset:
+                    return self._gm.not_found("Dataset not found")
 
             if eval_type == "preset" or eval_type == "previously_configured":
-                return self._get_preset_structure(
-                    eval_id,
-                    getattr(request, "organization", None) or request.user.organization,
-                )
+                return self._get_preset_structure(eval_id, request)
             else:  # user
                 if not dataset_id:
                     return self._gm.bad_request(get_error_message("DATASET_ID_MISSING"))
                 return self._get_user_structure(
                     eval_id,
                     dataset_id,
-                    getattr(request, "organization", None) or request.user.organization,
+                    request,
                 )
 
         except Exception as e:
@@ -7178,8 +7259,11 @@ class GetEvalStructureView(APIView):
                 get_error_message("FAILED_TO_GET_EVAL_STRUCTURE")
             )
 
-    def _get_preset_structure(self, template_id, organization):
-        template = EvalTemplate.no_workspace_objects.get(id=template_id)
+    def _get_preset_structure(self, template_id, request):
+        organization = _request_organization(request)
+        template = _request_eval_template_queryset(request).filter(id=template_id).first()
+        if not template:
+            return self._gm.not_found("Eval template not found")
 
         final_config = template.config.get("config", {})
         function_params_schema, params = params_with_defaults_for_response(
@@ -7233,16 +7317,14 @@ class GetEvalStructureView(APIView):
 
         return self._gm.success_response({"eval": eval_data})
 
-    def _get_user_structure(self, eval_id, dataset_id, organization):
-        try:
-            eval = get_object_or_404(
-                UserEvalMetric,
-                id=eval_id,
-                dataset_id=dataset_id,
-                organization=organization,
-            )
-        except Exception:
-            return self._gm.bad_request(get_error_message("EVAL_STACK_UPDATED"))
+    def _get_user_structure(self, eval_id, dataset_id, request):
+        eval = (
+            _request_user_eval_metric_queryset(request, dataset_id)
+            .filter(id=eval_id)
+            .first()
+        )
+        if not eval:
+            return self._gm.not_found("Eval not found")
 
         template = EvalTemplate.no_workspace_objects.get(id=eval.template_id)
         corresponding_column_id = Column.objects.filter(
@@ -7325,6 +7407,7 @@ class StartEvalsProcess(APIView):
             request_data = request.validated_data
             user_eval_ids = request_data.get("user_eval_ids", [])
             experiment_id = request_data.get("experiment_id")
+            requested_eval_ids = {str(eval_id) for eval_id in user_eval_ids}
 
             # Experiment evals are orchestrated by a Temporal workflow — delegate
             # to the experiment rerun-cells view so the workflow fires correctly
@@ -7342,18 +7425,20 @@ class StartEvalsProcess(APIView):
                     request, experiment_id=experiment_id
                 )
 
-            eval_metrics = list(
-                UserEvalMetric.objects.filter(
-                    id__in=user_eval_ids,
-                    dataset_id=dataset_id,
-                    organization=getattr(request, "organization", None)
-                    or request.user.organization,
-                    deleted=False,
-                ).select_related("dataset")
-            )
-
             if not user_eval_ids:
                 return self._gm.bad_request(get_error_message("MISSSING_EVAL_IDS"))
+
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
+
+            eval_metrics = list(
+                _request_user_eval_metric_queryset(request, dataset_id)
+                .filter(id__in=user_eval_ids)
+                .select_related("dataset", "template")
+            )
+            if {str(metric.id) for metric in eval_metrics} != requested_eval_ids:
+                return self._gm.not_found("Eval not found")
 
             for metric in eval_metrics:
                 if metric.column_deleted:
@@ -7363,20 +7448,18 @@ class StartEvalsProcess(APIView):
 
             # Update status for all specified evals
             updated = UserEvalMetric.objects.filter(
-                id__in=user_eval_ids,
-                dataset_id=dataset_id,
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                deleted=False,
+                id__in=[metric.id for metric in eval_metrics],
             ).update(status=StatusType.NOT_STARTED.value)
 
             if updated == 0:
                 return self._gm.bad_request(get_error_message("EVALS_NOT_FOUND"))
 
+            source_ids = [str(metric.id) for metric in eval_metrics]
             Cell.objects.filter(
-                column__source_id__in=user_eval_ids, deleted=False
+                column__dataset=dataset,
+                column__source_id__in=source_ids,
+                deleted=False,
             ).update(status=CellStatus.RUNNING.value)
-            dataset = eval_metrics[0].dataset
             existing_columns = {
                 str(col.source_id): col
                 for col in list(
@@ -7438,9 +7521,11 @@ class StartEvalsProcess(APIView):
                         column_order.insert(eval_idx + 1, str(reason_col.id))
                         column_order_changed = True
 
-                Cell.objects.filter(column__source_id=source_id, deleted=False).update(
-                    status=CellStatus.RUNNING.value
-                )
+                Cell.objects.filter(
+                    column__dataset=dataset,
+                    column__source_id=source_id,
+                    deleted=False,
+                ).update(status=CellStatus.RUNNING.value)
 
             if column_order_changed:
                 dataset.column_order = column_order
@@ -7466,19 +7551,19 @@ class DeleteEvalsView(APIView):
         try:
             delete_column = request.data.get("delete_column", False)
             experiment_id = request.data.get("experiment_id")
-            organization = (
-                getattr(request, "organization", None) or request.user.organization
-            )
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
             now = timezone.now()
             # Experiment-scoped evals live under source_id=experiment_id, not
             # dataset_id. Branch the lookup so experiment eval deletion doesn't
             # 404 against the dataset-scoped record.
-            lookup_kwargs = {"id": eval_id, "organization": organization}
+            eval_queryset = _request_user_eval_metric_queryset(request, dataset_id)
             if experiment_id:
-                lookup_kwargs["source_id"] = str(experiment_id)
-            else:
-                lookup_kwargs["dataset_id"] = dataset_id
-            eval_metric = get_object_or_404(UserEvalMetric, **lookup_kwargs)
+                eval_queryset = eval_queryset.filter(source_id=str(experiment_id))
+            eval_metric = eval_queryset.filter(id=eval_id).first()
+            if not eval_metric:
+                return self._gm.not_found("Eval not found")
 
             # Experiments must retain at least one eval — the creation flow
             # validates this via CreateExperimentSerializer; mirror it here
@@ -7557,7 +7642,9 @@ class DeleteEvalsView(APIView):
                 else:
                     # Check if column exists before attempting deletion
                     column = Column.objects.filter(
-                        source_id=eval_metric.id, deleted=False
+                        source_id=eval_metric.id,
+                        dataset=dataset,
+                        deleted=False,
                     ).first()
                     if column:
                         # Delete all cells associated with the column and its dependent columns
@@ -7635,17 +7722,25 @@ class DeleteTemplateEvalsView(APIView):
 
     def delete(self, request, dataset_id, eval_id, *args, **kwargs):
         try:
-            # Get the eval and verify ownership
-            eval_metric = EvalTemplate.no_workspace_objects.get(
-                id=eval_id,
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                deleted=False,
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
+
+            eval_template = (
+                _request_eval_template_queryset(request, include_system=False)
+                .filter(id=eval_id)
+                .first()
             )
-            eval_metric.deleted = True
-            eval_metric.save()
+            if not eval_template:
+                return self._gm.not_found("Eval template not found")
+
+            eval_template.deleted = True
+            eval_template.deleted_at = timezone.now()
+            eval_template.save(update_fields=["deleted", "deleted_at"])
             return self._gm.success_response("Eval deleted successfully")
 
+        except Http404:
+            return self._gm.not_found("Eval template not found")
         except Exception as e:
             logger.exception(f"Error in deleting eval template: {str(e)}")
             return self._gm.internal_server_error_response(
@@ -7689,15 +7784,23 @@ class EditAndRunUserEvalView(APIView):
             organization = (
                 getattr(request, "organization", None) or request.user.organization
             )
-            # When editing an eval attached to an experiment, the UserEvalMetric
-            # is keyed by (id, source_id=experiment_id) — not (id, dataset_id).
-            # Fall back to the dataset-scoped lookup for the dataset edit flow.
-            lookup_kwargs = {"id": eval_id, "organization": organization}
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
+
+            # When editing an eval attached to an experiment, retain the
+            # source_id=experiment_id discriminator, but keep the lookup bound to
+            # the active workspace dataset from the URL.
+            eval_queryset = _request_user_eval_metric_queryset(request, dataset_id)
             if experiment_id:
-                lookup_kwargs["source_id"] = str(experiment_id)
-            else:
-                lookup_kwargs["dataset_id"] = dataset_id
-            eval_metric = get_object_or_404(UserEvalMetric, **lookup_kwargs)
+                eval_queryset = eval_queryset.filter(source_id=str(experiment_id))
+            eval_metric = (
+                eval_queryset.filter(id=eval_id)
+                .select_related("dataset", "template")
+                .first()
+            )
+            if not eval_metric:
+                return self._gm.not_found("Eval not found")
             if eval_metric.column_deleted:
                 return self._gm.bad_request(
                     f"{get_error_message('COLUMN_DELETED')} {eval_metric.name}"
@@ -7736,6 +7839,7 @@ class EditAndRunUserEvalView(APIView):
                     eval_tags=template.eval_tags,
                     organization=getattr(request, "organization", None)
                     or request.user.organization,
+                    workspace=getattr(request, "workspace", None),
                     owner=OwnerChoices.USER.value,
                     criteria=template.criteria,
                     choices=template.choices,
@@ -7847,7 +7951,9 @@ class EditAndRunUserEvalView(APIView):
                         )
                 else:
                     column = Column.objects.filter(
-                        source_id=eval_metric.id, deleted=False
+                        source_id=eval_metric.id,
+                        dataset=eval_metric.dataset,
+                        deleted=False,
                     ).first()
                     if not column:
                         # Column doesn't exist yet (eval was added with run=false
@@ -7881,6 +7987,7 @@ class EditAndRunUserEvalView(APIView):
                     Column.objects.filter(
                         source=column_source,
                         source_id__endswith=f"-sourceid-{eval_id}",
+                        dataset=eval_metric.dataset,
                         deleted=False,
                     ).values_list("id", flat=True)
                 )
@@ -7889,6 +7996,7 @@ class EditAndRunUserEvalView(APIView):
                     Column.objects.filter(
                         source=column_source,
                         source_id=str(eval_id),
+                        dataset=eval_metric.dataset,
                         deleted=False,
                     ).values_list("id", flat=True)
                 )
@@ -7903,19 +8011,25 @@ class EditAndRunUserEvalView(APIView):
                 # columns (one per EDT for experiments, one for datasets).
                 if corresponding_column_ids:
                     Cell.objects.filter(
-                        column_id__in=corresponding_column_ids, deleted=False
+                        column_id__in=corresponding_column_ids,
+                        column__dataset=eval_metric.dataset,
+                        deleted=False,
                     ).update(status=CellStatus.RUNNING.value)
                     reason_source_ids = [
                         f"{cid}-sourceid-{eval_metric.id}"
                         for cid in corresponding_column_ids
                     ]
                     Cell.objects.filter(
-                        column__source_id__in=reason_source_ids, deleted=False
+                        column__source_id__in=reason_source_ids,
+                        column__dataset=eval_metric.dataset,
+                        deleted=False,
                     ).update(status=CellStatus.RUNNING.value)
                 else:
                     # Dataset fallback: reset cells under the base source_id
                     Cell.objects.filter(
-                        column__source_id=str(eval_id), deleted=False
+                        column__source_id=str(eval_id),
+                        column__dataset=eval_metric.dataset,
+                        deleted=False,
                     ).update(status=CellStatus.RUNNING.value)
 
             eval_metric.save()
@@ -7969,14 +8083,8 @@ class AddUserEvalView(CreateAPIView):
             getattr(request, "organization", None) or request.user.organization
         )
 
-        # Validate dataset exists and belongs to user's organization
-        try:
-            dataset = Dataset.objects.get(id=dataset_id)
-            if dataset.organization_id != organization.id:
-                return self._gm.bad_request(
-                    "Dataset does not belong to your organization"
-                )
-        except Dataset.DoesNotExist:
+        dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+        if not dataset:
             return self._gm.not_found("Dataset not found")
 
         serializer = UserEvalSerializer(data=request_data)
@@ -8005,13 +8113,13 @@ class AddUserEvalView(CreateAPIView):
                             get_error_message("EVAL_NAME_EXISTS")
                         )
 
-                    from model_hub.utils.eval_validators import (
-                        validate_eval_template_org_access,
+                    template = (
+                        _request_eval_template_queryset(request)
+                        .filter(id=validated_data.get("template_id"))
+                        .first()
                     )
-
-                    template = validate_eval_template_org_access(
-                        validated_data.get("template_id"), organization
-                    )
+                    if not template:
+                        return self._gm.not_found("Eval template not found")
                     new_template = EvalTemplate(
                         name=validated_data.get("name"),
                         description=template.description,
@@ -8019,6 +8127,7 @@ class AddUserEvalView(CreateAPIView):
                         eval_tags=template.eval_tags,
                         organization=getattr(request, "organization", None)
                         or request.user.organization,
+                        workspace=getattr(request, "workspace", None),
                         owner=OwnerChoices.USER.value,
                         criteria=template.criteria,
                         choices=template.choices,
@@ -8062,11 +8171,9 @@ class AddUserEvalView(CreateAPIView):
             ).exists():
                 return self._gm.bad_request(get_error_message("EVAL_NAME_EXISTS"))
 
-            from model_hub.utils.eval_validators import (
-                validate_eval_template_org_access,
-            )
-
-            template = validate_eval_template_org_access(template_id, organization)
+            template = _request_eval_template_queryset(request).filter(id=template_id).first()
+            if not template:
+                return self._gm.not_found("Eval template not found")
             # Inherit template-level enablement unless caller explicitly overrides.
             if "error_localizer" in request.data:
                 error_localizer = self._coerce_bool(
@@ -8107,6 +8214,7 @@ class AddUserEvalView(CreateAPIView):
             user_eval_metric = UserEvalMetric.objects.create(
                 name=validated_data.get("name"),
                 organization=organization,
+                workspace=getattr(request, "workspace", None),
                 dataset_id=id1,
                 template_id=template_id,
                 config=validated_data.get("config"),
@@ -8191,15 +8299,20 @@ class StopUserEvalView(APIView):
     def post(self, request, dataset_id, eval_id, *args, **kwargs):
         try:
             experiment_id = request.validated_data.get("experiment_id")
-            organization = (
-                getattr(request, "organization", None) or request.user.organization
-            )
-            lookup_kwargs = {"id": eval_id, "organization": organization}
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
+
+            eval_queryset = _request_user_eval_metric_queryset(request, dataset_id)
             if experiment_id:
-                lookup_kwargs["source_id"] = str(experiment_id)
-            else:
-                lookup_kwargs["dataset_id"] = dataset_id
-            eval_metric = get_object_or_404(UserEvalMetric, **lookup_kwargs)
+                eval_queryset = eval_queryset.filter(source_id=str(experiment_id))
+            eval_metric = (
+                eval_queryset.filter(id=eval_id)
+                .select_related("dataset", "template")
+                .first()
+            )
+            if not eval_metric:
+                return self._gm.not_found("Eval not found")
 
             if eval_metric.status in (
                 StatusType.RUNNING.value,
@@ -8271,6 +8384,9 @@ class PreviewRunEvalView(APIView):
             model = request_data.get("model", ModelChoices.TURING_LARGE.value)
             call_type = config["mapping"].get("call_type", None)
             sdk_uuid = request_data.get("sdk_uuid", None)
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
 
             protect = False
             # Get protect_flash parameter from request (defaults to False)
@@ -8284,14 +8400,18 @@ class PreviewRunEvalView(APIView):
                     protect_flash = True
                     is_only_eval = False
             # Get dataset and selected rows
-            rows = Row.objects.filter(dataset__id=dataset_id, deleted=False).order_by(
+            rows = Row.objects.filter(dataset=dataset, deleted=False).order_by(
                 "order"
             )[:3]
 
-            source = Dataset.objects.get(id=dataset_id).source
+            source = dataset.source
 
             # get eval template of this eval metric
-            eval_template = EvalTemplate.no_workspace_objects.get(id=template_id)
+            eval_template = (
+                _request_eval_template_queryset(request).filter(id=template_id).first()
+            )
+            if not eval_template:
+                return self._gm.not_found("Eval template not found")
 
             eval_class = globals().get(eval_template.config.get("eval_type_id"))
 
@@ -11106,29 +11226,58 @@ class SingleRowEvaluationView(APIView):
         try:
             request_data = request.validated_data
             # Extract the user_eval_metric_ids and row_ids from the request data
-            user_eval_metric_ids = [
-                str(metric_id)
-                for metric_id in request_data.get("user_eval_metric_ids", [])
-            ]
-            row_ids = [str(row_id) for row_id in request_data.get("row_ids", [])]
+            user_eval_metric_ids = list(
+                dict.fromkeys(
+                    str(metric_id)
+                    for metric_id in request_data.get("user_eval_metric_ids", [])
+                )
+            )
+            row_ids = list(
+                dict.fromkeys(str(row_id) for row_id in request_data.get("row_ids", []))
+            )
             selected_all_rows = request_data.get("selected_all_rows", False)
             if not user_eval_metric_ids:
                 return self._gm.bad_request(
                     get_error_message("USER_EVAL_METRIC_IDs_REQUIRED")
                 )
+
+            eval_metrics = list(
+                _request_user_eval_metric_queryset(request)
+                .filter(id__in=user_eval_metric_ids)
+                .select_related("dataset")
+            )
+            if {str(metric.id) for metric in eval_metrics} != set(
+                user_eval_metric_ids
+            ):
+                return self._gm.not_found("Eval not found")
+
+            dataset_ids = {metric.dataset_id for metric in eval_metrics}
+            if len(dataset_ids) != 1:
+                return self._gm.bad_request(
+                    "All eval metrics must belong to the same dataset."
+                )
+            dataset = eval_metrics[0].dataset
+
             if not row_ids and not selected_all_rows:
                 return self._gm.bad_request(get_error_message("MISSING_ROW_IDS"))
 
             if selected_all_rows:
-                user_eval_metric = UserEvalMetric.objects.get(
-                    id=user_eval_metric_ids[0]
-                )
                 if row_ids and len(row_ids) > 0:
+                    excluded_row_ids = set(
+                        map(
+                            str,
+                            Row.objects.filter(
+                                dataset=dataset, deleted=False, id__in=row_ids
+                            ).values_list("id", flat=True),
+                        )
+                    )
+                    if excluded_row_ids != set(row_ids):
+                        return self._gm.not_found("Row not found")
                     row_ids = list(
                         map(
                             str,
                             Row.objects.filter(
-                                dataset=user_eval_metric.dataset, deleted=False
+                                dataset=dataset, deleted=False
                             )
                             .exclude(id__in=row_ids)
                             .values_list("id", flat=True),
@@ -11139,20 +11288,35 @@ class SingleRowEvaluationView(APIView):
                         map(
                             str,
                             Row.objects.filter(
-                                dataset=user_eval_metric.dataset, deleted=False
+                                dataset=dataset, deleted=False
                             ).values_list("id", flat=True),
                         )
                     )
+                if not row_ids:
+                    return self._gm.bad_request(get_error_message("MISSING_ROW_IDS"))
+            else:
+                scoped_row_ids = set(
+                    map(
+                        str,
+                        Row.objects.filter(
+                            dataset=dataset, deleted=False, id__in=row_ids
+                        ).values_list("id", flat=True),
+                    )
+                )
+                if scoped_row_ids != set(row_ids):
+                    return self._gm.not_found("Row not found")
 
             # Prepare data for batch processing
             evaluation_data = {"metric_ids": user_eval_metric_ids, "row_ids": row_ids}
 
             Cell.objects.filter(
+                dataset=dataset,
                 row_id__in=row_ids,
+                column__dataset=dataset,
                 column__source_id__in=user_eval_metric_ids,
                 deleted=False,
             ).update(
-                status=CellStatus.RUNNING.value, value=None, value_infos=json.dumps({})
+                status=CellStatus.RUNNING.value, value=None, value_infos={}
             )
 
             # Run all evaluations in a single async task
@@ -15322,17 +15486,15 @@ class GetDatasetExplanationSummary(APIView):
     )
     def get(self, request, dataset_id):
         try:
-            organization = (
-                getattr(request, "organization", None) or request.user.organization
-            )
-            dataset = get_object_or_404(
-                Dataset, id=dataset_id, organization=organization
-            )
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found(get_error_message("DATASET_NOT_FOUND"))
+
             eval_reasons = dataset.eval_reasons
             eval_reason_last_updated = dataset.eval_reason_last_updated
             status = dataset.eval_reason_status
 
-            row_count = Row.objects.filter(dataset_id=dataset_id, deleted=False).count()
+            row_count = Row.objects.filter(dataset=dataset, deleted=False).count()
 
             if row_count < MIN_ROWS_FOR_CRITICAL_ISSUES:
                 status = EvalExplanationSummaryStatus.INSUFFICIENT_DATA
@@ -15341,7 +15503,7 @@ class GetDatasetExplanationSummary(APIView):
             elif eval_reason_last_updated is None:
                 dataset.eval_reason_status = EvalExplanationSummaryStatus.PENDING
                 dataset.save(update_fields=["eval_reason_status"])
-                get_explanation_summary.delay(str(dataset_id))
+                get_explanation_summary.delay(str(dataset.id))
 
             return self._gm.success_response(
                 {
@@ -15375,14 +15537,11 @@ class RefreshDatasetExplanationSummary(APIView):
     )
     def post(self, request, dataset_id):
         try:
-            organization = (
-                getattr(request, "organization", None) or request.user.organization
-            )
-            dataset = get_object_or_404(
-                Dataset, id=dataset_id, organization=organization
-            )
+            dataset = _request_dataset_queryset(request).filter(id=dataset_id).first()
+            if not dataset:
+                return self._gm.not_found(get_error_message("DATASET_NOT_FOUND"))
 
-            row_count = Row.objects.filter(dataset_id=dataset_id, deleted=False).count()
+            row_count = Row.objects.filter(dataset=dataset, deleted=False).count()
 
             if row_count < MIN_ROWS_FOR_CRITICAL_ISSUES:
                 dataset.eval_reason_status = (
@@ -15402,7 +15561,7 @@ class RefreshDatasetExplanationSummary(APIView):
             dataset.eval_reason_status = EvalExplanationSummaryStatus.PENDING
             dataset.save(update_fields=["eval_reason_status"])
 
-            get_explanation_summary.delay(str(dataset_id))
+            get_explanation_summary.delay(str(dataset.id))
 
             return self._gm.success_response(
                 {

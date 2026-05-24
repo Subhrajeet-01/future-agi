@@ -50,7 +50,11 @@ from model_hub.models.develop_dataset import (
     KnowledgeBaseFile,
     Row,
 )
-from model_hub.models.evals_metric import EvalTemplate, UserEvalMetric
+from model_hub.models.evals_metric import (
+    EvalTemplate,
+    EvalTemplateVersion,
+    UserEvalMetric,
+)
 from model_hub.models.run_prompt import RunPrompter
 from model_hub.serializers.contracts import (
     CustomEvalTemplateCreateResponseSerializer,
@@ -71,6 +75,7 @@ from model_hub.utils.json_path_resolver import (  # noqa: E402
     resolve_json_path,
 )
 from sdk.utils.helpers import _get_api_call_type
+from tfc.middleware.workspace_context import get_current_workspace
 from tfc.utils.error_codes import (
     get_error_for_api_status,
     get_error_message,
@@ -91,6 +96,64 @@ except ImportError:
     count_tiktoken_tokens = None
     log_and_deduct_cost_for_api_request = None
     refund_cost_for_api_call = None
+
+
+def _request_organization(request):
+    return getattr(request, "organization", None) or request.user.organization
+
+
+def _request_workspace_filter(request, field_name="workspace"):
+    workspace = getattr(request, "workspace", None) or get_current_workspace()
+    if not workspace:
+        return models.Q()
+
+    if getattr(workspace, "is_default", False):
+        return (
+            models.Q(**{field_name: workspace})
+            | models.Q(
+                **{
+                    f"{field_name}__is_default": True,
+                    f"{field_name}__organization_id": workspace.organization_id,
+                }
+            )
+            | models.Q(**{f"{field_name}__isnull": True})
+        )
+
+    return models.Q(**{field_name: workspace})
+
+
+def _request_dataset_queryset(request):
+    return Dataset.objects.filter(
+        _request_workspace_filter(request),
+        organization=_request_organization(request),
+        deleted=False,
+    )
+
+
+def _request_eval_template_queryset(request):
+    organization = _request_organization(request)
+    return EvalTemplate.no_workspace_objects.filter(deleted=False).filter(
+        models.Q(owner=OwnerChoices.SYSTEM.value)
+        | (
+            models.Q(owner=OwnerChoices.USER.value, organization=organization)
+            & _request_workspace_filter(request)
+        )
+    )
+
+
+def _mapped_column_ids(config):
+    mapping = config.get("mapping") if isinstance(config, dict) else None
+    if not isinstance(mapping, dict):
+        return set()
+
+    column_ids = set()
+    for value in mapping.values():
+        if not isinstance(value, str):
+            continue
+        column_id_or_name, _json_path = _extract_column_id_and_path(value)
+        if is_uuid(str(column_id_or_name)):
+            column_ids.add(str(column_id_or_name))
+    return column_ids
 
 
 def _format_messages_to_prompt_chain(messages):
@@ -3231,13 +3294,29 @@ class EvalTemplateCreateView(CreateAPIView):
             organization = (
                 getattr(request, "organization", None) or request.user.organization
             )
+            workspace = getattr(request, "workspace", None)
             validated_data = request.validated_data
-            EvalTemplate.objects.create(
+            owner = validated_data.get("owner", OwnerChoices.USER.value)
+            if owner != OwnerChoices.USER.value:
+                return self._gm.bad_request(
+                    "Only user-owned eval templates can be created through this endpoint."
+                )
+
+            eval_template = EvalTemplate.objects.create(
                 name=validated_data.get("name"),
                 organization=organization,
-                owner=validated_data.get("owner"),
+                workspace=workspace,
+                owner=owner,
                 eval_tags=validated_data.get("eval_tags"),
                 config=validated_data.get("config"),
+            )
+            EvalTemplateVersion.objects.create_version(
+                eval_template=eval_template,
+                config_snapshot=eval_template.config,
+                user=request.user,
+                organization=organization,
+                workspace=workspace,
+                eval_tags=eval_template.eval_tags,
             )
 
             return self._gm.success_response("success")
@@ -3262,15 +3341,57 @@ class EvalUserTemplateCreateView(CreateAPIView):
     )
     def post(self, request):
         try:
-            organization = (
-                getattr(request, "organization", None) or request.user.organization
-            )
+            organization = _request_organization(request)
+            workspace = getattr(request, "workspace", None) or get_current_workspace()
             validated_data = request.validated_data
+
+            dataset = (
+                _request_dataset_queryset(request)
+                .filter(id=validated_data.get("dataset_id"))
+                .first()
+            )
+            if not dataset:
+                return self._gm.not_found("Dataset not found")
+
+            template = (
+                _request_eval_template_queryset(request)
+                .filter(id=validated_data.get("template_id"))
+                .first()
+            )
+            if not template:
+                return self._gm.not_found("Eval template not found")
+
+            if UserEvalMetric.objects.filter(
+                _request_workspace_filter(request),
+                organization=organization,
+                dataset=dataset,
+                name=validated_data.get("name"),
+                deleted=False,
+            ).exists():
+                return self._gm.bad_request(get_error_message("EVAL_NAME_EXISTS"))
+
+            mapped_column_ids = _mapped_column_ids(validated_data.get("config") or {})
+            if mapped_column_ids:
+                existing_column_ids = set(
+                    Column.objects.filter(
+                        id__in=mapped_column_ids,
+                        dataset=dataset,
+                        deleted=False,
+                    ).values_list("id", flat=True)
+                )
+                if {str(column_id) for column_id in existing_column_ids} != set(
+                    mapped_column_ids
+                ):
+                    return self._gm.bad_request(
+                        "Eval mapping contains columns outside the selected dataset."
+                    )
+
             UserEvalMetric.objects.create(
                 name=validated_data.get("name"),
                 organization=organization,
-                dataset_id=validated_data.get("dataset_id"),
-                template_id=validated_data.get("template_id"),
+                workspace=workspace,
+                dataset=dataset,
+                template=template,
                 config=validated_data.get("config"),
                 user=request.user,
                 model=validated_data.get("model", ModelChoices.TURING_LARGE.value),

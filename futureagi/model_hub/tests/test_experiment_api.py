@@ -561,6 +561,58 @@ class TestExperimentActionWorkspaceIsolation:
         experiment.save(update_fields=["snapshot_dataset", "column"])
         return experiment, dataset, snapshot_column, snapshot_dataset
 
+    def _create_legacy_row_diff_fixture(self, organization, user, workspace):
+        experiment, dataset, _, _ = self._create_experiment_in_workspace(
+            organization, user, workspace
+        )
+        base_column = Column.objects.create(
+            name="Prompt A",
+            dataset=dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.EXPERIMENT.value,
+            status=StatusType.COMPLETED.value,
+        )
+        other_column = Column.objects.create(
+            name="Prompt B",
+            dataset=dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.EXPERIMENT.value,
+            status=StatusType.COMPLETED.value,
+        )
+        row = Row.objects.create(dataset=dataset, order=0)
+        base_cell = Cell.objects.create(
+            dataset=dataset,
+            row=row,
+            column=base_column,
+            value="base answer alpha",
+            status=CellStatus.PASS.value,
+            value_infos={"metadata": {"prompt": "a"}},
+        )
+        other_cell = Cell.objects.create(
+            dataset=dataset,
+            row=row,
+            column=other_column,
+            value="other answer beta",
+            status=CellStatus.PASS.value,
+            value_infos={"metadata": {"prompt": "b"}},
+        )
+        experiment_dataset = ExperimentDatasetTable.objects.create(
+            name="Prompt A",
+            status=StatusType.COMPLETED.value,
+            experiment=experiment,
+        )
+        experiment_dataset.columns.add(base_column, other_column)
+        experiment.experiments_datasets.add(experiment_dataset)
+        return {
+            "experiment": experiment,
+            "dataset": dataset,
+            "base_column": base_column,
+            "other_column": other_column,
+            "row": row,
+            "base_cell": base_cell,
+            "other_cell": other_cell,
+        }
+
     @pytest.fixture
     def other_workspace(self, organization, user):
         return Workspace.objects.create(
@@ -684,6 +736,116 @@ class TestExperimentActionWorkspaceIsolation:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "outside value should not leak" not in str(response.data)
         assert snapshot_dataset.id == experiment.snapshot_dataset_id
+
+    def test_legacy_row_diff_returns_dataset_scoped_cells(
+        self, auth_client, organization, user, workspace
+    ):
+        fixture = self._create_legacy_row_diff_fixture(
+            organization, user, workspace
+        )
+
+        response = auth_client.post(
+            "/model-hub/develops/get-row-diff/",
+            {
+                "experiment_id": str(fixture["experiment"].id),
+                "column_ids": [
+                    str(fixture["base_column"].id),
+                    str(fixture["other_column"].id),
+                ],
+                "row_ids": [str(fixture["row"].id)],
+                "compare_column_ids": [
+                    str(fixture["base_column"].id),
+                    str(fixture["other_column"].id),
+                ],
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        row_payload = response.data["result"][str(fixture["row"].id)]
+        assert (
+            row_payload[str(fixture["base_column"].id)]["cell_value"]
+            == fixture["base_cell"].value
+        )
+        assert row_payload[str(fixture["base_column"].id)]["cell_diff_value"] is None
+        diff = row_payload[str(fixture["other_column"].id)]["cell_diff_value"]
+        assert {part["status"] for part in diff} >= {"removed", "added"}
+        assert row_payload[str(fixture["other_column"].id)]["value_infos"] == {
+            "metadata": {"prompt": "b"}
+        }
+
+    def test_legacy_row_diff_rejects_other_workspace_experiment(
+        self, auth_client, organization, user, other_workspace
+    ):
+        fixture = self._create_legacy_row_diff_fixture(
+            organization, user, other_workspace
+        )
+
+        response = auth_client.post(
+            "/model-hub/develops/get-row-diff/",
+            {
+                "experiment_id": str(fixture["experiment"].id),
+                "column_ids": [
+                    str(fixture["base_column"].id),
+                    str(fixture["other_column"].id),
+                ],
+                "row_ids": [str(fixture["row"].id)],
+                "compare_column_ids": [
+                    str(fixture["base_column"].id),
+                    str(fixture["other_column"].id),
+                ],
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_legacy_row_diff_rejects_rows_and_columns_outside_experiment_dataset(
+        self, auth_client, organization, user, workspace
+    ):
+        fixture = self._create_legacy_row_diff_fixture(
+            organization, user, workspace
+        )
+        outside_dataset = Dataset.objects.create(
+            name="Outside Legacy Diff Dataset",
+            organization=organization,
+            workspace=workspace,
+            source=DatasetSourceChoices.BUILD.value,
+        )
+        outside_row = Row.objects.create(dataset=outside_dataset, order=0)
+        outside_column = Column.objects.create(
+            name="Outside Column",
+            dataset=outside_dataset,
+            data_type=DataTypeChoices.TEXT.value,
+            source=SourceChoices.EXPERIMENT.value,
+        )
+        Cell.objects.create(
+            dataset=outside_dataset,
+            row=outside_row,
+            column=outside_column,
+            value="outside legacy diff value should not leak",
+            status=CellStatus.PASS.value,
+        )
+
+        response = auth_client.post(
+            "/model-hub/develops/get-row-diff/",
+            {
+                "experiment_id": str(fixture["experiment"].id),
+                "column_ids": [
+                    str(fixture["base_column"].id),
+                    str(outside_column.id),
+                ],
+                "row_ids": [str(outside_row.id)],
+                "compare_column_ids": [
+                    str(fixture["base_column"].id),
+                    str(outside_column.id),
+                ],
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "outside legacy diff value should not leak" not in str(response.data)
 
     @patch("tfc.temporal.experiments.start_rerun_cells_v2_workflow")
     def test_v2_rerun_cells_rejects_column_outside_snapshot(

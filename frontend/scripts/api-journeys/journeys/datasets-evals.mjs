@@ -2638,6 +2638,1182 @@ export const datasetEvalJourneys = [
     },
   },
   {
+    id: "DPE-API-022",
+    title: "Dataset generated-column creation, preview, and scope guards",
+    tags: ["dataset", "dynamic-columns", "mutating", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedDatasetDynamicColumnFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Dynamic-column fixture seed did not create a dataset.",
+      );
+      cleanup.defer("hard delete API journey dynamic-column fixture", () =>
+        hardDeleteDatasetCopyFixture([fixture.dataset_id]),
+      );
+
+      const preview = await client.post(
+        apiPath("/model-hub/datasets/{dataset_id}/preview/{operation_type}/", {
+          dataset_id: fixture.dataset_id,
+          operation_type: "extract_json",
+        }),
+        {
+          column_id: fixture.payload_column_id,
+          json_key: "name",
+        },
+      );
+      const previewResults = asArray(preview?.preview_results);
+      assert(
+        previewResults.length === 2,
+        "Dynamic-column preview did not return the seeded sample rows.",
+      );
+      assert(
+        previewResults.map((row) => row.output).includes(fixture.preview_name_one),
+        "Dynamic-column extract-json preview did not return the expected value.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/datasets/{dataset_id}/add-api-column/", {
+              dataset_id: randomUUID(),
+            }),
+            {
+              column_name: fixture.missing_guard_column_name,
+              config: {
+                url: "https://example.com",
+                method: "GET",
+                output_type: "string",
+              },
+            },
+          ),
+        404,
+        "Dynamic add-api-column accepted a missing dataset id.",
+      );
+
+      const createdColumns = await createDatasetDynamicColumns(client, fixture);
+
+      const audit = await loadDatasetDynamicColumnFixtureAudit(fixture);
+      assertDatasetDynamicColumnFixtureAudit(audit, fixture, createdColumns);
+
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        preview_outputs: previewResults.map((row) => row.output),
+        dynamic_column_count: Number(audit.dynamic_column_count),
+        column_order_length: Number(audit.column_order_length),
+        created_columns: createdColumns,
+        dynamic_sources: asArray(audit.dynamic_columns).map((row) => row.source),
+      });
+    },
+  },
+  {
+    id: "DPE-API-023",
+    title: "Dataset generated-column config and rerun guards",
+    tags: ["dataset", "dynamic-columns", "mutating", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedDatasetDynamicColumnFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Dynamic-column rerun fixture seed did not create a dataset.",
+      );
+      cleanup.defer("hard delete API journey dynamic-column rerun fixture", () =>
+        hardDeleteDatasetCopyFixture([fixture.dataset_id]),
+      );
+
+      const createdColumns = await createDatasetDynamicColumns(client, fixture);
+      const creationAudit = await loadDatasetDynamicColumnFixtureAudit(fixture);
+      assertDatasetDynamicColumnFixtureAudit(
+        creationAudit,
+        fixture,
+        createdColumns,
+      );
+
+      const configs = {};
+      for (const [name, id] of Object.entries(createdColumns)) {
+        const config = await client.get(
+          apiPath("/model-hub/columns/{column_id}/operation-config/", {
+            column_id: id,
+          }),
+        );
+        assert(
+          config.column_id === id,
+          `Operation config returned the wrong column_id for ${name}.`,
+        );
+        configs[name] = config.metadata;
+      }
+
+      assert(
+        configs[fixture.extract_json_column_name]?.json_key === "name",
+        "Extract-json operation config did not return stored json_key.",
+      );
+      assert(
+        configs[fixture.api_column_name]?.url === "https://example.com",
+        "API-call operation config did not return stored URL.",
+      );
+      assert(
+        asArray(configs[fixture.conditional_column_name]?.config).length === 1,
+        "Conditional operation config did not return stored branch config.",
+      );
+      assert(
+        asArray(configs[fixture.classify_column_name]?.labels).length === 2,
+        "Classification operation config did not return stored labels.",
+      );
+      assert(
+        configs[fixture.entities_column_name]?.instruction === "Extract names",
+        "Entity operation config did not return stored instruction.",
+      );
+      assert(
+        configs[fixture.vector_column_name]?.sub_type === "pinecone",
+        "Vector operation config did not return stored subtype.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.get(
+            apiPath("/model-hub/columns/{column_id}/operation-config/", {
+              column_id: randomUUID(),
+            }),
+          ),
+        400,
+        "Operation config accepted a missing column id.",
+      );
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/columns/{column_id}/rerun-operation/", {
+              column_id: randomUUID(),
+            }),
+            { operation_type: "extract_json" },
+          ),
+        404,
+        "Rerun operation accepted a missing column id.",
+      );
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/columns/{column_id}/rerun-operation/", {
+              column_id: createdColumns[fixture.extract_json_column_name],
+            }),
+            { operation_type: "invalid_type" },
+          ),
+        400,
+        "Rerun operation accepted an invalid operation type.",
+      );
+
+      const rerunJson = await client.post(
+        apiPath("/model-hub/columns/{column_id}/rerun-operation/", {
+          column_id: createdColumns[fixture.extract_json_column_name],
+        }),
+        { operation_type: "extract_json" },
+      );
+      assert(
+        rerunJson.column_id === createdColumns[fixture.extract_json_column_name] &&
+          rerunJson.status === "running",
+        "Extract-json rerun did not use stored metadata successfully.",
+      );
+
+      const rerunConditional = await client.post(
+        apiPath("/model-hub/columns/{column_id}/rerun-operation/", {
+          column_id: createdColumns[fixture.conditional_column_name],
+        }),
+        { operation_type: "conditional" },
+      );
+      assert(
+        rerunConditional.column_id ===
+          createdColumns[fixture.conditional_column_name] &&
+          rerunConditional.status === "running",
+        "Conditional rerun did not use stored metadata successfully.",
+      );
+
+      const rerunAudit = await loadDatasetDynamicColumnFixtureAudit(fixture);
+      assertDatasetDynamicColumnFixtureAudit(
+        rerunAudit,
+        fixture,
+        createdColumns,
+      );
+
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        configured_columns: Object.keys(configs).length,
+        rerun_columns: [rerunJson.column_id, rerunConditional.column_id],
+        dynamic_column_count: Number(rerunAudit.dynamic_column_count),
+        dynamic_sources: asArray(rerunAudit.dynamic_columns).map(
+          (row) => row.source,
+        ),
+      });
+    },
+  },
+  {
+    id: "DPE-API-024",
+    title: "Dataset synthetic config update and guards",
+    tags: ["dataset", "synthetic", "mutating", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedDatasetSyntheticFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Synthetic dataset fixture seed did not create a dataset.",
+      );
+      cleanup.defer("hard delete API journey synthetic dataset fixture", () =>
+        hardDeleteDatasetCopyFixture([fixture.dataset_id]),
+      );
+
+      const config = await client.get(
+        apiPath("/model-hub/develops/{dataset_id}/synthetic-config/", {
+          dataset_id: fixture.dataset_id,
+        }),
+      );
+      assert(
+        config?.data?.dataset?.description === fixture.original_description,
+        "Synthetic config readback did not return the seeded description.",
+      );
+      assert(
+        Number(config?.data?.num_rows) === 10,
+        "Synthetic config readback did not return the seeded row count.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.get(
+            apiPath("/model-hub/develops/{dataset_id}/synthetic-config/", {
+              dataset_id: randomUUID(),
+            }),
+          ),
+        404,
+        "Synthetic config accepted a missing dataset id.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/develops/create-synthetic-dataset/"), {
+            num_rows: 9,
+            columns: [fixture.synthetic_column_payload],
+            dataset: {
+              name: `api invalid synthetic ${runId}`,
+              description: "Invalid synthetic guard",
+              objective: "Guard invalid synthetic creation",
+              patterns: [],
+            },
+          }),
+        400,
+        "Create synthetic dataset accepted fewer than ten rows.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/develops/{dataset_id}/add_synthetic_data/", {
+              dataset_id: fixture.dataset_id,
+            }),
+            {
+              num_rows: 9,
+              fill_existing_rows: false,
+              columns: [fixture.synthetic_add_column_payload],
+              dataset: {
+                description: "Invalid synthetic add rows",
+                objective: "Guard invalid synthetic add rows",
+                patterns: [],
+              },
+            },
+          ),
+        400,
+        "Add synthetic data accepted fewer than ten rows.",
+      );
+
+      const updatePayload = {
+        num_rows: 10,
+        columns: [fixture.synthetic_column_payload],
+        dataset: {
+          name: fixture.dataset_name,
+          description: fixture.updated_description,
+          objective: "Update synthetic config through API",
+          patterns: [],
+        },
+        regenerate: false,
+      };
+      const update = await client.put(
+        apiPath("/model-hub/develops/{dataset_id}/update-synthetic-config/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        updatePayload,
+      );
+      assert(
+        update?.data?.dataset_id === fixture.dataset_id,
+        "Synthetic config update returned the wrong dataset id.",
+      );
+
+      const updatedConfig = await client.get(
+        apiPath("/model-hub/develops/{dataset_id}/synthetic-config/", {
+          dataset_id: fixture.dataset_id,
+        }),
+      );
+      assert(
+        updatedConfig?.data?.dataset?.description ===
+          fixture.updated_description,
+        "Synthetic config update did not persist the new description.",
+      );
+
+      const audit = await loadDatasetSyntheticFixtureAudit(fixture);
+      assertDatasetSyntheticFixtureAudit(audit, fixture);
+
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        initial_description: config.data.dataset.description,
+        updated_description: updatedConfig.data.dataset.description,
+        row_count: Number(audit.row_count),
+        column_count: Number(audit.column_count),
+        cell_count: Number(audit.cell_count),
+        column_order_length: Number(audit.column_order_length),
+      });
+    },
+  },
+  {
+    id: "DPE-API-025",
+    title: "Dataset explanation summary refresh guards",
+    tags: ["dataset", "summary", "mutating", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedDatasetExplanationFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Explanation summary fixture seed did not create a dataset.",
+      );
+      cleanup.defer("hard delete API journey explanation summary fixture", () =>
+        hardDeleteDatasetCopyFixture([fixture.dataset_id]),
+      );
+
+      const summary = await client.get(
+        apiPath("/model-hub/datasets/explanation-summary/{dataset_id}/", {
+          dataset_id: fixture.dataset_id,
+        }),
+      );
+      assert(
+        summary.status === "insufficient_data" &&
+          Number(summary.row_count) === fixture.row_count,
+        "Explanation summary read did not return insufficient_data for the seeded small dataset.",
+      );
+
+      const refreshed = await client.post(
+        apiPath("/model-hub/datasets/explanation-summary/{dataset_id}/refresh/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        {},
+      );
+      assert(
+        refreshed.status === "insufficient_data" &&
+          Number(refreshed.row_count) === fixture.row_count,
+        "Explanation summary refresh did not preserve insufficient_data status.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.get(
+            apiPath("/model-hub/datasets/explanation-summary/{dataset_id}/", {
+              dataset_id: randomUUID(),
+            }),
+          ),
+        404,
+        "Explanation summary read accepted a missing dataset id.",
+      );
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath(
+              "/model-hub/datasets/explanation-summary/{dataset_id}/refresh/",
+              { dataset_id: randomUUID() },
+            ),
+            {},
+          ),
+        404,
+        "Explanation summary refresh accepted a missing dataset id.",
+      );
+
+      const audit = await loadDatasetExplanationFixtureAudit(fixture);
+      assertDatasetExplanationFixtureAudit(audit, fixture);
+
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        row_count: Number(summary.row_count),
+        read_status: summary.status,
+        refresh_status: refreshed.status,
+        db_status: audit.eval_reason_status,
+      });
+    },
+  },
+  {
+    id: "DPE-API-026",
+    title: "Hugging Face dataset lookup and config",
+    tags: ["dataset", "huggingface", "safe"],
+    async run({ client, evidence }) {
+      const datasetId = "rajpurkar/squad";
+      const list = await client.post(
+        apiPath("/model-hub/datasets/huggingface/list/"),
+        {
+          search_query: "squad",
+          filter_params: { sort: "downloads" },
+        },
+      );
+      const datasets = asArray(list?.datasets);
+      assert(
+        Number(list?.total_datasets) > 0 && datasets.length > 0,
+        "Hugging Face list did not return datasets.",
+      );
+      assert(
+        datasets.some((dataset) => dataset.id === datasetId),
+        "Hugging Face list did not include rajpurkar/squad.",
+      );
+
+      const detail = await client.post(
+        apiPath("/model-hub/datasets/huggingface/detail/"),
+        { dataset_id: datasetId },
+      );
+      assert(
+        detail?.dataset?.id === datasetId &&
+          asArray(detail?.dataset?.tags).length > 0,
+        "Hugging Face detail did not return the expected dataset metadata.",
+      );
+
+      const config = await client.post(
+        apiPath("/model-hub/develops/get-huggingface-dataset-config/"),
+        { dataset_path: datasetId },
+      );
+      const splits = config?.dataset_info?.splits || {};
+      assert(
+        asArray(splits.plain_text).includes("train") &&
+          asArray(splits.plain_text).includes("validation"),
+        "Hugging Face config did not return plain_text train/validation splits.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/develops/get-huggingface-dataset-config/"),
+            { dataset_path: "lhoestq/custom_squad" },
+          ),
+        400,
+        "Hugging Face config accepted a dataset with arbitrary code.",
+      );
+
+      evidence.push({
+        dataset_id: datasetId,
+        total_datasets: Number(list.total_datasets),
+        list_result_count: datasets.length,
+        detail_downloads: Number(detail.dataset.downloads || 0),
+        config_names: Object.keys(splits),
+        plain_text_splits: splits.plain_text,
+      });
+    },
+  },
+  {
+    id: "DPE-API-027",
+    title: "Dataset eval drawer list, preview, run, stop, and cleanup",
+    tags: ["dataset", "evals", "mutating", "data-roundtrip", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      const template = await findEvalTemplateDetailByName(
+        client,
+        "word_count_in_range",
+      );
+      if (!template) {
+        skip("System eval word_count_in_range was not available for dataset evals.");
+      }
+      const requiredKeys = promptEvalRequiredKeys(template);
+      if (!requiredKeys.includes("text")) {
+        skip("word_count_in_range did not expose the expected text input key.");
+      }
+      const paramsConfig = promptEvalParamsForTemplate(template);
+      const evalConfig = {
+        mapping: { text: null },
+        params: paramsConfig.params,
+        reason_column: true,
+      };
+      const fixture = await seedDatasetEvalDrawerFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Dataset eval drawer fixture seed did not create a dataset.",
+      );
+      evalConfig.mapping.text = fixture.input_column_id;
+      cleanup.defer("hard delete API journey dataset eval drawer fixture", () =>
+        hardDeleteDatasetEvalDrawerFixture(fixture),
+      );
+
+      const systemList = await client.get(
+        apiPath("/model-hub/develops/{dataset_id}/get_evals_list/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        { query: { eval_categories: "futureagi_built", search_text: template.name } },
+      );
+      const systemRows = payloadArray(systemList?.evals, "evals");
+      assert(
+        systemRows.some((row) => row.id === template.id && row.name === template.name),
+        "Dataset eval list did not include the expected system eval template.",
+      );
+
+      const presetStructure = await client.get(
+        apiPath(
+          "/model-hub/develops/{dataset_id}/get_eval_structure/{eval_id}/",
+          { dataset_id: fixture.dataset_id, eval_id: template.id },
+        ),
+        { query: { eval_type: "preset" } },
+      );
+      assertDatasetEvalStructure(presetStructure, {
+        templateId: template.id,
+        expectedName: template.name,
+        expectedMapping: { text: "" },
+      });
+
+      const preview = await client.post(
+        apiPath("/model-hub/develops/{dataset_id}/preview_run_eval/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        {
+          template_id: template.id,
+          config: evalConfig,
+          model: "turing_small",
+        },
+      );
+      const previewResponses = payloadArray(preview?.responses, "responses");
+      assert(
+        previewResponses.length === fixture.row_count,
+        "Dataset eval preview did not evaluate the seeded fixture rows.",
+      );
+      assert(
+        previewResponses.every(
+          (response) => normalizeEvalOutput(response?.output) === "passed",
+        ),
+        "Dataset eval preview did not pass all seeded word-count rows.",
+      );
+
+      const metricName = `api_eval_drawer_${suffix}`;
+      await client.post(
+        apiPath("/model-hub/develops/{dataset_id}/add_user_eval/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        {
+          name: metricName,
+          template_id: template.id,
+          config: evalConfig,
+          run: false,
+          model: "turing_small",
+          error_localizer: false,
+        },
+      );
+
+      const userList = await client.get(
+        apiPath("/model-hub/develops/{dataset_id}/get_evals_list/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        { query: { eval_type: "user", search_text: metricName } },
+      );
+      const userRows = payloadArray(userList?.evals, "evals");
+      const userEval = userRows.find((row) => row.name === metricName);
+      assert(isUuid(userEval?.id), "Dataset eval list did not return the new metric.");
+      const metricId = userEval.id;
+
+      const userStructure = await client.get(
+        apiPath(
+          "/model-hub/develops/{dataset_id}/get_eval_structure/{eval_id}/",
+          { dataset_id: fixture.dataset_id, eval_id: metricId },
+        ),
+        { query: { eval_type: "user" } },
+      );
+      assertDatasetEvalStructure(userStructure, {
+        metricId,
+        templateId: template.id,
+        expectedName: metricName,
+        expectedMapping: { text: fixture.input_column_id },
+      });
+
+      let activeAudit = await loadDatasetEvalDrawerDbAudit({
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertDatasetEvalDrawerDbAudit(activeAudit, {
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricId,
+        metricName,
+        organizationId,
+        workspaceId,
+        expectedStatus: "Inactive",
+        expectedDeleted: false,
+        expectedEvalColumns: 0,
+      });
+
+      await client.post(
+        apiPath("/model-hub/develops/{dataset_id}/start_evals_process/", {
+          dataset_id: fixture.dataset_id,
+        }),
+        { user_eval_ids: [metricId] },
+      );
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/develops/{dataset_id}/start_evals_process/", {
+              dataset_id: fixture.dataset_id,
+            }),
+            { user_eval_ids: [randomUUID()] },
+          ),
+        404,
+        "Dataset eval start accepted an eval id outside the dataset/workspace.",
+      );
+
+      const startedAudit = await loadDatasetEvalDrawerDbAudit({
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertDatasetEvalDrawerDbAudit(startedAudit, {
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricId,
+        metricName,
+        organizationId,
+        workspaceId,
+        expectedStatus: "NotStarted",
+        expectedDeleted: false,
+        expectedEvalColumns: 1,
+        expectedReasonColumns: 1,
+      });
+
+      await client.post(
+        apiPath("/model-hub/develops/{dataset_id}/stop_user_eval/{eval_id}/", {
+          dataset_id: fixture.dataset_id,
+          eval_id: metricId,
+        }),
+        {},
+      );
+      const stoppedAudit = await loadDatasetEvalDrawerDbAudit({
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertDatasetEvalDrawerDbAudit(stoppedAudit, {
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricId,
+        metricName,
+        organizationId,
+        workspaceId,
+        expectedStatus: "Error",
+        expectedDeleted: false,
+        expectedEvalColumns: 1,
+        expectedReasonColumns: 1,
+      });
+
+      await client.delete(
+        apiPath("/model-hub/develops/{dataset_id}/delete_user_eval/{eval_id}/", {
+          dataset_id: fixture.dataset_id,
+          eval_id: metricId,
+        }),
+        { body: { delete_column: true } },
+      );
+      const deletedMetricAudit = await loadDatasetEvalDrawerDbAudit({
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertDatasetEvalDrawerDbAudit(deletedMetricAudit, {
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricId,
+        metricName,
+        organizationId,
+        workspaceId,
+        expectedStatus: "Error",
+        expectedDeleted: true,
+        expectedEvalColumns: 0,
+        expectedReasonColumns: 0,
+        expectedDeletedEvalColumns: 1,
+        expectedDeletedReasonColumns: 1,
+      });
+
+      const templateName = `api_journey_eval_drawer_template_${suffix}`;
+      const createdTemplate = await client.post(
+        apiPath("/model-hub/create_custom_evals/"),
+        {
+          name: templateName,
+          description: "Custom eval template for dataset drawer delete coverage.",
+          template_type: "Futureagi",
+          output_type: "Pass/Fail",
+          required_keys: ["response"],
+          criteria: "Judge {{response}} for clarity.",
+          tags: ["api-journey", "dataset-eval-drawer"],
+          config: {
+            model: "turing_large",
+            proxy_agi: true,
+            visible_ui: true,
+          },
+          check_internet: false,
+        },
+      );
+      const templateId =
+        createdTemplate?.result?.eval_template_id ||
+        createdTemplate?.data?.result?.eval_template_id ||
+        createdTemplate?.eval_template_id;
+      assert(
+        isUuid(templateId),
+        "Dataset eval drawer custom template create did not return a UUID.",
+      );
+      let templateDeleted = false;
+      cleanup.defer("delete API journey dataset eval drawer template", () => {
+        if (templateDeleted) return null;
+        return client.post(apiPath("/model-hub/eval-templates/bulk-delete/"), {
+          template_ids: [templateId],
+        });
+      });
+
+      await client.delete(
+        apiPath(
+          "/model-hub/develops/{dataset_id}/delete_template_eval/{eval_id}/",
+          { dataset_id: fixture.dataset_id, eval_id: templateId },
+        ),
+      );
+      templateDeleted = true;
+      const deletedTemplateAudit = await loadCustomEvalCreateDbAudit({
+        templateId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        deletedTemplateAudit.deleted === true &&
+          deletedTemplateAudit.deleted_at_set === true,
+        "Dataset eval drawer template delete did not stamp deleted_at.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.get(
+            apiPath(
+              "/model-hub/develops/{dataset_id}/get_eval_structure/{eval_id}/",
+              { dataset_id: randomUUID(), eval_id: template.id },
+            ),
+            { query: { eval_type: "preset" } },
+          ),
+        404,
+        "Dataset eval structure accepted an inaccessible dataset id.",
+      );
+
+      activeAudit = await loadDatasetEvalDrawerDbAudit({
+        datasetId: fixture.dataset_id,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        template_id: template.id,
+        user_eval_metric_id: metricId,
+        preview_responses: previewResponses.length,
+        status_after_start: startedAudit.metric_status,
+        status_after_stop: stoppedAudit.metric_status,
+        metric_deleted_at_set: deletedMetricAudit.metric_deleted_at_set,
+        deleted_eval_column_count: Number(
+          deletedMetricAudit.deleted_eval_column_count,
+        ),
+        deleted_reason_column_count: Number(
+          deletedMetricAudit.deleted_reason_column_count,
+        ),
+        deleted_template_id: templateId,
+        deleted_template_deleted_at_set: deletedTemplateAudit.deleted_at_set,
+        active_metric_count_after_delete: Number(activeAudit.active_metric_count),
+      });
+    },
+  },
+  {
+    id: "DPE-API-028",
+    title: "Legacy experiment row diff scope and payload",
+    tags: ["experiments", "dataset", "guard", "data-roundtrip", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedLegacyExperimentRowDiffFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Legacy row-diff fixture seed did not create an experiment.",
+      );
+      cleanup.defer("hard delete API journey legacy row-diff fixture", () =>
+        hardDeleteLegacyExperimentRowDiffFixture(fixture),
+      );
+
+      const diffPayload = await client.post(
+        apiPath("/model-hub/develops/get-row-diff/"),
+        {
+          experiment_id: fixture.experiment_id,
+          column_ids: [fixture.base_column_id, fixture.other_column_id],
+          row_ids: [fixture.row_id],
+          compare_column_ids: [fixture.base_column_id, fixture.other_column_id],
+        },
+      );
+      const rowPayload = diffPayload?.[fixture.row_id];
+      assert(rowPayload, "Legacy row-diff did not return the requested row.");
+      assert(
+        rowPayload?.[fixture.base_column_id]?.cell_value ===
+          fixture.base_cell_value,
+        "Legacy row-diff returned the wrong base cell value.",
+      );
+      assert(
+        rowPayload?.[fixture.base_column_id]?.cell_diff_value == null,
+        "Legacy row-diff returned a diff for the base column.",
+      );
+      assert(
+        rowPayload?.[fixture.other_column_id]?.cell_value ===
+          fixture.other_cell_value,
+        "Legacy row-diff returned the wrong comparison cell value.",
+      );
+      const diffStatuses = asArray(
+        rowPayload?.[fixture.other_column_id]?.cell_diff_value,
+      ).map((part) => part.status);
+      assert(
+        diffStatuses.includes("removed") && diffStatuses.includes("added"),
+        "Legacy row-diff did not include removed and added diff segments.",
+      );
+      assert(
+        rowPayload?.[fixture.other_column_id]?.value_infos?.metadata?.prompt ===
+          "other",
+        "Legacy row-diff did not preserve JSON value_infos.",
+      );
+
+      const outsideError = await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/develops/get-row-diff/"), {
+            experiment_id: fixture.experiment_id,
+            column_ids: [fixture.base_column_id, fixture.outside_column_id],
+            row_ids: [fixture.outside_row_id],
+            compare_column_ids: [
+              fixture.base_column_id,
+              fixture.outside_column_id,
+            ],
+          }),
+        400,
+        "Legacy row-diff accepted rows or columns outside the experiment dataset.",
+      );
+      assert(
+        !JSON.stringify(outsideError.body || {}).includes(
+          fixture.outside_cell_value,
+        ),
+        "Legacy row-diff outside-dataset error leaked the outside cell value.",
+      );
+
+      let otherWorkspaceGuard = "skipped:no-other-workspace";
+      const otherWorkspaceId = await findOtherWorkspaceId(
+        organizationId,
+        workspaceId,
+      );
+      if (otherWorkspaceId) {
+        const otherFixture = await seedLegacyExperimentRowDiffFixture({
+          runId: `${runId}-otherws`,
+          organizationId,
+          workspaceId: otherWorkspaceId,
+        });
+        cleanup.defer(
+          "hard delete API journey other-workspace legacy row-diff fixture",
+          () => hardDeleteLegacyExperimentRowDiffFixture(otherFixture),
+        );
+        await expectApiErrorStatus(
+          () =>
+            client.post(apiPath("/model-hub/develops/get-row-diff/"), {
+              experiment_id: otherFixture.experiment_id,
+              column_ids: [
+                otherFixture.base_column_id,
+                otherFixture.other_column_id,
+              ],
+              row_ids: [otherFixture.row_id],
+              compare_column_ids: [
+                otherFixture.base_column_id,
+                otherFixture.other_column_id,
+              ],
+            }),
+          404,
+          "Legacy row-diff accepted a same-org experiment from another workspace.",
+        );
+        otherWorkspaceGuard = "passed";
+      }
+
+      evidence.push({
+        experiment_id: fixture.experiment_id,
+        dataset_id: fixture.dataset_id,
+        row_id: fixture.row_id,
+        base_column_id: fixture.base_column_id,
+        other_column_id: fixture.other_column_id,
+        outside_dataset_id: fixture.outside_dataset_id,
+        diff_segment_count: diffStatuses.length,
+        outside_guard_status: outsideError.status,
+        other_workspace_guard: otherWorkspaceGuard,
+      });
+    },
+  },
+  {
+    id: "DPE-API-029",
+    title: "Hugging Face create and add-rows validation guards",
+    tags: ["dataset", "huggingface", "guard", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedHuggingFaceGuardFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Hugging Face guard fixture seed did not create datasets.",
+      );
+      cleanup.defer("hard delete API journey Hugging Face guard fixture", () =>
+        hardDeleteHuggingFaceGuardFixture(fixture),
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/develops/create-dataset-from-huggingface/"), {
+            name: fixture.duplicate_dataset_name,
+            model_type: "GenerativeLLM",
+            num_rows: 1,
+            huggingface_dataset_name: "rajpurkar/squad",
+            huggingface_dataset_config: "plain_text",
+            huggingface_dataset_split: "train",
+          }),
+        400,
+        "Hugging Face create accepted a duplicate active dataset name.",
+      );
+
+      const afterDuplicateAudit = await loadHuggingFaceGuardFixtureAudit(
+        fixture,
+        organizationId,
+        workspaceId,
+      );
+      assert(
+        Number(afterDuplicateAudit.duplicate_name_active_count) === 1,
+        "Duplicate Hugging Face create produced an extra active dataset.",
+      );
+
+      let otherWorkspaceGuard = "skipped:no-other-workspace";
+      if (fixture.other_dataset_id) {
+        await expectApiErrorStatus(
+          () =>
+            client.post(
+              apiPath(
+                "/model-hub/develops/{dataset_id}/add_rows_from_huggingface/",
+                { dataset_id: fixture.other_dataset_id },
+              ),
+              {
+                num_rows: 1,
+                huggingface_dataset_name: "rajpurkar/squad",
+                huggingface_dataset_config: "plain_text",
+                huggingface_dataset_split: "train",
+              },
+            ),
+          404,
+          "Hugging Face add-rows accepted a same-org other-workspace dataset.",
+        );
+        otherWorkspaceGuard = "passed";
+      }
+
+      const finalAudit = await loadHuggingFaceGuardFixtureAudit(
+        fixture,
+        organizationId,
+        workspaceId,
+      );
+      if (fixture.other_dataset_id) {
+        assert(
+          Number(finalAudit.other_dataset_row_count) ===
+            Number(fixture.other_initial_row_count),
+          "Other-workspace Hugging Face add-rows mutated row count.",
+        );
+        assert(
+          Number(finalAudit.other_dataset_column_count) ===
+            Number(fixture.other_initial_column_count),
+          "Other-workspace Hugging Face add-rows mutated column count.",
+        );
+      }
+
+      evidence.push({
+        duplicate_dataset_id: fixture.duplicate_dataset_id,
+        duplicate_dataset_name: fixture.duplicate_dataset_name,
+        duplicate_name_active_count: Number(
+          finalAudit.duplicate_name_active_count,
+        ),
+        other_workspace_guard: otherWorkspaceGuard,
+        other_dataset_id: fixture.other_dataset_id,
+        other_dataset_row_count: Number(finalAudit.other_dataset_row_count || 0),
+        other_dataset_column_count: Number(
+          finalAudit.other_dataset_column_count || 0,
+        ),
+      });
+    },
+  },
+  {
+    id: "DPE-API-030",
+    title: "Experiment dataset table readback and materialize guards",
+    tags: ["dataset", "experiment", "guard", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedExperimentDatasetMaterializeFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Experiment dataset materialize fixture seed did not create records.",
+      );
+      cleanup.defer(
+        "hard delete API journey experiment dataset materialize fixture",
+        () => hardDeleteExperimentDatasetMaterializeFixture(fixture),
+      );
+
+      const table = await client.get(
+        apiPath(
+          "/model-hub/develops/{experiment_dataset_id}/get-experiment-dataset-table/",
+          { experiment_dataset_id: fixture.experiment_dataset_id },
+        ),
+        { query: { page_size: 1, current_page_index: 0 } },
+      );
+      assert(
+        table?.metadata?.dataset_name === fixture.experiment_dataset_name,
+        "Experiment dataset table returned the wrong dataset name.",
+      );
+      assert(
+        Number(table.metadata.total_rows) === 2,
+        "Experiment dataset table total_rows did not include all rows.",
+      );
+      assert(
+        Number(table.metadata.total_pages) === 2,
+        "Experiment dataset table total_pages did not use the unsliced row count.",
+      );
+      assert(
+        Array.isArray(table.table) && table.table.length === 1,
+        "Experiment dataset table page did not return exactly one row.",
+      );
+      assert(
+        table.table[0]?.row_id === fixture.first_row_id,
+        "Experiment dataset table did not preserve row ordering.",
+      );
+      assert(
+        table.table[0]?.[fixture.input_column_id]?.cell_value ===
+          fixture.first_input_value,
+        "Experiment dataset table did not include the base input cell.",
+      );
+      assert(
+        table.table[0]?.[fixture.result_column_id]?.cell_value ===
+          fixture.first_result_value,
+        "Experiment dataset table did not include the experiment result cell.",
+      );
+      const columnNames = new Set(
+        asArray(table.column_config).map((column) => column.name),
+      );
+      assert(
+        columnNames.has("api_exp_input") &&
+          columnNames.has("api_exp_result"),
+        "Experiment dataset table did not expose both base and experiment columns.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/develops/{exp_dataset_id}/create-dataset/", {
+              exp_dataset_id: fixture.experiment_dataset_id,
+            }),
+            {
+              name: fixture.duplicate_dataset_name,
+              model_type: "GenerativeLLM",
+            },
+          ),
+        400,
+        "Experiment create-dataset accepted a duplicate active dataset name.",
+      );
+
+      let otherWorkspaceGuard = "skipped:no-other-workspace";
+      if (fixture.other_experiment_dataset_id) {
+        await expectApiErrorStatus(
+          () =>
+            client.get(
+              apiPath(
+                "/model-hub/develops/{experiment_dataset_id}/get-experiment-dataset-table/",
+                {
+                  experiment_dataset_id:
+                    fixture.other_experiment_dataset_id,
+                },
+              ),
+            ),
+          404,
+          "Experiment dataset table read accepted a same-org other-workspace fixture.",
+        );
+        await expectApiErrorStatus(
+          () =>
+            client.post(
+              apiPath("/model-hub/develops/{exp_dataset_id}/create-dataset/", {
+                exp_dataset_id: fixture.other_experiment_dataset_id,
+              }),
+              {
+                name: fixture.other_blocked_dataset_name,
+                model_type: "GenerativeLLM",
+              },
+            ),
+          404,
+          "Experiment create-dataset accepted a same-org other-workspace fixture.",
+        );
+        otherWorkspaceGuard = "passed";
+      }
+
+      const audit = await loadExperimentDatasetMaterializeAudit(fixture);
+      assert(
+        Number(audit.duplicate_name_active_count) === 1,
+        "Experiment create-dataset duplicate guard produced an extra dataset.",
+      );
+      assert(
+        Number(audit.blocked_dataset_count) === 0,
+        "Experiment create-dataset other-workspace guard created a dataset.",
+      );
+
+      evidence.push({
+        experiment_dataset_id: fixture.experiment_dataset_id,
+        experiment_dataset_name: fixture.experiment_dataset_name,
+        table_total_rows: Number(table.metadata.total_rows),
+        table_total_pages: Number(table.metadata.total_pages),
+        duplicate_dataset_name: fixture.duplicate_dataset_name,
+        duplicate_name_active_count: Number(audit.duplicate_name_active_count),
+        other_workspace_guard: otherWorkspaceGuard,
+        other_experiment_dataset_id: fixture.other_experiment_dataset_id,
+        blocked_dataset_count: Number(audit.blocked_dataset_count),
+      });
+    },
+  },
+  {
     id: "PROMPT-API-002",
     title:
       "Dataset run-prompt preview, create, config reload, row rerun, and guards",
@@ -2884,6 +4060,117 @@ export const datasetEvalJourneys = [
         run_prompt_deleted_at_set: deletedAudit.run_prompt_deleted_at_set,
         output_column_deleted_at_set: deletedAudit.column_deleted_at_set,
         active_cells_after_cleanup: Number(deletedAudit.active_cell_count),
+      });
+    },
+  },
+  {
+    id: "PROMPT-API-005",
+    title: "Dataset run-prompt edit and config scope guards",
+    tags: ["prompts", "dataset", "mutating", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const fixture = await seedRunPromptEditFixture({
+        runId,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Run-prompt edit fixture seed did not create a dataset.",
+      );
+      cleanup.defer("hard delete API journey run-prompt edit fixture", () =>
+        hardDeleteRunPromptEditFixture(fixture),
+      );
+
+      const initialConfig = await client.get(
+        apiPath("/model-hub/develops/retrieve_run_prompt_column_config/"),
+        { query: { column_id: fixture.output_column_id } },
+      );
+      assertRunPromptConfigReload(initialConfig, {
+        datasetId: fixture.dataset_id,
+        outputName: fixture.output_column_name,
+        modelName: fixture.model_name,
+        inputName: fixture.input_column_name,
+      });
+
+      const editConfig = runPromptColumnConfig(
+        fixture.model_name,
+        fixture.input_column_name,
+      );
+      editConfig.messages[0].content[0].text =
+        "Return exactly EDITED OK. Do not include punctuation.";
+      const editResult = await client.post(
+        apiPath("/model-hub/develops/edit_run_prompt_column/"),
+        {
+          dataset_id: fixture.dataset_id,
+          column_id: fixture.output_column_id,
+          name: fixture.edited_output_column_name,
+          config: editConfig,
+        },
+      );
+      assert(
+        String(editResult).includes("updated successfully"),
+        "Run-prompt edit did not return a success message.",
+      );
+
+      const editedConfig = await client.get(
+        apiPath("/model-hub/develops/retrieve_run_prompt_column_config/"),
+        { query: { column_id: fixture.output_column_id } },
+      );
+      assertRunPromptConfigReload(editedConfig, {
+        datasetId: fixture.dataset_id,
+        outputName: fixture.edited_output_column_name,
+        modelName: fixture.model_name,
+        inputName: fixture.input_column_name,
+      });
+
+      await expectApiErrorStatus(
+        () =>
+          client.get(
+            apiPath("/model-hub/develops/retrieve_run_prompt_column_config/"),
+            { query: { column_id: randomUUID() } },
+          ),
+        404,
+        "Run-prompt config accepted a missing column id.",
+      );
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/develops/edit_run_prompt_column/"), {
+            dataset_id: randomUUID(),
+            column_id: fixture.output_column_id,
+            name: `missing ${fixture.edited_output_column_name}`,
+            config: editConfig,
+          }),
+        404,
+        "Run-prompt edit accepted a missing dataset id.",
+      );
+
+      const audit = await loadRunPromptColumnDbAudit({
+        datasetId: fixture.dataset_id,
+        rowId: fixture.row_id,
+        columnId: fixture.output_column_id,
+        organizationId,
+        workspaceId,
+      });
+      assertRunPromptColumnDbAudit(audit, {
+        datasetId: fixture.dataset_id,
+        rowId: fixture.row_id,
+        columnId: fixture.output_column_id,
+        outputName: fixture.edited_output_column_name,
+        modelName: fixture.model_name,
+        organizationId,
+        workspaceId,
+        expectedDeleted: false,
+      });
+
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        column_id: fixture.output_column_id,
+        run_prompt_id: fixture.run_prompt_id,
+        original_name: fixture.output_column_name,
+        edited_name: fixture.edited_output_column_name,
+        run_prompt_status: audit.run_prompt_status,
+        active_cell_count: Number(audit.active_cell_count),
       });
     },
   },
@@ -3914,6 +5201,634 @@ export const datasetEvalJourneys = [
         version_count: Number(audit.version_count),
         default_version_count: Number(audit.default_version_count),
         deleted_at_set: deletedAudit.deleted_at_set,
+      });
+    },
+  },
+  {
+    id: "EVAL-API-019",
+    title: "Legacy eval-template create contract and version audit",
+    tags: ["evals", "mutating", "data-roundtrip", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 22);
+      const templateName = `api_legacy_eval_${suffix}`;
+      const systemOwnerName = `api_legacy_eval_sys_${suffix}`;
+      const createPayload = {
+        name: templateName,
+        config: {
+          required_keys: ["response"],
+          eval_type_id: "OutputEvaluator",
+          output: "Pass/Fail",
+        },
+        eval_tags: ["api-journey", "legacy-eval-template"],
+      };
+
+      cleanup.defer("hard delete API journey legacy eval-template create rows", () =>
+        hardDeleteLegacyEvalTemplateCreateFixture([
+          templateName,
+          systemOwnerName,
+        ], organizationId),
+      );
+
+      const created = await client.post(
+        apiPath("/model-hub/eval-template/create/"),
+        createPayload,
+      );
+      assert(
+        created === "success" || created?.result === "success",
+        "Legacy eval-template create did not return success.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/eval-template/create/"),
+            createPayload,
+          ),
+        400,
+        "Legacy eval-template create accepted a duplicate active template name.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/eval-template/create/"), {
+            ...createPayload,
+            name: systemOwnerName,
+            owner: "system",
+          }),
+        400,
+        "Legacy eval-template create allowed a user to create owner=system.",
+      );
+
+      const audit = await loadLegacyEvalTemplateCreateAudit({
+        templateName,
+        systemOwnerName,
+        organizationId,
+        workspaceId,
+      });
+      assert(
+        Number(audit.active_template_count) === 1,
+        "Legacy eval-template create did not leave exactly one active template.",
+      );
+      assert(
+        isUuid(audit.template_id),
+        "Legacy eval-template audit did not find the created template id.",
+      );
+      assert(
+        audit.owner === "user",
+        "Legacy eval-template create did not force owner=user.",
+      );
+      assert(
+        !workspaceId || audit.workspace_id === workspaceId,
+        "Legacy eval-template create did not persist request workspace.",
+      );
+      assert(
+        Number(audit.version_count) === 1 &&
+          Number(audit.default_version_count) === 1,
+        "Legacy eval-template create did not create exactly one default version.",
+      );
+      assert(
+        Number(audit.version_scope_mismatch_count) === 0,
+        "Legacy eval-template version scope did not match the template.",
+      );
+      assert(
+        Number(audit.system_owner_count) === 0,
+        "Legacy eval-template create inserted owner=system rows.",
+      );
+      assert(
+        asArray(audit.required_keys).includes("response"),
+        "Legacy eval-template config did not persist required_keys.",
+      );
+
+      evidence.push({
+        eval_template_id: audit.template_id,
+        template_name: templateName,
+        owner: audit.owner,
+        workspace_id: audit.workspace_id,
+        version_count: Number(audit.version_count),
+        default_version_count: Number(audit.default_version_count),
+        duplicate_guard: "passed",
+        system_owner_guard: "passed",
+      });
+    },
+  },
+  {
+    id: "EVAL-API-020",
+    title: "Legacy eval-user-template create and evaluate-rows scoping",
+    tags: ["evals", "mutating", "data-roundtrip", "db-audit"],
+    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+      requireMutations();
+      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 22);
+      const metricName = `api_legacy_user_eval_${suffix}`;
+      const duplicateName = `api_legacy_user_dup_${suffix}`;
+      const template = await findEvalTemplateDetailByName(
+        client,
+        "word_count_in_range",
+      );
+      if (!template) {
+        skip("System eval word_count_in_range was not available for legacy eval-user-template coverage.");
+      }
+      const requiredKeys = promptEvalRequiredKeys(template);
+      if (!requiredKeys.includes("text")) {
+        skip("word_count_in_range did not expose the expected text input key.");
+      }
+      const paramsConfig = promptEvalParamsForTemplate(template);
+      const fixture = await seedLegacyEvalUserTemplateFixture({
+        runId,
+        organizationId,
+        workspaceId,
+        templateId: template.id,
+      });
+      assert(
+        fixture?.fixture_created,
+        "Legacy eval-user-template fixture seed did not create datasets.",
+      );
+      cleanup.defer("hard delete API journey legacy eval-user-template fixture", () =>
+        hardDeleteLegacyEvalUserTemplateFixture(fixture),
+      );
+
+      const createPayload = {
+        name: metricName,
+        template_id: template.id,
+        dataset_id: fixture.dataset_id,
+        config: {
+          mapping: { text: fixture.input_column_id },
+          params: paramsConfig.params,
+        },
+        model: "turing_small",
+      };
+
+      const created = await client.post(
+        apiPath("/model-hub/eval-user-template/create/"),
+        createPayload,
+      );
+      assert(
+        created === "success" || created?.result === "success",
+        "Legacy eval-user-template create did not return success.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/eval-user-template/create/"),
+            createPayload,
+          ),
+        400,
+        "Legacy eval-user-template create accepted a duplicate metric name.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/eval-user-template/create/"), {
+            ...createPayload,
+            name: duplicateName,
+            config: {
+              ...createPayload.config,
+              mapping: { text: fixture.outside_column_id },
+            },
+          }),
+        400,
+        "Legacy eval-user-template create accepted a mapped column outside the selected dataset.",
+      );
+
+      let otherWorkspaceCreateGuard = "skipped:no-other-workspace";
+      if (fixture.other_dataset_id) {
+        await expectApiErrorStatus(
+          () =>
+            client.post(apiPath("/model-hub/eval-user-template/create/"), {
+              ...createPayload,
+              name: `${duplicateName}_other`,
+              dataset_id: fixture.other_dataset_id,
+              config: {
+                ...createPayload.config,
+                mapping: { text: fixture.other_column_id },
+              },
+            }),
+          404,
+          "Legacy eval-user-template create accepted a same-org dataset from another workspace.",
+        );
+        otherWorkspaceCreateGuard = "passed";
+      }
+
+      const createAudit = await loadLegacyEvalUserTemplateAudit({
+        fixture,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertLegacyEvalUserTemplateCreateAudit(createAudit, {
+        fixture,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+        expectedParams: paramsConfig.params,
+      });
+      const metricId = createAudit.metric_id;
+      const seededCells = await seedLegacyEvalUserTemplateEvaluationCells({
+        fixture,
+        metricId,
+      });
+      assert(
+        seededCells?.inserted_eval_cell_count === 3,
+        "Legacy evaluate-rows fixture did not seed scoped and guard eval cells.",
+      );
+
+      const beforeEvaluateAudit = await loadLegacyEvalUserTemplateAudit({
+        fixture,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertLegacyEvalCellState(beforeEvaluateAudit, fixture.row_one_id, {
+        status: "pass",
+        value: fixture.eval_value_one,
+      });
+      assertLegacyEvalCellState(beforeEvaluateAudit, fixture.row_two_id, {
+        status: "pass",
+        value: fixture.eval_value_two,
+      });
+
+      const singleRowQueued = await client.post(
+        apiPath("/model-hub/evaluate-rows/"),
+        {
+          row_ids: [fixture.row_one_id],
+          user_eval_metric_ids: [metricId],
+        },
+      );
+      assert(
+        singleRowQueued?.success ||
+          singleRowQueued?.result?.success ||
+          JSON.stringify(singleRowQueued || {}).includes("Evaluations queued"),
+        "evaluate-rows did not acknowledge the explicit row queue request.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/evaluate-rows/"), {
+            row_ids: [fixture.outside_row_id],
+            user_eval_metric_ids: [metricId],
+          }),
+        404,
+        "evaluate-rows accepted a row outside the metric dataset.",
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(apiPath("/model-hub/evaluate-rows/"), {
+            selected_all_rows: true,
+            row_ids: [fixture.outside_row_id],
+            user_eval_metric_ids: [metricId],
+          }),
+        404,
+        "evaluate-rows accepted a selected-all exclusion row outside the metric dataset.",
+      );
+
+      let otherWorkspaceMetricGuard = "skipped:no-other-workspace";
+      if (fixture.other_metric_id) {
+        await expectApiErrorStatus(
+          () =>
+            client.post(apiPath("/model-hub/evaluate-rows/"), {
+              row_ids: [fixture.other_row_id],
+              user_eval_metric_ids: [fixture.other_metric_id],
+            }),
+          404,
+          "evaluate-rows accepted a metric from another workspace.",
+        );
+        otherWorkspaceMetricGuard = "passed";
+      }
+
+      const singleRowAudit = await loadLegacyEvalUserTemplateAudit({
+        fixture,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertLegacyEvalCellState(singleRowAudit, fixture.row_one_id, {
+        status: "running",
+        value: null,
+        valueInfos: {},
+      });
+      assertLegacyEvalCellState(singleRowAudit, fixture.row_two_id, {
+        status: "pass",
+        value: fixture.eval_value_two,
+      });
+      assert(
+        singleRowAudit.outside_eval_cell_status === "pass" &&
+          singleRowAudit.outside_eval_cell_value === fixture.outside_eval_value,
+        "evaluate-rows outside-row guard mutated the outside dataset eval cell.",
+      );
+      if (fixture.other_metric_id) {
+        assert(
+          singleRowAudit.other_eval_cell_status === "pass" &&
+            singleRowAudit.other_eval_cell_value === fixture.other_eval_value,
+          "evaluate-rows other-workspace guard mutated the other workspace eval cell.",
+        );
+      }
+
+      await client.post(apiPath("/model-hub/evaluate-rows/"), {
+        selected_all_rows: true,
+        row_ids: [fixture.row_one_id],
+        user_eval_metric_ids: [metricId],
+      });
+
+      const selectedAllAudit = await loadLegacyEvalUserTemplateAudit({
+        fixture,
+        templateId: template.id,
+        metricName,
+        organizationId,
+        workspaceId,
+      });
+      assertLegacyEvalCellState(selectedAllAudit, fixture.row_one_id, {
+        status: "running",
+        value: null,
+        valueInfos: {},
+      });
+      assertLegacyEvalCellState(selectedAllAudit, fixture.row_two_id, {
+        status: "running",
+        value: null,
+        valueInfos: {},
+      });
+      assert(
+        Number(selectedAllAudit.running_eval_cell_count) === 2,
+        "evaluate-rows selected_all_rows did not reset the remaining scoped row.",
+      );
+
+      evidence.push({
+        dataset_id: fixture.dataset_id,
+        eval_template_id: template.id,
+        user_eval_metric_id: metricId,
+        metric_name: metricName,
+        duplicate_guard: "passed",
+        mapping_guard: "passed",
+        row_scope_guard: "passed",
+        selected_all_scope_guard: "passed",
+        other_workspace_create_guard: otherWorkspaceCreateGuard,
+        other_workspace_metric_guard: otherWorkspaceMetricGuard,
+        running_eval_cell_count: Number(selectedAllAudit.running_eval_cell_count),
+      });
+    },
+  },
+  {
+    id: "EVAL-API-021",
+    title: "Ground-truth embed/search guards and workspace scope",
+    tags: ["evals", "mutating", "provider-guard", "db-audit"],
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
+      requireMutations();
+      const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 22);
+      const templateName = `api_gt_retrieval_${suffix}`;
+      const emptyGroundTruthName = `api_gt_retrieval_empty_${suffix}`;
+      const groundTruthName = `api_gt_retrieval_rows_${suffix}`;
+
+      const created = await client.post(
+        apiPath("/model-hub/eval-templates/create-v2/"),
+        {
+          name: templateName,
+          eval_type: "code",
+          code: "def evaluate(output=None, expected=None):\n    return True",
+          code_language: "python",
+          output_type: "pass_fail",
+          description: "Created by API journey ground-truth retrieval guards.",
+          tags: ["api-journey", "ground-truth-retrieval"],
+        },
+      );
+      const templateId = created?.id;
+      assert(
+        isUuid(templateId),
+        "Ground-truth retrieval eval template create did not return a UUID id.",
+      );
+      cleanup.defer("hard delete API journey ground-truth retrieval fixture", () =>
+        hardDeleteGroundTruthRetrievalFixture([templateId], organizationId),
+      );
+
+      const emptyGroundTruth = await client.post(
+        apiPath(
+          "/model-hub/eval-templates/{template_id}/ground-truth/upload/",
+          { template_id: templateId },
+        ),
+        {
+          name: emptyGroundTruthName,
+          description: "Empty ground truth for embed guard coverage.",
+          file_name: "api-journey-empty-ground-truth.json",
+          columns: ["question"],
+          data: [],
+        },
+      );
+      const emptyGroundTruthId = emptyGroundTruth?.id;
+      assert(
+        isUuid(emptyGroundTruthId),
+        "Empty ground-truth upload did not return a UUID id.",
+      );
+
+      const groundTruth = await client.post(
+        apiPath(
+          "/model-hub/eval-templates/{template_id}/ground-truth/upload/",
+          { template_id: templateId },
+        ),
+        {
+          name: groundTruthName,
+          description: "Ground truth rows for retrieval guard coverage.",
+          file_name: "api-journey-ground-truth-retrieval.json",
+          columns: ["question", "answer"],
+          data: [
+            { question: "What is 1+1?", answer: "2" },
+            { question: "Capital of France?", answer: "Paris" },
+          ],
+          role_mapping: { input: "question", expected_output: "answer" },
+        },
+      );
+      const groundTruthId = groundTruth?.id;
+      assert(
+        isUuid(groundTruthId),
+        "Ground-truth upload did not return a UUID id.",
+      );
+
+      const pendingSearchError = await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/ground-truth/{ground_truth_id}/search/", {
+              ground_truth_id: groundTruthId,
+            }),
+            { query: "What is 1+1?", max_results: 2 },
+          ),
+        400,
+        "Ground-truth search accepted a pending embedding dataset.",
+      );
+      assert(
+        String(pendingSearchError.body?.message || "").includes(
+          "Embeddings not ready",
+        ),
+        "Pending ground-truth search did not return the embeddings-not-ready message.",
+      );
+
+      const emptyEmbedError = await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/ground-truth/{ground_truth_id}/embed/", {
+              ground_truth_id: emptyGroundTruthId,
+            }),
+            {},
+          ),
+        400,
+        "Ground-truth embed accepted an empty dataset.",
+      );
+      assert(
+        emptyEmbedError.body?.message === "No data rows to embed.",
+        "Empty ground-truth embed returned an unexpected error message.",
+      );
+
+      await setGroundTruthEmbeddingStatus({
+        groundTruthId,
+        embeddingStatus: "processing",
+        embeddedRowCount: 1,
+      });
+
+      const processingEmbedError = await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/ground-truth/{ground_truth_id}/embed/", {
+              ground_truth_id: groundTruthId,
+            }),
+            {},
+          ),
+        400,
+        "Ground-truth embed accepted a dataset already marked processing.",
+      );
+      assert(
+        processingEmbedError.body?.message ===
+          "Embedding generation is already in progress.",
+        "Processing ground-truth embed returned an unexpected error message.",
+      );
+
+      const groundTruthIds = [emptyGroundTruthId, groundTruthId];
+      const otherWorkspaceId = await findOtherWorkspaceId(
+        organizationId,
+        workspaceId,
+      );
+      let otherWorkspaceGuard = "skipped:no-other-workspace";
+      if (otherWorkspaceId) {
+        const otherTemplateName = `api_gt_retrieval_other_${suffix}`;
+        const otherCreated = await client.post(
+          apiPath("/model-hub/eval-templates/create-v2/"),
+          {
+            name: otherTemplateName,
+            eval_type: "code",
+            code: "def evaluate(output=None, expected=None):\n    return True",
+            code_language: "python",
+            output_type: "pass_fail",
+            description:
+              "Created by API journey ground-truth retrieval workspace guard.",
+            tags: ["api-journey", "ground-truth-retrieval"],
+          },
+        );
+        const otherTemplateId = otherCreated?.id;
+        assert(
+          isUuid(otherTemplateId),
+          "Other-workspace eval template create did not return a UUID id.",
+        );
+        cleanup.defer(
+          "hard delete API journey ground-truth retrieval other-workspace fixture",
+          () =>
+            hardDeleteGroundTruthRetrievalFixture(
+              [otherTemplateId],
+              organizationId,
+            ),
+        );
+
+        const otherGroundTruth = await client.post(
+          apiPath(
+            "/model-hub/eval-templates/{template_id}/ground-truth/upload/",
+            { template_id: otherTemplateId },
+          ),
+          {
+            name: `api_gt_retrieval_other_rows_${suffix}`,
+            description: "Other workspace ground truth guard fixture.",
+            file_name: "api-journey-ground-truth-other-workspace.json",
+            columns: ["question", "answer"],
+            data: [{ question: "private", answer: "hidden" }],
+            role_mapping: { input: "question", expected_output: "answer" },
+          },
+        );
+        const otherGroundTruthId = otherGroundTruth?.id;
+        assert(
+          isUuid(otherGroundTruthId),
+          "Other-workspace ground-truth upload did not return a UUID id.",
+        );
+        await moveGroundTruthRetrievalFixtureToWorkspace({
+          templateId: otherTemplateId,
+          groundTruthId: otherGroundTruthId,
+          workspaceId: otherWorkspaceId,
+        });
+        groundTruthIds.push(otherGroundTruthId);
+
+        await expectApiErrorStatus(
+          () =>
+            client.post(
+              apiPath("/model-hub/ground-truth/{ground_truth_id}/search/", {
+                ground_truth_id: otherGroundTruthId,
+              }),
+              { query: "private", max_results: 1 },
+            ),
+          404,
+          "Ground-truth search accepted a same-org other-workspace dataset.",
+        );
+        await expectApiErrorStatus(
+          () =>
+            client.post(
+              apiPath("/model-hub/ground-truth/{ground_truth_id}/embed/", {
+                ground_truth_id: otherGroundTruthId,
+              }),
+              {},
+            ),
+          404,
+          "Ground-truth embed accepted a same-org other-workspace dataset.",
+        );
+        otherWorkspaceGuard = "passed";
+      }
+
+      const audit = await loadGroundTruthRetrievalAudit({
+        groundTruthIds,
+        organizationId,
+      });
+      const primaryAudit = findGroundTruthAudit(audit, groundTruthId);
+      const emptyAudit = findGroundTruthAudit(audit, emptyGroundTruthId);
+      assert(
+        primaryAudit.workspace_id === workspaceId,
+        "Ground-truth retrieval audit primary workspace mismatch.",
+      );
+      assert(
+        primaryAudit.embedding_status === "processing" &&
+          Number(primaryAudit.embedded_row_count) === 1,
+        "Processing embed guard mutated the primary ground-truth status.",
+      );
+      assert(
+        emptyAudit.row_count === 0 && emptyAudit.embedding_status === "pending",
+        "Empty embed guard mutated the empty ground-truth status.",
+      );
+      assert(
+        Number(audit.embedding_count) === 0,
+        "Ground-truth retrieval guard journey unexpectedly created embeddings.",
+      );
+
+      evidence.push({
+        eval_template_id: templateId,
+        ground_truth_id: groundTruthId,
+        empty_ground_truth_id: emptyGroundTruthId,
+        pending_search_guard: "passed",
+        empty_embed_guard: "passed",
+        processing_embed_guard: "passed",
+        other_workspace_guard: otherWorkspaceGuard,
+        embedding_count: Number(audit.embedding_count),
       });
     },
   },
@@ -11550,6 +13465,1223 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
+async function findOtherWorkspaceId(organizationId, workspaceId) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const activeWorkspaceFilter = workspaceId
+    ? `AND id <> ${sqlUuid(workspaceId)}`
+    : "";
+  const sql = `
+SELECT COALESCE((
+  SELECT json_build_object('workspace_id', id::text)
+  FROM accounts_workspace
+  WHERE organization_id = ${sqlUuid(organizationId)}
+    AND deleted = false
+    ${activeWorkspaceFilter}
+  ORDER BY is_default ASC, created_at DESC
+  LIMIT 1
+), '{}'::json);
+`;
+  const result = await runPostgresJson(sql);
+  return result?.workspace_id || null;
+}
+
+async function seedExperimentDatasetMaterializeFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const otherWorkspaceId = await findOtherWorkspaceId(organizationId, workspaceId);
+  const datasetId = randomUUID();
+  const duplicateDatasetId = randomUUID();
+  const experimentId = randomUUID();
+  const experimentDatasetId = randomUUID();
+  const inputColumnId = randomUUID();
+  const resultColumnId = randomUUID();
+  const firstRowId = randomUUID();
+  const secondRowId = randomUUID();
+  const otherDatasetId = otherWorkspaceId ? randomUUID() : null;
+  const otherExperimentId = otherWorkspaceId ? randomUUID() : null;
+  const otherExperimentDatasetId = otherWorkspaceId ? randomUUID() : null;
+  const otherInputColumnId = otherWorkspaceId ? randomUUID() : null;
+  const otherResultColumnId = otherWorkspaceId ? randomUUID() : null;
+  const otherRowId = otherWorkspaceId ? randomUUID() : null;
+  const datasetName = `api journey exp materialize source ${runId}`;
+  const experimentDatasetName = `api journey exp materialize result ${runId}`;
+  const duplicateDatasetName = `api journey exp materialize duplicate ${runId}`;
+  const otherDatasetName = `api journey exp materialize other ${runId}`;
+  const otherBlockedDatasetName = `api journey exp materialize blocked ${runId}`;
+  const firstInputValue = `first input ${suffix}`;
+  const firstResultValue = `first result ${suffix}`;
+  const secondInputValue = `second input ${suffix}`;
+  const secondResultValue = `second result ${suffix}`;
+
+  const datasetRows = [
+    {
+      id: datasetId,
+      name: datasetName,
+      workspaceSql: activeWorkspaceSql,
+      columnIds: [inputColumnId, resultColumnId],
+    },
+    {
+      id: duplicateDatasetId,
+      name: duplicateDatasetName,
+      workspaceSql: activeWorkspaceSql,
+      columnIds: [],
+    },
+  ];
+  if (otherWorkspaceId) {
+    datasetRows.push({
+      id: otherDatasetId,
+      name: otherDatasetName,
+      workspaceSql: sqlUuid(otherWorkspaceId),
+      columnIds: [otherInputColumnId, otherResultColumnId],
+    });
+  }
+
+  const datasetValues = datasetRows
+    .map((row) => {
+      const columnOrderSql = row.columnIds.length
+        ? `${sqlTextArray(row.columnIds)}::varchar[]`
+        : "ARRAY[]::varchar[]";
+      return `(
+    ${sqlUuid(row.id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(row.name)},
+    ${columnOrderSql},
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${row.workspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )`;
+    })
+    .join(",\n");
+
+  const columnRows = [
+    [inputColumnId, "api_exp_input", datasetId],
+    [resultColumnId, "api_exp_result", datasetId],
+  ];
+  if (otherWorkspaceId) {
+    columnRows.push(
+      [otherInputColumnId, "api_exp_input", otherDatasetId],
+      [otherResultColumnId, "api_exp_result", otherDatasetId],
+    );
+  }
+  const columnValues = columnRows
+    .map(
+      ([id, name, columnDatasetId]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(name)},
+    'text',
+    'OTHERS',
+    NULL::varchar,
+    ${sqlUuid(columnDatasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )`,
+    )
+    .join(",\n");
+
+  const rowRows = [
+    [firstRowId, datasetId, 0],
+    [secondRowId, datasetId, 7],
+  ];
+  if (otherWorkspaceId) rowRows.push([otherRowId, otherDatasetId, 0]);
+  const rowValues = rowRows
+    .map(
+      ([id, rowDatasetId, order]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${Number(order)},
+    ${sqlUuid(rowDatasetId)},
+    '{}'::jsonb
+  )`,
+    )
+    .join(",\n");
+
+  const cellRows = [
+    [randomUUID(), inputColumnId, datasetId, firstRowId, firstInputValue],
+    [randomUUID(), resultColumnId, datasetId, firstRowId, firstResultValue],
+    [randomUUID(), inputColumnId, datasetId, secondRowId, secondInputValue],
+    [randomUUID(), resultColumnId, datasetId, secondRowId, secondResultValue],
+  ];
+  if (otherWorkspaceId) {
+    cellRows.push(
+      [
+        randomUUID(),
+        otherInputColumnId,
+        otherDatasetId,
+        otherRowId,
+        `other input ${suffix}`,
+      ],
+      [
+        randomUUID(),
+        otherResultColumnId,
+        otherDatasetId,
+        otherRowId,
+        `other result ${suffix}`,
+      ],
+    );
+  }
+  const cellValues = cellRows
+    .map(
+      ([id, columnId, cellDatasetId, rowId, value]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(value)},
+    ${sqlUuid(columnId)},
+    ${sqlUuid(cellDatasetId)},
+    ${sqlUuid(rowId)},
+    'pass',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  )`,
+    )
+    .join(",\n");
+
+  const experimentRows = [
+    [experimentId, `${datasetName} experiment`, datasetId, inputColumnId],
+  ];
+  if (otherWorkspaceId) {
+    experimentRows.push([
+      otherExperimentId,
+      `${otherDatasetName} experiment`,
+      otherDatasetId,
+      otherInputColumnId,
+    ]);
+  }
+  const experimentValues = experimentRows
+    .map(
+      ([id, name, experimentDatasetIdForRow, columnId]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(name)},
+    '[]'::jsonb,
+    'Completed',
+    ${sqlUuid(experimentDatasetIdForRow)},
+    ${sqlUuid(columnId)},
+    NULL::uuid,
+    'llm',
+    NULL::uuid
+  )`,
+    )
+    .join(",\n");
+
+  const experimentDatasetRows = [
+    [experimentDatasetId, experimentDatasetName, experimentId],
+  ];
+  if (otherWorkspaceId) {
+    experimentDatasetRows.push([
+      otherExperimentDatasetId,
+      `${experimentDatasetName} other`,
+      otherExperimentId,
+    ]);
+  }
+  const experimentDatasetValues = experimentDatasetRows
+    .map(
+      ([id, name, experimentIdForRow]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(name)},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    'Completed',
+    ${sqlUuid(experimentIdForRow)}
+  )`,
+    )
+    .join(",\n");
+
+  const experimentDatasetColumnRows = [
+    [experimentDatasetId, resultColumnId],
+  ];
+  if (otherWorkspaceId) {
+    experimentDatasetColumnRows.push([
+      otherExperimentDatasetId,
+      otherResultColumnId,
+    ]);
+  }
+  const experimentDatasetColumnValues = experimentDatasetColumnRows
+    .map(
+      ([edtId, columnId]) =>
+        `(${sqlUuid(edtId)}, ${sqlUuid(columnId)})`,
+    )
+    .join(",\n");
+
+  const experimentDatasetM2mRows = [[experimentId, experimentDatasetId]];
+  if (otherWorkspaceId) {
+    experimentDatasetM2mRows.push([
+      otherExperimentId,
+      otherExperimentDatasetId,
+    ]);
+  }
+  const experimentDatasetM2mValues = experimentDatasetM2mRows
+    .map(
+      ([expId, edtId]) => `(${sqlUuid(expId)}, ${sqlUuid(edtId)})`,
+    )
+    .join(",\n");
+
+  const sql = `
+WITH inserted_datasets AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES
+${datasetValues}
+  RETURNING id
+),
+inserted_columns AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES
+${columnValues}
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+${rowValues}
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES
+${cellValues}
+  RETURNING id
+),
+inserted_experiments AS (
+  INSERT INTO model_hub_experimentstable (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    prompt_config,
+    status,
+    dataset_id,
+    column_id,
+    user_id,
+    experiment_type,
+    snapshot_dataset_id
+  )
+  VALUES
+${experimentValues}
+  RETURNING id
+),
+inserted_experiment_datasets AS (
+  INSERT INTO model_hub_experimentdatasettable (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    prompt_config,
+    exclude_values,
+    status,
+    experiment_id
+  )
+  VALUES
+${experimentDatasetValues}
+  RETURNING id
+),
+inserted_experiment_dataset_columns AS (
+  INSERT INTO model_hub_experimentdatasettable_columns (
+    experimentdatasettable_id,
+    column_id
+  )
+  VALUES
+${experimentDatasetColumnValues}
+  RETURNING id
+),
+inserted_experiment_dataset_m2m AS (
+  INSERT INTO model_hub_experimentstable_experiments_datasets (
+    experimentstable_id,
+    experimentdatasettable_id
+  )
+  VALUES
+${experimentDatasetM2mValues}
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_experiments) >= 1,
+  'organization_id', ${sqlUuid(organizationId)}::text,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'duplicate_dataset_id', ${sqlUuid(duplicateDatasetId)}::text,
+  'duplicate_dataset_name', ${sqlTextLiteral(duplicateDatasetName)},
+  'experiment_id', ${sqlUuid(experimentId)}::text,
+  'experiment_dataset_id', ${sqlUuid(experimentDatasetId)}::text,
+  'experiment_dataset_name', ${sqlTextLiteral(experimentDatasetName)},
+  'input_column_id', ${sqlUuid(inputColumnId)}::text,
+  'result_column_id', ${sqlUuid(resultColumnId)}::text,
+  'first_row_id', ${sqlUuid(firstRowId)}::text,
+  'first_input_value', ${sqlTextLiteral(firstInputValue)},
+  'first_result_value', ${sqlTextLiteral(firstResultValue)},
+  'other_workspace_id', ${otherWorkspaceId ? `${sqlUuid(otherWorkspaceId)}::text` : "NULL"},
+  'other_dataset_id', ${otherDatasetId ? `${sqlUuid(otherDatasetId)}::text` : "NULL"},
+  'other_experiment_id', ${otherExperimentId ? `${sqlUuid(otherExperimentId)}::text` : "NULL"},
+  'other_experiment_dataset_id', ${otherExperimentDatasetId ? `${sqlUuid(otherExperimentDatasetId)}::text` : "NULL"},
+  'other_blocked_dataset_name', ${sqlTextLiteral(otherBlockedDatasetName)}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadExperimentDatasetMaterializeAudit(fixture) {
+  assert(
+    isUuid(fixture.organization_id),
+    "fixture organization id required for DB audit.",
+  );
+  const sql = `
+SELECT json_build_object(
+  'duplicate_name_active_count', (
+    SELECT count(*)
+    FROM model_hub_dataset d
+    WHERE d.name = ${sqlTextLiteral(fixture.duplicate_dataset_name)}
+      AND d.organization_id = ${sqlUuid(fixture.organization_id)}
+      AND d.deleted = false
+  ),
+  'blocked_dataset_count', (
+    SELECT count(*)
+    FROM model_hub_dataset d
+    WHERE d.name = ${sqlTextLiteral(fixture.other_blocked_dataset_name)}
+      AND d.organization_id = ${sqlUuid(fixture.organization_id)}
+      AND d.deleted = false
+  )
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteExperimentDatasetMaterializeFixture(fixture) {
+  const datasetIds = [
+    fixture.dataset_id,
+    fixture.duplicate_dataset_id,
+    fixture.other_dataset_id,
+  ].filter(isUuid);
+  const experimentIds = [
+    fixture.experiment_id,
+    fixture.other_experiment_id,
+  ].filter(isUuid);
+  const experimentDatasetIds = [
+    fixture.experiment_dataset_id,
+    fixture.other_experiment_dataset_id,
+  ].filter(isUuid);
+  assert(
+    datasetIds.length > 0,
+    "Experiment dataset materialize cleanup missing dataset ids.",
+  );
+  assert(
+    isUuid(fixture.organization_id),
+    "Experiment dataset materialize cleanup missing organization id.",
+  );
+  const sql = `
+WITH target_datasets AS (
+  SELECT id
+  FROM model_hub_dataset
+  WHERE id = ANY(${sqlUuidArray(datasetIds)})
+     OR (
+       organization_id = ${sqlUuid(fixture.organization_id)}
+       AND name = ${sqlTextLiteral(fixture.other_blocked_dataset_name)}
+     )
+),
+deleted_cells AS (
+  DELETE FROM model_hub_cell
+  WHERE dataset_id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+),
+deleted_rows AS (
+  DELETE FROM model_hub_row
+  WHERE dataset_id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+),
+deleted_experiment_m2m AS (
+  DELETE FROM model_hub_experimentstable_experiments_datasets
+  WHERE experimentstable_id = ANY(${sqlUuidArray(experimentIds)})
+     OR experimentdatasettable_id = ANY(${sqlUuidArray(experimentDatasetIds)})
+  RETURNING 1
+),
+deleted_experiment_dataset_columns AS (
+  DELETE FROM model_hub_experimentdatasettable_columns
+  WHERE experimentdatasettable_id = ANY(${sqlUuidArray(experimentDatasetIds)})
+  RETURNING 1
+),
+deleted_experiment_datasets AS (
+  DELETE FROM model_hub_experimentdatasettable
+  WHERE id = ANY(${sqlUuidArray(experimentDatasetIds)})
+  RETURNING 1
+),
+deleted_experiments AS (
+  DELETE FROM model_hub_experimentstable
+  WHERE id = ANY(${sqlUuidArray(experimentIds)})
+  RETURNING 1
+),
+deleted_columns AS (
+  DELETE FROM model_hub_column
+  WHERE dataset_id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+),
+deleted_datasets AS (
+  DELETE FROM model_hub_dataset
+  WHERE id IN (SELECT id FROM target_datasets)
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_cell_count', (SELECT count(*) FROM deleted_cells),
+  'deleted_row_count', (SELECT count(*) FROM deleted_rows),
+  'deleted_experiment_m2m_count', (SELECT count(*) FROM deleted_experiment_m2m),
+  'deleted_experiment_dataset_column_count', (SELECT count(*) FROM deleted_experiment_dataset_columns),
+  'deleted_experiment_dataset_count', (SELECT count(*) FROM deleted_experiment_datasets),
+  'deleted_experiment_count', (SELECT count(*) FROM deleted_experiments),
+  'deleted_column_count', (SELECT count(*) FROM deleted_columns),
+  'deleted_dataset_count', (SELECT count(*) FROM deleted_datasets)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedHuggingFaceGuardFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const otherWorkspaceId = await findOtherWorkspaceId(organizationId, workspaceId);
+  const duplicateDatasetId = randomUUID();
+  const otherDatasetId = otherWorkspaceId ? randomUUID() : null;
+  const otherColumnId = otherWorkspaceId ? randomUUID() : null;
+  const otherRowId = otherWorkspaceId ? randomUUID() : null;
+  const otherCellId = otherWorkspaceId ? randomUUID() : null;
+  const duplicateDatasetName = `api journey hf duplicate ${runId}`;
+  const otherDatasetName = `api journey hf other ${runId}`;
+  const otherDatasetSql = otherWorkspaceId
+    ? `,
+  (
+    ${sqlUuid(otherDatasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(otherDatasetName)},
+    ARRAY[${sqlTextLiteral(otherColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${sqlUuid(otherWorkspaceId)},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )`
+    : "";
+  const otherChildSql = otherWorkspaceId
+    ? `,
+inserted_other_column AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES (
+    ${sqlUuid(otherColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'existing',
+    'text',
+    'OTHERS',
+    NULL::varchar,
+    ${sqlUuid(otherDatasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )
+  RETURNING id
+),
+inserted_other_row AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES (
+    ${sqlUuid(otherRowId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    5,
+    ${sqlUuid(otherDatasetId)},
+    '{}'::jsonb
+  )
+  RETURNING id
+),
+inserted_other_cell AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES (
+    ${sqlUuid(otherCellId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'existing other workspace row',
+    ${sqlUuid(otherColumnId)},
+    ${sqlUuid(otherDatasetId)},
+    ${sqlUuid(otherRowId)},
+    'pass',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  )
+  RETURNING id
+)`
+    : "";
+  const sql = `
+WITH inserted_datasets AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES
+  (
+    ${sqlUuid(duplicateDatasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(duplicateDatasetName)},
+    ARRAY[]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${activeWorkspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )${otherDatasetSql}
+  RETURNING id
+)${otherChildSql}
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_datasets) >= 1,
+  'duplicate_dataset_id', ${sqlUuid(duplicateDatasetId)}::text,
+  'duplicate_dataset_name', ${sqlTextLiteral(duplicateDatasetName)},
+  'other_workspace_id', ${otherWorkspaceId ? `${sqlUuid(otherWorkspaceId)}::text` : "NULL"},
+  'other_dataset_id', ${otherDatasetId ? `${sqlUuid(otherDatasetId)}::text` : "NULL"},
+  'other_initial_row_count', ${otherWorkspaceId ? 1 : 0},
+  'other_initial_column_count', ${otherWorkspaceId ? 1 : 0}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadHuggingFaceGuardFixtureAudit(
+  fixture,
+  organizationId,
+  workspaceId,
+) {
+  assert(isUuid(fixture.duplicate_dataset_id), "fixture duplicate dataset id required.");
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const otherDatasetSelect = fixture.other_dataset_id
+    ? `(SELECT count(*) FROM model_hub_row r WHERE r.dataset_id = ${sqlUuid(fixture.other_dataset_id)} AND r.deleted = false)`
+    : "0";
+  const otherColumnSelect = fixture.other_dataset_id
+    ? `(SELECT count(*) FROM model_hub_column c WHERE c.dataset_id = ${sqlUuid(fixture.other_dataset_id)} AND c.deleted = false)`
+    : "0";
+  const sql = `
+SELECT json_build_object(
+  'duplicate_name_active_count', (
+    SELECT count(*)
+    FROM model_hub_dataset d
+    WHERE d.name = ${sqlTextLiteral(fixture.duplicate_dataset_name)}
+      AND d.organization_id = ${sqlUuid(organizationId)}
+      AND d.deleted = false
+  ),
+  'duplicate_dataset_workspace_id', (
+    SELECT d.workspace_id::text
+    FROM model_hub_dataset d
+    WHERE d.id = ${sqlUuid(fixture.duplicate_dataset_id)}
+  ),
+  'other_dataset_row_count', ${otherDatasetSelect},
+  'other_dataset_column_count', ${otherColumnSelect}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteHuggingFaceGuardFixture(fixture) {
+  const datasetIds = [
+    fixture.duplicate_dataset_id,
+    fixture.other_dataset_id,
+  ].filter(isUuid);
+  assert(datasetIds.length > 0, "Hugging Face fixture cleanup missing datasets.");
+  const sql = `
+WITH deleted_cells AS (
+  DELETE FROM model_hub_cell
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_rows AS (
+  DELETE FROM model_hub_row
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_columns AS (
+  DELETE FROM model_hub_column
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_datasets AS (
+  DELETE FROM model_hub_dataset
+  WHERE id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_cell_count', (SELECT count(*) FROM deleted_cells),
+  'deleted_row_count', (SELECT count(*) FROM deleted_rows),
+  'deleted_column_count', (SELECT count(*) FROM deleted_columns),
+  'deleted_dataset_count', (SELECT count(*) FROM deleted_datasets)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedLegacyExperimentRowDiffFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const workspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const datasetId = randomUUID();
+  const outsideDatasetId = randomUUID();
+  const experimentId = randomUUID();
+  const experimentDatasetId = randomUUID();
+  const baseColumnId = randomUUID();
+  const otherColumnId = randomUUID();
+  const outsideColumnId = randomUUID();
+  const rowId = randomUUID();
+  const outsideRowId = randomUUID();
+  const baseCellValue = `legacy base answer ${suffix}`;
+  const otherCellValue = `legacy other response ${suffix}`;
+  const outsideCellValue = `outside legacy row diff ${suffix}`;
+  const datasetName = `api journey legacy diff ${runId}`;
+  const outsideDatasetName = `api journey legacy diff outside ${runId}`;
+  const columnValues = [
+    [baseColumnId, "legacy_prompt_a", datasetId],
+    [otherColumnId, "legacy_prompt_b", datasetId],
+    [outsideColumnId, "legacy_outside", outsideDatasetId],
+  ]
+    .map(
+      ([id, name, columnDatasetId]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(name)},
+    'text',
+    'experiment',
+    NULL::varchar,
+    ${sqlUuid(columnDatasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )`,
+    )
+    .join(",\n");
+  const cellValues = [
+    [
+      randomUUID(),
+      baseCellValue,
+      baseColumnId,
+      datasetId,
+      rowId,
+      { metadata: { prompt: "base" } },
+    ],
+    [
+      randomUUID(),
+      otherCellValue,
+      otherColumnId,
+      datasetId,
+      rowId,
+      { metadata: { prompt: "other" } },
+    ],
+    [
+      randomUUID(),
+      outsideCellValue,
+      outsideColumnId,
+      outsideDatasetId,
+      outsideRowId,
+      { metadata: { prompt: "outside" } },
+    ],
+  ]
+    .map(
+      ([id, value, columnId, cellDatasetId, cellRowId, valueInfos]) => `(
+    ${sqlUuid(id)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(value)},
+    ${sqlUuid(columnId)},
+    ${sqlUuid(cellDatasetId)},
+    ${sqlUuid(cellRowId)},
+    'pass',
+    ${sqlJsonLiteral(valueInfos)},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  )`,
+    )
+    .join(",\n");
+  const sql = `
+WITH inserted_datasets AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES
+  (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[${sqlTextLiteral(baseColumnId)}, ${sqlTextLiteral(otherColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  ),
+  (
+    ${sqlUuid(outsideDatasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(outsideDatasetName)},
+    ARRAY[${sqlTextLiteral(outsideColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )
+  RETURNING id
+),
+inserted_columns AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES
+${columnValues}
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+  (
+    ${sqlUuid(rowId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    0,
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb
+  ),
+  (
+    ${sqlUuid(outsideRowId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    0,
+    ${sqlUuid(outsideDatasetId)},
+    '{}'::jsonb
+  )
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES
+${cellValues}
+  RETURNING id
+),
+inserted_experiment AS (
+  INSERT INTO model_hub_experimentstable (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    prompt_config,
+    status,
+    dataset_id,
+    column_id,
+    user_id,
+    experiment_type,
+    snapshot_dataset_id
+  )
+  VALUES (
+    ${sqlUuid(experimentId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(`api journey legacy diff experiment ${runId}`)},
+    '[]'::jsonb,
+    'Completed',
+    ${sqlUuid(datasetId)},
+    ${sqlUuid(baseColumnId)},
+    NULL::uuid,
+    'llm',
+    NULL::uuid
+  )
+  RETURNING id
+),
+inserted_experiment_dataset AS (
+  INSERT INTO model_hub_experimentdatasettable (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    prompt_config,
+    exclude_values,
+    status,
+    experiment_id
+  )
+  VALUES (
+    ${sqlUuid(experimentDatasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'legacy_prompt_a',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    'Completed',
+    ${sqlUuid(experimentId)}
+  )
+  RETURNING id
+),
+inserted_experiment_dataset_columns AS (
+  INSERT INTO model_hub_experimentdatasettable_columns (
+    experimentdatasettable_id,
+    column_id
+  )
+  VALUES
+  (${sqlUuid(experimentDatasetId)}, ${sqlUuid(baseColumnId)}),
+  (${sqlUuid(experimentDatasetId)}, ${sqlUuid(otherColumnId)})
+  RETURNING id
+),
+inserted_experiment_dataset_m2m AS (
+  INSERT INTO model_hub_experimentstable_experiments_datasets (
+    experimentstable_id,
+    experimentdatasettable_id
+  )
+  VALUES (${sqlUuid(experimentId)}, ${sqlUuid(experimentDatasetId)})
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_experiment) = 1,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'outside_dataset_id', ${sqlUuid(outsideDatasetId)}::text,
+  'experiment_id', ${sqlUuid(experimentId)}::text,
+  'experiment_dataset_id', ${sqlUuid(experimentDatasetId)}::text,
+  'base_column_id', ${sqlUuid(baseColumnId)}::text,
+  'other_column_id', ${sqlUuid(otherColumnId)}::text,
+  'outside_column_id', ${sqlUuid(outsideColumnId)}::text,
+  'row_id', ${sqlUuid(rowId)}::text,
+  'outside_row_id', ${sqlUuid(outsideRowId)}::text,
+  'base_cell_value', ${sqlTextLiteral(baseCellValue)},
+  'other_cell_value', ${sqlTextLiteral(otherCellValue)},
+  'outside_cell_value', ${sqlTextLiteral(outsideCellValue)}
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteLegacyExperimentRowDiffFixture(fixture) {
+  const datasetIds = [fixture.dataset_id, fixture.outside_dataset_id].filter(isUuid);
+  const experimentIds = [fixture.experiment_id].filter(isUuid);
+  const experimentDatasetIds = [fixture.experiment_dataset_id].filter(isUuid);
+  assert(datasetIds.length > 0, "Legacy row-diff cleanup missing dataset ids.");
+  assert(
+    experimentIds.length > 0,
+    "Legacy row-diff cleanup missing experiment ids.",
+  );
+  assert(
+    experimentDatasetIds.length > 0,
+    "Legacy row-diff cleanup missing experiment dataset ids.",
+  );
+  const sql = `
+WITH deleted_cells AS (
+  DELETE FROM model_hub_cell
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_rows AS (
+  DELETE FROM model_hub_row
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_experiment_m2m AS (
+  DELETE FROM model_hub_experimentstable_experiments_datasets
+  WHERE experimentstable_id = ANY(${sqlUuidArray(experimentIds)})
+     OR experimentdatasettable_id = ANY(${sqlUuidArray(experimentDatasetIds)})
+  RETURNING 1
+),
+deleted_experiment_dataset_columns AS (
+  DELETE FROM model_hub_experimentdatasettable_columns
+  WHERE experimentdatasettable_id = ANY(${sqlUuidArray(experimentDatasetIds)})
+  RETURNING 1
+),
+deleted_experiment_datasets AS (
+  DELETE FROM model_hub_experimentdatasettable
+  WHERE id = ANY(${sqlUuidArray(experimentDatasetIds)})
+  RETURNING 1
+),
+deleted_experiments AS (
+  DELETE FROM model_hub_experimentstable
+  WHERE id = ANY(${sqlUuidArray(experimentIds)})
+  RETURNING 1
+),
+deleted_columns AS (
+  DELETE FROM model_hub_column
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_datasets AS (
+  DELETE FROM model_hub_dataset
+  WHERE id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_cell_count', (SELECT count(*) FROM deleted_cells),
+  'deleted_row_count', (SELECT count(*) FROM deleted_rows),
+  'deleted_experiment_m2m_count', (SELECT count(*) FROM deleted_experiment_m2m),
+  'deleted_experiment_dataset_column_count', (SELECT count(*) FROM deleted_experiment_dataset_columns),
+  'deleted_experiment_dataset_count', (SELECT count(*) FROM deleted_experiment_datasets),
+  'deleted_experiment_count', (SELECT count(*) FROM deleted_experiments),
+  'deleted_column_count', (SELECT count(*) FROM deleted_columns),
+  'deleted_dataset_count', (SELECT count(*) FROM deleted_datasets)
+);
+`;
+  return runPostgresJson(sql);
+}
+
 async function seedDatasetCopyFixture({ runId, organizationId, workspaceId }) {
   assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
   if (workspaceId)
@@ -12246,6 +15378,2427 @@ function assertDatasetFileImportFixtureAudit(audit, fixture) {
     audit.progress_status === "queued",
     "File import changed the seeded local-file progress status unexpectedly.",
   );
+}
+
+async function seedDatasetDynamicColumnFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const workspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const datasetId = randomUUID();
+  const payloadColumnId = randomUUID();
+  const rowOneId = randomUUID();
+  const rowTwoId = randomUUID();
+  const datasetName = `api journey dynamic columns ${runId}`;
+  const previewNameOne = `Dynamic Alice ${suffix}`;
+  const previewNameTwo = `Dynamic Bob ${suffix}`;
+  const columnConfig = {
+    [payloadColumnId]: { is_visible: true, is_frozen: null },
+  };
+  const values = [
+    [rowOneId, 1, `{"name":"${previewNameOne}","priority":"high"}`],
+    [rowTwoId, 2, `{"name":"${previewNameTwo}","priority":"low"}`],
+  ];
+  const rowValues = values
+    .map(
+      ([rowId, order]) => `(
+    ${sqlUuid(rowId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${Number(order)},
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb
+  )`,
+    )
+    .join(",\n");
+  const cellValues = values
+    .map(
+      ([rowId, , value]) => `(
+    ${sqlUuid(randomUUID())},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(value)},
+    ${sqlUuid(payloadColumnId)},
+    ${sqlUuid(datasetId)},
+    ${sqlUuid(rowId)},
+    'pass',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  )`,
+    )
+    .join(",\n");
+  const sql = `
+WITH inserted_dataset AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[${sqlTextLiteral(payloadColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    ${sqlJsonLiteral(columnConfig)},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )
+  RETURNING id
+),
+inserted_column AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES (
+    ${sqlUuid(payloadColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'payload',
+    'text',
+    'OTHERS',
+    NULL::varchar,
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+${rowValues}
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES
+${cellValues}
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_dataset) = 1,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'dataset_name', ${sqlTextLiteral(datasetName)},
+  'payload_column_id', ${sqlUuid(payloadColumnId)}::text,
+  'preview_name_one', ${sqlTextLiteral(previewNameOne)},
+  'preview_name_two', ${sqlTextLiteral(previewNameTwo)},
+  'extract_json_column_name', ${sqlTextLiteral(`json_name_${suffix}`)},
+  'api_column_name', ${sqlTextLiteral(`api_result_${suffix}`)},
+  'conditional_column_name', ${sqlTextLiteral(`conditional_${suffix}`)},
+  'classify_column_name', ${sqlTextLiteral(`classification_${suffix}`)},
+  'entities_column_name', ${sqlTextLiteral(`entities_${suffix}`)},
+  'vector_column_name', ${sqlTextLiteral(`vector_${suffix}`)},
+  'missing_guard_column_name', ${sqlTextLiteral(`missing_guard_${suffix}`)},
+  'inserted_row_count', (SELECT count(*) FROM inserted_rows),
+  'inserted_cell_count', (SELECT count(*) FROM inserted_cells)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function createDatasetDynamicColumns(client, fixture) {
+  const extractJson = await client.post(
+    apiPath("/model-hub/develops/{dataset_id}/extract-json-column/", {
+      dataset_id: fixture.dataset_id,
+    }),
+    {
+      column_id: fixture.payload_column_id,
+      json_key: "name",
+      new_column_name: fixture.extract_json_column_name,
+      concurrency: 1,
+    },
+  );
+  const apiColumn = await client.post(
+    apiPath("/model-hub/datasets/{dataset_id}/add-api-column/", {
+      dataset_id: fixture.dataset_id,
+    }),
+    {
+      column_name: fixture.api_column_name,
+      config: {
+        url: "https://example.com",
+        method: "GET",
+        output_type: "string",
+      },
+      concurrency: 1,
+    },
+  );
+  const conditional = await client.post(
+    apiPath("/model-hub/datasets/{dataset_id}/conditional-column/", {
+      dataset_id: fixture.dataset_id,
+    }),
+    {
+      new_column_name: fixture.conditional_column_name,
+      config: [
+        {
+          branch_type: "else",
+          condition: "",
+          branch_node_config: {
+            type: "static_value",
+            config: { value: "fallback" },
+          },
+        },
+      ],
+      concurrency: 1,
+    },
+  );
+  const classification = await client.post(
+    apiPath("/model-hub/datasets/{dataset_id}/classify-column/", {
+      dataset_id: fixture.dataset_id,
+    }),
+    {
+      column_id: fixture.payload_column_id,
+      labels: ["alpha", "beta"],
+      new_column_name: fixture.classify_column_name,
+      language_model_id: "gpt-4o-mini",
+      concurrency: 1,
+    },
+  );
+  const entities = await client.post(
+    apiPath("/model-hub/datasets/{dataset_id}/extract-entities/", {
+      dataset_id: fixture.dataset_id,
+    }),
+    {
+      column_id: fixture.payload_column_id,
+      instruction: "Extract names",
+      new_column_name: fixture.entities_column_name,
+      language_model_id: "gpt-4o-mini",
+      concurrency: 1,
+    },
+  );
+  const vector = await client.post(
+    apiPath("/model-hub/datasets/{dataset_id}/add_vector_db_column/", {
+      dataset_id: fixture.dataset_id,
+    }),
+    {
+      column_id: fixture.payload_column_id,
+      sub_type: "pinecone",
+      api_key: randomUUID(),
+      new_column_name: fixture.vector_column_name,
+      index_name: "api-journey-index",
+      top_k: 1,
+      embedding_config: {
+        type: "openai",
+        model: "text-embedding-3-small",
+      },
+      concurrency: 1,
+    },
+  );
+
+  const createdColumns = {
+    [fixture.extract_json_column_name]: extractJson.new_column_id,
+    [fixture.api_column_name]: apiColumn.new_column_id,
+    [fixture.conditional_column_name]: conditional.new_column_id,
+    [fixture.classify_column_name]: classification.new_column_id,
+    [fixture.entities_column_name]: entities.new_column_id,
+    [fixture.vector_column_name]: vector.new_column_id,
+  };
+  for (const [name, id] of Object.entries(createdColumns)) {
+    assert(isUuid(id), `Dynamic-column API did not return a UUID for ${name}.`);
+  }
+  return createdColumns;
+}
+
+async function loadDatasetDynamicColumnFixtureAudit(fixture) {
+  assert(isUuid(fixture.dataset_id), "dataset_id must be a UUID for DB audit.");
+  const expectedNames = [
+    fixture.extract_json_column_name,
+    fixture.api_column_name,
+    fixture.conditional_column_name,
+    fixture.classify_column_name,
+    fixture.entities_column_name,
+    fixture.vector_column_name,
+  ];
+  const sql = `
+WITH dataset_row AS (
+  SELECT id, column_order
+  FROM model_hub_dataset
+  WHERE id = ${sqlUuid(fixture.dataset_id)}
+    AND deleted = false
+),
+base_rows AS (
+  SELECT id
+  FROM model_hub_row
+  WHERE dataset_id = ${sqlUuid(fixture.dataset_id)}
+    AND deleted = false
+),
+base_cells AS (
+  SELECT id
+  FROM model_hub_cell
+  WHERE dataset_id = ${sqlUuid(fixture.dataset_id)}
+    AND column_id = ${sqlUuid(fixture.payload_column_id)}
+    AND deleted = false
+),
+dynamic_columns AS (
+  SELECT id, name, source, status, metadata
+  FROM model_hub_column
+  WHERE dataset_id = ${sqlUuid(fixture.dataset_id)}
+    AND deleted = false
+    AND name = ANY(${sqlTextArray(expectedNames)})
+)
+SELECT json_build_object(
+  'row_count', (SELECT count(*) FROM base_rows),
+  'base_cell_count', (SELECT count(*) FROM base_cells),
+  'column_order_length', (
+    SELECT COALESCE(cardinality(column_order), 0)
+    FROM dataset_row
+  ),
+  'column_order', (
+    SELECT COALESCE(array_to_json(column_order), '[]'::json)
+    FROM dataset_row
+  ),
+  'dynamic_column_count', (SELECT count(*) FROM dynamic_columns),
+  'dynamic_columns', (
+    SELECT COALESCE(
+      json_agg(
+        json_build_object(
+          'id', id::text,
+          'name', name,
+          'source', source,
+          'status', status,
+          'metadata', metadata
+        )
+        ORDER BY name
+      ),
+      '[]'::json
+    )
+    FROM dynamic_columns
+  )
+);
+`;
+  return runPostgresJson(sql);
+}
+
+function assertDatasetDynamicColumnFixtureAudit(audit, fixture, createdColumns) {
+  assert(Number(audit.row_count) === 2, "Dynamic fixture row count mismatch.");
+  assert(
+    Number(audit.base_cell_count) === 2,
+    "Dynamic fixture base cell count mismatch.",
+  );
+  assert(
+    Number(audit.dynamic_column_count) === 6,
+    "Dynamic fixture did not create all generated columns.",
+  );
+  assert(
+    Number(audit.column_order_length) === 7,
+    "Dynamic fixture column order did not include all generated columns.",
+  );
+  const columns = asArray(audit.dynamic_columns);
+  const byName = new Map(columns.map((column) => [column.name, column]));
+  const expected = [
+    [fixture.extract_json_column_name, "extracted_json"],
+    [fixture.api_column_name, "api_call"],
+    [fixture.conditional_column_name, "conditional"],
+    [fixture.classify_column_name, "classification"],
+    [fixture.entities_column_name, "extracted_entities"],
+    [fixture.vector_column_name, "vector_db"],
+  ];
+  for (const [name, source] of expected) {
+    const column = byName.get(name);
+    assert(column, `Dynamic column ${name} was missing from DB audit.`);
+    assert(column.id === createdColumns[name], `Dynamic column ${name} id mismatch.`);
+    assert(column.source === source, `Dynamic column ${name} source mismatch.`);
+    assert(
+      ["Running", "Completed", "Error"].includes(column.status),
+      `Dynamic column ${name} had an unexpected status.`,
+    );
+    assert(
+      asArray(audit.column_order).includes(column.id),
+      `Dynamic column ${name} was missing from dataset column_order.`,
+    );
+  }
+
+  const extractJson = byName.get(fixture.extract_json_column_name);
+  assert(
+    extractJson.metadata?.column_id === fixture.payload_column_id &&
+      extractJson.metadata?.json_key === "name",
+    "Extract-json column metadata did not preserve source column and json_key.",
+  );
+  const apiColumn = byName.get(fixture.api_column_name);
+  assert(
+    apiColumn.metadata?.url === "https://example.com" &&
+      apiColumn.metadata?.method === "GET",
+    "API column metadata did not preserve request config.",
+  );
+  const conditional = byName.get(fixture.conditional_column_name);
+  assert(
+    asArray(conditional.metadata?.config).length === 1,
+    "Conditional column metadata did not preserve branch config.",
+  );
+  const classification = byName.get(fixture.classify_column_name);
+  assert(
+    classification.metadata?.column_id === fixture.payload_column_id &&
+      asArray(classification.metadata?.labels).length === 2,
+    "Classification metadata did not preserve labels/source column.",
+  );
+  const entities = byName.get(fixture.entities_column_name);
+  assert(
+    entities.metadata?.column_id === fixture.payload_column_id &&
+      entities.metadata?.instruction === "Extract names",
+    "Entity extraction metadata did not preserve instruction/source column.",
+  );
+  const vector = byName.get(fixture.vector_column_name);
+  assert(
+    vector.metadata?.column_id === fixture.payload_column_id &&
+      vector.metadata?.sub_type === "pinecone",
+    "Vector DB metadata did not preserve source column/sub_type.",
+  );
+}
+
+async function seedDatasetSyntheticFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const workspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const datasetId = randomUUID();
+  const columnId = randomUUID();
+  const datasetName = `api journey synthetic ${runId}`;
+  const columnName = `synthetic_answer_${suffix}`;
+  const originalDescription = `Original synthetic description ${suffix}`;
+  const updatedDescription = `Updated synthetic description ${suffix}`;
+  const syntheticColumnPayload = {
+    name: columnName,
+    data_type: "text",
+    description: "Synthetic answer",
+    property: "answer",
+  };
+  const syntheticAddColumnPayload = {
+    ...syntheticColumnPayload,
+    skip: false,
+    is_new: false,
+  };
+  const syntheticConfig = {
+    num_rows: 10,
+    columns: [syntheticColumnPayload],
+    dataset: {
+      name: datasetName,
+      description: originalDescription,
+      objective: "Seed synthetic config for API journey",
+      patterns: [],
+    },
+  };
+  const columnConfig = {
+    [columnId]: { is_visible: true, is_frozen: null },
+  };
+  const rowValues = Array.from({ length: 10 }, (_, index) => {
+    const rowId = randomUUID();
+    return {
+      rowSql: `(
+        ${sqlUuid(rowId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${index},
+        ${sqlUuid(datasetId)},
+        '{}'::jsonb
+      )`,
+      cellSql: `(
+        ${sqlUuid(randomUUID())},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${sqlTextLiteral(`synthetic seeded value ${index} ${suffix}`)},
+        ${sqlUuid(columnId)},
+        ${sqlUuid(datasetId)},
+        ${sqlUuid(rowId)},
+        'pass',
+        '{}'::jsonb,
+        '{}'::jsonb,
+        '{}'::jsonb,
+        NULL::integer,
+        NULL::integer,
+        NULL::double precision
+      )`,
+    };
+  });
+  const sql = `
+WITH inserted_dataset AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[${sqlTextLiteral(columnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    ${sqlJsonLiteral(columnConfig)},
+    '{}'::jsonb,
+    ${sqlJsonLiteral(syntheticConfig)},
+    '[]'::jsonb,
+    'pending'
+  )
+  RETURNING id
+),
+inserted_column AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES (
+    ${sqlUuid(columnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(columnName)},
+    'text',
+    'OTHERS',
+    NULL::varchar,
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+${rowValues.map((row) => row.rowSql).join(",\n")}
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES
+${rowValues.map((row) => row.cellSql).join(",\n")}
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_dataset) = 1,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'dataset_name', ${sqlTextLiteral(datasetName)},
+  'workspace_id', ${workspaceId ? `${sqlUuid(workspaceId)}::text` : "NULL::text"},
+  'column_id', ${sqlUuid(columnId)}::text,
+  'column_name', ${sqlTextLiteral(columnName)},
+  'original_description', ${sqlTextLiteral(originalDescription)},
+  'updated_description', ${sqlTextLiteral(updatedDescription)},
+  'synthetic_column_payload', ${sqlJsonLiteral(syntheticColumnPayload)},
+  'synthetic_add_column_payload', ${sqlJsonLiteral(syntheticAddColumnPayload)},
+  'inserted_row_count', (SELECT count(*) FROM inserted_rows),
+  'inserted_cell_count', (SELECT count(*) FROM inserted_cells)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadDatasetSyntheticFixtureAudit(fixture) {
+  assert(isUuid(fixture.dataset_id), "dataset_id must be a UUID for DB audit.");
+  const sql = `
+SELECT json_build_object(
+  'workspace_id', d.workspace_id::text,
+  'synthetic_description', d.synthetic_dataset_config->'dataset'->>'description',
+  'synthetic_num_rows', (d.synthetic_dataset_config->>'num_rows')::integer,
+  'column_order_length', COALESCE(array_length(d.column_order, 1), 0),
+  'row_count', (
+    SELECT count(*)
+    FROM model_hub_row r
+    WHERE r.dataset_id = d.id
+      AND r.deleted = false
+  ),
+  'column_count', (
+    SELECT count(*)
+    FROM model_hub_column c
+    WHERE c.dataset_id = d.id
+      AND c.deleted = false
+  ),
+  'cell_count', (
+    SELECT count(*)
+    FROM model_hub_cell c
+    WHERE c.dataset_id = d.id
+      AND c.deleted = false
+  ),
+  'column_statuses', (
+    SELECT COALESCE(json_agg(DISTINCT c.status), '[]'::json)
+    FROM model_hub_column c
+    WHERE c.dataset_id = d.id
+      AND c.deleted = false
+  )
+)
+FROM model_hub_dataset d
+WHERE d.id = ${sqlUuid(fixture.dataset_id)}
+  AND d.deleted = false;
+`;
+  return runPostgresJson(sql);
+}
+
+function assertDatasetSyntheticFixtureAudit(audit, fixture) {
+  assert(
+    audit.workspace_id === fixture.workspace_id,
+    "Synthetic fixture workspace id mismatch.",
+  );
+  assert(
+    audit.synthetic_description === fixture.updated_description,
+    "Synthetic config description was not updated.",
+  );
+  assert(
+    Number(audit.synthetic_num_rows) === 10,
+    "Synthetic config row count was not preserved.",
+  );
+  assert(Number(audit.row_count) === 10, "Synthetic row count changed.");
+  assert(Number(audit.column_count) === 1, "Synthetic column count changed.");
+  assert(Number(audit.cell_count) === 10, "Synthetic cell count changed.");
+  assert(
+    Number(audit.column_order_length) === 1,
+    "Synthetic column order length changed.",
+  );
+}
+
+async function seedDatasetExplanationFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const workspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const datasetId = randomUUID();
+  const datasetName = `api journey explanation summary ${runId}`;
+  const rowIds = [randomUUID(), randomUUID()];
+  const rowSql = rowIds
+    .map(
+      (rowId, index) => `(
+        ${sqlUuid(rowId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${index},
+        ${sqlUuid(datasetId)},
+        '{}'::jsonb
+      )`,
+    )
+    .join(",\n");
+  const sql = `
+WITH inserted_dataset AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'completed'
+  )
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+${rowSql}
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_dataset) = 1,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'dataset_name', ${sqlTextLiteral(datasetName)},
+  'workspace_id', ${workspaceId ? `${sqlUuid(workspaceId)}::text` : "NULL::text"},
+  'row_count', (SELECT count(*) FROM inserted_rows)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadDatasetExplanationFixtureAudit(fixture) {
+  assert(isUuid(fixture.dataset_id), "dataset_id must be a UUID for DB audit.");
+  const sql = `
+SELECT json_build_object(
+  'workspace_id', d.workspace_id::text,
+  'eval_reason_status', d.eval_reason_status,
+  'row_count', (
+    SELECT count(*)
+    FROM model_hub_row r
+    WHERE r.dataset_id = d.id
+      AND r.deleted = false
+  )
+)
+FROM model_hub_dataset d
+WHERE d.id = ${sqlUuid(fixture.dataset_id)}
+  AND d.deleted = false;
+`;
+  return runPostgresJson(sql);
+}
+
+function assertDatasetExplanationFixtureAudit(audit, fixture) {
+  assert(
+    audit.workspace_id === fixture.workspace_id,
+    "Explanation summary fixture workspace id mismatch.",
+  );
+  assert(
+    audit.eval_reason_status === "insufficient_data",
+    "Explanation summary refresh did not persist insufficient_data status.",
+  );
+  assert(
+    Number(audit.row_count) === fixture.row_count,
+    "Explanation summary fixture row count changed.",
+  );
+}
+
+function assertDatasetEvalStructure(
+  payload,
+  { metricId, templateId, expectedName, expectedMapping },
+) {
+  const evalData = payload?.eval || payload;
+  assert(evalData && typeof evalData === "object", "Eval structure was empty.");
+  if (metricId) {
+    assert(evalData.id === metricId, "Eval structure returned wrong metric id.");
+  }
+  assert(
+    evalData.template_id === templateId,
+    "Eval structure returned wrong template id.",
+  );
+  assert(evalData.name === expectedName, "Eval structure returned wrong name.");
+  for (const [key, value] of Object.entries(expectedMapping || {})) {
+    assert(
+      String(evalData.mapping?.[key] ?? "") === String(value),
+      `Eval structure mapping for ${key} did not match.`,
+    );
+  }
+  assert(
+    payloadArray(evalData.required_keys, "required_keys").includes("text"),
+    "Eval structure did not expose required key text.",
+  );
+}
+
+async function seedDatasetEvalDrawerFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const workspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const datasetId = randomUUID();
+  const inputColumnId = randomUUID();
+  const datasetName = `api journey eval drawer ${runId}`;
+  const inputColumnName = `api_eval_text_${suffix}`;
+  const rowTexts = [
+    `alpha beta gamma ${suffix}`,
+    `delta epsilon zeta ${suffix}`,
+    `eta theta iota ${suffix}`,
+  ];
+  const rows = rowTexts.map((text, index) => ({
+    rowId: randomUUID(),
+    cellId: randomUUID(),
+    text,
+    order: index,
+  }));
+  const columnConfig = {
+    [inputColumnId]: { is_visible: true, is_frozen: null },
+  };
+  const rowValues = rows
+    .map(
+      (row) => `(
+        ${sqlUuid(row.rowId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${row.order},
+        ${sqlUuid(datasetId)},
+        '{}'::jsonb
+      )`,
+    )
+    .join(",\n");
+  const cellValues = rows
+    .map(
+      (row) => `(
+        ${sqlUuid(row.cellId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${sqlTextLiteral(row.text)},
+        '{}'::jsonb,
+        '{}'::jsonb,
+        '{}'::jsonb,
+        'pass',
+        ${sqlUuid(datasetId)},
+        ${sqlUuid(inputColumnId)},
+        ${sqlUuid(row.rowId)}
+      )`,
+    )
+    .join(",\n");
+  const sql = `
+WITH inserted_dataset AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[${sqlTextLiteral(inputColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    ${sqlJsonLiteral(columnConfig)},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )
+  RETURNING id
+),
+inserted_column AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES (
+    ${sqlUuid(inputColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(inputColumnName)},
+    'text',
+    'OTHERS',
+    NULL::varchar,
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+${rowValues}
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    status,
+    dataset_id,
+    column_id,
+    row_id
+  )
+  VALUES
+${cellValues}
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_dataset) = 1,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'dataset_name', ${sqlTextLiteral(datasetName)},
+  'input_column_id', ${sqlUuid(inputColumnId)}::text,
+  'input_column_name', ${sqlTextLiteral(inputColumnName)},
+  'workspace_id', ${workspaceId ? `${sqlUuid(workspaceId)}::text` : "NULL::text"},
+  'row_count', (SELECT count(*) FROM inserted_rows),
+  'cell_count', (SELECT count(*) FROM inserted_cells)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteDatasetEvalDrawerFixture(fixture) {
+  assert(
+    fixture && isUuid(fixture.dataset_id),
+    "Dataset eval drawer fixture id must be a UUID for DB cleanup.",
+  );
+  const sql = `
+WITH deleted_pending_tasks AS (
+  DELETE FROM model_hub_pendingrowtask
+  WHERE dataset_id = ${sqlUuid(fixture.dataset_id)}
+  RETURNING 1
+),
+deleted_metrics AS (
+  DELETE FROM model_hub_userevalmetric
+  WHERE dataset_id = ${sqlUuid(fixture.dataset_id)}
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_pending_task_count', (SELECT count(*) FROM deleted_pending_tasks),
+  'deleted_metric_count', (SELECT count(*) FROM deleted_metrics)
+);
+`;
+  await runPostgresJson(sql);
+  return hardDeleteDatasetCopyFixture([fixture.dataset_id]);
+}
+
+async function seedLegacyEvalUserTemplateFixture({
+  runId,
+  organizationId,
+  workspaceId,
+  templateId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  assert(isUuid(templateId), "templateId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const activeWorkspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const otherWorkspaceId = await findOtherWorkspaceId(organizationId, workspaceId);
+  const datasetId = randomUUID();
+  const outsideDatasetId = randomUUID();
+  const inputColumnId = randomUUID();
+  const outsideColumnId = randomUUID();
+  const rowOneId = randomUUID();
+  const rowTwoId = randomUUID();
+  const outsideRowId = randomUUID();
+  const inputCellOneId = randomUUID();
+  const inputCellTwoId = randomUUID();
+  const outsideInputCellId = randomUUID();
+  const otherDatasetId = otherWorkspaceId ? randomUUID() : null;
+  const otherColumnId = otherWorkspaceId ? randomUUID() : null;
+  const otherRowId = otherWorkspaceId ? randomUUID() : null;
+  const otherInputCellId = otherWorkspaceId ? randomUUID() : null;
+  const otherMetricId = otherWorkspaceId ? randomUUID() : null;
+  const otherEvalColumnId = otherWorkspaceId ? randomUUID() : null;
+  const otherEvalCellId = otherWorkspaceId ? randomUUID() : null;
+  const datasetName = `api journey legacy eval user ${runId}`;
+  const outsideDatasetName = `api journey legacy eval outside ${runId}`;
+  const inputColumnName = `api_legacy_eval_input_${suffix}`;
+  const outsideColumnName = `api_legacy_eval_outside_${suffix}`;
+  const inputValueOne = `alpha beta gamma ${suffix}`;
+  const inputValueTwo = `delta epsilon zeta ${suffix}`;
+  const outsideInputValue = `outside row ${suffix}`;
+  const evalValueOne = `old eval one ${suffix}`;
+  const evalValueTwo = `old eval two ${suffix}`;
+  const outsideEvalValue = `outside old eval ${suffix}`;
+  const otherInputValue = `other workspace row ${suffix}`;
+  const otherEvalValue = `other workspace old eval ${suffix}`;
+  const datasetValues = [
+    {
+      id: datasetId,
+      name: datasetName,
+      workspaceSql: activeWorkspaceSql,
+      columnIds: [inputColumnId],
+    },
+    {
+      id: outsideDatasetId,
+      name: outsideDatasetName,
+      workspaceSql: activeWorkspaceSql,
+      columnIds: [outsideColumnId],
+    },
+  ];
+  if (otherWorkspaceId) {
+    datasetValues.push({
+      id: otherDatasetId,
+      name: `api journey legacy eval other ${runId}`,
+      workspaceSql: sqlUuid(otherWorkspaceId),
+      columnIds: [otherColumnId],
+    });
+  }
+  const datasetSql = datasetValues
+    .map(
+      (dataset) => `(
+        ${sqlUuid(dataset.id)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${sqlTextLiteral(dataset.name)},
+        ARRAY[${dataset.columnIds.map(sqlTextLiteral).join(", ")}]::varchar[],
+        'GenerativeLLM',
+        ${sqlUuid(organizationId)},
+        ${dataset.workspaceSql},
+        'build',
+        ${sqlJsonLiteral(
+          Object.fromEntries(
+            dataset.columnIds.map((columnId) => [
+              columnId,
+              { is_visible: true, is_frozen: null },
+            ]),
+          ),
+        )},
+        '{}'::jsonb,
+        '{}'::jsonb,
+        '[]'::jsonb,
+        'pending'
+      )`,
+    )
+    .join(",\n");
+  const columnRows = [
+    [inputColumnId, inputColumnName, datasetId],
+    [outsideColumnId, outsideColumnName, outsideDatasetId],
+  ];
+  if (otherWorkspaceId) {
+    columnRows.push([otherColumnId, `api_legacy_eval_other_${suffix}`, otherDatasetId]);
+  }
+  const columnSql = columnRows
+    .map(
+      ([columnId, name, datasetIdForColumn]) => `(
+        ${sqlUuid(columnId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${sqlTextLiteral(name)},
+        'text',
+        'OTHERS',
+        NULL::varchar,
+        ${sqlUuid(datasetIdForColumn)},
+        '{}'::jsonb,
+        'Completed'
+      )`,
+    )
+    .join(",\n");
+  const rowRows = [
+    [rowOneId, datasetId, 0],
+    [rowTwoId, datasetId, 1],
+    [outsideRowId, outsideDatasetId, 0],
+  ];
+  if (otherWorkspaceId) rowRows.push([otherRowId, otherDatasetId, 0]);
+  const rowSql = rowRows
+    .map(
+      ([rowId, rowDatasetId, order]) => `(
+        ${sqlUuid(rowId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${order},
+        ${sqlUuid(rowDatasetId)},
+        '{}'::jsonb
+      )`,
+    )
+    .join(",\n");
+  const cellRows = [
+    [inputCellOneId, inputValueOne, inputColumnId, datasetId, rowOneId],
+    [inputCellTwoId, inputValueTwo, inputColumnId, datasetId, rowTwoId],
+    [
+      outsideInputCellId,
+      outsideInputValue,
+      outsideColumnId,
+      outsideDatasetId,
+      outsideRowId,
+    ],
+  ];
+  if (otherWorkspaceId) {
+    cellRows.push([
+      otherInputCellId,
+      otherInputValue,
+      otherColumnId,
+      otherDatasetId,
+      otherRowId,
+    ]);
+  }
+  const cellSql = cellRows
+    .map(
+      ([cellId, value, columnId, cellDatasetId, rowId]) => `(
+        ${sqlUuid(cellId)},
+        now(),
+        now(),
+        false,
+        NULL::timestamptz,
+        ${sqlTextLiteral(value)},
+        ${sqlUuid(columnId)},
+        ${sqlUuid(cellDatasetId)},
+        ${sqlUuid(rowId)},
+        'pass',
+        '{}'::jsonb,
+        '{}'::jsonb,
+        '{}'::jsonb,
+        NULL::integer,
+        NULL::integer,
+        NULL::double precision
+      )`,
+    )
+    .join(",\n");
+  const otherWorkspaceSql = otherWorkspaceId
+    ? `,
+inserted_other_metric AS (
+  INSERT INTO model_hub_userevalmetric (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    config,
+    dataset_id,
+    template_id,
+    organization_id,
+    workspace_id,
+    status,
+    show_in_sidebar,
+    source_id,
+    column_deleted,
+    user_id,
+    error_localizer,
+    kb_id,
+    model,
+    eval_group_id,
+    composite_weight_overrides
+  )
+  VALUES (
+    ${sqlUuid(otherMetricId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(`api legacy eval other metric ${runId}`)},
+    ${sqlJsonLiteral({ mapping: { text: otherColumnId }, params: {} })},
+    ${sqlUuid(otherDatasetId)},
+    ${sqlUuid(templateId)},
+    ${sqlUuid(organizationId)},
+    ${sqlUuid(otherWorkspaceId)},
+    'Inactive',
+    true,
+    '',
+    false,
+    NULL::uuid,
+    false,
+    NULL::uuid,
+    'turing_small',
+    NULL::uuid,
+    NULL::jsonb
+  )
+  RETURNING id
+),
+inserted_other_eval_column AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES (
+    ${sqlUuid(otherEvalColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(`api_legacy_eval_other_output_${suffix}`)},
+    'text',
+    'evaluation',
+    ${sqlTextLiteral(otherMetricId)},
+    ${sqlUuid(otherDatasetId)},
+    '{}'::jsonb,
+    'Completed'
+  )
+  RETURNING id
+),
+inserted_other_eval_cell AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES (
+    ${sqlUuid(otherEvalCellId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(otherEvalValue)},
+    ${sqlUuid(otherEvalColumnId)},
+    ${sqlUuid(otherDatasetId)},
+    ${sqlUuid(otherRowId)},
+    'pass',
+    ${sqlJsonLiteral({ kept: true })},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  )
+  RETURNING id
+)`
+    : "";
+  const sql = `
+WITH inserted_datasets AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES
+${datasetSql}
+  RETURNING id
+),
+inserted_columns AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES
+${columnSql}
+  RETURNING id
+),
+inserted_rows AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES
+${rowSql}
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES
+${cellSql}
+  RETURNING id
+)${otherWorkspaceSql}
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_datasets) >= 2,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'dataset_name', ${sqlTextLiteral(datasetName)},
+  'input_column_id', ${sqlUuid(inputColumnId)}::text,
+  'row_one_id', ${sqlUuid(rowOneId)}::text,
+  'row_two_id', ${sqlUuid(rowTwoId)}::text,
+  'outside_dataset_id', ${sqlUuid(outsideDatasetId)}::text,
+  'outside_column_id', ${sqlUuid(outsideColumnId)}::text,
+  'outside_row_id', ${sqlUuid(outsideRowId)}::text,
+  'other_workspace_id', ${otherWorkspaceId ? `${sqlUuid(otherWorkspaceId)}::text` : "NULL::text"},
+  'other_dataset_id', ${otherDatasetId ? `${sqlUuid(otherDatasetId)}::text` : "NULL::text"},
+  'other_column_id', ${otherColumnId ? `${sqlUuid(otherColumnId)}::text` : "NULL::text"},
+  'other_row_id', ${otherRowId ? `${sqlUuid(otherRowId)}::text` : "NULL::text"},
+  'other_metric_id', ${otherMetricId ? `${sqlUuid(otherMetricId)}::text` : "NULL::text"},
+  'eval_value_one', ${sqlTextLiteral(evalValueOne)},
+  'eval_value_two', ${sqlTextLiteral(evalValueTwo)},
+  'outside_eval_value', ${sqlTextLiteral(outsideEvalValue)},
+  'other_eval_value', ${sqlTextLiteral(otherEvalValue)},
+  'workspace_id', ${workspaceId ? `${sqlUuid(workspaceId)}::text` : "NULL::text"},
+  'inserted_dataset_count', (SELECT count(*) FROM inserted_datasets),
+  'inserted_column_count', (SELECT count(*) FROM inserted_columns),
+  'inserted_row_count', (SELECT count(*) FROM inserted_rows),
+  'inserted_cell_count', (SELECT count(*) FROM inserted_cells)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedLegacyEvalUserTemplateEvaluationCells({ fixture, metricId }) {
+  assert(
+    fixture && isUuid(fixture.dataset_id) && isUuid(fixture.outside_dataset_id),
+    "Legacy eval-user-template fixture ids must be UUIDs for DB seeding.",
+  );
+  assert(isUuid(metricId), "metricId must be a UUID for DB seeding.");
+  const evalColumnId = randomUUID();
+  const outsideEvalColumnId = randomUUID();
+  const evalCellOneId = randomUUID();
+  const evalCellTwoId = randomUUID();
+  const outsideEvalCellId = randomUUID();
+  const sql = `
+WITH inserted_columns AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES
+  (
+    ${sqlUuid(evalColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'api legacy eval output',
+    'text',
+    'evaluation',
+    ${sqlTextLiteral(metricId)},
+    ${sqlUuid(fixture.dataset_id)},
+    '{}'::jsonb,
+    'Completed'
+  ),
+  (
+    ${sqlUuid(outsideEvalColumnId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    'api legacy outside eval output',
+    'text',
+    'evaluation',
+    ${sqlTextLiteral(metricId)},
+    ${sqlUuid(fixture.outside_dataset_id)},
+    '{}'::jsonb,
+    'Completed'
+  )
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    column_id,
+    dataset_id,
+    row_id,
+    status,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    completion_tokens,
+    prompt_tokens,
+    response_time
+  )
+  VALUES
+  (
+    ${sqlUuid(evalCellOneId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(fixture.eval_value_one)},
+    ${sqlUuid(evalColumnId)},
+    ${sqlUuid(fixture.dataset_id)},
+    ${sqlUuid(fixture.row_one_id)},
+    'pass',
+    ${sqlJsonLiteral({ seeded: true, row: 1 })},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  ),
+  (
+    ${sqlUuid(evalCellTwoId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(fixture.eval_value_two)},
+    ${sqlUuid(evalColumnId)},
+    ${sqlUuid(fixture.dataset_id)},
+    ${sqlUuid(fixture.row_two_id)},
+    'pass',
+    ${sqlJsonLiteral({ seeded: true, row: 2 })},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  ),
+  (
+    ${sqlUuid(outsideEvalCellId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(fixture.outside_eval_value)},
+    ${sqlUuid(outsideEvalColumnId)},
+    ${sqlUuid(fixture.outside_dataset_id)},
+    ${sqlUuid(fixture.outside_row_id)},
+    'pass',
+    ${sqlJsonLiteral({ kept: true })},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    NULL::integer,
+    NULL::integer,
+    NULL::double precision
+  )
+  RETURNING id
+)
+SELECT json_build_object(
+  'inserted_eval_column_count', (SELECT count(*) FROM inserted_columns),
+  'inserted_eval_cell_count', (SELECT count(*) FROM inserted_cells),
+  'eval_column_id', ${sqlUuid(evalColumnId)}::text,
+  'outside_eval_column_id', ${sqlUuid(outsideEvalColumnId)}::text
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteLegacyEvalUserTemplateFixture(fixture) {
+  assert(
+    fixture && isUuid(fixture.dataset_id) && isUuid(fixture.outside_dataset_id),
+    "Legacy eval-user-template fixture ids must be UUIDs for DB cleanup.",
+  );
+  const datasetIds = [fixture.dataset_id, fixture.outside_dataset_id].filter(isUuid);
+  if (isUuid(fixture.other_dataset_id)) datasetIds.push(fixture.other_dataset_id);
+  const sql = `
+WITH deleted_pending_tasks AS (
+  DELETE FROM model_hub_pendingrowtask
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_metrics AS (
+  DELETE FROM model_hub_userevalmetric
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_cells AS (
+  DELETE FROM model_hub_cell
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_rows AS (
+  DELETE FROM model_hub_row
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_columns AS (
+  DELETE FROM model_hub_column
+  WHERE dataset_id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+),
+deleted_datasets AS (
+  DELETE FROM model_hub_dataset
+  WHERE id = ANY(${sqlUuidArray(datasetIds)})
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_pending_task_count', (SELECT count(*) FROM deleted_pending_tasks),
+  'deleted_metric_count', (SELECT count(*) FROM deleted_metrics),
+  'deleted_cell_count', (SELECT count(*) FROM deleted_cells),
+  'deleted_row_count', (SELECT count(*) FROM deleted_rows),
+  'deleted_column_count', (SELECT count(*) FROM deleted_columns),
+  'deleted_dataset_count', (SELECT count(*) FROM deleted_datasets)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadLegacyEvalUserTemplateAudit({
+  fixture,
+  templateId,
+  metricName,
+  organizationId,
+  workspaceId,
+}) {
+  assert(
+    fixture && isUuid(fixture.dataset_id) && isUuid(fixture.outside_dataset_id),
+    "Legacy eval-user-template fixture ids must be UUIDs for DB audit.",
+  );
+  assert(isUuid(templateId), "templateId must be a UUID for DB audit.");
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const otherMetricStatus = isUuid(fixture.other_metric_id)
+    ? `(SELECT c.status FROM model_hub_cell c JOIN model_hub_column col ON col.id = c.column_id WHERE c.row_id = ${sqlUuid(fixture.other_row_id)} AND c.dataset_id = ${sqlUuid(fixture.other_dataset_id)} AND col.source_id = ${sqlTextLiteral(fixture.other_metric_id)} AND c.deleted = false LIMIT 1)`
+    : "NULL::varchar";
+  const otherMetricValue = isUuid(fixture.other_metric_id)
+    ? `(SELECT c.value FROM model_hub_cell c JOIN model_hub_column col ON col.id = c.column_id WHERE c.row_id = ${sqlUuid(fixture.other_row_id)} AND c.dataset_id = ${sqlUuid(fixture.other_dataset_id)} AND col.source_id = ${sqlTextLiteral(fixture.other_metric_id)} AND c.deleted = false LIMIT 1)`
+    : "NULL::text";
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlUuid(fixture.dataset_id)}::uuid AS dataset_id,
+    ${sqlUuid(fixture.outside_dataset_id)}::uuid AS outside_dataset_id,
+    ${sqlUuid(templateId)}::uuid AS template_id,
+    ${sqlTextLiteral(metricName)}::text AS metric_name
+),
+metric AS (
+  SELECT uem.*
+  FROM requested
+  JOIN model_hub_userevalmetric uem
+    ON uem.dataset_id = requested.dataset_id
+   AND uem.template_id = requested.template_id
+   AND uem.name = requested.metric_name
+   AND uem.organization_id = ${sqlUuid(organizationId)}
+   AND uem.deleted = false
+  ORDER BY uem.created_at DESC
+  LIMIT 1
+),
+eval_cells AS (
+  SELECT
+    c.row_id::text,
+    c.status,
+    c.value,
+    c.value_infos,
+    r."order"
+  FROM metric m
+  JOIN model_hub_column col
+    ON col.dataset_id = m.dataset_id
+   AND col.source = 'evaluation'
+   AND col.source_id = m.id::text
+   AND col.deleted = false
+  JOIN model_hub_cell c
+    ON c.column_id = col.id
+   AND c.dataset_id = m.dataset_id
+   AND c.deleted = false
+  JOIN model_hub_row r
+    ON r.id = c.row_id
+   AND r.dataset_id = m.dataset_id
+   AND r.deleted = false
+),
+outside_eval_cell AS (
+  SELECT c.status, c.value
+  FROM metric m
+  JOIN requested req ON true
+  JOIN model_hub_column col
+    ON col.dataset_id = req.outside_dataset_id
+   AND col.source = 'evaluation'
+   AND col.source_id = m.id::text
+   AND col.deleted = false
+  JOIN model_hub_cell c
+    ON c.column_id = col.id
+   AND c.dataset_id = req.outside_dataset_id
+   AND c.row_id = ${sqlUuid(fixture.outside_row_id)}
+   AND c.deleted = false
+  LIMIT 1
+)
+SELECT json_build_object(
+  'dataset_id', d.id::text,
+  'workspace_id', d.workspace_id::text,
+  'template_id', requested.template_id::text,
+  'metric_id', (SELECT id::text FROM metric),
+  'metric_name', (SELECT name FROM metric),
+  'metric_organization_id', (SELECT organization_id::text FROM metric),
+  'metric_workspace_id', (SELECT workspace_id::text FROM metric),
+  'metric_dataset_id', (SELECT dataset_id::text FROM metric),
+  'metric_template_id', (SELECT template_id::text FROM metric),
+  'metric_config', (SELECT config FROM metric),
+  'metric_model', (SELECT model FROM metric),
+  'active_metric_count', (
+    SELECT count(*)
+    FROM model_hub_userevalmetric uem
+    WHERE uem.dataset_id = requested.dataset_id
+      AND uem.template_id = requested.template_id
+      AND uem.name = requested.metric_name
+      AND uem.organization_id = ${sqlUuid(organizationId)}
+      AND uem.deleted = false
+  ),
+  'failed_candidate_metric_count', (
+    SELECT count(*)
+    FROM model_hub_userevalmetric uem
+    WHERE uem.dataset_id = requested.dataset_id
+      AND uem.name LIKE ${sqlTextLiteral("api_legacy_user_dup_%")}
+      AND uem.organization_id = ${sqlUuid(organizationId)}
+      AND uem.deleted = false
+  ),
+  'eval_cells', COALESCE((
+    SELECT json_agg(
+      json_build_object(
+        'row_id', row_id,
+        'status', status,
+        'value', value,
+        'value_infos', value_infos
+      )
+      ORDER BY "order"
+    )
+    FROM eval_cells
+  ), '[]'::json),
+  'running_eval_cell_count', (
+    SELECT count(*) FROM eval_cells WHERE status = 'running'
+  ),
+  'outside_eval_cell_status', (SELECT status FROM outside_eval_cell),
+  'outside_eval_cell_value', (SELECT value FROM outside_eval_cell),
+  'other_eval_cell_status', ${otherMetricStatus},
+  'other_eval_cell_value', ${otherMetricValue}
+)
+FROM requested
+LEFT JOIN model_hub_dataset d
+  ON d.id = requested.dataset_id;
+`;
+  return runPostgresJson(sql);
+}
+
+function assertLegacyEvalUserTemplateCreateAudit(
+  audit,
+  { fixture, templateId, metricName, organizationId, workspaceId, expectedParams },
+) {
+  assert(
+    audit?.dataset_id === fixture.dataset_id,
+    "Legacy eval-user-template audit dataset mismatch.",
+  );
+  assert(
+    audit.template_id === templateId,
+    "Legacy eval-user-template audit template mismatch.",
+  );
+  assert(
+    isUuid(audit.metric_id),
+    "Legacy eval-user-template audit did not find the created metric.",
+  );
+  assert(
+    Number(audit.active_metric_count) === 1,
+    "Legacy eval-user-template create did not leave exactly one active metric.",
+  );
+  assert(
+    Number(audit.failed_candidate_metric_count) === 0,
+    "Legacy eval-user-template failed guard inserted a candidate metric.",
+  );
+  assert(
+    audit.metric_name === metricName,
+    "Legacy eval-user-template audit metric name mismatch.",
+  );
+  assert(
+    audit.metric_organization_id === organizationId,
+    "Legacy eval-user-template audit organization mismatch.",
+  );
+  assert(
+    audit.metric_dataset_id === fixture.dataset_id,
+    "Legacy eval-user-template audit metric dataset mismatch.",
+  );
+  assert(
+    audit.metric_template_id === templateId,
+    "Legacy eval-user-template audit metric template mismatch.",
+  );
+  if (workspaceId) {
+    assert(
+      audit.workspace_id === workspaceId,
+      "Legacy eval-user-template audit dataset workspace mismatch.",
+    );
+    assert(
+      audit.metric_workspace_id === workspaceId,
+      "Legacy eval-user-template audit metric workspace mismatch.",
+    );
+  }
+  assert(
+    audit.metric_model === "turing_small",
+    "Legacy eval-user-template create did not persist requested model.",
+  );
+  assert(
+    String(audit.metric_config?.mapping?.text || "") === fixture.input_column_id,
+    "Legacy eval-user-template create did not persist the scoped column mapping.",
+  );
+  const actualParams = audit.metric_config?.params || {};
+  const expectedParamEntries = Object.entries(expectedParams || {});
+  assert(
+    Object.keys(actualParams).length === expectedParamEntries.length,
+    "Legacy eval-user-template create persisted an unexpected params shape.",
+  );
+  for (const [key, value] of expectedParamEntries) {
+    assert(
+      String(actualParams[key]) === String(value),
+      "Legacy eval-user-template create did not persist params config.",
+    );
+  }
+}
+
+function assertLegacyEvalCellState(audit, rowId, expected) {
+  const cell = payloadArray(audit?.eval_cells, "eval_cells").find(
+    (candidate) => candidate?.row_id === rowId,
+  );
+  assert(isUuid(cell?.row_id), "Legacy evaluate-rows audit did not find eval cell.");
+  if (Object.hasOwn(expected, "status")) {
+    assert(
+      cell.status === expected.status,
+      `Legacy evaluate-rows cell ${rowId} status mismatch.`,
+    );
+  }
+  if (Object.hasOwn(expected, "value")) {
+    assert(
+      cell.value === expected.value,
+      `Legacy evaluate-rows cell ${rowId} value mismatch.`,
+    );
+  }
+  if (Object.hasOwn(expected, "valueInfos")) {
+    assert(
+      JSON.stringify(cell.value_infos || {}) ===
+        JSON.stringify(expected.valueInfos || {}),
+      `Legacy evaluate-rows cell ${rowId} value_infos mismatch.`,
+    );
+  }
+}
+
+async function loadDatasetEvalDrawerDbAudit({
+  datasetId,
+  templateId,
+  metricName,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(datasetId), "datasetId must be a UUID for DB audit.");
+  assert(isUuid(templateId), "templateId must be a UUID for DB audit.");
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlUuid(datasetId)}::uuid AS dataset_id,
+    ${sqlUuid(templateId)}::uuid AS template_id,
+    ${sqlTextLiteral(metricName)}::text AS metric_name
+),
+metric AS (
+  SELECT uem.*
+  FROM requested
+  JOIN model_hub_userevalmetric uem
+    ON uem.dataset_id = requested.dataset_id
+   AND uem.template_id = requested.template_id
+   AND uem.name = requested.metric_name
+   AND uem.organization_id = ${sqlUuid(organizationId)}
+  ORDER BY uem.created_at DESC
+  LIMIT 1
+),
+eval_columns AS (
+  SELECT c.*
+  FROM metric m
+  JOIN model_hub_column c
+    ON c.dataset_id = m.dataset_id
+   AND c.source = 'evaluation'
+   AND c.source_id = m.id::text
+),
+reason_columns AS (
+  SELECT rc.*
+  FROM metric m
+  JOIN eval_columns ec
+    ON true
+  JOIN model_hub_column rc
+    ON rc.dataset_id = m.dataset_id
+   AND rc.source = 'evaluation_reason'
+   AND rc.source_id = ec.id::text || '-sourceid-' || m.id::text
+)
+SELECT json_build_object(
+  'dataset_id', d.id::text,
+  'dataset_workspace_id', d.workspace_id::text,
+  'template_id', requested.template_id::text,
+  'metric_exists', EXISTS(SELECT 1 FROM metric),
+  'metric_id', (SELECT id::text FROM metric),
+  'metric_name', (SELECT name FROM metric),
+  'metric_organization_id', (SELECT organization_id::text FROM metric),
+  'metric_workspace_id', (SELECT workspace_id::text FROM metric),
+  'metric_status', (SELECT status FROM metric),
+  'metric_config', (SELECT config FROM metric),
+  'metric_deleted', (SELECT deleted FROM metric),
+  'metric_deleted_at_set', (SELECT deleted_at IS NOT NULL FROM metric),
+  'active_metric_count', (
+    SELECT count(*)
+    FROM model_hub_userevalmetric uem
+    WHERE uem.dataset_id = requested.dataset_id
+      AND uem.template_id = requested.template_id
+      AND uem.name = requested.metric_name
+      AND uem.organization_id = ${sqlUuid(organizationId)}
+      AND uem.deleted = false
+  ),
+  'active_eval_column_count', (
+    SELECT count(*) FROM eval_columns WHERE deleted = false
+  ),
+  'deleted_eval_column_count', (
+    SELECT count(*) FROM eval_columns WHERE deleted = true
+  ),
+  'deleted_eval_column_deleted_at_count', (
+    SELECT count(*) FROM eval_columns WHERE deleted = true AND deleted_at IS NOT NULL
+  ),
+  'active_reason_column_count', (
+    SELECT count(*) FROM reason_columns WHERE deleted = false
+  ),
+  'deleted_reason_column_count', (
+    SELECT count(*) FROM reason_columns WHERE deleted = true
+  ),
+  'deleted_reason_column_deleted_at_count', (
+    SELECT count(*) FROM reason_columns WHERE deleted = true AND deleted_at IS NOT NULL
+  ),
+  'column_order_contains_active_eval', EXISTS(
+    SELECT 1
+    FROM eval_columns c
+    WHERE c.deleted = false AND c.id::text = ANY(d.column_order)
+  ),
+  'column_order_contains_active_reason', EXISTS(
+    SELECT 1
+    FROM reason_columns c
+    WHERE c.deleted = false AND c.id::text = ANY(d.column_order)
+  )
+)
+FROM requested
+LEFT JOIN model_hub_dataset d
+  ON d.id = requested.dataset_id;
+`;
+  return runPostgresJson(sql);
+}
+
+function assertDatasetEvalDrawerDbAudit(
+  audit,
+  {
+    datasetId,
+    templateId,
+    metricId,
+    metricName,
+    organizationId,
+    workspaceId,
+    expectedStatus,
+    expectedDeleted,
+    expectedEvalColumns = 0,
+    expectedReasonColumns = 0,
+    expectedDeletedEvalColumns = 0,
+    expectedDeletedReasonColumns = 0,
+  },
+) {
+  assert(audit?.dataset_id === datasetId, "Eval drawer audit dataset mismatch.");
+  assert(audit.template_id === templateId, "Eval drawer audit template mismatch.");
+  assert(audit.metric_exists === true, "Eval drawer audit did not find metric.");
+  assert(audit.metric_id === metricId, "Eval drawer audit metric id mismatch.");
+  assert(audit.metric_name === metricName, "Eval drawer audit metric name mismatch.");
+  assert(
+    audit.metric_organization_id === organizationId,
+    "Eval drawer audit organization mismatch.",
+  );
+  if (workspaceId) {
+    assert(
+      audit.dataset_workspace_id === workspaceId,
+      "Eval drawer audit dataset workspace mismatch.",
+    );
+    assert(
+      audit.metric_workspace_id === workspaceId,
+      "Eval drawer audit metric workspace mismatch.",
+    );
+  }
+  assert(
+    audit.metric_status === expectedStatus,
+    "Eval drawer audit metric status mismatch.",
+  );
+  assert(
+    audit.metric_deleted === expectedDeleted,
+    "Eval drawer audit deleted state mismatch.",
+  );
+  assert(
+    String(audit.metric_config?.mapping?.text || ""),
+    "Eval drawer audit metric mapping was empty.",
+  );
+  if (expectedDeleted) {
+    assert(
+      audit.metric_deleted_at_set === true,
+      "Deleted eval drawer metric missing deleted_at.",
+    );
+    assert(
+      Number(audit.active_metric_count) === 0,
+      "Deleted eval drawer metric still counted as active.",
+    );
+  } else {
+    assert(
+      Number(audit.active_metric_count) === 1,
+      "Active eval drawer metric count mismatch.",
+    );
+  }
+  assert(
+    Number(audit.active_eval_column_count) === expectedEvalColumns,
+    "Eval drawer active eval column count mismatch.",
+  );
+  assert(
+    Number(audit.active_reason_column_count) === expectedReasonColumns,
+    "Eval drawer active reason column count mismatch.",
+  );
+  assert(
+    Number(audit.deleted_eval_column_count) === expectedDeletedEvalColumns,
+    "Eval drawer deleted eval column count mismatch.",
+  );
+  assert(
+    Number(audit.deleted_reason_column_count) === expectedDeletedReasonColumns,
+    "Eval drawer deleted reason column count mismatch.",
+  );
+  if (expectedEvalColumns > 0) {
+    assert(
+      audit.column_order_contains_active_eval === true,
+      "Eval drawer column_order missing active eval column.",
+    );
+  }
+  if (expectedReasonColumns > 0) {
+    assert(
+      audit.column_order_contains_active_reason === true,
+      "Eval drawer column_order missing active reason column.",
+    );
+  }
+  if (expectedDeletedEvalColumns > 0) {
+    assert(
+      Number(audit.deleted_eval_column_deleted_at_count) >=
+        expectedDeletedEvalColumns,
+      "Deleted eval drawer eval column missing deleted_at.",
+    );
+  }
+  if (expectedDeletedReasonColumns > 0) {
+    assert(
+      Number(audit.deleted_reason_column_deleted_at_count) >=
+        expectedDeletedReasonColumns,
+      "Deleted eval drawer reason column missing deleted_at.",
+    );
+  }
+}
+
+async function seedRunPromptEditFixture({
+  runId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const suffix = runId.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const workspaceSql = workspaceId ? sqlUuid(workspaceId) : "NULL::uuid";
+  const datasetId = randomUUID();
+  const inputColumnId = randomUUID();
+  const outputColumnId = randomUUID();
+  const rowId = randomUUID();
+  const inputCellId = randomUUID();
+  const outputCellId = randomUUID();
+  const runPromptId = randomUUID();
+  const datasetName = `api journey run prompt edit ${runId}`;
+  const inputColumnName = `api_edit_input_${suffix}`;
+  const outputColumnName = `api_edit_output_${suffix}`;
+  const editedOutputColumnName = `api_edit_output_renamed_${suffix}`;
+  const modelName = "gpt-4o-mini";
+  const inputValue = `Seeded prompt edit input ${runId}`;
+  const outputValue = `seeded output ${runId}`;
+  const messages = [
+    {
+      role: "system",
+      content: [
+        {
+          type: "text",
+          text: "Return exactly OK. Do not include punctuation.",
+        },
+      ],
+    },
+    {
+      role: "user",
+      content: [{ type: "text", text: `Input: {{${inputColumnName}}}` }],
+    },
+  ];
+  const runPromptConfig = {
+    temperature: 0,
+    max_tokens: 20,
+    template_format: "f-string",
+    model_type: "llm",
+  };
+  const columnConfig = {
+    [inputColumnId]: { is_visible: true, is_frozen: null },
+    [outputColumnId]: { is_visible: true, is_frozen: null },
+  };
+  const sql = `
+WITH inserted_dataset AS (
+  INSERT INTO model_hub_dataset (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    column_order,
+    model_type,
+    organization_id,
+    workspace_id,
+    source,
+    column_config,
+    dataset_config,
+    synthetic_dataset_config,
+    eval_reasons,
+    eval_reason_status
+  )
+  VALUES (
+    ${sqlUuid(datasetId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(datasetName)},
+    ARRAY[${sqlTextLiteral(inputColumnId)}, ${sqlTextLiteral(outputColumnId)}]::varchar[],
+    'GenerativeLLM',
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    'build',
+    ${sqlJsonLiteral(columnConfig)},
+    '{}'::jsonb,
+    '{}'::jsonb,
+    '[]'::jsonb,
+    'pending'
+  )
+  RETURNING id
+),
+inserted_columns AS (
+  INSERT INTO model_hub_column (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    name,
+    data_type,
+    source,
+    source_id,
+    dataset_id,
+    metadata,
+    status
+  )
+  VALUES
+    (
+      ${sqlUuid(inputColumnId)},
+      now(),
+      now(),
+      false,
+      NULL::timestamptz,
+      ${sqlTextLiteral(inputColumnName)},
+      'text',
+      'OTHERS',
+      NULL::varchar,
+      ${sqlUuid(datasetId)},
+      '{}'::jsonb,
+      'Completed'
+    ),
+    (
+      ${sqlUuid(outputColumnId)},
+      now(),
+      now(),
+      false,
+      NULL::timestamptz,
+      ${sqlTextLiteral(outputColumnName)},
+      'text',
+      'run_prompt',
+      ${sqlTextLiteral(runPromptId)},
+      ${sqlUuid(datasetId)},
+      '{}'::jsonb,
+      'Completed'
+    )
+  RETURNING id
+),
+inserted_row AS (
+  INSERT INTO model_hub_row (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    "order",
+    dataset_id,
+    metadata
+  )
+  VALUES (
+    ${sqlUuid(rowId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    0,
+    ${sqlUuid(datasetId)},
+    '{}'::jsonb
+  )
+  RETURNING id
+),
+inserted_cells AS (
+  INSERT INTO model_hub_cell (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    value,
+    value_infos,
+    feedback_info,
+    column_metadata,
+    status,
+    dataset_id,
+    column_id,
+    row_id
+  )
+  VALUES
+    (
+      ${sqlUuid(inputCellId)},
+      now(),
+      now(),
+      false,
+      NULL::timestamptz,
+      ${sqlTextLiteral(inputValue)},
+      '{}'::jsonb,
+      '{}'::jsonb,
+      '{}'::jsonb,
+      'pass',
+      ${sqlUuid(datasetId)},
+      ${sqlUuid(inputColumnId)},
+      ${sqlUuid(rowId)}
+    ),
+    (
+      ${sqlUuid(outputCellId)},
+      now(),
+      now(),
+      false,
+      NULL::timestamptz,
+      ${sqlTextLiteral(outputValue)},
+      '{}'::jsonb,
+      '{}'::jsonb,
+      '{}'::jsonb,
+      'pass',
+      ${sqlUuid(datasetId)},
+      ${sqlUuid(outputColumnId)},
+      ${sqlUuid(rowId)}
+    )
+  RETURNING id
+),
+inserted_run_prompt AS (
+  INSERT INTO model_hub_runprompter (
+    id,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    model,
+    name,
+    concurrency,
+    messages,
+    output_format,
+    temperature,
+    frequency_penalty,
+    presence_penalty,
+    max_tokens,
+    top_p,
+    response_format,
+    tool_choice,
+    status,
+    dataset_id,
+    organization_id,
+    workspace_id,
+    run_prompt_config
+  )
+  VALUES (
+    ${sqlUuid(runPromptId)},
+    now(),
+    now(),
+    false,
+    NULL::timestamptz,
+    ${sqlTextLiteral(modelName)},
+    ${sqlTextLiteral(outputColumnName)},
+    1,
+    ARRAY[${messages.map(sqlJsonLiteral).join(", ")}]::jsonb[],
+    'string',
+    0,
+    NULL::double precision,
+    NULL::double precision,
+    20,
+    1,
+    NULL::jsonb,
+    NULL::varchar,
+    'Completed',
+    ${sqlUuid(datasetId)},
+    ${sqlUuid(organizationId)},
+    ${workspaceSql},
+    ${sqlJsonLiteral(runPromptConfig)}
+  )
+  RETURNING id
+)
+SELECT json_build_object(
+  'fixture_created', (SELECT count(*) FROM inserted_dataset) = 1,
+  'dataset_id', ${sqlUuid(datasetId)}::text,
+  'dataset_name', ${sqlTextLiteral(datasetName)},
+  'input_column_id', ${sqlUuid(inputColumnId)}::text,
+  'input_column_name', ${sqlTextLiteral(inputColumnName)},
+  'output_column_id', ${sqlUuid(outputColumnId)}::text,
+  'output_column_name', ${sqlTextLiteral(outputColumnName)},
+  'edited_output_column_name', ${sqlTextLiteral(editedOutputColumnName)},
+  'model_name', ${sqlTextLiteral(modelName)},
+  'run_prompt_id', ${sqlUuid(runPromptId)}::text,
+  'row_id', ${sqlUuid(rowId)}::text,
+  'workspace_id', ${workspaceId ? `${sqlUuid(workspaceId)}::text` : "NULL::text"},
+  'inserted_column_count', (SELECT count(*) FROM inserted_columns),
+  'inserted_cell_count', (SELECT count(*) FROM inserted_cells),
+  'inserted_run_prompt_count', (SELECT count(*) FROM inserted_run_prompt)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteRunPromptEditFixture(fixture) {
+  assert(
+    fixture && isUuid(fixture.dataset_id) && isUuid(fixture.run_prompt_id),
+    "Run-prompt edit fixture ids must be UUIDs for DB cleanup.",
+  );
+  const sql = `
+WITH deleted_pending_tasks AS (
+  DELETE FROM model_hub_pendingrowtask
+  WHERE dataset_id = ${sqlUuid(fixture.dataset_id)}
+  RETURNING 1
+),
+deleted_run_prompt_tools AS (
+  DELETE FROM model_hub_runprompter_tools
+  WHERE runprompter_id = ${sqlUuid(fixture.run_prompt_id)}
+  RETURNING 1
+),
+deleted_run_prompt AS (
+  DELETE FROM model_hub_runprompter
+  WHERE id = ${sqlUuid(fixture.run_prompt_id)}
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_pending_task_count', (SELECT count(*) FROM deleted_pending_tasks),
+  'deleted_run_prompt_tool_count', (SELECT count(*) FROM deleted_run_prompt_tools),
+  'deleted_run_prompt_count', (SELECT count(*) FROM deleted_run_prompt)
+);
+`;
+  await runPostgresJson(sql);
+  return hardDeleteDatasetCopyFixture([fixture.dataset_id]);
 }
 
 async function loadDatasetOptimizationReadCandidate(
@@ -13595,6 +19148,118 @@ FROM template_row t;
   return runPostgresJson(sql);
 }
 
+async function loadLegacyEvalTemplateCreateAudit({
+  templateName,
+  systemOwnerName,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  if (workspaceId)
+    assert(isUuid(workspaceId), "workspaceId must be a UUID for DB audit.");
+  const sql = `
+WITH template_row AS (
+  SELECT
+    id,
+    name,
+    owner,
+    organization_id,
+    workspace_id,
+    eval_tags,
+    config
+  FROM model_hub_evaltemplate
+  WHERE name = ${sqlTextLiteral(templateName)}
+    AND organization_id = ${sqlUuid(organizationId)}
+    AND deleted = false
+  ORDER BY created_at ASC
+  LIMIT 1
+)
+SELECT COALESCE((
+  SELECT json_build_object(
+    'template_id', t.id::text,
+    'name', t.name,
+    'owner', t.owner,
+    'organization_id', t.organization_id::text,
+    'workspace_id', t.workspace_id::text,
+    'eval_tags', t.eval_tags,
+    'required_keys', t.config->'required_keys',
+    'eval_type_id', t.config->>'eval_type_id',
+    'active_template_count', (
+      SELECT count(*)
+      FROM model_hub_evaltemplate et
+      WHERE et.name = ${sqlTextLiteral(templateName)}
+        AND et.organization_id = ${sqlUuid(organizationId)}
+        AND et.deleted = false
+    ),
+    'system_owner_count', (
+      SELECT count(*)
+      FROM model_hub_evaltemplate et
+      WHERE et.name = ${sqlTextLiteral(systemOwnerName)}
+        AND et.organization_id = ${sqlUuid(organizationId)}
+        AND et.owner = 'system'
+        AND et.deleted = false
+    ),
+    'version_count', (
+      SELECT count(*)
+      FROM model_hub_eval_template_version v
+      WHERE v.eval_template_id = t.id
+        AND v.deleted = false
+    ),
+    'default_version_count', (
+      SELECT count(*)
+      FROM model_hub_eval_template_version v
+      WHERE v.eval_template_id = t.id
+        AND v.is_default = true
+        AND v.deleted = false
+    ),
+    'version_scope_mismatch_count', (
+      SELECT count(*)
+      FROM model_hub_eval_template_version v
+      WHERE v.eval_template_id = t.id
+        AND v.deleted = false
+        AND (
+          v.organization_id IS DISTINCT FROM t.organization_id
+          OR v.workspace_id IS DISTINCT FROM t.workspace_id
+        )
+    )
+  )
+  FROM template_row t
+), '{}'::json);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteLegacyEvalTemplateCreateFixture(
+  templateNames,
+  organizationId,
+) {
+  assert(Array.isArray(templateNames), "templateNames must be an array.");
+  assert(isUuid(organizationId), "organizationId must be a UUID for cleanup.");
+  const sql = `
+WITH target_templates AS (
+  SELECT id
+  FROM model_hub_evaltemplate
+  WHERE name = ANY(${sqlTextArray(templateNames)})
+    AND organization_id = ${sqlUuid(organizationId)}
+),
+deleted_versions AS (
+  DELETE FROM model_hub_eval_template_version
+  WHERE eval_template_id IN (SELECT id FROM target_templates)
+  RETURNING 1
+),
+deleted_templates AS (
+  DELETE FROM model_hub_evaltemplate
+  WHERE id IN (SELECT id FROM target_templates)
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_version_count', (SELECT count(*) FROM deleted_versions),
+  'deleted_template_count', (SELECT count(*) FROM deleted_templates)
+);
+`;
+  return runPostgresJson(sql);
+}
+
 async function loadEvalPlaygroundDbAudit({
   templateId,
   logId,
@@ -14811,6 +20476,211 @@ FROM model_hub_eval_ground_truth gt
 WHERE gt.id = ${sqlUuid(groundTruthId)}
   AND gt.eval_template_id = ${sqlUuid(templateId)}
   AND gt.organization_id = ${sqlUuid(organizationId)};
+`;
+  return runPostgresJson(sql);
+}
+
+async function setGroundTruthEmbeddingStatus({
+  groundTruthId,
+  embeddingStatus,
+  embeddedRowCount = 0,
+}) {
+  assert(isUuid(groundTruthId), "groundTruthId must be a UUID for DB update.");
+  assert(
+    ["pending", "processing", "completed", "failed"].includes(embeddingStatus),
+    "Invalid ground-truth embedding status for DB update.",
+  );
+  const sql = `
+WITH updated AS (
+  UPDATE model_hub_eval_ground_truth
+  SET
+    embedding_status = ${sqlTextLiteral(embeddingStatus)},
+    embedded_row_count = ${Number(embeddedRowCount) || 0},
+    updated_at = now()
+  WHERE id = ${sqlUuid(groundTruthId)}
+  RETURNING id, embedding_status, embedded_row_count
+)
+SELECT json_build_object(
+  'updated_count', (SELECT count(*) FROM updated),
+  'ground_truth_id', (SELECT id::text FROM updated),
+  'embedding_status', (SELECT embedding_status FROM updated),
+  'embedded_row_count', (SELECT embedded_row_count FROM updated)
+);
+`;
+  const result = await runPostgresJson(sql);
+  assert(
+    Number(result.updated_count) === 1,
+    "Ground-truth embedding status DB update did not affect one row.",
+  );
+  return result;
+}
+
+async function moveGroundTruthRetrievalFixtureToWorkspace({
+  templateId,
+  groundTruthId,
+  workspaceId,
+}) {
+  assert(isUuid(templateId), "templateId must be a UUID for DB update.");
+  assert(isUuid(groundTruthId), "groundTruthId must be a UUID for DB update.");
+  assert(isUuid(workspaceId), "workspaceId must be a UUID for DB update.");
+  const sql = `
+WITH updated_template AS (
+  UPDATE model_hub_evaltemplate
+  SET workspace_id = ${sqlUuid(workspaceId)}, updated_at = now()
+  WHERE id = ${sqlUuid(templateId)}
+  RETURNING id
+),
+updated_versions AS (
+  UPDATE model_hub_eval_template_version
+  SET workspace_id = ${sqlUuid(workspaceId)}, updated_at = now()
+  WHERE eval_template_id = ${sqlUuid(templateId)}
+  RETURNING id
+),
+updated_ground_truth AS (
+  UPDATE model_hub_eval_ground_truth
+  SET workspace_id = ${sqlUuid(workspaceId)}, updated_at = now()
+  WHERE id = ${sqlUuid(groundTruthId)}
+    AND eval_template_id = ${sqlUuid(templateId)}
+  RETURNING id
+)
+SELECT json_build_object(
+  'updated_template_count', (SELECT count(*) FROM updated_template),
+  'updated_version_count', (SELECT count(*) FROM updated_versions),
+  'updated_ground_truth_count', (SELECT count(*) FROM updated_ground_truth)
+);
+`;
+  const result = await runPostgresJson(sql);
+  assert(
+    Number(result.updated_template_count) === 1 &&
+      Number(result.updated_ground_truth_count) === 1,
+    "Ground-truth retrieval fixture workspace move did not update expected rows.",
+  );
+  return result;
+}
+
+async function loadGroundTruthRetrievalAudit({ groundTruthIds, organizationId }) {
+  assert(
+    Array.isArray(groundTruthIds) && groundTruthIds.every(isUuid),
+    "groundTruthIds must be UUIDs for DB audit.",
+  );
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  const sql = `
+WITH requested AS (
+  SELECT unnest(${sqlUuidArray(groundTruthIds)}) AS ground_truth_id
+),
+ground_truths AS (
+  SELECT
+    gt.id,
+    gt.eval_template_id,
+    gt.organization_id,
+    gt.workspace_id,
+    gt.name,
+    gt.row_count,
+    gt.embedding_status,
+    gt.embedded_row_count,
+    gt.deleted,
+    gt.deleted_at,
+    et.workspace_id AS template_workspace_id,
+    et.deleted AS template_deleted
+  FROM requested
+  JOIN model_hub_eval_ground_truth gt
+    ON gt.id = requested.ground_truth_id
+   AND gt.organization_id = ${sqlUuid(organizationId)}
+  JOIN model_hub_evaltemplate et
+    ON et.id = gt.eval_template_id
+)
+SELECT json_build_object(
+  'ground_truths', COALESCE((
+    SELECT json_agg(
+      json_build_object(
+        'ground_truth_id', id::text,
+        'template_id', eval_template_id::text,
+        'organization_id', organization_id::text,
+        'workspace_id', workspace_id::text,
+        'template_workspace_id', template_workspace_id::text,
+        'name', name,
+        'row_count', row_count,
+        'embedding_status', embedding_status,
+        'embedded_row_count', embedded_row_count,
+        'deleted', deleted,
+        'deleted_at_set', deleted_at IS NOT NULL,
+        'template_deleted', template_deleted
+      )
+      ORDER BY name
+    )
+    FROM ground_truths
+  ), '[]'::json),
+  'ground_truth_count', (SELECT count(*) FROM ground_truths),
+  'embedding_count', (
+    SELECT count(*)
+    FROM model_hub_eval_ground_truth_embedding emb
+    WHERE emb.ground_truth_id = ANY(${sqlUuidArray(groundTruthIds)})
+  )
+);
+`;
+  return runPostgresJson(sql);
+}
+
+function findGroundTruthAudit(audit, groundTruthId) {
+  const row = payloadArray(audit?.ground_truths, "ground_truths").find(
+    (candidate) => candidate?.ground_truth_id === groundTruthId,
+  );
+  assert(row, "Ground-truth retrieval audit did not find expected row.");
+  return row;
+}
+
+async function hardDeleteGroundTruthRetrievalFixture(
+  templateIds,
+  organizationId,
+) {
+  const ids = (templateIds || []).filter(isUuid);
+  assert(isUuid(organizationId), "organizationId must be a UUID for cleanup.");
+  if (!ids.length) {
+    return {
+      deleted_embedding_count: 0,
+      deleted_ground_truth_count: 0,
+      deleted_version_count: 0,
+      deleted_template_count: 0,
+    };
+  }
+  const sql = `
+WITH target_templates AS (
+  SELECT id
+  FROM model_hub_evaltemplate
+  WHERE id = ANY(${sqlUuidArray(ids)})
+    AND organization_id = ${sqlUuid(organizationId)}
+),
+target_ground_truths AS (
+  SELECT id
+  FROM model_hub_eval_ground_truth
+  WHERE eval_template_id IN (SELECT id FROM target_templates)
+),
+deleted_embeddings AS (
+  DELETE FROM model_hub_eval_ground_truth_embedding
+  WHERE ground_truth_id IN (SELECT id FROM target_ground_truths)
+  RETURNING 1
+),
+deleted_ground_truths AS (
+  DELETE FROM model_hub_eval_ground_truth
+  WHERE id IN (SELECT id FROM target_ground_truths)
+  RETURNING 1
+),
+deleted_versions AS (
+  DELETE FROM model_hub_eval_template_version
+  WHERE eval_template_id IN (SELECT id FROM target_templates)
+  RETURNING 1
+),
+deleted_templates AS (
+  DELETE FROM model_hub_evaltemplate
+  WHERE id IN (SELECT id FROM target_templates)
+  RETURNING 1
+)
+SELECT json_build_object(
+  'deleted_embedding_count', (SELECT count(*) FROM deleted_embeddings),
+  'deleted_ground_truth_count', (SELECT count(*) FROM deleted_ground_truths),
+  'deleted_version_count', (SELECT count(*) FROM deleted_versions),
+  'deleted_template_count', (SELECT count(*) FROM deleted_templates)
+);
 `;
   return runPostgresJson(sql);
 }

@@ -119,6 +119,7 @@ from model_hub.utils.SQL_queries import SQLQueryHandler
 from model_hub.views.utils.evals import run_eval_func, run_eval_func_task
 from tfc.settings.settings import BASE_URL
 from tfc.telemetry import wrap_for_thread
+from tfc.middleware.workspace_context import get_current_workspace
 from tfc.utils.api_contracts import validated_request
 from tfc.utils.error_codes import get_error_message
 from tfc.utils.functions import calculate_eval_average
@@ -3071,21 +3072,62 @@ def _request_organization(request):
     return getattr(request, "organization", None) or request.user.organization
 
 
+def _request_workspace_filter(request, field_name="workspace"):
+    workspace = getattr(request, "workspace", None) or get_current_workspace()
+    if not workspace:
+        return Q()
+
+    if getattr(workspace, "is_default", False):
+        return (
+            Q(**{field_name: workspace})
+            | Q(
+                **{
+                    f"{field_name}__is_default": True,
+                    f"{field_name}__organization_id": workspace.organization_id,
+                }
+            )
+            | Q(**{f"{field_name}__isnull": True})
+        )
+
+    return Q(**{field_name: workspace})
+
+
+def _get_accessible_eval_template_for_request(
+    template_id, request, template_type=None
+):
+    organization = _request_organization(request)
+    queryset = EvalTemplate.no_workspace_objects.filter(id=template_id, deleted=False)
+    if template_type:
+        queryset = queryset.filter(template_type=template_type)
+
+    return queryset.filter(
+        Q(owner=OwnerChoices.SYSTEM.value)
+        | (
+            Q(owner=OwnerChoices.USER.value, organization=organization)
+            & _request_workspace_filter(request)
+        )
+    ).get()
+
+
 def _get_accessible_ground_truth(ground_truth_id, request):
     from model_hub.models.evals_metric import EvalGroundTruth
 
     organization = _request_organization(request)
     return (
-        EvalGroundTruth.objects.select_related("eval_template")
+        EvalGroundTruth.no_workspace_objects.select_related("eval_template")
         .filter(id=ground_truth_id, deleted=False)
         .filter(
             Q(eval_template__owner=OwnerChoices.SYSTEM.value)
-            | Q(
-                eval_template__owner=OwnerChoices.USER.value,
-                eval_template__organization=organization,
+            | (
+                Q(
+                    eval_template__owner=OwnerChoices.USER.value,
+                    eval_template__organization=organization,
+                )
+                & _request_workspace_filter(request, "eval_template__workspace")
             )
         )
         .filter(Q(organization__isnull=True) | Q(organization=organization))
+        .filter(_request_workspace_filter(request))
         .get()
     )
 
@@ -4141,13 +4183,21 @@ class GroundTruthListView(APIView):
         try:
             organization = _request_organization(request)
             try:
-                template = _get_accessible_eval_template(template_id, organization)
+                template = _get_accessible_eval_template_for_request(
+                    template_id, request
+                )
             except EvalTemplate.DoesNotExist:
                 return self._gm.not_found("Eval template not found.")
 
-            gts = EvalGroundTruth.objects.filter(
-                eval_template=template, deleted=False
-            ).order_by("-created_at")
+            gts = (
+                EvalGroundTruth.no_workspace_objects.filter(
+                    _request_workspace_filter(request),
+                    eval_template=template,
+                    deleted=False,
+                )
+                .filter(Q(organization__isnull=True) | Q(organization=organization))
+                .order_by("-created_at")
+            )
 
             items = [
                 GroundTruthItem(
@@ -4209,7 +4259,9 @@ class GroundTruthUploadView(APIView):
             organization = _request_organization(request)
 
             try:
-                template = _get_accessible_eval_template(template_id, organization)
+                template = _get_accessible_eval_template_for_request(
+                    template_id, request
+                )
             except EvalTemplate.DoesNotExist:
                 return self._gm.not_found("Eval template not found.")
 
@@ -4547,7 +4599,9 @@ class GroundTruthConfigView(APIView):
         try:
             organization = _request_organization(request)
             try:
-                template = _get_accessible_eval_template(template_id, organization)
+                template = _get_accessible_eval_template_for_request(
+                    template_id, request
+                )
             except EvalTemplate.DoesNotExist:
                 return self._gm.not_found("Eval template not found.")
 
@@ -4598,7 +4652,9 @@ class GroundTruthConfigView(APIView):
 
             try:
                 organization = _request_organization(request)
-                template = _get_accessible_eval_template(template_id, organization)
+                template = _get_accessible_eval_template_for_request(
+                    template_id, request
+                )
             except EvalTemplate.DoesNotExist:
                 return self._gm.not_found("Eval template not found.")
 
@@ -4606,9 +4662,15 @@ class GroundTruthConfigView(APIView):
             if req.ground_truth_id:
                 from model_hub.models.evals_metric import EvalGroundTruth
 
-                if not EvalGroundTruth.objects.filter(
-                    id=req.ground_truth_id, eval_template=template, deleted=False
-                ).exists():
+                try:
+                    ground_truth = _get_accessible_ground_truth(
+                        req.ground_truth_id, request
+                    )
+                except EvalGroundTruth.DoesNotExist:
+                    return self._gm.bad_request(
+                        "Ground truth dataset not found or does not belong to this eval template."
+                    )
+                if ground_truth.eval_template_id != template.id:
                     return self._gm.bad_request(
                         "Ground truth dataset not found or does not belong to this eval template."
                     )
@@ -4743,16 +4805,19 @@ class GroundTruthTriggerEmbeddingView(APIView):
             from tfc.temporal.ground_truth.client import trigger_embedding_generation
 
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # We're inside an async context, schedule the coroutine
-                    asyncio.ensure_future(trigger_embedding_generation(str(gt.id)))
-                else:
-                    loop.run_until_complete(trigger_embedding_generation(str(gt.id)))
+                running_loop = asyncio.get_running_loop()
             except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(trigger_embedding_generation(str(gt.id)))
+                workflow_run_id = asyncio.run(trigger_embedding_generation(str(gt.id)))
+            else:
+                running_loop.create_task(trigger_embedding_generation(str(gt.id)))
+                workflow_run_id = "scheduled"
+
+            if workflow_run_id is None:
+                gt.embedding_status = "failed"
+                gt.save(update_fields=["embedding_status", "updated_at"])
+                return self._gm.bad_request(
+                    "Failed to trigger embedding generation."
+                )
 
             return self._gm.success_response(
                 {

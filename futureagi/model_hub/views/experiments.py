@@ -1461,6 +1461,16 @@ class GetRowDiffView(APIView):
     _gm = GeneralMethods()
     permission_classes = [IsAuthenticated]
 
+    def _parse_value_infos(self, raw):
+        if not raw:
+            return None
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+        return raw
+
     @validated_request(
         request_serializer=DatasetRowDiffRequestSerializer,
         responses={
@@ -1479,14 +1489,70 @@ class GetRowDiffView(APIView):
                 str(column_id) for column_id in data["compare_column_ids"]
             ]
 
-            experiment = get_object_or_404(
-                ExperimentsTable, id=experiment_id, deleted=False
+            organization = (
+                getattr(request, "organization", None) or request.user.organization
+            )
+            experiment = (
+                _scoped_experiment_queryset(request, organization)
+                .select_related("dataset")
+                .filter(id=experiment_id)
+                .first()
+            )
+            if not experiment:
+                return self._gm.not_found(get_error_message("EXPERIMENT_NOT_FOUND"))
+
+            requested_column_ids = set(all_column_ids) | set(compare_column_ids)
+            valid_column_ids = {
+                str(column_id)
+                for column_id in Column.objects.filter(
+                    id__in=requested_column_ids,
+                    dataset_id=experiment.dataset_id,
+                    deleted=False,
+                ).values_list("id", flat=True)
+            }
+            if requested_column_ids - valid_column_ids:
+                return self._gm.bad_request("Columns not found in experiment dataset.")
+
+            valid_row_ids = {
+                str(row_id)
+                for row_id in Row.objects.filter(
+                    id__in=row_ids,
+                    dataset_id=experiment.dataset_id,
+                    deleted=False,
+                ).values_list("id", flat=True)
+            }
+            if set(row_ids) - valid_row_ids:
+                return self._gm.bad_request("Rows not found in experiment dataset.")
+
+            experiment_column_ids = {
+                str(column_id)
+                for column_id in ExperimentDatasetTable.objects.filter(
+                    Q(experiments_datasets_created=experiment)
+                    | Q(experiment=experiment),
+                    deleted=False,
+                ).values_list("columns__id", flat=True)
+                if column_id
+            }
+            if experiment_column_ids and set(compare_column_ids) - experiment_column_ids:
+                return self._gm.bad_request("Columns not found in experiment.")
+
+            base_column_id = next(
+                (
+                    column_id
+                    for column_id in compare_column_ids
+                    if not experiment_column_ids
+                    or column_id in experiment_column_ids
+                ),
+                None,
             )
             base_column = (
-                experiment.experiments_datasets.filter(deleted=False)
-                .first()
-                .columns.filter(id__in=compare_column_ids, deleted=False)
-                .first()
+                Column.objects.filter(
+                    id=base_column_id,
+                    dataset_id=experiment.dataset_id,
+                    deleted=False,
+                ).first()
+                if base_column_id
+                else None
             )
             if not base_column:
                 return self._gm.bad_request(get_error_message("COLUMN_NOT_FOUND"))
@@ -1496,6 +1562,7 @@ class GetRowDiffView(APIView):
             ]
             cells = list(
                 Cell.objects.filter(
+                    dataset_id=experiment.dataset_id,
                     row_id__in=row_ids,
                     column_id__in=all_column_ids,
                     deleted=False,
@@ -1520,6 +1587,7 @@ class GetRowDiffView(APIView):
                         "cell_diff_value": (
                             get_diff(base_cell.value, current_cell.value)
                             if column_id in other_column_ids
+                            and base_cell
                             and (
                                 base_cell.status == CellStatus.PASS.value
                                 and current_cell.status == CellStatus.PASS.value
@@ -1527,10 +1595,8 @@ class GetRowDiffView(APIView):
                             else None
                         ),
                         "status": current_cell.status,
-                        "value_infos": (
-                            json.loads(current_cell.value_infos)
-                            if current_cell.value_infos
-                            else None
+                        "value_infos": self._parse_value_infos(
+                            current_cell.value_infos
                         ),
                     }
 
