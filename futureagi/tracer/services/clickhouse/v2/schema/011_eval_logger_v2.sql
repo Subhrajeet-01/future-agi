@@ -148,7 +148,24 @@ SETTINGS index_granularity = 8192, allow_nullable_key = 1;
 --     an `output_float IS NOT NULL` predicate so null floats are excluded
 --     from the percentile state without polluting it with zeros.
 --   • `error` is non-nullable (DEFAULT 0), no change needed.
-CREATE MATERIALIZED VIEW IF NOT EXISTS eval_per_config_mv
+--
+-- NOTE (codex follow-up P1 finding 2026-05-26): an earlier version of this
+-- file used `CREATE MATERIALIZED VIEW IF NOT EXISTS eval_per_config_mv`,
+-- which means CH skips the DDL on any cluster that already created the
+-- previous (buggy) MV. The fix above is then a no-op on follow-up upgrades —
+-- the broken MV with nullable aggregate expressions persists in production.
+--
+-- Resolution: explicit DROP+CREATE. Safe because:
+--   • The MV writes TO eval_per_config (a separate target table); dropping
+--     the MV does NOT drop the rollup data.
+--   • After DROP+CREATE, the new MV starts fresh — past inserts into
+--     tracer_eval_logger_v2 are already in eval_per_config; new inserts
+--     get propagated correctly through the fixed MV.
+--   • apply_schema.py is hash-tracked (D-004), so this re-runs on next
+--     `--force` apply after the file hash changes.
+DROP VIEW IF EXISTS eval_per_config_mv;
+
+CREATE MATERIALIZED VIEW eval_per_config_mv
 TO eval_per_config
 AS
 SELECT
