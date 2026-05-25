@@ -7,6 +7,7 @@ import jinja2
 from jinja2 import Environment
 
 from agentic_eval.core.llm.llm import LLM
+from agentic_eval.core.utils.eval_output import response_format_schema
 from agentic_eval.core.utils.jinja_utils import nest_dotted_value
 from agentic_eval.core.utils.json_utils import extract_dict_from_string
 from agentic_eval.core.utils.llm_payloads import detect_and_build_media_blocks
@@ -108,32 +109,15 @@ class CustomPromptEvaluator(LLM):
     def _build_response_format(self) -> dict:
         """Build a json_schema response_format based on the eval output type.
 
-        Uses json_schema (not json_object) so the gateway can translate it
-        to provider-native structured output for all backends (Bedrock,
-        Anthropic, Gemini, OpenAI, etc.).
+        Delegates to :func:`response_format_schema` so the schema layout is
+        the single source of truth across every code path that runs an
+        LLM judge.
         """
-        if self._output_type in ("score", "numeric"):
-            result_schema = {"type": "number"}
-        elif self._output_type == "Pass/Fail":
-            result_schema = {"type": "string", "enum": ["Pass", "Fail"]}
-        elif self._output_type == "choices" and getattr(self, "_choices", None):
-            result_schema = {"type": "string", "enum": self._choices}
-        else:
-            result_schema = {"type": "string"}
-        return {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "eval_result",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "result": result_schema,
-                        "explanation": {"type": "string"},
-                    },
-                    "required": ["result", "explanation"],
-                },
-            },
-        }
+        return response_format_schema(
+            self._output_type,
+            getattr(self, "_choices", None),
+            multi_choice=bool(getattr(self, "_multi_choice", False)),
+        )
 
     def _system_message(self) -> str:
         judge_preamble = (
@@ -172,6 +156,17 @@ class CustomPromptEvaluator(LLM):
             if hasattr(self, "_choice_scores") and self._choice_scores:
                 score_parts = [f'"{k}" = {v}' for k, v in self._choice_scores.items()]
                 score_hint = f"\nScore mapping: {', '.join(score_parts)}\n"
+            if getattr(self, "_multi_choice", False):
+                return (
+                    judge_preamble +
+                    f"You MUST select ONE OR MORE of these choices: {choices_str}\n"
+                    f"Do NOT make up new choices. Do NOT return a number. Return ONLY values from the listed choices.\n"
+                    f"Select every choice that applies — multiple choices are allowed when more than one is supported by the input.\n"
+                    f"{score_hint}"
+                    "You MUST return a JSON object with the following fields:\n"
+                    f"- result: An ARRAY of strings. Each element MUST be one of: {choices_str}. No other values allowed. Do not repeat the same choice.\n"
+                    "- explanation: An explanation of why you selected those choices.\n"
+                )
             return (
                 judge_preamble +
                 f"You MUST select EXACTLY ONE of these choices: {choices_str}\n"
