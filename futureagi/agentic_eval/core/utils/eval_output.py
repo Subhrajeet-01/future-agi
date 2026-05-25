@@ -31,7 +31,7 @@ def response_format_schema(
     * ``result`` is typed according to the eval's output. For
       ``"choices"`` evals the schema reflects whether the template was
       configured for a single selection or multi-pick (``multi_choice``
-      — an array of distinct labels, at least one).
+      — an array of labels, at least one; deduplicated downstream).
     * ``explanation`` is always a free-form string the model uses to
       justify the verdict.
 
@@ -64,11 +64,14 @@ def response_format_schema(
         result_schema = {"type": "string", "enum": ["Pass", "Fail"]}
     elif output_type == "choices" and choices:
         if multi_choice:
+            # NB: no ``uniqueItems`` — some provider structured-output
+            # validators (Bedrock) reject that keyword on arrays.
+            # Duplicates are filtered downstream when the result is
+            # persisted.
             result_schema = {
                 "type": "array",
                 "items": {"type": "string", "enum": list(choices)},
                 "minItems": 1,
-                "uniqueItems": True,
             }
         else:
             result_schema = {"type": "string", "enum": list(choices)}
