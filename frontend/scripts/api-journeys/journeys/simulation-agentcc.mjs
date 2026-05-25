@@ -2176,27 +2176,126 @@ export const simulationAgentccJourneys = [
   },
   {
     id: "AGENTCC-API-004",
-    title:
-      "Gateway webhook create, update, list, event list, and delete lifecycle",
-    tags: ["gateway", "agentcc", "webhooks", "mutating", "data-roundtrip"],
-    async run({ client, cleanup, runId, evidence }) {
+    title: "Gateway webhook create, update, event retry, and delete lifecycle",
+    tags: [
+      "gateway",
+      "agentcc",
+      "webhooks",
+      "mutating",
+      "data-roundtrip",
+      "db-audit",
+    ],
+    async run({ client, cleanup, runId, evidence, organizationId }) {
       requireMutations();
       const name = `api_journey_webhook_${runId.replace(/[^a-z0-9]/gi, "_")}`;
+      const rawSecret = `secret-${runId}`;
 
-      const created = await client.post(apiPath("/agentcc/webhooks/"), {
-        name,
-        url: "https://example.com/futureagi-api-journey-webhook",
-        secret: `secret-${runId}`,
-        events: ["request.completed", "error.occurred"],
-        is_active: true,
-        headers: { "X-API-Journey": runId },
-        description: "Temporary webhook for API journey regression.",
-      });
+      let created;
+      let createMode = "api";
+      let createEntitlementStatus = null;
+      try {
+        created = await client.post(apiPath("/agentcc/webhooks/"), {
+          name,
+          url: "https://example.com/futureagi-api-journey-webhook",
+          secret: rawSecret,
+          events: ["request.completed", "error.occurred"],
+          is_active: true,
+          headers: { "X-API-Journey": runId },
+          description: "Temporary webhook for API journey regression.",
+        });
+      } catch (error) {
+        if (!isEntitlementDeniedError(error)) throw error;
+        createMode = "db_seeded_after_create_entitlement";
+        createEntitlementStatus = error.status;
+        created = await seedAgentccWebhookDb({
+          webhookId: randomUUID(),
+          organizationId,
+          name,
+          rawSecret,
+          runId,
+        });
+      }
       assert(created?.id, "Gateway webhook create did not return id.");
-      cleanup.defer("delete API journey gateway webhook", () =>
-        ignoreNotFound(() =>
-          client.delete(apiPath("/agentcc/webhooks/{id}/", { id: created.id })),
-        ),
+      cleanup.defer("hard delete API journey gateway webhook fixture", () =>
+        deleteAgentccWebhookFixtureDb({
+          webhookId: created.id,
+          organizationId,
+        }),
+      );
+
+      let dbAudit = await loadAgentccWebhookDbAudit({
+        webhookId: created.id,
+        organizationId,
+        eventIds: [],
+        rawSecret,
+      });
+      assert(
+        dbAudit.id === created.id &&
+          dbAudit.name === name &&
+          dbAudit.organization_id === organizationId &&
+          dbAudit.raw_secret_present === true &&
+          dbAudit.deleted === false,
+        "Gateway webhook DB audit did not find the created org-scoped active row.",
+      );
+
+      let duplicateStatus = null;
+      if (createMode === "api") {
+        const duplicateCreate = await expectApiError(
+          () =>
+            client.post(apiPath("/agentcc/webhooks/"), {
+              name,
+              url: "https://example.com/futureagi-api-journey-webhook-duplicate",
+              events: ["request.completed"],
+            }),
+          [400],
+          "Gateway webhook create accepted a duplicate active name.",
+        );
+        duplicateStatus = duplicateCreate.status;
+        assert(
+          errorText(duplicateCreate).toLowerCase().includes("unique") ||
+            errorText(duplicateCreate).toLowerCase().includes("duplicate"),
+          "Duplicate webhook create did not return a uniqueness error.",
+        );
+      }
+
+      const privateUrlError = await expectApiError(
+        () =>
+          client.patch(apiPath("/agentcc/webhooks/{id}/", { id: created.id }), {
+            url: "https://127.0.0.1/futureagi-api-journey-webhook",
+          }),
+        [400],
+        "Gateway webhook update accepted a private loopback URL.",
+      );
+      assert(
+        errorText(privateUrlError).toLowerCase().includes("private") ||
+          errorText(privateUrlError).toLowerCase().includes("internal"),
+        "Private webhook URL guard did not explain the URL safety failure.",
+      );
+
+      const invalidEventsPayload = await expectApiError(
+        () =>
+          client.patch(apiPath("/agentcc/webhooks/{id}/", { id: created.id }), {
+            events: "request.completed",
+          }),
+        [400],
+        "Gateway webhook update accepted non-array events.",
+      );
+      assert(
+        errorText(invalidEventsPayload).toLowerCase().includes("events"),
+        "Invalid webhook events payload did not explain the events validation failure.",
+      );
+
+      const invalidEventName = await expectApiError(
+        () =>
+          client.patch(apiPath("/agentcc/webhooks/{id}/", { id: created.id }), {
+            events: ["request.unknown"],
+          }),
+        [400],
+        "Gateway webhook update accepted an unsupported event type.",
+      );
+      assert(
+        errorText(invalidEventName).toLowerCase().includes("invalid event"),
+        "Invalid webhook event type did not return an event validation error.",
       );
 
       const updated = await client.patch(
@@ -2205,13 +2304,15 @@ export const simulationAgentccJourneys = [
           description: "Updated temporary webhook for API journey regression.",
           events: ["request.completed"],
           is_active: false,
+          headers: { "X-API-Journey": `${runId}-updated` },
         },
       );
       assert(
         updated.is_active === false &&
           asArray(updated.events).length === 1 &&
-          asArray(updated.events).includes("request.completed"),
-        "Gateway webhook update did not persist active/events fields.",
+          asArray(updated.events).includes("request.completed") &&
+          updated.headers?.["X-API-Journey"] === `${runId}-updated`,
+        "Gateway webhook update did not persist active/events/header fields.",
       );
 
       const detail = await client.get(
@@ -2226,14 +2327,83 @@ export const simulationAgentccJourneys = [
         "Gateway webhook detail leaked the write-only secret.",
       );
 
+      const eventIds = [randomUUID(), randomUUID()];
+      const seedAudit = await seedAgentccWebhookEventsDb({
+        organizationId,
+        webhookId: created.id,
+        eventIds,
+        marker: name,
+      });
+      assert(
+        Number(seedAudit.inserted_count) === 2,
+        "Gateway webhook event DB seed did not insert the expected rows.",
+      );
+
       const events = asArray(
         await client.get(apiPath("/agentcc/webhook-events/"), {
           query: { webhook_id: created.id },
         }),
       );
       assert(
-        Array.isArray(events),
-        "Gateway webhook events list was not an array.",
+        events.length === 2 &&
+          events.every((event) => event.webhook === created.id) &&
+          events.every((event) => event.webhook_name === name),
+        "Gateway webhook events list did not filter by webhook_id.",
+      );
+
+      const failedEvents = asArray(
+        await client.get(apiPath("/agentcc/webhook-events/"), {
+          query: {
+            webhook_id: created.id,
+            status: "failed",
+            event_type: "error.occurred",
+          },
+        }),
+      );
+      assert(
+        failedEvents.length === 1 &&
+          failedEvents[0]?.id === eventIds[0] &&
+          failedEvents[0]?.last_response_code === 503 &&
+          failedEvents[0]?.last_error?.includes(name),
+        "Gateway webhook event status/event_type filters did not return the seeded failed event.",
+      );
+
+      const failedDetail = await client.get(
+        apiPath("/agentcc/webhook-events/{id}/", { id: eventIds[0] }),
+      );
+      assert(
+        failedDetail?.id === eventIds[0] &&
+          failedDetail.webhook === created.id &&
+          failedDetail.max_attempts === 5,
+        "Gateway webhook event detail did not return the seeded failed event.",
+      );
+
+      const retried = await client.post(
+        apiPath("/agentcc/webhook-events/{id}/retry/", { id: eventIds[0] }),
+        {},
+      );
+      assert(
+        retried.status === "pending" &&
+          retried.attempts === 0 &&
+          !retried.last_error &&
+          !retried.next_retry_at,
+        "Gateway webhook event retry did not reset failed event state.",
+      );
+
+      const deliveredRetryGuard = await expectApiError(
+        () =>
+          client.post(
+            apiPath("/agentcc/webhook-events/{id}/retry/", {
+              id: eventIds[1],
+            }),
+            {},
+          ),
+        [400],
+        "Gateway webhook event retry accepted an already delivered event.",
+      );
+      assert(
+        errorText(deliveredRetryGuard).toLowerCase().includes("delivered"),
+        "Delivered webhook retry guard did not explain the delivered-state rejection.",
       );
 
       await client.delete(
@@ -2245,7 +2415,47 @@ export const simulationAgentccJourneys = [
         "Deleted gateway webhook was still visible in list.",
       );
 
-      evidence.push({ webhook_id: created.id, webhook_name: name });
+      dbAudit = await loadAgentccWebhookDbAudit({
+        webhookId: created.id,
+        organizationId,
+        eventIds,
+        rawSecret,
+      });
+      assert(
+        dbAudit.deleted === true &&
+          dbAudit.deleted_at_set === true &&
+          dbAudit.event_count === 2 &&
+          dbAudit.pending_event_count === 1 &&
+          dbAudit.delivered_event_count === 1,
+        "Gateway webhook DB audit did not confirm soft-delete and retried event state.",
+      );
+
+      const cleanupAudit = await deleteAgentccWebhookFixtureDb({
+        webhookId: created.id,
+        organizationId,
+      });
+      assert(
+        Number(cleanupAudit.remaining_webhook_count) === 0 &&
+          Number(cleanupAudit.remaining_event_count) === 0,
+        `Gateway webhook fixture hard cleanup left disposable rows behind: ${JSON.stringify(cleanupAudit)}`,
+      );
+
+      evidence.push({
+        webhook_id: created.id,
+        webhook_name: name,
+        private_url_status: privateUrlError.status,
+        invalid_events_status: invalidEventsPayload.status,
+        invalid_event_name_status: invalidEventName.status,
+        duplicate_status: duplicateStatus,
+        create_mode: createMode,
+        create_entitlement_status: createEntitlementStatus,
+        event_count: dbAudit.event_count,
+        retry_status: retried.status,
+        delivered_retry_guard_status: deliveredRetryGuard.status,
+        deleted_at_set: dbAudit.deleted_at_set,
+        cleanup_remaining_webhook_count: cleanupAudit.remaining_webhook_count,
+        cleanup_remaining_event_count: cleanupAudit.remaining_event_count,
+      });
     },
   },
   {
@@ -4333,6 +4543,14 @@ function errorText(error) {
   return [error?.message, JSON.stringify(error?.body || {})].join(" ");
 }
 
+function isEntitlementDeniedError(error) {
+  const text = errorText(error).toLowerCase();
+  return (
+    error?.status === 402 &&
+    (text.includes("entitlement") || text.includes("upgrade"))
+  );
+}
+
 function assertApprox(actual, expected, message, tolerance = 0.0001) {
   const actualNumber = Number(actual);
   assert(
@@ -5111,6 +5329,266 @@ SELECT COALESCE((
   WHERE id = ${sqlUuid(alertId)}
     AND organization_id = ${sqlUuid(organizationId)}
 ), '{}'::json);
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadAgentccWebhookDbAudit({
+  webhookId,
+  organizationId,
+  eventIds,
+  rawSecret,
+}) {
+  const sql = `
+WITH target_events AS (
+  SELECT unnest(${sqlUuidArray(eventIds)}::uuid[]) AS id
+),
+event_rows AS (
+  SELECT e.*
+  FROM agentcc_webhook_event e
+  JOIN target_events te ON te.id = e.id
+  WHERE e.organization_id = ${sqlUuid(organizationId)}
+    AND e.webhook_id = ${sqlUuid(webhookId)}
+)
+SELECT COALESCE((
+  SELECT json_build_object(
+    'id', w.id::text,
+    'organization_id', w.organization_id::text,
+    'name', w.name,
+    'url', w.url,
+    'events', w.events,
+    'is_active', w.is_active,
+    'raw_secret_present', w.secret = ${sqlString(rawSecret)},
+    'deleted', w.deleted,
+    'deleted_at_set', w.deleted_at IS NOT NULL,
+    'event_count', (SELECT count(*) FROM event_rows),
+    'pending_event_count', (
+      SELECT count(*) FROM event_rows WHERE status = 'pending'
+    ),
+    'failed_event_count', (
+      SELECT count(*) FROM event_rows WHERE status = 'failed'
+    ),
+    'delivered_event_count', (
+      SELECT count(*) FROM event_rows WHERE status = 'delivered'
+    )
+  )
+  FROM agentcc_webhook w
+  WHERE w.id = ${sqlUuid(webhookId)}
+    AND w.organization_id = ${sqlUuid(organizationId)}
+), '{}'::json);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedAgentccWebhookDb({
+  webhookId,
+  organizationId,
+  name,
+  rawSecret,
+  runId,
+}) {
+  const sql = `
+WITH stale_events AS (
+  DELETE FROM agentcc_webhook_event
+  WHERE webhook_id IN (
+    SELECT id
+    FROM agentcc_webhook
+    WHERE organization_id = ${sqlUuid(organizationId)}
+      AND name = ${sqlString(name)}
+  )
+  RETURNING id
+),
+stale_webhook AS (
+  DELETE FROM agentcc_webhook
+  WHERE organization_id = ${sqlUuid(organizationId)}
+    AND name = ${sqlString(name)}
+  RETURNING id
+),
+inserted AS (
+  INSERT INTO agentcc_webhook (
+    id,
+    organization_id,
+    name,
+    url,
+    secret,
+    events,
+    is_active,
+    headers,
+    description,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at
+  )
+  VALUES (
+    ${sqlUuid(webhookId)},
+    ${sqlUuid(organizationId)},
+    ${sqlString(name)},
+    'https://example.com/futureagi-api-journey-webhook',
+    ${sqlString(rawSecret)},
+    ${sqlJson(["request.completed", "error.occurred"])},
+    true,
+    ${sqlJson({ "X-API-Journey": runId })},
+    'Temporary webhook for API journey regression.',
+    now(),
+    now(),
+    false,
+    NULL
+  )
+  RETURNING
+    id::text,
+    name,
+    url,
+    events,
+    is_active,
+    headers,
+    description
+)
+SELECT COALESCE((
+  SELECT json_build_object(
+    'id', id,
+    'name', name,
+    'url', url,
+    'events', events,
+    'is_active', is_active,
+    'headers', headers,
+    'description', description,
+    'seeded_after_entitlement', true
+  )
+  FROM inserted
+), '{}'::json);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedAgentccWebhookEventsDb({
+  organizationId,
+  webhookId,
+  eventIds,
+  marker,
+}) {
+  const [failedEventId, deliveredEventId] = eventIds;
+  assert(
+    isUuid(failedEventId) && isUuid(deliveredEventId),
+    "Webhook event seed requires two UUIDs.",
+  );
+
+  const sql = `
+WITH stale AS (
+  DELETE FROM agentcc_webhook_event
+  WHERE webhook_id = ${sqlUuid(webhookId)}
+    AND organization_id = ${sqlUuid(organizationId)}
+    AND payload->>'marker' = ${sqlString(marker)}
+  RETURNING id
+),
+inserted AS (
+  INSERT INTO agentcc_webhook_event (
+    id,
+    organization_id,
+    webhook_id,
+    event_type,
+    payload,
+    status,
+    attempts,
+    max_attempts,
+    last_attempt_at,
+    last_response_code,
+    last_error,
+    next_retry_at,
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at
+  )
+  VALUES
+    (
+      ${sqlUuid(failedEventId)},
+      ${sqlUuid(organizationId)},
+      ${sqlUuid(webhookId)},
+      'error.occurred',
+      ${sqlJson({
+        marker,
+        event: "error.occurred",
+        request_id: `${marker}_failed_request`,
+      })},
+      'failed',
+      2,
+      5,
+      now() - interval '5 minutes',
+      503,
+      ${sqlString(`${marker} temporary delivery failure`)},
+      now() + interval '10 minutes',
+      now() - interval '5 minutes',
+      now() - interval '5 minutes',
+      false,
+      NULL
+    ),
+    (
+      ${sqlUuid(deliveredEventId)},
+      ${sqlUuid(organizationId)},
+      ${sqlUuid(webhookId)},
+      'request.completed',
+      ${sqlJson({
+        marker,
+        event: "request.completed",
+        request_id: `${marker}_delivered_request`,
+      })},
+      'delivered',
+      1,
+      5,
+      now() - interval '3 minutes',
+      204,
+      '',
+      NULL,
+      now() - interval '3 minutes',
+      now() - interval '3 minutes',
+      false,
+      NULL
+    )
+  RETURNING id
+)
+SELECT json_build_object(
+  'inserted_count', (SELECT count(*) FROM inserted),
+  'stale_deleted_count', (SELECT count(*) FROM stale)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function deleteAgentccWebhookFixtureDb({ webhookId, organizationId }) {
+  const sql = `
+WITH target_events AS (
+  SELECT id
+  FROM agentcc_webhook_event
+  WHERE webhook_id = ${sqlUuid(webhookId)}
+    AND organization_id = ${sqlUuid(organizationId)}
+),
+target_webhook AS (
+  SELECT id
+  FROM agentcc_webhook
+  WHERE id = ${sqlUuid(webhookId)}
+    AND organization_id = ${sqlUuid(organizationId)}
+),
+deleted_events AS (
+  DELETE FROM agentcc_webhook_event
+  USING target_events
+  WHERE agentcc_webhook_event.id = target_events.id
+  RETURNING agentcc_webhook_event.id
+),
+deleted_webhook AS (
+  DELETE FROM agentcc_webhook
+  USING target_webhook
+  WHERE agentcc_webhook.id = target_webhook.id
+  RETURNING agentcc_webhook.id
+)
+SELECT json_build_object(
+  'deleted_event_count', (SELECT count(*) FROM deleted_events),
+  'deleted_webhook_count', (SELECT count(*) FROM deleted_webhook),
+  'remaining_event_count',
+    (SELECT count(*) FROM target_events) - (SELECT count(*) FROM deleted_events),
+  'remaining_webhook_count',
+    (SELECT count(*) FROM target_webhook) - (SELECT count(*) FROM deleted_webhook)
+);
 `;
   return runPostgresJson(sql);
 }
