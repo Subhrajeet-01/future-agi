@@ -129,6 +129,42 @@ class TestAgentccRequestOrganizationContext:
         assert blocklist.organization_id == org_b.id
         assert blocklist.organization_id != user.organization_id
 
+    def test_blocklist_add_words_rejects_non_string_values(self, secondary_org_client):
+        create_response = secondary_org_client.post(
+            "/agentcc/blocklists/",
+            {"name": "secondary_blocklist_word_validation", "words": ["foo"]},
+            format="json",
+        )
+        assert create_response.status_code == 200, create_response.json()
+        blocklist_id = create_response.json()["result"]["id"]
+
+        response = secondary_org_client.post(
+            f"/agentcc/blocklists/{blocklist_id}/add-words/",
+            {"words": ["bar", 123]},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "Word at index 1 must be a string" in str(response.json())
+        blocklist = AgentccBlocklist.no_workspace_objects.get(id=blocklist_id)
+        assert blocklist.words == ["foo"]
+
+    def test_blocklist_delete_stamps_deleted_at(self, secondary_org_client):
+        create_response = secondary_org_client.post(
+            "/agentcc/blocklists/",
+            {"name": "secondary_blocklist_delete_stamp", "words": ["foo"]},
+            format="json",
+        )
+        assert create_response.status_code == 200, create_response.json()
+        blocklist_id = create_response.json()["result"]["id"]
+
+        response = secondary_org_client.delete(f"/agentcc/blocklists/{blocklist_id}/")
+
+        assert response.status_code == 200, response.json()
+        blocklist = AgentccBlocklist.all_objects.get(id=blocklist_id)
+        assert blocklist.deleted is True
+        assert blocklist.deleted_at is not None
+
     def test_email_alert_create_uses_active_request_organization(
         self, user, secondary_org_context, secondary_org_client
     ):

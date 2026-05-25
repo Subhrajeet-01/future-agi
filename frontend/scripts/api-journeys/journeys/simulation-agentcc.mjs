@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import process from "node:process";
 import { promisify } from "node:util";
 import {
   apiPath,
@@ -14,7 +15,8 @@ const execFileAsync = promisify(execFile);
 export const simulationAgentccJourneys = [
   {
     id: "SIM-API-001",
-    title: "Simulation persona create, search, update, retrieve, and delete lifecycle",
+    title:
+      "Simulation persona create, search, update, retrieve, and delete lifecycle",
     tags: ["simulation", "personas", "mutating", "data-roundtrip"],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
@@ -43,7 +45,9 @@ export const simulationAgentccJourneys = [
       assert(created?.id, "Persona create did not return id.");
       cleanup.defer("delete API journey persona", () =>
         ignoreNotFound(() =>
-          client.delete(apiPath("/simulate/api/personas/{id}/", { id: created.id })),
+          client.delete(
+            apiPath("/simulate/api/personas/{id}/", { id: created.id }),
+          ),
         ),
       );
 
@@ -78,7 +82,9 @@ export const simulationAgentccJourneys = [
       );
       assert(detail?.id === created.id, "Persona detail returned wrong id.");
 
-      await client.delete(apiPath("/simulate/api/personas/{id}/", { id: created.id }));
+      await client.delete(
+        apiPath("/simulate/api/personas/{id}/", { id: created.id }),
+      );
       const afterDelete = asArray(
         await client.get(apiPath("/simulate/api/personas/"), {
           query: { search: name, page_size: 10 },
@@ -94,7 +100,8 @@ export const simulationAgentccJourneys = [
   },
   {
     id: "SIM-API-002",
-    title: "Simulation agent definition operations create, update, retrieve, and delete lifecycle",
+    title:
+      "Simulation agent definition operations create, update, retrieve, and delete lifecycle",
     tags: ["simulation", "agents", "mutating", "data-roundtrip"],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
@@ -131,7 +138,8 @@ export const simulationAgentccJourneys = [
           id: created.id,
         }),
         {
-          description: "Updated temporary agent definition for API journey regression.",
+          description:
+            "Updated temporary agent definition for API journey regression.",
           model_details: { source: "api-journey", updated: true },
         },
       );
@@ -149,8 +157,14 @@ export const simulationAgentccJourneys = [
           id: created.id,
         }),
       );
-      assert(detail?.id === created.id, "Agent definition detail returned wrong id.");
-      assert(detail?.agent_name === name, "Agent definition detail returned wrong name.");
+      assert(
+        detail?.id === created.id,
+        "Agent definition detail returned wrong id.",
+      );
+      assert(
+        detail?.agent_name === name,
+        "Agent definition detail returned wrong name.",
+      );
 
       await client.delete(
         apiPath("/simulate/api/agent-definition-operations/{id}/", {
@@ -158,9 +172,12 @@ export const simulationAgentccJourneys = [
         }),
       );
       const listed = asArray(
-        await client.get(apiPath("/simulate/api/agent-definition-operations/"), {
-          query: { search: name, limit: 10 },
-        }),
+        await client.get(
+          apiPath("/simulate/api/agent-definition-operations/"),
+          {
+            query: { search: name, limit: 10 },
+          },
+        ),
       );
       assert(
         !listed.some((agent) => agent.id === created.id),
@@ -207,7 +224,10 @@ export const simulationAgentccJourneys = [
       const apiRunTests = collectionRows(apiRunTestsPayload);
       const apiTestExecutions = collectionRows(apiTestExecutionsPayload);
       const apiCallExecutions = collectionRows(apiCallExecutionsPayload);
-      assert(Array.isArray(runTests), "Simulation run-test list was not array-like.");
+      assert(
+        Array.isArray(runTests),
+        "Simulation run-test list was not array-like.",
+      );
       assert(
         Array.isArray(apiRunTests),
         "Simulation API run-test list was not array-like.",
@@ -229,10 +249,14 @@ export const simulationAgentccJourneys = [
         apiRunTests.find((row) => row?.id === runFromExecution?.run_test) ||
         runTests.find((row) => isUuid(row?.id)) ||
         apiRunTests.find((row) => isUuid(row?.id));
-      if (!runTest) skip("No simulation run tests found for read-surface coverage.");
+      if (!runTest)
+        skip("No simulation run tests found for read-surface coverage.");
 
       const runTestId = runTest.id;
-      assert(isUuid(runTestId), "Selected simulation run test id was not a UUID.");
+      assert(
+        isUuid(runTestId),
+        "Selected simulation run test id was not a UUID.",
+      );
       if (apiRunTests.length > 0) {
         assert(
           apiRunTests.some((row) => row.id === runTestId) ||
@@ -256,7 +280,10 @@ export const simulationAgentccJourneys = [
           run_test_id: runTestId,
         }),
       );
-      assert(detail?.id === runTestId, "Run-test detail returned the wrong id.");
+      assert(
+        detail?.id === runTestId,
+        "Run-test detail returned the wrong id.",
+      );
       const runTestName = detail.name || runTest.name;
       assert(runTestName, "Run-test detail did not include a name.");
 
@@ -329,9 +356,18 @@ export const simulationAgentccJourneys = [
       const runCalls = collectionRows(runCallsPayload);
       const executions = collectionRows(executionsPayload);
       const scenarios = collectionRows(scenariosPayload);
-      assert(Array.isArray(runCalls), "Run-test call executions were not array-like.");
-      assert(Array.isArray(executions), "Run-test executions were not array-like.");
-      assert(Array.isArray(scenarios), "Run-test scenarios were not array-like.");
+      assert(
+        Array.isArray(runCalls),
+        "Run-test call executions were not array-like.",
+      );
+      assert(
+        Array.isArray(executions),
+        "Run-test executions were not array-like.",
+      );
+      assert(
+        Array.isArray(scenarios),
+        "Run-test scenarios were not array-like.",
+      );
       assert(
         Array.isArray(asArray(evalSummary)),
         "Run-test eval summary was not array-like.",
@@ -346,7 +382,8 @@ export const simulationAgentccJourneys = [
       );
       assertSimulationSdkCodeSafe(sdkPayload);
       assert(
-        sdkPayload.run_test_id === runTestId && sdkPayload.run_test_name === runTestName,
+        sdkPayload.run_test_id === runTestId &&
+          sdkPayload.run_test_name === runTestName,
         "Run-test SDK payload returned the wrong run id/name.",
       );
 
@@ -357,7 +394,8 @@ export const simulationAgentccJourneys = [
           apiTestExecutions.find((row) => row?.run_test === runTestId)?.id,
         );
       assert(
-        !testExecutionId || dbAudit.test_execution_ids.includes(testExecutionId),
+        !testExecutionId ||
+          dbAudit.test_execution_ids.includes(testExecutionId),
         "Selected test execution was not present in the DB audit.",
       );
 
@@ -385,9 +423,12 @@ export const simulationAgentccJourneys = [
           comparison,
         ] = await Promise.all([
           client.get(
-            apiPath("/simulate/test-executions/{test_execution_id}/analytics/", {
-              test_execution_id: testExecutionId,
-            }),
+            apiPath(
+              "/simulate/test-executions/{test_execution_id}/analytics/",
+              {
+                test_execution_id: testExecutionId,
+              },
+            ),
           ),
           client.get(
             apiPath("/simulate/test-executions/{test_execution_id}/kpis/", {
@@ -401,9 +442,12 @@ export const simulationAgentccJourneys = [
             ),
           ),
           client.get(
-            apiPath("/simulate/test-executions/{test_execution_id}/transcripts/", {
-              test_execution_id: testExecutionId,
-            }),
+            apiPath(
+              "/simulate/test-executions/{test_execution_id}/transcripts/",
+              {
+                test_execution_id: testExecutionId,
+              },
+            ),
           ),
           client.get(
             apiPath(
@@ -483,36 +527,47 @@ export const simulationAgentccJourneys = [
         "Selected call execution was not present in the DB audit or global API list.",
       );
 
-      const [callDetail, callTranscripts, callLogs, errorTasks, branchAnalysis] =
-        await Promise.all([
-          client.get(
-            apiPath("/simulate/call-executions/{call_execution_id}/", {
+      const [
+        callDetail,
+        callTranscripts,
+        callLogs,
+        errorTasks,
+        branchAnalysis,
+      ] = await Promise.all([
+        client.get(
+          apiPath("/simulate/call-executions/{call_execution_id}/", {
+            call_execution_id: callExecutionId,
+          }),
+        ),
+        client.get(
+          apiPath(
+            "/simulate/call-executions/{call_execution_id}/transcripts/",
+            {
               call_execution_id: callExecutionId,
-            }),
+            },
           ),
-          client.get(
-            apiPath("/simulate/call-executions/{call_execution_id}/transcripts/", {
+        ),
+        client.get(
+          apiPath("/simulate/call-executions/{call_execution_id}/logs/", {
+            call_execution_id: callExecutionId,
+          }),
+          { query: { limit: 5, page: 1 } },
+        ),
+        client.get(
+          apiPath(
+            "/simulate/call-executions/{call_execution_id}/error-localizer-tasks/",
+            { call_execution_id: callExecutionId },
+          ),
+        ),
+        client.get(
+          apiPath(
+            "/simulate/call-executions/{call_execution_id}/branch-analysis/",
+            {
               call_execution_id: callExecutionId,
-            }),
+            },
           ),
-          client.get(
-            apiPath("/simulate/call-executions/{call_execution_id}/logs/", {
-              call_execution_id: callExecutionId,
-            }),
-            { query: { limit: 5, page: 1 } },
-          ),
-          client.get(
-            apiPath(
-              "/simulate/call-executions/{call_execution_id}/error-localizer-tasks/",
-              { call_execution_id: callExecutionId },
-            ),
-          ),
-          client.get(
-            apiPath("/simulate/call-executions/{call_execution_id}/branch-analysis/", {
-              call_execution_id: callExecutionId,
-            }),
-          ),
-        ]);
+        ),
+      ]);
 
       assert(
         callDetail?.id === callExecutionId,
@@ -572,7 +627,14 @@ export const simulationAgentccJourneys = [
       "db-audit",
       "security",
     ],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
 
       const seed = await selectSimulationRunTestSeed(client);
@@ -619,19 +681,24 @@ export const simulationAgentccJourneys = [
         );
       });
 
-      const created = await client.post(apiPath("/simulate/run-tests/create/"), {
-        name: runName,
-        description: "Temporary run test for API journey lifecycle coverage.",
-        agent_definition_id: seed.agentDefinitionId,
-        agent_version: seed.agentVersionId,
-        scenario_ids: [seed.scenarioId],
-        enable_tool_evaluation: false,
-      });
+      const created = await client.post(
+        apiPath("/simulate/run-tests/create/"),
+        {
+          name: runName,
+          description: "Temporary run test for API journey lifecycle coverage.",
+          agent_definition_id: seed.agentDefinitionId,
+          agent_version: seed.agentVersionId,
+          scenario_ids: [seed.scenarioId],
+          enable_tool_evaluation: false,
+        },
+      );
       assert(isUuid(created?.id), "Run-test create did not return a UUID id.");
       createdRunIds.push(created.id);
       assert(
         asArray(created.scenarios).map(String).includes(seed.scenarioId) ||
-          asArray(created.scenarios_detail).some((scenario) => scenario.id === seed.scenarioId),
+          asArray(created.scenarios_detail).some(
+            (scenario) => scenario.id === seed.scenarioId,
+          ),
         "Run-test create did not attach the selected scenario.",
       );
 
@@ -654,9 +721,12 @@ export const simulationAgentccJourneys = [
       );
 
       const patched = await client.patch(
-        apiPath("/simulate/run-tests/{run_test_id}/", { run_test_id: created.id }),
+        apiPath("/simulate/run-tests/{run_test_id}/", {
+          run_test_id: created.id,
+        }),
         {
-          description: "Updated temporary run test for API journey lifecycle coverage.",
+          description:
+            "Updated temporary run test for API journey lifecycle coverage.",
         },
       );
       assert(
@@ -685,7 +755,9 @@ export const simulationAgentccJourneys = [
         "Run-test components update did not preserve enable_tool_evaluation=false.",
       );
 
-      const activeTests = await client.get(apiPath("/simulate/run-tests/active/"));
+      const activeTests = await client.get(
+        apiPath("/simulate/run-tests/active/"),
+      );
       assert(
         typeof activeTests.total_active === "number" &&
           activeTests.active_tests &&
@@ -700,7 +772,10 @@ export const simulationAgentccJourneys = [
         {},
       );
       testExecutionId = firstUuid(chatExecution.execution_id);
-      assert(testExecutionId, "Chat execute did not return a test execution id.");
+      assert(
+        testExecutionId,
+        "Chat execute did not return a test execution id.",
+      );
       assert(
         chatExecution.run_test_id === created.id,
         "Chat execute returned the wrong run_test_id.",
@@ -755,7 +830,10 @@ export const simulationAgentccJourneys = [
           ended_reason: rawEndedReason,
         },
       );
-      assert(failedCall.status === "failed", "Call-execution PATCH did not set failed.");
+      assert(
+        failedCall.status === "failed",
+        "Call-execution PATCH did not set failed.",
+      );
       assert(
         failedCall.ended_reason === "Error processing simulation",
         "Failed call-execution PATCH did not sanitize ended_reason.",
@@ -768,9 +846,12 @@ export const simulationAgentccJourneys = [
       const comparisonError = await expectApiError(
         () =>
           client.get(
-            apiPath("/simulate/call-executions/{call_execution_id}/session-comparison/", {
-              call_execution_id: callExecutionId,
-            }),
+            apiPath(
+              "/simulate/call-executions/{call_execution_id}/session-comparison/",
+              {
+                call_execution_id: callExecutionId,
+              },
+            ),
           ),
         [400],
         "Session comparison accepted a non-completed disposable call execution.",
@@ -792,7 +873,10 @@ export const simulationAgentccJourneys = [
         }),
         {},
       );
-      assert(cancelled.success === true, "Test-execution cancel did not return success.");
+      assert(
+        cancelled.success === true,
+        "Test-execution cancel did not return success.",
+      );
       assert(
         cancelled.test_execution_id === testExecutionId,
         "Test-execution cancel returned the wrong id.",
@@ -816,14 +900,17 @@ export const simulationAgentccJourneys = [
         }),
       );
 
-      const detailDeleted = await client.post(apiPath("/simulate/run-tests/create/"), {
-        name: `${runName} detail delete`,
-        description: "Temporary run test for direct detail DELETE coverage.",
-        agent_definition_id: seed.agentDefinitionId,
-        agent_version: seed.agentVersionId,
-        scenario_ids: [seed.scenarioId],
-        enable_tool_evaluation: false,
-      });
+      const detailDeleted = await client.post(
+        apiPath("/simulate/run-tests/create/"),
+        {
+          name: `${runName} detail delete`,
+          description: "Temporary run test for direct detail DELETE coverage.",
+          agent_definition_id: seed.agentDefinitionId,
+          agent_version: seed.agentVersionId,
+          scenario_ids: [seed.scenarioId],
+          enable_tool_evaluation: false,
+        },
+      );
       assert(
         isUuid(detailDeleted?.id),
         "Second run-test create did not return a UUID id.",
@@ -842,11 +929,17 @@ export const simulationAgentccJourneys = [
         workspaceId,
       });
       const deletedRuns = new Map(
-        collectionRows(dbAudit.run_tests).map((runTest) => [runTest.id, runTest]),
+        collectionRows(dbAudit.run_tests).map((runTest) => [
+          runTest.id,
+          runTest,
+        ]),
       );
       for (const runTestId of [created.id, detailDeleted.id]) {
         const row = deletedRuns.get(runTestId);
-        assert(row?.deleted === true, "Disposable run test was not soft-deleted.");
+        assert(
+          row?.deleted === true,
+          "Disposable run test was not soft-deleted.",
+        );
         assert(
           row?.deleted_at_set === true,
           "Disposable run test deleted_at was not stamped.",
@@ -891,7 +984,14 @@ export const simulationAgentccJourneys = [
       "data-roundtrip",
       "db-audit",
     ],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
 
       const seed = await selectSimulationRunTestSeed(client);
@@ -928,27 +1028,34 @@ export const simulationAgentccJourneys = [
       const createdRunIds = [];
       let runDeleted = false;
 
-      cleanup.defer("delete disposable simulation eval-config run tests", async () => {
-        if (runDeleted) return null;
-        for (const runTestId of createdRunIds) {
-          await ignoreNotFound(() =>
-            client.delete(
-              apiPath("/simulate/run-tests/{run_test_id}/delete/", {
-                run_test_id: runTestId,
-              }),
-            ),
-          );
-        }
-      });
+      cleanup.defer(
+        "delete disposable simulation eval-config run tests",
+        async () => {
+          if (runDeleted) return null;
+          for (const runTestId of createdRunIds) {
+            await ignoreNotFound(() =>
+              client.delete(
+                apiPath("/simulate/run-tests/{run_test_id}/delete/", {
+                  run_test_id: runTestId,
+                }),
+              ),
+            );
+          }
+        },
+      );
 
-      const created = await client.post(apiPath("/simulate/run-tests/create/"), {
-        name: runName,
-        description: "Temporary run test for eval-config API journey coverage.",
-        agent_definition_id: seed.agentDefinitionId,
-        agent_version: seed.agentVersionId,
-        scenario_ids: [seed.scenarioId],
-        enable_tool_evaluation: false,
-      });
+      const created = await client.post(
+        apiPath("/simulate/run-tests/create/"),
+        {
+          name: runName,
+          description:
+            "Temporary run test for eval-config API journey coverage.",
+          agent_definition_id: seed.agentDefinitionId,
+          agent_version: seed.agentVersionId,
+          scenario_ids: [seed.scenarioId],
+          enable_tool_evaluation: false,
+        },
+      );
       assert(isUuid(created?.id), "Run-test create did not return a UUID id.");
       createdRunIds.push(created.id);
 
@@ -1001,14 +1108,25 @@ export const simulationAgentccJourneys = [
         createdConfigs.length === 2,
         "Eval-config add did not create both submitted configs.",
       );
-      const primaryConfig = createdConfigs.find((config) => config.name === primaryName);
+      const primaryConfig = createdConfigs.find(
+        (config) => config.name === primaryName,
+      );
       const secondaryConfig = createdConfigs.find(
         (config) => config.name === secondaryName,
       );
-      assert(isUuid(primaryConfig?.id), "Primary eval config did not return a UUID.");
-      assert(isUuid(secondaryConfig?.id), "Secondary eval config did not return a UUID.");
+      assert(
+        isUuid(primaryConfig?.id),
+        "Primary eval config did not return a UUID.",
+      );
+      assert(
+        isUuid(secondaryConfig?.id),
+        "Secondary eval config did not return a UUID.",
+      );
       assertSimulationEvalMapping(primaryConfig.mapping, mapping);
-      assertSimulationEvalParams(primaryConfig.config?.params, initialParams.expected);
+      assertSimulationEvalParams(
+        primaryConfig.config?.params,
+        initialParams.expected,
+      );
 
       let dbAudit = await loadSimulationEvalConfigDbAudit({
         runTestId: created.id,
@@ -1039,7 +1157,10 @@ export const simulationAgentccJourneys = [
         ),
       );
       const structureEval = structure.eval || structure.result?.eval;
-      assert(structureEval?.id === primaryConfig.id, "Eval structure returned wrong id.");
+      assert(
+        structureEval?.id === primaryConfig.id,
+        "Eval structure returned wrong id.",
+      );
       assert(
         structureEval.template_id === template.id,
         "Eval structure returned wrong template id.",
@@ -1116,7 +1237,8 @@ export const simulationAgentccJourneys = [
           { run_test_id: created.id, eval_config_id: primaryConfig.id },
         ),
       );
-      const updatedStructureEval = updatedStructure.eval || updatedStructure.result?.eval;
+      const updatedStructureEval =
+        updatedStructure.eval || updatedStructure.result?.eval;
       assert(
         updatedStructureEval?.name === updatedName,
         "Eval structure did not return updated name.",
@@ -1129,13 +1251,19 @@ export const simulationAgentccJourneys = [
         updatedStructureEval.selected_model === "turing_large",
         "Eval structure did not return updated model.",
       );
-      assertSimulationEvalParams(updatedStructureEval.params, updatedParams.expected);
+      assertSimulationEvalParams(
+        updatedStructureEval.params,
+        updatedParams.expected,
+      );
 
       await client.delete(
-        apiPath("/simulate/run-tests/{run_test_id}/eval-configs/{eval_config_id}/", {
-          run_test_id: created.id,
-          eval_config_id: secondaryConfig.id,
-        }),
+        apiPath(
+          "/simulate/run-tests/{run_test_id}/eval-configs/{eval_config_id}/",
+          {
+            run_test_id: created.id,
+            eval_config_id: secondaryConfig.id,
+          },
+        ),
       );
 
       await client.delete(
@@ -1151,13 +1279,19 @@ export const simulationAgentccJourneys = [
         organizationId,
         workspaceId,
       });
-      assert(dbAudit.run_test_deleted === true, "Disposable run test was not deleted.");
+      assert(
+        dbAudit.run_test_deleted === true,
+        "Disposable run test was not deleted.",
+      );
       assert(
         Number(dbAudit.active_eval_config_count) === 0,
         "Active eval configs remained after run-test cleanup.",
       );
       for (const config of collectionRows(dbAudit.eval_configs)) {
-        assert(config.deleted === true, "Disposable eval config was not soft-deleted.");
+        assert(
+          config.deleted === true,
+          "Disposable eval config was not soft-deleted.",
+        );
         assert(
           config.deleted_at_set === true,
           "Disposable eval config deleted_at was not stamped.",
@@ -1189,7 +1323,14 @@ export const simulationAgentccJourneys = [
       "guards",
       "db-audit",
     ],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
 
       const seed = await selectSimulationRunTestSeed(client);
@@ -1204,46 +1345,58 @@ export const simulationAgentccJourneys = [
       let testExecutionId = null;
       let callExecutionId = null;
 
-      cleanup.defer("delete disposable simulation call-action run tests", async () => {
-        for (const runTestId of createdRunIds) {
+      cleanup.defer(
+        "delete disposable simulation call-action run tests",
+        async () => {
+          for (const runTestId of createdRunIds) {
+            await ignoreNotFound(() =>
+              client.delete(
+                apiPath("/simulate/run-tests/{run_test_id}/delete/", {
+                  run_test_id: runTestId,
+                }),
+              ),
+            );
+          }
+        },
+      );
+      cleanup.defer(
+        "delete disposable simulation call-action test execution",
+        async () => {
+          if (!testExecutionId) return;
           await ignoreNotFound(() =>
             client.delete(
-              apiPath("/simulate/run-tests/{run_test_id}/delete/", {
-                run_test_id: runTestId,
+              apiPath("/simulate/test-executions/{test_execution_id}/delete/", {
+                test_execution_id: testExecutionId,
               }),
             ),
           );
-        }
-      });
-      cleanup.defer("delete disposable simulation call-action test execution", async () => {
-        if (!testExecutionId) return;
-        await ignoreNotFound(() =>
-          client.delete(
-            apiPath("/simulate/test-executions/{test_execution_id}/delete/", {
-              test_execution_id: testExecutionId,
-            }),
-          ),
-        );
-      });
-      cleanup.defer("delete disposable simulation call-action call execution", async () => {
-        if (!callExecutionId) return;
-        await ignoreNotFound(() =>
-          client.delete(
-            apiPath("/simulate/call-executions/{call_execution_id}/delete/", {
-              call_execution_id: callExecutionId,
-            }),
-          ),
-        );
-      });
+        },
+      );
+      cleanup.defer(
+        "delete disposable simulation call-action call execution",
+        async () => {
+          if (!callExecutionId) return;
+          await ignoreNotFound(() =>
+            client.delete(
+              apiPath("/simulate/call-executions/{call_execution_id}/delete/", {
+                call_execution_id: callExecutionId,
+              }),
+            ),
+          );
+        },
+      );
 
-      const created = await client.post(apiPath("/simulate/run-tests/create/"), {
-        name: runName,
-        description: "Temporary run test for chat/branch action coverage.",
-        agent_definition_id: seed.agentDefinitionId,
-        agent_version: seed.agentVersionId,
-        scenario_ids: [seed.scenarioId],
-        enable_tool_evaluation: false,
-      });
+      const created = await client.post(
+        apiPath("/simulate/run-tests/create/"),
+        {
+          name: runName,
+          description: "Temporary run test for chat/branch action coverage.",
+          agent_definition_id: seed.agentDefinitionId,
+          agent_version: seed.agentVersionId,
+          scenario_ids: [seed.scenarioId],
+          enable_tool_evaluation: false,
+        },
+      );
       assert(isUuid(created?.id), "Run-test create did not return a UUID id.");
       createdRunIds.push(created.id);
 
@@ -1254,7 +1407,10 @@ export const simulationAgentccJourneys = [
         {},
       );
       testExecutionId = firstUuid(chatExecution.execution_id);
-      assert(testExecutionId, "Chat execute did not return a test execution id.");
+      assert(
+        testExecutionId,
+        "Chat execute did not return a test execution id.",
+      );
 
       const batch = await client.post(
         apiPath(
@@ -1273,9 +1429,12 @@ export const simulationAgentccJourneys = [
       const chatGuardError = await expectApiError(
         () =>
           client.post(
-            apiPath("/simulate/call-executions/{call_execution_id}/chat/send-message/", {
-              call_execution_id: callExecutionId,
-            }),
+            apiPath(
+              "/simulate/call-executions/{call_execution_id}/chat/send-message/",
+              {
+                call_execution_id: callExecutionId,
+              },
+            ),
             {
               initiate_chat: false,
               messages: [{ role: "user", content: "hello from api journey" }],
@@ -1290,9 +1449,12 @@ export const simulationAgentccJourneys = [
       );
 
       const branchAnalysis = await client.get(
-        apiPath("/simulate/call-executions/{call_execution_id}/branch-analysis/", {
-          call_execution_id: callExecutionId,
-        }),
+        apiPath(
+          "/simulate/call-executions/{call_execution_id}/branch-analysis/",
+          {
+            call_execution_id: callExecutionId,
+          },
+        ),
       );
       assert(
         branchAnalysis.call_execution_id === callExecutionId,
@@ -1307,9 +1469,12 @@ export const simulationAgentccJourneys = [
       const branchUnknownBody = await expectApiError(
         () =>
           client.post(
-            apiPath("/simulate/call-executions/{call_execution_id}/branch-analysis/", {
-              call_execution_id: callExecutionId,
-            }),
+            apiPath(
+              "/simulate/call-executions/{call_execution_id}/branch-analysis/",
+              {
+                call_execution_id: callExecutionId,
+              },
+            ),
             { legacy_extra: "should-not-be-accepted" },
           ),
         [400],
@@ -1321,9 +1486,12 @@ export const simulationAgentccJourneys = [
       );
 
       const branchCreate = await client.post(
-        apiPath("/simulate/call-executions/{call_execution_id}/branch-analysis/", {
-          call_execution_id: callExecutionId,
-        }),
+        apiPath(
+          "/simulate/call-executions/{call_execution_id}/branch-analysis/",
+          {
+            call_execution_id: callExecutionId,
+          },
+        ),
         {},
       );
       assert(
@@ -1380,8 +1548,12 @@ export const simulationAgentccJourneys = [
         chat_guard_status: chatGuardError.status,
         branch_create_scenario_graph_id: branchCreate.scenario_graph_id,
         branch_create_message: branchCreate.message,
-        active_test_execution_count: Number(dbAudit.active_test_execution_count),
-        active_call_execution_count: Number(dbAudit.active_call_execution_count),
+        active_test_execution_count: Number(
+          dbAudit.active_test_execution_count,
+        ),
+        active_call_execution_count: Number(
+          dbAudit.active_call_execution_count,
+        ),
       });
     },
   },
@@ -1398,7 +1570,14 @@ export const simulationAgentccJourneys = [
       "guards",
       "db-audit",
     ],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
 
       const seed = await selectSimulationRunTestSeed(client);
@@ -1413,17 +1592,20 @@ export const simulationAgentccJourneys = [
       let testExecutionId = null;
       let callExecutionId = null;
 
-      cleanup.defer("delete disposable simulation execution-guard run tests", async () => {
-        for (const runTestId of createdRunIds) {
-          await ignoreNotFound(() =>
-            client.delete(
-              apiPath("/simulate/run-tests/{run_test_id}/delete/", {
-                run_test_id: runTestId,
-              }),
-            ),
-          );
-        }
-      });
+      cleanup.defer(
+        "delete disposable simulation execution-guard run tests",
+        async () => {
+          for (const runTestId of createdRunIds) {
+            await ignoreNotFound(() =>
+              client.delete(
+                apiPath("/simulate/run-tests/{run_test_id}/delete/", {
+                  run_test_id: runTestId,
+                }),
+              ),
+            );
+          }
+        },
+      );
       cleanup.defer(
         "delete disposable simulation execution-guard test execution",
         async () => {
@@ -1437,25 +1619,32 @@ export const simulationAgentccJourneys = [
           );
         },
       );
-      cleanup.defer("delete disposable simulation execution-guard call execution", async () => {
-        if (!callExecutionId) return;
-        await ignoreNotFound(() =>
-          client.delete(
-            apiPath("/simulate/call-executions/{call_execution_id}/delete/", {
-              call_execution_id: callExecutionId,
-            }),
-          ),
-        );
-      });
+      cleanup.defer(
+        "delete disposable simulation execution-guard call execution",
+        async () => {
+          if (!callExecutionId) return;
+          await ignoreNotFound(() =>
+            client.delete(
+              apiPath("/simulate/call-executions/{call_execution_id}/delete/", {
+                call_execution_id: callExecutionId,
+              }),
+            ),
+          );
+        },
+      );
 
-      const created = await client.post(apiPath("/simulate/run-tests/create/"), {
-        name: runName,
-        description: "Temporary run test for execution action guard coverage.",
-        agent_definition_id: seed.agentDefinitionId,
-        agent_version: seed.agentVersionId,
-        scenario_ids: [seed.scenarioId],
-        enable_tool_evaluation: false,
-      });
+      const created = await client.post(
+        apiPath("/simulate/run-tests/create/"),
+        {
+          name: runName,
+          description:
+            "Temporary run test for execution action guard coverage.",
+          agent_definition_id: seed.agentDefinitionId,
+          agent_version: seed.agentVersionId,
+          scenario_ids: [seed.scenarioId],
+          enable_tool_evaluation: false,
+        },
+      );
       assert(isUuid(created?.id), "Run-test create did not return a UUID id.");
       createdRunIds.push(created.id);
 
@@ -1482,7 +1671,10 @@ export const simulationAgentccJourneys = [
         {},
       );
       testExecutionId = firstUuid(chatExecution.execution_id);
-      assert(testExecutionId, "Chat execute did not return a test execution id.");
+      assert(
+        testExecutionId,
+        "Chat execute did not return a test execution id.",
+      );
 
       const batch = await client.post(
         apiPath(
@@ -1535,9 +1727,12 @@ export const simulationAgentccJourneys = [
       const callRerunPendingGuard = await expectApiError(
         () =>
           client.post(
-            apiPath("/simulate/test-executions/{test_execution_id}/rerun-calls/", {
-              test_execution_id: testExecutionId,
-            }),
+            apiPath(
+              "/simulate/test-executions/{test_execution_id}/rerun-calls/",
+              {
+                test_execution_id: testExecutionId,
+              },
+            ),
             { rerun_type: "eval_only", select_all: true },
           ),
         [400],
@@ -1551,9 +1746,12 @@ export const simulationAgentccJourneys = [
       const testExecutionRerunTextGuard = await expectApiError(
         () =>
           client.post(
-            apiPath("/simulate/run-tests/{run_test_id}/rerun-test-executions/", {
-              run_test_id: created.id,
-            }),
+            apiPath(
+              "/simulate/run-tests/{run_test_id}/rerun-test-executions/",
+              {
+                run_test_id: created.id,
+              },
+            ),
             { rerun_type: "call_and_eval", select_all: true },
           ),
         [400],
@@ -1621,18 +1819,31 @@ export const simulationAgentccJourneys = [
         eval_refresh_unknown_status: evalRefreshUnknownBody.status,
         optimiser_refresh_unknown_status: optimiserRefreshUnknownBody.status,
         call_rerun_pending_status: callRerunPendingGuard.status,
-        test_execution_rerun_text_guard_status: testExecutionRerunTextGuard.status,
+        test_execution_rerun_text_guard_status:
+          testExecutionRerunTextGuard.status,
         run_new_evals_empty_configs_status: runNewEvalsEmptyConfigs.status,
-        active_test_execution_count: Number(dbAudit.active_test_execution_count),
-        active_call_execution_count: Number(dbAudit.active_call_execution_count),
+        active_test_execution_count: Number(
+          dbAudit.active_test_execution_count,
+        ),
+        active_call_execution_count: Number(
+          dbAudit.active_call_execution_count,
+        ),
       });
     },
   },
   {
     id: "AGENTCC-API-001",
-    title: "Gateway blocklist create, add words, remove words, update, and delete lifecycle",
-    tags: ["gateway", "agentcc", "blocklists", "mutating", "data-roundtrip"],
-    async run({ client, cleanup, runId, evidence }) {
+    title:
+      "Gateway blocklist create, add words, remove words, update, and delete lifecycle",
+    tags: [
+      "gateway",
+      "agentcc",
+      "blocklists",
+      "mutating",
+      "data-roundtrip",
+      "db-audit",
+    ],
+    async run({ client, cleanup, runId, evidence, organizationId }) {
       requireMutations();
       const name = `api_journey_blocklist_${runId.replace(/[^a-z0-9]/gi, "_")}`;
 
@@ -1645,8 +1856,82 @@ export const simulationAgentccJourneys = [
       assert(created?.id, "Blocklist create did not return id.");
       cleanup.defer("delete API journey blocklist", () =>
         ignoreNotFound(() =>
-          client.delete(apiPath("/agentcc/blocklists/{id}/", { id: created.id })),
+          client.delete(
+            apiPath("/agentcc/blocklists/{id}/", { id: created.id }),
+          ),
         ),
+      );
+
+      let dbAudit = await loadAgentccBlocklistDbAudit({
+        blocklistId: created.id,
+        organizationId,
+      });
+      assert(
+        dbAudit.id === created.id &&
+          dbAudit.name === name &&
+          dbAudit.organization_id === organizationId &&
+          dbAudit.deleted === false,
+        "Blocklist DB audit did not find the created org-scoped active row.",
+      );
+
+      const duplicateCreate = await expectApiError(
+        () =>
+          client.post(apiPath("/agentcc/blocklists/"), {
+            name,
+            description: "Duplicate blocklist should be rejected.",
+            words: ["blocked-alpha"],
+          }),
+        [400],
+        "Blocklist create accepted a duplicate active name.",
+      );
+      assert(
+        errorText(duplicateCreate).toLowerCase().includes("unique") ||
+          errorText(duplicateCreate).toLowerCase().includes("duplicate"),
+        "Duplicate blocklist create did not return a uniqueness error.",
+      );
+
+      const invalidCreate = await expectApiError(
+        () =>
+          client.post(apiPath("/agentcc/blocklists/"), {
+            name: `${name}_invalid`,
+            words: "blocked-alpha",
+          }),
+        [400],
+        "Blocklist create accepted a non-array words payload.",
+      );
+      assert(
+        errorText(invalidCreate).toLowerCase().includes("words"),
+        "Invalid blocklist create did not explain the words validation failure.",
+      );
+
+      const detail = await client.get(
+        apiPath("/agentcc/blocklists/{id}/", { id: created.id }),
+      );
+      assert(
+        detail?.id === created.id &&
+          detail.name === name &&
+          asArray(detail.words).includes("blocked-alpha"),
+        "Blocklist detail did not return the created row.",
+      );
+
+      const listed = asArray(await client.get(apiPath("/agentcc/blocklists/")));
+      assert(
+        listed.some((blocklist) => blocklist.id === created.id),
+        "Created blocklist was not visible through list.",
+      );
+
+      const invalidAdd = await expectApiError(
+        () =>
+          client.post(
+            apiPath("/agentcc/blocklists/{id}/add-words/", { id: created.id }),
+            { words: ["blocked-gamma", 123] },
+          ),
+        [400],
+        "Blocklist add-words accepted a non-string word.",
+      );
+      assert(
+        errorText(invalidAdd).includes("Word at index 1 must be a string"),
+        "Blocklist add-words did not identify the invalid word position.",
       );
 
       const withWords = await client.post(
@@ -1668,41 +1953,92 @@ export const simulationAgentccJourneys = [
         "Blocklist remove-words did not remove only the requested word.",
       );
 
+      const invalidRemove = await expectApiError(
+        () =>
+          client.post(
+            apiPath("/agentcc/blocklists/{id}/remove-words/", {
+              id: created.id,
+            }),
+            { words: "blocked-beta" },
+          ),
+        [400],
+        "Blocklist remove-words accepted a non-array words payload.",
+      );
+      assert(
+        errorText(invalidRemove).toLowerCase().includes("words must be a list"),
+        "Blocklist remove-words did not explain the words-list validation failure.",
+      );
+
       const updated = await client.patch(
         apiPath("/agentcc/blocklists/{id}/", { id: created.id }),
         {
-          description: "Updated temporary blocklist for API journey regression.",
+          description:
+            "Updated temporary blocklist for API journey regression.",
           is_active: false,
         },
       );
-      assert(updated.is_active === false, "Blocklist update did not persist is_active.");
-
-      await client.delete(apiPath("/agentcc/blocklists/{id}/", { id: created.id }));
-      const listed = asArray(await client.get(apiPath("/agentcc/blocklists/")));
       assert(
-        !listed.some((blocklist) => blocklist.id === created.id),
+        updated.is_active === false,
+        "Blocklist update did not persist is_active.",
+      );
+
+      await client.delete(
+        apiPath("/agentcc/blocklists/{id}/", { id: created.id }),
+      );
+      const afterDeleteList = asArray(
+        await client.get(apiPath("/agentcc/blocklists/")),
+      );
+      assert(
+        !afterDeleteList.some((blocklist) => blocklist.id === created.id),
         "Deleted blocklist was still visible in list.",
       );
 
-      evidence.push({ blocklist_id: created.id, blocklist_name: name });
+      dbAudit = await loadAgentccBlocklistDbAudit({
+        blocklistId: created.id,
+        organizationId,
+      });
+      assert(
+        dbAudit.deleted === true && dbAudit.deleted_at_set === true,
+        "Blocklist DB audit did not show soft-delete state.",
+      );
+
+      evidence.push({
+        blocklist_id: created.id,
+        blocklist_name: name,
+        duplicate_create_status: duplicateCreate.status,
+        invalid_create_status: invalidCreate.status,
+        invalid_add_status: invalidAdd.status,
+        invalid_remove_status: invalidRemove.status,
+        deleted_at_set: dbAudit.deleted_at_set,
+      });
     },
   },
   {
     id: "AGENTCC-API-002",
-    title: "Gateway custom property schema create, validate, update, and delete lifecycle",
-    tags: ["gateway", "agentcc", "custom-properties", "mutating", "data-roundtrip"],
+    title:
+      "Gateway custom property schema create, validate, update, and delete lifecycle",
+    tags: [
+      "gateway",
+      "agentcc",
+      "custom-properties",
+      "mutating",
+      "data-roundtrip",
+    ],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
       const name = `api_journey_property_${runId.replace(/[^a-z0-9]/gi, "_")}`;
 
-      const created = await client.post(apiPath("/agentcc/custom-properties/"), {
-        name,
-        description: "Temporary custom property for API journey regression.",
-        property_type: "enum",
-        required: true,
-        allowed_values: ["alpha", "beta"],
-        default_value: "alpha",
-      });
+      const created = await client.post(
+        apiPath("/agentcc/custom-properties/"),
+        {
+          name,
+          description: "Temporary custom property for API journey regression.",
+          property_type: "enum",
+          required: true,
+          allowed_values: ["alpha", "beta"],
+          default_value: "alpha",
+        },
+      );
       assert(created?.id, "Custom property schema create did not return id.");
       cleanup.defer("delete API journey custom property", () =>
         ignoreNotFound(() =>
@@ -1712,10 +2048,16 @@ export const simulationAgentccJourneys = [
         ),
       );
 
-      const valid = await client.post(apiPath("/agentcc/custom-properties/validate/"), {
-        properties: { [name]: "beta" },
-      });
-      assert(valid.valid === true, "Custom property validate rejected a valid value.");
+      const valid = await client.post(
+        apiPath("/agentcc/custom-properties/validate/"),
+        {
+          properties: { [name]: "beta" },
+        },
+      );
+      assert(
+        valid.valid === true,
+        "Custom property validate rejected a valid value.",
+      );
 
       const invalid = await client.post(
         apiPath("/agentcc/custom-properties/validate/"),
@@ -1740,14 +2082,21 @@ export const simulationAgentccJourneys = [
         "Custom property update did not persist required/allowed_values.",
       );
 
-      await client.delete(apiPath("/agentcc/custom-properties/{id}/", { id: created.id }));
-      const listed = asArray(await client.get(apiPath("/agentcc/custom-properties/")));
+      await client.delete(
+        apiPath("/agentcc/custom-properties/{id}/", { id: created.id }),
+      );
+      const listed = asArray(
+        await client.get(apiPath("/agentcc/custom-properties/")),
+      );
       assert(
         !listed.some((schema) => schema.id === created.id),
         "Deleted custom property schema was still visible in list.",
       );
 
-      evidence.push({ custom_property_id: created.id, custom_property_name: name });
+      evidence.push({
+        custom_property_id: created.id,
+        custom_property_name: name,
+      });
     },
   },
   {
@@ -1794,7 +2143,10 @@ export const simulationAgentccJourneys = [
       const detail = await client.get(
         apiPath("/agentcc/api-keys/{id}/", { id: created.id }),
       );
-      assert(detail?.id === created.id, "Gateway API key detail returned wrong id.");
+      assert(
+        detail?.id === created.id,
+        "Gateway API key detail returned wrong id.",
+      );
       assert(
         !Object.prototype.hasOwnProperty.call(detail, "key"),
         "Gateway API key detail leaked the raw key after creation.",
@@ -1804,9 +2156,14 @@ export const simulationAgentccJourneys = [
         apiPath("/agentcc/api-keys/{id}/revoke/", { id: created.id }),
         {},
       );
-      assert(revoked.status === "revoked", "Gateway API key revoke did not persist.");
+      assert(
+        revoked.status === "revoked",
+        "Gateway API key revoke did not persist.",
+      );
 
-      await client.delete(apiPath("/agentcc/api-keys/{id}/", { id: created.id }));
+      await client.delete(
+        apiPath("/agentcc/api-keys/{id}/", { id: created.id }),
+      );
       const listed = asArray(await client.get(apiPath("/agentcc/api-keys/")));
       assert(
         !listed.some((key) => key.id === created.id),
@@ -1818,7 +2175,8 @@ export const simulationAgentccJourneys = [
   },
   {
     id: "AGENTCC-API-004",
-    title: "Gateway webhook create, update, list, event list, and delete lifecycle",
+    title:
+      "Gateway webhook create, update, list, event list, and delete lifecycle",
     tags: ["gateway", "agentcc", "webhooks", "mutating", "data-roundtrip"],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
@@ -1858,7 +2216,10 @@ export const simulationAgentccJourneys = [
       const detail = await client.get(
         apiPath("/agentcc/webhooks/{id}/", { id: created.id }),
       );
-      assert(detail?.id === created.id, "Gateway webhook detail returned wrong id.");
+      assert(
+        detail?.id === created.id,
+        "Gateway webhook detail returned wrong id.",
+      );
       assert(
         !Object.prototype.hasOwnProperty.call(detail, "secret"),
         "Gateway webhook detail leaked the write-only secret.",
@@ -1869,9 +2230,14 @@ export const simulationAgentccJourneys = [
           query: { webhook_id: created.id },
         }),
       );
-      assert(Array.isArray(events), "Gateway webhook events list was not an array.");
+      assert(
+        Array.isArray(events),
+        "Gateway webhook events list was not an array.",
+      );
 
-      await client.delete(apiPath("/agentcc/webhooks/{id}/", { id: created.id }));
+      await client.delete(
+        apiPath("/agentcc/webhooks/{id}/", { id: created.id }),
+      );
       const listed = asArray(await client.get(apiPath("/agentcc/webhooks/")));
       assert(
         !listed.some((webhook) => webhook.id === created.id),
@@ -1883,8 +2249,15 @@ export const simulationAgentccJourneys = [
   },
   {
     id: "AGENTCC-API-005",
-    title: "Gateway routing policy create, activate, list, and delete lifecycle",
-    tags: ["gateway", "agentcc", "routing-policies", "mutating", "data-roundtrip"],
+    title:
+      "Gateway routing policy create, activate, list, and delete lifecycle",
+    tags: [
+      "gateway",
+      "agentcc",
+      "routing-policies",
+      "mutating",
+      "data-roundtrip",
+    ],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
       const name = `api_journey_routing_${runId.replace(/[^a-z0-9]/gi, "_")}`;
@@ -1910,7 +2283,10 @@ export const simulationAgentccJourneys = [
           ),
         ),
       );
-      assert(created.version >= 1, "Gateway routing policy did not get a version.");
+      assert(
+        created.version >= 1,
+        "Gateway routing policy did not get a version.",
+      );
 
       const activated = await client.post(
         apiPath("/agentcc/routing-policies/{id}/activate/", { id: created.id }),
@@ -1934,18 +2310,24 @@ export const simulationAgentccJourneys = [
       await client.delete(
         apiPath("/agentcc/routing-policies/{id}/", { id: created.id }),
       );
-      const listed = asArray(await client.get(apiPath("/agentcc/routing-policies/")));
+      const listed = asArray(
+        await client.get(apiPath("/agentcc/routing-policies/")),
+      );
       assert(
         !listed.some((policy) => policy.id === created.id),
         "Deleted gateway routing policy was still visible in list.",
       );
 
-      evidence.push({ routing_policy_id: created.id, routing_policy_name: name });
+      evidence.push({
+        routing_policy_id: created.id,
+        routing_policy_name: name,
+      });
     },
   },
   {
     id: "AGENTCC-API-006",
-    title: "Gateway session create, update, close, requests, and delete lifecycle",
+    title:
+      "Gateway session create, update, close, requests, and delete lifecycle",
     tags: ["gateway", "agentcc", "sessions", "mutating", "data-roundtrip"],
     async run({ client, cleanup, runId, evidence }) {
       requireMutations();
@@ -1990,22 +2372,33 @@ export const simulationAgentccJourneys = [
       const detail = await client.get(
         apiPath("/agentcc/sessions/{id}/", { id: created.id }),
       );
-      assert(detail?.id === created.id, "Gateway session detail returned wrong id.");
+      assert(
+        detail?.id === created.id,
+        "Gateway session detail returned wrong id.",
+      );
       assert(
         detail?.stats && typeof detail.stats.request_count === "number",
         "Gateway session detail did not include request stats.",
       );
 
       const requests = asArray(
-        await client.get(apiPath("/agentcc/sessions/{id}/requests/", { id: created.id })),
+        await client.get(
+          apiPath("/agentcc/sessions/{id}/requests/", { id: created.id }),
+        ),
       );
-      assert(Array.isArray(requests), "Gateway session requests did not return an array.");
+      assert(
+        Array.isArray(requests),
+        "Gateway session requests did not return an array.",
+      );
 
       const closed = await client.post(
         apiPath("/agentcc/sessions/{id}/close/", { id: created.id }),
         {},
       );
-      assert(closed.status === "closed", "Gateway session close did not persist.");
+      assert(
+        closed.status === "closed",
+        "Gateway session close did not persist.",
+      );
 
       const closedSessions = asArray(
         await client.get(apiPath("/agentcc/sessions/"), {
@@ -2017,9 +2410,13 @@ export const simulationAgentccJourneys = [
         "Closed gateway session was not visible through status filter.",
       );
 
-      await client.delete(apiPath("/agentcc/sessions/{id}/", { id: created.id }));
+      await client.delete(
+        apiPath("/agentcc/sessions/{id}/", { id: created.id }),
+      );
       const listed = asArray(
-        await client.get(apiPath("/agentcc/sessions/"), { query: { limit: 100 } }),
+        await client.get(apiPath("/agentcc/sessions/"), {
+          query: { limit: 100 },
+        }),
       );
       assert(
         !listed.some((session) => session.id === created.id),
@@ -2031,7 +2428,8 @@ export const simulationAgentccJourneys = [
   },
   {
     id: "AGENTCC-API-007",
-    title: "Gateway request logs, sessions aggregate, analytics, filters, and detail read consistency",
+    title:
+      "Gateway request logs, sessions aggregate, analytics, filters, and detail read consistency",
     tags: ["gateway", "agentcc", "request-logs", "analytics", "safe"],
     async run({ client, evidence }) {
       const logs = asArray(
@@ -2039,41 +2437,69 @@ export const simulationAgentccJourneys = [
           query: { limit: 5 },
         }),
       );
-      assert(Array.isArray(logs), "Gateway request log list did not return an array.");
+      assert(
+        Array.isArray(logs),
+        "Gateway request log list did not return an array.",
+      );
 
-      const analyticsOverview = await client.get(apiPath("/agentcc/analytics/overview/"));
+      const analyticsOverview = await client.get(
+        apiPath("/agentcc/analytics/overview/"),
+      );
       assert(
         analyticsOverview?.total_requests &&
           typeof analyticsOverview.total_requests.value !== "undefined",
         "Gateway analytics overview did not include total_requests KPI.",
       );
 
-      const usage = await client.get(apiPath("/agentcc/analytics/usage-timeseries/"), {
-        query: { granularity: "day" },
-      });
-      assert(Array.isArray(usage?.series), "Gateway usage analytics missing series.");
+      const usage = await client.get(
+        apiPath("/agentcc/analytics/usage-timeseries/"),
+        {
+          query: { granularity: "day" },
+        },
+      );
+      assert(
+        Array.isArray(usage?.series),
+        "Gateway usage analytics missing series.",
+      );
 
-      const cost = await client.get(apiPath("/agentcc/analytics/cost-breakdown/"), {
-        query: { group_by: "model", top_n: 5 },
-      });
-      assert(Array.isArray(cost?.breakdown), "Gateway cost analytics missing breakdown.");
+      const cost = await client.get(
+        apiPath("/agentcc/analytics/cost-breakdown/"),
+        {
+          query: { group_by: "model", top_n: 5 },
+        },
+      );
+      assert(
+        Array.isArray(cost?.breakdown),
+        "Gateway cost analytics missing breakdown.",
+      );
 
-      const latency = await client.get(apiPath("/agentcc/analytics/latency-stats/"));
+      const latency = await client.get(
+        apiPath("/agentcc/analytics/latency-stats/"),
+      );
       assert(
         latency?.summary && Array.isArray(latency?.timeseries),
         "Gateway latency analytics missing summary/timeseries.",
       );
 
-      const errors = await client.get(apiPath("/agentcc/analytics/error-breakdown/"), {
-        query: { group_by: "status_code" },
-      });
+      const errors = await client.get(
+        apiPath("/agentcc/analytics/error-breakdown/"),
+        {
+          query: { group_by: "status_code" },
+        },
+      );
       assert(
-        Array.isArray(errors?.breakdown) && Array.isArray(errors?.error_timeseries),
+        Array.isArray(errors?.breakdown) &&
+          Array.isArray(errors?.error_timeseries),
         "Gateway error analytics missing breakdown/timeseries.",
       );
 
-      const models = await client.get(apiPath("/agentcc/analytics/model-comparison/"));
-      assert(Array.isArray(models?.models), "Gateway model comparison missing models array.");
+      const models = await client.get(
+        apiPath("/agentcc/analytics/model-comparison/"),
+      );
+      assert(
+        Array.isArray(models?.models),
+        "Gateway model comparison missing models array.",
+      );
 
       const sessionAggregates = asArray(
         await client.get(apiPath("/agentcc/request-logs/sessions/"), {
@@ -2150,8 +2576,9 @@ export const simulationAgentccJourneys = [
         );
       }
 
-      const searchTerm =
-        String(sample.model || sample.provider || sample.request_id || "").slice(0, 8);
+      const searchTerm = String(
+        sample.model || sample.provider || sample.request_id || "",
+      ).slice(0, 8);
       if (searchTerm.length >= 2) {
         const searched = asArray(
           await client.get(apiPath("/agentcc/request-logs/search/"), {
@@ -2201,7 +2628,8 @@ export const simulationAgentccJourneys = [
   },
   {
     id: "AGENTCC-API-008",
-    title: "Gateway provider credential create, mask, rotate, update, and delete lifecycle",
+    title:
+      "Gateway provider credential create, mask, rotate, update, and delete lifecycle",
     tags: [
       "gateway",
       "agentcc",
@@ -2218,17 +2646,20 @@ export const simulationAgentccJourneys = [
       const initialKey = `sk-api-journey-${suffix}-initial-secret-value`;
       const rotatedKey = `sk-api-journey-${suffix}-rotated-secret-value`;
 
-      const created = await client.post(apiPath("/agentcc/provider-credentials/"), {
-        provider_name: providerName,
-        display_name: "API journey provider",
-        credentials: { api_key: initialKey },
-        api_format: "openai",
-        models_list: ["gpt-4o-mini"],
-        default_timeout_seconds: 30,
-        max_concurrent: 4,
-        conn_pool_size: 8,
-        extra_config: { source: "api-journey", runId },
-      });
+      const created = await client.post(
+        apiPath("/agentcc/provider-credentials/"),
+        {
+          provider_name: providerName,
+          display_name: "API journey provider",
+          credentials: { api_key: initialKey },
+          api_format: "openai",
+          models_list: ["gpt-4o-mini"],
+          default_timeout_seconds: 30,
+          max_concurrent: 4,
+          conn_pool_size: 8,
+          extra_config: { source: "api-journey", runId },
+        },
+      );
       assert(created?.id, "Provider credential create did not return id.");
       cleanup.defer("delete API journey provider credential", () =>
         ignoreNotFound(() =>
@@ -2269,7 +2700,10 @@ export const simulationAgentccJourneys = [
       const detail = await client.get(
         apiPath("/agentcc/provider-credentials/{id}/", { id: created.id }),
       );
-      assert(detail?.id === created.id, "Provider credential detail returned wrong id.");
+      assert(
+        detail?.id === created.id,
+        "Provider credential detail returned wrong id.",
+      );
       assertProviderCredentialSecretMasked(detail, initialKey);
 
       const updated = await client.patch(
@@ -2292,10 +2726,15 @@ export const simulationAgentccJourneys = [
       assertProviderCredentialSecretMasked(updated, initialKey);
 
       const rotated = await client.post(
-        apiPath("/agentcc/provider-credentials/{id}/rotate/", { id: created.id }),
+        apiPath("/agentcc/provider-credentials/{id}/rotate/", {
+          id: created.id,
+        }),
         { credentials: { api_key: rotatedKey } },
       );
-      assert(rotated.last_rotated_at, "Provider credential rotate did not set last_rotated_at.");
+      assert(
+        rotated.last_rotated_at,
+        "Provider credential rotate did not set last_rotated_at.",
+      );
       assertProviderCredentialSecretMasked(rotated, rotatedKey);
 
       dbAudit = await loadAgentccProviderCredentialDbAudit({
@@ -2310,7 +2749,9 @@ export const simulationAgentccJourneys = [
         "Provider credential DB audit did not preserve encrypted active state after rotate.",
       );
 
-      await client.delete(apiPath("/agentcc/provider-credentials/{id}/", { id: created.id }));
+      await client.delete(
+        apiPath("/agentcc/provider-credentials/{id}/", { id: created.id }),
+      );
       const afterDelete = asArray(
         await client.get(apiPath("/agentcc/provider-credentials/"), {
           query: { provider_name: providerName },
@@ -2335,13 +2776,16 @@ export const simulationAgentccJourneys = [
         provider_credential_id: created.id,
         provider_name: providerName,
         masked_secret: rotated.credentials?.api_key || null,
-        encrypted_credentials_bytes: Number(dbAudit.encrypted_credentials_bytes),
+        encrypted_credentials_bytes: Number(
+          dbAudit.encrypted_credentials_bytes,
+        ),
       });
     },
   },
   {
     id: "AGENTCC-API-009",
-    title: "Gateway guardrail policy create, encrypted secret preservation, sync, and delete lifecycle",
+    title:
+      "Gateway guardrail policy create, encrypted secret preservation, sync, and delete lifecycle",
     tags: [
       "gateway",
       "agentcc",
@@ -2358,8 +2802,13 @@ export const simulationAgentccJourneys = [
       const checkName = `api_journey_check_${suffix}`;
       const checkSecret = `gr-api-journey-${suffix}-secret-value`;
 
-      const topics = await client.get(apiPath("/agentcc/guardrail-configs/topics/"));
-      assert(Array.isArray(asArray(topics)), "Guardrail topics catalog was not array-like.");
+      const topics = await client.get(
+        apiPath("/agentcc/guardrail-configs/topics/"),
+      );
+      assert(
+        Array.isArray(asArray(topics)),
+        "Guardrail topics catalog was not array-like.",
+      );
       const piiEntities = await client.get(
         apiPath("/agentcc/guardrail-configs/pii-entities/"),
       );
@@ -2368,26 +2817,29 @@ export const simulationAgentccJourneys = [
         "Guardrail PII entities catalog was not array-like.",
       );
 
-      const created = await client.post(apiPath("/agentcc/guardrail-policies/"), {
-        name,
-        description: "Temporary guardrail policy for API journey regression.",
-        scope: "global",
-        mode: "monitor",
-        is_active: false,
-        priority: 997,
-        checks: [
-          {
-            name: checkName,
-            type: "regex",
-            enabled: true,
-            config: {
-              pattern: "api-journey",
-              action: "flag",
-              api_key: checkSecret,
+      const created = await client.post(
+        apiPath("/agentcc/guardrail-policies/"),
+        {
+          name,
+          description: "Temporary guardrail policy for API journey regression.",
+          scope: "global",
+          mode: "monitor",
+          is_active: false,
+          priority: 997,
+          checks: [
+            {
+              name: checkName,
+              type: "regex",
+              enabled: true,
+              config: {
+                pattern: "api-journey",
+                action: "flag",
+                api_key: checkSecret,
+              },
             },
-          },
-        ],
-      });
+          ],
+        },
+      );
       assert(created?.id, "Guardrail policy create did not return id.");
       cleanup.defer("delete API journey guardrail policy", () =>
         ignoreNotFound(() =>
@@ -2418,7 +2870,10 @@ export const simulationAgentccJourneys = [
       const detail = await client.get(
         apiPath("/agentcc/guardrail-policies/{id}/", { id: created.id }),
       );
-      assert(detail?.id === created.id, "Guardrail policy detail returned wrong id.");
+      assert(
+        detail?.id === created.id,
+        "Guardrail policy detail returned wrong id.",
+      );
       assertGuardrailSecretSanitized(detail, checkName, checkSecret);
 
       const updated = await client.patch(
@@ -2447,7 +2902,10 @@ export const simulationAgentccJourneys = [
       );
       assertGuardrailSecretSanitized(updated, checkName, checkSecret);
 
-      const syncResult = await client.post(apiPath("/agentcc/guardrail-policies/sync/"), {});
+      const syncResult = await client.post(
+        apiPath("/agentcc/guardrail-policies/sync/"),
+        {},
+      );
       assert(
         syncResult.synced === true &&
           Object.prototype.hasOwnProperty.call(syncResult, "gateway_synced"),
@@ -2466,8 +2924,12 @@ export const simulationAgentccJourneys = [
         "Guardrail policy DB audit did not preserve sanitized secret after patch.",
       );
 
-      await client.delete(apiPath("/agentcc/guardrail-policies/{id}/", { id: created.id }));
-      const listed = asArray(await client.get(apiPath("/agentcc/guardrail-policies/")));
+      await client.delete(
+        apiPath("/agentcc/guardrail-policies/{id}/", { id: created.id }),
+      );
+      const listed = asArray(
+        await client.get(apiPath("/agentcc/guardrail-policies/")),
+      );
       assert(
         !listed.some((policy) => policy.id === created.id),
         "Deleted guardrail policy was still visible in list.",
@@ -2487,13 +2949,15 @@ export const simulationAgentccJourneys = [
         guardrail_policy_id: created.id,
         guardrail_policy_name: name,
         sync_gateway_synced: syncResult.gateway_synced,
-        encrypted_check_configs_present: dbAudit.encrypted_check_configs_present,
+        encrypted_check_configs_present:
+          dbAudit.encrypted_check_configs_present,
       });
     },
   },
   {
     id: "AGENTCC-API-010",
-    title: "Gateway overview, budget, alerting, fallback, MCP, and org-config restore lifecycle",
+    title:
+      "Gateway overview, budget, alerting, fallback, MCP, and org-config restore lifecycle",
     tags: [
       "gateway",
       "agentcc",
@@ -2533,7 +2997,10 @@ export const simulationAgentccJourneys = [
         beforeConfigIds,
         originalActiveConfigId: originalActiveConfig.id,
       });
-      cleanup.defer("restore AgentCC gateway org config versions", restoreOrgConfig);
+      cleanup.defer(
+        "restore AgentCC gateway org config versions",
+        restoreOrgConfig,
+      );
 
       const gateways = asArray(await client.get(apiPath("/agentcc/gateways/")));
       assert(
@@ -2552,7 +3019,8 @@ export const simulationAgentccJourneys = [
         {},
       );
       assert(
-        health?.status === "healthy" && typeof health.provider_count === "number",
+        health?.status === "healthy" &&
+          typeof health.provider_count === "number",
         "Gateway health check did not return healthy provider counters.",
       );
       const providerSummary = await client.get(
@@ -2645,14 +3113,15 @@ export const simulationAgentccJourneys = [
       );
       assert(
         gatewayConfig.alerting?.rules?.[alertRuleName]?.threshold === 99.99 &&
-          gatewayConfig.alerting?.channels?.[alertChannelName]?.type === "webhook",
+          gatewayConfig.alerting?.channels?.[alertChannelName]?.type ===
+            "webhook",
         "Gateway config did not expose the disposable alert rule/channel.",
       );
       assert(
         gatewayConfig.routing?.fallback_enabled === true &&
-          asArray(gatewayConfig.routing?.model_fallbacks?.[primaryModel]).includes(
-            fallbackModel,
-          ),
+          asArray(
+            gatewayConfig.routing?.model_fallbacks?.[primaryModel],
+          ).includes(fallbackModel),
         "Gateway config did not expose the disposable fallback routing rule.",
       );
 
@@ -2675,7 +3144,9 @@ export const simulationAgentccJourneys = [
       );
 
       const mcpGuardrails = await client.post(
-        apiPath("/agentcc/gateways/{id}/update-mcp-guardrails/", { id: gatewayId }),
+        apiPath("/agentcc/gateways/{id}/update-mcp-guardrails/", {
+          id: gatewayId,
+        }),
         {
           config: {
             enabled: true,
@@ -2699,7 +3170,9 @@ export const simulationAgentccJourneys = [
         "Gateway config did not expose the disposable MCP server.",
       );
       assert(
-        asArray(gatewayConfig.mcp?.guardrails?.server_ids).includes(mcpServerId),
+        asArray(gatewayConfig.mcp?.guardrails?.server_ids).includes(
+          mcpServerId,
+        ),
         "Gateway config did not expose MCP guardrail server binding.",
       );
 
@@ -2712,7 +3185,9 @@ export const simulationAgentccJourneys = [
         "Gateway MCP status response did not include enabled/servers.",
       );
       const mcpTools = asArray(
-        await client.get(apiPath("/agentcc/gateways/{id}/mcp-tools/", { id: gatewayId })),
+        await client.get(
+          apiPath("/agentcc/gateways/{id}/mcp-tools/", { id: gatewayId }),
+        ),
       );
       const mcpResources = asArray(
         await client.get(
@@ -2736,14 +3211,18 @@ export const simulationAgentccJourneys = [
         { level: budgetLevel },
       );
       assert(
-        removedBudget?.action === "removed" && removedBudget.budget === budgetLevel,
+        removedBudget?.action === "removed" &&
+          removedBudget.budget === budgetLevel,
         "Gateway budget remove response did not echo the budget level/action.",
       );
       gatewayConfig = await client.get(
         apiPath("/agentcc/gateways/{id}/config/", { id: gatewayId }),
       );
       assert(
-        !Object.prototype.hasOwnProperty.call(gatewayConfig.budgets || {}, budgetLevel),
+        !Object.prototype.hasOwnProperty.call(
+          gatewayConfig.budgets || {},
+          budgetLevel,
+        ),
         "Gateway config still exposed the disposable budget after remove-budget.",
       );
 
@@ -2811,13 +3290,16 @@ export const simulationAgentccJourneys = [
           removedBudget.gateway_synced,
           removedMcpServer.gateway_synced,
         ],
-        created_config_deleted_count: Number(dbAudit.created_config_deleted_count),
+        created_config_deleted_count: Number(
+          dbAudit.created_config_deleted_count,
+        ),
       });
     },
   },
   {
     id: "AGENTCC-API-011",
-    title: "Gateway email alert create, mask, patch, validation-only test, and delete lifecycle",
+    title:
+      "Gateway email alert create, mask, patch, validation-only test, and delete lifecycle",
     tags: [
       "gateway",
       "agentcc",
@@ -2876,10 +3358,15 @@ export const simulationAgentccJourneys = [
       assert(created?.id, "Email alert create did not return id.");
       cleanup.defer("delete API journey email alert", () =>
         ignoreNotFound(() =>
-          client.delete(apiPath("/agentcc/email-alerts/{id}/", { id: created.id })),
+          client.delete(
+            apiPath("/agentcc/email-alerts/{id}/", { id: created.id }),
+          ),
         ),
       );
-      assertEmailAlertProviderConfigMasked(created, [initialApiKey, initialPassword]);
+      assertEmailAlertProviderConfigMasked(created, [
+        initialApiKey,
+        initialPassword,
+      ]);
 
       let dbAudit = await loadAgentccEmailAlertDbAudit({
         alertId: created.id,
@@ -2894,7 +3381,9 @@ export const simulationAgentccJourneys = [
         "Email alert DB audit did not find encrypted created config.",
       );
 
-      const listed = asArray(await client.get(apiPath("/agentcc/email-alerts/")));
+      const listed = asArray(
+        await client.get(apiPath("/agentcc/email-alerts/")),
+      );
       assert(
         listed.some((alert) => alert.id === created.id),
         "Created email alert was not visible in list.",
@@ -2907,14 +3396,23 @@ export const simulationAgentccJourneys = [
       const detail = await client.get(
         apiPath("/agentcc/email-alerts/{id}/", { id: created.id }),
       );
-      assert(detail?.id === created.id, "Email alert detail returned wrong id.");
-      assertEmailAlertProviderConfigMasked(detail, [initialApiKey, initialPassword]);
+      assert(
+        detail?.id === created.id,
+        "Email alert detail returned wrong id.",
+      );
+      assertEmailAlertProviderConfigMasked(detail, [
+        initialApiKey,
+        initialPassword,
+      ]);
 
       const invalidTest = await expectApiError(
         () =>
-          client.post(apiPath("/agentcc/email-alerts/{id}/test/", { id: created.id }), {
-            recipient_override: "not-an-email",
-          }),
+          client.post(
+            apiPath("/agentcc/email-alerts/{id}/test/", { id: created.id }),
+            {
+              recipient_override: "not-an-email",
+            },
+          ),
         [400],
         "Expected email-alert test endpoint to reject invalid recipient without sending email.",
       );
@@ -2948,10 +3446,15 @@ export const simulationAgentccJourneys = [
         updated.is_active === true &&
           updated.cooldown_minutes === 23 &&
           asArray(updated.events).includes("latency.spike") &&
-          asArray(updated.recipients).includes("api-journey-updated@example.com"),
+          asArray(updated.recipients).includes(
+            "api-journey-updated@example.com",
+          ),
         "Email alert patch did not persist active/cooldown/events/recipients.",
       );
-      assertEmailAlertProviderConfigMasked(updated, [rotatedApiKey, rotatedPassword]);
+      assertEmailAlertProviderConfigMasked(updated, [
+        rotatedApiKey,
+        rotatedPassword,
+      ]);
 
       dbAudit = await loadAgentccEmailAlertDbAudit({
         alertId: created.id,
@@ -2970,8 +3473,12 @@ export const simulationAgentccJourneys = [
         "Email alert API readback did not preserve non-secret SMTP host config.",
       );
 
-      await client.delete(apiPath("/agentcc/email-alerts/{id}/", { id: created.id }));
-      const afterDelete = asArray(await client.get(apiPath("/agentcc/email-alerts/")));
+      await client.delete(
+        apiPath("/agentcc/email-alerts/{id}/", { id: created.id }),
+      );
+      const afterDelete = asArray(
+        await client.get(apiPath("/agentcc/email-alerts/")),
+      );
       assert(
         !afterDelete.some((alert) => alert.id === created.id),
         "Deleted email alert was still visible in list.",
@@ -3151,14 +3658,17 @@ function statusIsCompleted(value) {
 }
 
 async function findEvalTemplateDetailByName(client, name) {
-  const payload = await client.post(apiPath("/model-hub/eval-templates/list/"), {
-    page: 0,
-    page_size: 10,
-    owner_filter: "all",
-    search: name,
-    sort_by: "updated_at",
-    sort_order: "desc",
-  });
+  const payload = await client.post(
+    apiPath("/model-hub/eval-templates/list/"),
+    {
+      page: 0,
+      page_size: 10,
+      owner_filter: "all",
+      search: name,
+      sort_by: "updated_at",
+      sort_order: "desc",
+    },
+  );
   const row = asArray(payload?.items).find(
     (item) => item?.name === name && isUuid(item?.id),
   );
@@ -3260,7 +3770,8 @@ function assertSimulationSdkCodeSafe(payload) {
 
 function findSdkCredentialLiterals(sdkCode) {
   const findings = [];
-  const assignmentPattern = /\b(FI_API_KEY|FI_SECRET_KEY)\s*=\s*["']([^"']+)["']/g;
+  const assignmentPattern =
+    /\b(FI_API_KEY|FI_SECRET_KEY)\s*=\s*["']([^"']+)["']/g;
   for (const match of sdkCode.matchAll(assignmentPattern)) {
     const [, name, value] = match;
     if (value.startsWith("<") || value.includes("YOUR_")) continue;
@@ -3290,7 +3801,9 @@ function assertGuardrailSecretSanitized(payload, checkName, rawSecret) {
     !serialized.includes(rawSecret),
     "Guardrail policy API response leaked the raw check secret.",
   );
-  const check = asArray(payload?.checks).find((item) => item?.name === checkName);
+  const check = asArray(payload?.checks).find(
+    (item) => item?.name === checkName,
+  );
   assert(check, "Guardrail policy response did not include the created check.");
   assert(
     check.config?.api_key === "__encrypted__",
@@ -3337,7 +3850,9 @@ function createAgentccOrgConfigRestorer({
       deleted_config_versions: [],
     };
 
-    const activeConfig = await client.get(apiPath("/agentcc/org-configs/active/"));
+    const activeConfig = await client.get(
+      apiPath("/agentcc/org-configs/active/"),
+    );
     if (activeConfig?.id !== originalActiveConfigId) {
       await client.post(
         apiPath("/agentcc/org-configs/{id}/activate/", {
@@ -3348,7 +3863,9 @@ function createAgentccOrgConfigRestorer({
       restoreEvidence.activated_original = true;
     }
 
-    const configs = collectionRows(await client.get(apiPath("/agentcc/org-configs/")));
+    const configs = collectionRows(
+      await client.get(apiPath("/agentcc/org-configs/")),
+    );
     const disposableConfigs = configs.filter(
       (config) =>
         config?.id &&
@@ -3370,7 +3887,11 @@ function createAgentccOrgConfigRestorer({
   };
 }
 
-async function loadSimulationRunDbAudit(runTestId, organizationId, workspaceId) {
+async function loadSimulationRunDbAudit(
+  runTestId,
+  organizationId,
+  workspaceId,
+) {
   const sql = `
 WITH selected_run AS (
   SELECT id, name
@@ -3536,6 +4057,27 @@ SELECT json_build_object(
     WHERE deleted = false
   )
 );
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadAgentccBlocklistDbAudit({ blocklistId, organizationId }) {
+  const sql = `
+SELECT COALESCE((
+  SELECT json_build_object(
+    'id', id::text,
+    'organization_id', organization_id::text,
+    'name', name,
+    'description', description,
+    'words', words,
+    'is_active', is_active,
+    'deleted', deleted,
+    'deleted_at_set', deleted_at IS NOT NULL
+  )
+  FROM agentcc_blocklist
+  WHERE id = ${sqlUuid(blocklistId)}
+    AND organization_id = ${sqlUuid(organizationId)}
+), '{}'::json);
 `;
   return runPostgresJson(sql);
 }
