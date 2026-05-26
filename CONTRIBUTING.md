@@ -137,7 +137,7 @@ We follow:
 - **Types:** new code must pass `mypy` (we use a baseline for existing code)
 - **JS / TS:** ESLint (Airbnb) + Prettier
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`)
-- **Branch names:** for internal consistency, we use `type/short-description` (e.g. `fix/session-list-pagination`). Not required for fork PRs since we squash-merge and the branch name doesn't carry over.
+- **Branch names:** `type/short-description` (e.g. `fix/session-list-pagination`) for internal branches. Fork branches are unrestricted.
 
 Run `make format` to auto-fix most issues.
 
