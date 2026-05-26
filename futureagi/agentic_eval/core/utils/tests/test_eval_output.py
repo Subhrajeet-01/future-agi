@@ -46,6 +46,9 @@ class TestResponseFormatSchema:
         )
 
     def test_choices_multi_returns_array_schema(self):
+        # uniqueItems is intentionally omitted for broader provider
+        # compatibility. Duplicate-handling is enforced downstream by
+        # aggregate_choice_scores instead.
         assert response_format_schema(
             "choices", ["A", "B", "C"], multi_choice=True
         ) == _envelope(
@@ -53,7 +56,6 @@ class TestResponseFormatSchema:
                 "type": "array",
                 "items": {"type": "string", "enum": ["A", "B", "C"]},
                 "minItems": 1,
-                "uniqueItems": True,
             }
         )
 
