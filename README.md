@@ -94,7 +94,7 @@ Go-based gateway with **~9.9 ns weighted routing**, **~29 k req/s on t3.xlarge**
 
 ---
 
-## 🚀 Quickstart (60 seconds)
+## 🚀 Quickstart (one command)
 
 Two ways, picked by how much you want to install:
 
@@ -134,7 +134,7 @@ cd future-agi
 .\bin\install.ps1
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+The installer pulls images and starts ~12 services. **First boot takes a few minutes** (image download + database migrations) and wants **~8 GB of free RAM**. When it's ready, open [http://localhost:3000](http://localhost:3000).
 <sub>For production, use `./deploy/setup.sh` to generate required secrets and pin the image version.</sub>
 
 </td>
