@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box/Box";
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import GetStartedHeaderView from "./GetStartedHeaderView";
 import SetupStepsView from "./setup-steps/SetupStepsView";
 import { useAuthContext } from "src/auth/hooks";
@@ -10,6 +10,11 @@ import { menuesConstant } from "./constant";
 import { useSearchParams } from "src/routes/hooks";
 import { ShowComponent } from "src/components/show";
 import { Events, PropertyName, trackEvent } from "src/utils/Mixpanel";
+import {
+  buildCurrentFlowContext,
+  getFirstIncompleteStep,
+  trackCurrentFlow,
+} from "src/utils/analytics/currentFlow";
 const TryOutFeatures = React.lazy(
   () => import("./try-out-features/TryOutFeatures"),
 );
@@ -21,7 +26,7 @@ const GetStartedView = () => {
     tab: "addKeys",
   });
   const [_showDemoModal, setShowDemoModal] = useState(false);
-  const { user: _user } = useAuthContext();
+  const { user } = useAuthContext();
   const { contactUs: _contactUs, getStartedVideo: _getStartedVideo } =
     getStartedPage;
 
@@ -42,6 +47,25 @@ const GetStartedView = () => {
       }
     }
     trackEvent(Events.demoVideoPageLoaded, { [PropertyName.status]: "Loaded" });
+    trackCurrentFlow(
+      Events.currentFlowGetStartedTabsLoaded,
+      {
+        ...buildCurrentFlowContext({ user }),
+        event_source: "get_started_view",
+        first_incomplete_step: getFirstIncompleteStep(label),
+        completed_step_count: label
+          ? Object.values(label).filter(Boolean).length
+          : undefined,
+        total_step_count: label ? Object.keys(label).length : undefined,
+      },
+      {
+        onceKeyParts: [
+          "getStartedTabsLoaded",
+          user?.default_workspace_id,
+          user?.id,
+        ],
+      },
+    );
     return label;
   };
 
@@ -59,6 +83,25 @@ const GetStartedView = () => {
   const setCurrentLabel = (label) => {
     setQueryParamState({ tab: label });
   };
+
+  useEffect(() => {
+    if (!user) return;
+    trackCurrentFlow(
+      Events.currentFlowGetStartedViewed,
+      {
+        ...buildCurrentFlowContext({ user }),
+        event_source: "get_started_view",
+        selected_tab: currentLabel.tab,
+      },
+      {
+        onceKeyParts: [
+          "getStartedViewed",
+          user?.default_workspace_id,
+          user?.id,
+        ],
+      },
+    );
+  }, [currentLabel.tab, user]);
 
   return (
     <Box

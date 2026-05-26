@@ -19,6 +19,19 @@ export const Events = {
   sendPasswordClicked: "Send_password_clicked",
   setupOrganizationClicked: "Set_up_organization_clicked",
   demoVideoPageLoaded: "Demo_video_page_loaded",
+  currentFlowPostLoginDecisionResolved:
+    "current_flow_post_login_decision_resolved",
+  currentFlowFirstLandingViewed: "current_flow_first_landing_viewed",
+  currentFlowFirstProductRouteOpened: "current_flow_first_product_route_opened",
+  currentFlowGetStartedViewed: "current_flow_get_started_viewed",
+  currentFlowGetStartedTabsLoaded: "current_flow_get_started_tabs_loaded",
+  currentFlowGetStartedStepSelected: "current_flow_get_started_step_selected",
+  currentFlowGetStartedPrimaryClicked:
+    "current_flow_get_started_primary_clicked",
+  currentFlowTryFeatureClicked: "current_flow_try_feature_clicked",
+  currentFlowFalconViewed: "current_flow_falcon_viewed",
+  currentFlowFalconMessageSent: "current_flow_falcon_message_sent",
+  currentFlowFirstValueCandidate: "current_flow_first_value_candidate",
   ssoSignupClicked: "SSO_signup_clicked",
 
   createOrganizationSetup: "Create Organization Clicked",
