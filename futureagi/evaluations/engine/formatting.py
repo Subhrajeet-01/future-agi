@@ -89,7 +89,10 @@ def format_eval_value(result_data, eval_template):
             )
 
         # Map choice string to numeric score via choice_scores
-        from model_hub.utils.scoring import apply_choice_scores
+        from model_hub.utils.scoring import (
+            aggregate_choice_scores,
+            apply_choice_scores,
+        )
 
         if (
             eval_template
@@ -107,32 +110,16 @@ def format_eval_value(result_data, eval_template):
             and isinstance(choice_result, list)
             and choice_result
         ):
-            # Look up each picked label's score and aggregate.
-            # Multi-pick uses mean across recognised labels — matches the
-            # numeric-aggregation convention in
-            # ``tfc/utils/functions._calculate_numeric_choices_average``.
-            # Single-pick (model returned a list on a single-choice template,
-            # e.g. fallback) falls back to the first label's score so
-            # legacy behaviour is preserved.
-            is_multi = bool(getattr(eval_template, "multi_choice", False))
-            if is_multi:
-                mapped_scores: list[float] = []
-                for c in choice_result:
-                    s = apply_choice_scores(str(c), eval_template.choice_scores)
-                    if s is not None:
-                        mapped_scores.append(float(s))
-                score = (
-                    sum(mapped_scores) / len(mapped_scores)
-                    if mapped_scores
-                    else 0.0
+            if bool(getattr(eval_template, "multi_choice", False)):
+                mapped = aggregate_choice_scores(
+                    choice_result, eval_template.choice_scores
                 )
             else:
                 mapped = apply_choice_scores(
                     str(choice_result[0]), eval_template.choice_scores
                 )
-                score = float(mapped) if mapped is not None else 0.0
             value = {
-                "score": score,
+                "score": float(mapped) if mapped is not None else 0.0,
                 "choices": choice_result,
             }
         else:
