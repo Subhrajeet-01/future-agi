@@ -121,8 +121,18 @@ class GetTraceAnalyticsTool(BaseTool):
             # Sum across all matching traces. `per_trace_aggregate`'s
             # `latency_ms` is `sum(latency_ms)` per trace, so total_lat =
             # sum-of-sums across traces; avg over spans is reconstructed
-            # as total_lat / total_spans (matches the legacy
-            # `Avg("latency_ms")` semantic — mean over all matching spans).
+            # as total_lat / total_spans.
+            #
+            # PG-vs-CH semantic note: legacy `Avg("latency_ms")` on PG
+            # excluded null-latency rows from the denominator. The CH
+            # adapter (tracer/services/clickhouse/v2/adapter.py:376)
+            # coerces null `latency_ms` to 0 at write time, so post-
+            # cutover those rows count in the denominator. This matches
+            # the system-wide `avg(latency_ms)` semantic used by every
+            # other wave-2/wave-3 reader method (see span_reader.py:616,
+            # 738, 851, 910, 1060, 1105). The drift is a property of the
+            # CH-as-canonical-store choice, not a regression introduced
+            # by this migration.
             span_count = sum(v.get("span_count", 0) for v in per_trace.values())
             total_tokens = sum(v.get("total_tokens", 0) for v in per_trace.values())
             total_prompt_tokens = sum(

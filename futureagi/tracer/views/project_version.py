@@ -1239,12 +1239,12 @@ class ProjectVersionView(BaseModelViewSetMixin, ModelViewSet):
             # Single CH fetch covers both the window-wide aggregate
             # (avg_latency/avg_cost/stddev/avg_tokens) and the per-span
             # outlier scan that used to issue two ORM queries. Python
-            # ``statistics.stdev`` matches Django's ``StdDev`` (sample
-            # variance, n-1 — see PG ``STDDEV_SAMP``). All metrics here
-            # are project-scoped via the trace_ids pre-fetch above, which
-            # itself was filtered by ``project=project_version.project``,
-            # so the org/workspace gate is preserved through the trace_ids
-            # pre-step.
+            # ``statistics.pstdev`` matches Django's default ``StdDev``
+            # (population, ``STDDEV_POP``) — see the per-variable comments
+            # below. All metrics here are project-scoped via the
+            # trace_ids pre-fetch above, which itself was filtered by
+            # ``project=project_version.project``, so the org/workspace
+            # gate is preserved through the trace_ids pre-step.
             trace_ids_str = [str(tid) for tid in trace_ids]
             with get_reader() as reader:
                 ch_spans = reader.list_by_trace_ids(trace_ids_str)
@@ -1279,11 +1279,17 @@ class ProjectVersionView(BaseModelViewSetMixin, ModelViewSet):
             latency_mean = (
                 statistics.fmean(root_latencies) if root_latencies else 0
             )
-            # ``statistics.stdev`` matches Django's ``StdDev`` (sample, n-1,
-            # via PG ``STDDEV_SAMP``). Returns NaN/raises for n<2; default to
-            # 0 to preserve the legacy "if latency_std else 0" guard below.
+            # ``statistics.pstdev`` matches Django's default ``StdDev``,
+            # which is **population** stddev (``STDDEV_POP``) — see
+            # django/db/models/aggregates.py::StdDev.__init__ where
+            # ``function = "STDDEV_SAMP" if sample else "STDDEV_POP"`` and
+            # the call sites here used the bare ``StdDev(...)`` form
+            # (sample=False default). ``statistics.pstdev`` returns 0 for
+            # n<2 without raising, so the explicit ``if root_latencies else
+            # 0`` guard stays only to preserve the downstream divide-by-
+            # zero protection at the z-score sites.
             latency_std = (
-                statistics.stdev(root_latencies) if len(root_latencies) > 1 else 0
+                statistics.pstdev(root_latencies) if root_latencies else 0
             )
             cost_mean = (
                 round(statistics.fmean(costs_with_value), 6)
@@ -1291,8 +1297,8 @@ class ProjectVersionView(BaseModelViewSetMixin, ModelViewSet):
                 else 0
             )
             cost_std = (
-                statistics.stdev(costs_with_value)
-                if len(costs_with_value) > 1
+                statistics.pstdev(costs_with_value)
+                if costs_with_value
                 else 0
             )
             avg_tokens = (
