@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import process from "node:process";
 import { promisify } from "node:util";
 import {
@@ -3954,6 +3955,428 @@ export const appCoreJourneys = [
     },
   },
   {
+    id: "CORE-API-015",
+    title:
+      "Falcon MCP connector create, secret masking, tool selection, delete, and DB cleanup",
+    tags: [
+      "core",
+      "settings",
+      "falcon",
+      "mcp-connectors",
+      "mutating",
+      "data-integrity",
+      "credential-safety",
+    ],
+    async run({
+      client,
+      user,
+      organizationId,
+      workspaceId,
+      cleanup,
+      runId,
+      evidence,
+    }) {
+      requireMutations();
+      const userId = currentUserId(user);
+      assert(isUuid(userId), "Falcon connector journey requires current user id.");
+      assert(
+        isUuid(organizationId),
+        "Falcon connector journey requires organization context.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Falcon connector journey requires workspace context.",
+      );
+
+      const suffix = runId.replace(/[^a-z0-9]/gi, "_");
+      const namePrefix = `api_journey_falcon_connector_${suffix}`;
+      const name = `${namePrefix}_primary`;
+      const updatedName = `${namePrefix}_updated`;
+      const rawSecret = `falcon-secret-${suffix}`;
+      const rotatedSecret = `falcon-rotated-secret-${suffix}`;
+      const toolName = `${namePrefix}_tool`;
+      let hardCleaned = false;
+      let createMode = "public_api";
+      let createEntitlementStatus = null;
+      let duplicateCreate = null;
+      let invalidCreate = null;
+
+      await hardDeleteFalconConnectorFixturesDb({
+        namePrefix,
+        organizationId,
+      });
+      cleanup.defer("hard-delete Falcon connector fixture", () =>
+        hardCleaned
+          ? null
+          : hardDeleteFalconConnectorFixturesDb({
+              namePrefix,
+              organizationId,
+            }),
+      );
+
+      let created;
+      try {
+        created = await client.post(apiPath("/falcon-ai/mcp-connectors/"), {
+          name,
+          server_url: "https://example.com/futureagi-api-journey-mcp",
+          transport: "streamable_http",
+          auth_type: "api_key",
+          auth_header_name: "X-FutureAGI-Test",
+          auth_header_value: rawSecret,
+        });
+      } catch (error) {
+        if (error?.status !== 402) throw error;
+        createMode = "db_seeded_after_entitlement";
+        createEntitlementStatus = error.status;
+        created = await seedFalconConnectorDb({
+          name,
+          serverUrl: "https://example.com/futureagi-api-journey-mcp",
+          transport: "streamable_http",
+          authType: "api_key",
+          authHeaderName: "X-FutureAGI-Test",
+          rawSecret,
+          organizationId,
+          workspaceId,
+          userId,
+        });
+      }
+      assert(isUuid(created?.id), "Falcon connector create did not return id.");
+      assert(
+        created.name === name && created.auth_type === "api_key",
+        "Falcon connector create response did not echo canonical fields.",
+      );
+      assertNoPayloadString(
+        created,
+        rawSecret,
+        "Falcon connector create response",
+      );
+
+      if (createMode === "public_api") {
+        duplicateCreate = await expectApiError(
+          () =>
+            client.post(apiPath("/falcon-ai/mcp-connectors/"), {
+              name,
+              server_url: "https://example.com/futureagi-api-journey-duplicate",
+              transport: "streamable_http",
+              auth_type: "none",
+            }),
+          [409],
+          "Falcon connector create accepted a duplicate workspace name.",
+        );
+        assert(
+          errorText(duplicateCreate).toLowerCase().includes("already exists") ||
+            errorText(duplicateCreate).toLowerCase().includes("connector"),
+          "Falcon connector duplicate guard did not explain the name conflict.",
+        );
+
+        invalidCreate = await expectApiError(
+          () =>
+            client.post(apiPath("/falcon-ai/mcp-connectors/"), {
+              name: `${namePrefix}_invalid`,
+              server_url: "not-a-url",
+              transport: "websocket",
+              auth_type: "none",
+            }),
+          [400],
+          "Falcon connector create accepted invalid URL/transport values.",
+        );
+        assert(
+          errorText(invalidCreate).toLowerCase().includes("server_url") ||
+            errorText(invalidCreate).toLowerCase().includes("transport"),
+          "Falcon connector invalid create did not explain URL/transport validation.",
+        );
+      } else {
+        duplicateCreate = await expectApiError(
+          () =>
+            client.post(apiPath("/falcon-ai/mcp-connectors/"), {
+              name,
+              server_url: "https://example.com/futureagi-api-journey-duplicate",
+              transport: "streamable_http",
+              auth_type: "none",
+            }),
+          [402],
+          "Falcon connector gated create unexpectedly bypassed entitlement checks.",
+        );
+        invalidCreate = await expectApiError(
+          () =>
+            client.post(apiPath("/falcon-ai/mcp-connectors/"), {
+              name: `${namePrefix}_invalid`,
+              server_url: "not-a-url",
+              transport: "websocket",
+              auth_type: "none",
+            }),
+          [402],
+          "Falcon connector gated invalid create unexpectedly bypassed entitlement checks.",
+        );
+      }
+
+      let dbAudit = await loadFalconConnectorDbAudit({
+        connectorId: created.id,
+        organizationId,
+        workspaceId,
+        userId,
+        rawSecret,
+      });
+      assertFalconConnectorDbAudit(dbAudit, {
+        name,
+        organizationId,
+        workspaceId,
+        userId,
+        deleted: false,
+        expectedEnabledToolCount: 0,
+      });
+      assert(
+        dbAudit.auth_value_is_encrypted === true &&
+          dbAudit.auth_value_contains_raw_secret === false,
+        "Falcon connector DB audit found unencrypted auth_header_value.",
+      );
+      const initialSecretHash = dbAudit.auth_value_hash;
+
+      const list = asArray(await client.get(apiPath("/falcon-ai/mcp-connectors/")));
+      assert(
+        list.some((connector) => connector.id === created.id),
+        "Falcon connector list did not include the created connector.",
+      );
+      const listRow = list.find((connector) => connector.id === created.id);
+      assert(
+        Number(listRow.tool_count) === 0,
+        "Falcon connector list tool_count did not start at zero.",
+      );
+      assertNoPayloadString(list, rawSecret, "Falcon connector list response");
+
+      const detail = await client.get(
+        apiPath("/falcon-ai/mcp-connectors/{connector_id}/", {
+          connector_id: created.id,
+        }),
+      );
+      assert(
+        detail?.id === created.id &&
+          detail.name === name &&
+          detail.auth_header_name === "X-FutureAGI-Test",
+        "Falcon connector detail did not return the created row.",
+      );
+      assertNoPayloadString(detail, rawSecret, "Falcon connector detail");
+
+      const updated = await client.patch(
+        apiPath("/falcon-ai/mcp-connectors/{connector_id}/", {
+          connector_id: created.id,
+        }),
+        {
+          name: updatedName,
+          server_url: "https://example.com/futureagi-api-journey-mcp-updated",
+          is_active: false,
+          auth_header_name: "X-FutureAGI-Test-Updated",
+        },
+      );
+      assert(
+        updated.name === updatedName &&
+          updated.is_active === false &&
+          updated.auth_header_name === "X-FutureAGI-Test-Updated",
+        "Falcon connector PATCH did not persist display fields.",
+      );
+      assertNoPayloadString(updated, rawSecret, "Falcon connector PATCH response");
+
+      dbAudit = await loadFalconConnectorDbAudit({
+        connectorId: created.id,
+        organizationId,
+        workspaceId,
+        userId,
+        rawSecret,
+      });
+      assertFalconConnectorDbAudit(dbAudit, {
+        name: updatedName,
+        organizationId,
+        workspaceId,
+        userId,
+        deleted: false,
+        expectedEnabledToolCount: 0,
+      });
+      assert(
+        dbAudit.auth_value_is_encrypted === true &&
+          dbAudit.auth_value_contains_raw_secret === false &&
+          dbAudit.auth_value_hash === initialSecretHash,
+        "Falcon connector PATCH without auth_header_value did not preserve the encrypted secret.",
+      );
+
+      const rotated = await client.patch(
+        apiPath("/falcon-ai/mcp-connectors/{connector_id}/", {
+          connector_id: created.id,
+        }),
+        {
+          auth_header_name: "X-FutureAGI-Test-Rotated",
+          auth_header_value: rotatedSecret,
+        },
+      );
+      assert(
+        rotated.auth_header_name === "X-FutureAGI-Test-Rotated",
+        "Falcon connector PATCH did not persist rotated auth header name.",
+      );
+      assertNoPayloadString(rotated, rawSecret, "Falcon connector rotate response");
+      assertNoPayloadString(
+        rotated,
+        rotatedSecret,
+        "Falcon connector rotate response",
+      );
+
+      dbAudit = await loadFalconConnectorDbAudit({
+        connectorId: created.id,
+        organizationId,
+        workspaceId,
+        userId,
+        rawSecret: rotatedSecret,
+      });
+      assertFalconConnectorDbAudit(dbAudit, {
+        name: updatedName,
+        organizationId,
+        workspaceId,
+        userId,
+        deleted: false,
+        expectedEnabledToolCount: 0,
+      });
+      assert(
+        dbAudit.auth_value_is_encrypted === true &&
+          dbAudit.auth_value_contains_raw_secret === false &&
+          dbAudit.auth_value_hash !== initialSecretHash,
+        "Falcon connector PATCH with auth_header_value did not rotate to encrypted storage.",
+      );
+
+      const unknownToolError = await expectApiError(
+        () =>
+          client.patch(
+            apiPath("/falcon-ai/mcp-connectors/{connector_id}/tools/", {
+              connector_id: created.id,
+            }),
+            { enabled_tool_names: [`${toolName}_missing`] },
+          ),
+        [400],
+        "Falcon connector tools update accepted a tool that was never discovered.",
+      );
+      assert(
+        errorText(unknownToolError).toLowerCase().includes("unknown tools"),
+        "Falcon connector unknown-tool guard did not explain the validation error.",
+      );
+
+      const seededToolsAudit = await seedFalconConnectorToolsDb({
+        connectorId: created.id,
+        organizationId,
+        workspaceId,
+        tools: [
+          {
+            name: toolName,
+            description: "Temporary Falcon connector tool for API journey.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: { type: "string" },
+              },
+            },
+          },
+          {
+            name: `${toolName}_secondary`,
+            description: "Temporary disabled Falcon connector tool.",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+      });
+      assert(
+        Number(seededToolsAudit.discovered_tool_count) === 2,
+        "Falcon connector DB tool seed did not persist discovered tools.",
+      );
+
+      const toolUpdate = await client.patch(
+        apiPath("/falcon-ai/mcp-connectors/{connector_id}/tools/", {
+          connector_id: created.id,
+        }),
+        { enabled_tool_names: [toolName] },
+      );
+      assert(
+        asArray(toolUpdate.enabled_tool_names).includes(toolName),
+        "Falcon connector tools update did not persist enabled_tool_names.",
+      );
+      assertNoPayloadString(toolUpdate, rawSecret, "Falcon connector tools update");
+      assertNoPayloadString(
+        toolUpdate,
+        rotatedSecret,
+        "Falcon connector tools update",
+      );
+
+      const missingDetail = await expectApiError(
+        () =>
+          client.get(
+            apiPath("/falcon-ai/mcp-connectors/{connector_id}/", {
+              connector_id: "00000000-0000-0000-0000-000000000000",
+            }),
+          ),
+        [404],
+        "Falcon connector missing detail unexpectedly succeeded.",
+      );
+
+      await client.delete(
+        apiPath("/falcon-ai/mcp-connectors/{connector_id}/", {
+          connector_id: created.id,
+        }),
+      );
+
+      const listAfterDelete = asArray(
+        await client.get(apiPath("/falcon-ai/mcp-connectors/")),
+      );
+      assert(
+        !listAfterDelete.some((connector) => connector.id === created.id),
+        "Deleted Falcon connector remained visible through list.",
+      );
+
+      dbAudit = await loadFalconConnectorDbAudit({
+        connectorId: created.id,
+        organizationId,
+        workspaceId,
+        userId,
+        rawSecret: rotatedSecret,
+      });
+      assertFalconConnectorDbAudit(dbAudit, {
+        name: updatedName,
+        organizationId,
+        workspaceId,
+        userId,
+        deleted: true,
+        expectedEnabledToolCount: 1,
+      });
+      assert(
+        dbAudit.deleted_at_set === true,
+        "Falcon connector public delete did not stamp deleted_at.",
+      );
+
+      const cleanupAudit = await hardDeleteFalconConnectorFixturesDb({
+        namePrefix,
+        organizationId,
+      });
+      hardCleaned = true;
+      assert(
+        Number(cleanupAudit.remaining_connector_count) === 0,
+        `Falcon connector hard cleanup left disposable rows behind: ${JSON.stringify(cleanupAudit)}`,
+      );
+
+      evidence.push({
+        connector_id: created.id,
+        connector_name: updatedName,
+        create_mode: createMode,
+        create_entitlement_status: createEntitlementStatus,
+        duplicate_create_status: duplicateCreate.status,
+        invalid_create_status: invalidCreate.status,
+        unknown_tool_status: unknownToolError.status,
+        missing_detail_status: missingDetail.status,
+        discovered_tool_count: seededToolsAudit.discovered_tool_count,
+        enabled_tool_names: toolUpdate.enabled_tool_names,
+        encrypted_secret_stored: dbAudit.auth_value_is_encrypted,
+        auth_hash_preserved_without_secret: true,
+        rotated_secret_encrypted: true,
+        raw_secret_in_api: false,
+        deleted_at_set: dbAudit.deleted_at_set,
+        cleanup_remaining_connector_count:
+          cleanupAudit.remaining_connector_count,
+      });
+    },
+  },
+  {
     id: "CORE-API-002",
     title:
       "Developer secret key create, masked list, disable, enable, and delete lifecycle",
@@ -4514,6 +4937,13 @@ function assertNoCredentialLeak(payload, seeded, label) {
   assert(
     !/"public_key"|"secret_key"/.test(text),
     `${label} exposed raw credential field names.`,
+  );
+}
+
+function assertNoPayloadString(payload, forbidden, label) {
+  assert(
+    !JSON.stringify(payload ?? {}).includes(forbidden),
+    `${label} leaked a forbidden credential value.`,
   );
 }
 
@@ -6401,6 +6831,317 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
+async function loadFalconConnectorDbAudit({
+  connectorId,
+  organizationId,
+  workspaceId,
+  userId,
+  rawSecret,
+}) {
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlUuid(connectorId)} AS connector_id,
+    ${sqlUuid(organizationId)} AS organization_id,
+    ${sqlUuid(workspaceId)} AS workspace_id,
+    ${sqlUuid(userId)} AS user_id,
+    ${sqlTextLiteral(rawSecret)} AS raw_secret
+),
+connector_rows AS (
+  SELECT
+    connector.id,
+    connector.name,
+    connector.server_url,
+    connector.transport,
+    connector.auth_type,
+    connector.auth_header_name,
+    connector.auth_header_value,
+    connector.organization_id,
+    connector.workspace_id,
+    connector.created_by_id,
+    connector.is_active,
+    connector.is_verified,
+    connector.discovered_tools,
+    connector.enabled_tool_names,
+    connector.deleted,
+    connector.deleted_at IS NOT NULL AS deleted_at_set
+  FROM falcon_ai_mcpconnector connector
+  JOIN requested r ON connector.id = r.connector_id
+)
+SELECT json_build_object(
+  'connector_count', (SELECT count(*) FROM connector_rows),
+  'id', (SELECT id::text FROM connector_rows LIMIT 1),
+  'name', (SELECT name FROM connector_rows LIMIT 1),
+  'server_url', (SELECT server_url FROM connector_rows LIMIT 1),
+  'transport', (SELECT transport FROM connector_rows LIMIT 1),
+  'auth_type', (SELECT auth_type FROM connector_rows LIMIT 1),
+  'auth_header_name', (SELECT auth_header_name FROM connector_rows LIMIT 1),
+  'organization_id', (SELECT organization_id::text FROM connector_rows LIMIT 1),
+  'workspace_id', (SELECT workspace_id::text FROM connector_rows LIMIT 1),
+  'created_by_id', (SELECT created_by_id::text FROM connector_rows LIMIT 1),
+  'is_active', (SELECT is_active FROM connector_rows LIMIT 1),
+  'is_verified', (SELECT is_verified FROM connector_rows LIMIT 1),
+  'deleted', (SELECT deleted FROM connector_rows LIMIT 1),
+  'deleted_at_set', (SELECT deleted_at_set FROM connector_rows LIMIT 1),
+  'auth_value_is_encrypted',
+    COALESCE((SELECT auth_header_value LIKE 'enc::%' FROM connector_rows LIMIT 1), false),
+  'auth_value_hash',
+    COALESCE((SELECT md5(auth_header_value) FROM connector_rows LIMIT 1), ''),
+  'auth_value_contains_raw_secret',
+    COALESCE((SELECT position((SELECT raw_secret FROM requested) in auth_header_value) > 0 FROM connector_rows LIMIT 1), false),
+  'discovered_tool_count',
+    COALESCE((SELECT jsonb_array_length(discovered_tools::jsonb) FROM connector_rows LIMIT 1), 0),
+  'enabled_tool_count',
+    COALESCE((SELECT jsonb_array_length(enabled_tool_names::jsonb) FROM connector_rows LIMIT 1), 0),
+  'enabled_tool_names',
+    COALESCE((SELECT enabled_tool_names FROM connector_rows LIMIT 1), '[]'::jsonb)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function seedFalconConnectorDb({
+  name,
+  serverUrl,
+  transport,
+  authType,
+  authHeaderName,
+  rawSecret,
+  organizationId,
+  workspaceId,
+  userId,
+}) {
+  const connectorId = randomUUID();
+  const encryptedSecret = await encryptFalconConnectorSecret(rawSecret);
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlUuid(connectorId)} AS connector_id,
+    ${sqlTextLiteral(name)} AS name,
+    ${sqlTextLiteral(serverUrl)} AS server_url,
+    ${sqlTextLiteral(transport)} AS transport,
+    ${sqlTextLiteral(authType)} AS auth_type,
+    ${sqlTextLiteral(authHeaderName)} AS auth_header_name,
+    ${sqlTextLiteral(encryptedSecret)} AS auth_header_value,
+    ${sqlUuid(organizationId)} AS organization_id,
+    ${sqlUuid(workspaceId)} AS workspace_id,
+    ${sqlUuid(userId)} AS user_id
+),
+deleted_existing AS (
+  DELETE FROM falcon_ai_mcpconnector connector
+  USING requested r
+  WHERE connector.organization_id = r.organization_id
+    AND connector.workspace_id = r.workspace_id
+    AND connector.name = r.name
+),
+inserted AS (
+  INSERT INTO falcon_ai_mcpconnector (
+    created_at,
+    updated_at,
+    deleted,
+    deleted_at,
+    id,
+    name,
+    server_url,
+    transport,
+    auth_type,
+    auth_header_name,
+    auth_header_value,
+    is_active,
+    is_verified,
+    discovered_tools,
+    enabled_tool_names,
+    last_discovery_at,
+    last_error,
+    created_by_id,
+    organization_id,
+    workspace_id,
+    oauth_client_id,
+    oauth_client_secret,
+    oauth_server_metadata,
+    oauth_access_token,
+    oauth_refresh_token,
+    oauth_token_expires_at,
+    oauth_code_verifier,
+    oauth_state
+  )
+  SELECT
+    NOW(),
+    NOW(),
+    false,
+    NULL,
+    connector_id,
+    name,
+    server_url,
+    transport,
+    auth_type,
+    auth_header_name,
+    auth_header_value,
+    true,
+    false,
+    '[]'::jsonb,
+    '[]'::jsonb,
+    NULL,
+    '',
+    user_id,
+    organization_id,
+    workspace_id,
+    '',
+    '',
+    '{}'::jsonb,
+    '',
+    '',
+    NULL,
+    '',
+    ''
+  FROM requested
+  RETURNING
+    id,
+    name,
+    server_url,
+    transport,
+    auth_type,
+    auth_header_name,
+    is_active,
+    is_verified
+)
+SELECT json_build_object(
+  'id', (SELECT id::text FROM inserted LIMIT 1),
+  'name', (SELECT name FROM inserted LIMIT 1),
+  'server_url', (SELECT server_url FROM inserted LIMIT 1),
+  'transport', (SELECT transport FROM inserted LIMIT 1),
+  'auth_type', (SELECT auth_type FROM inserted LIMIT 1),
+  'auth_header_name', (SELECT auth_header_name FROM inserted LIMIT 1),
+  'is_active', (SELECT is_active FROM inserted LIMIT 1),
+  'is_verified', (SELECT is_verified FROM inserted LIMIT 1),
+  'seeded', true
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function encryptFalconConnectorSecret(rawSecret) {
+  const script = `
+import json
+from agentcc.services.credential_manager import encrypt_token
+
+print(json.dumps({
+    "encrypted": encrypt_token(${JSON.stringify(rawSecret)}),
+}))
+`;
+  const encrypted = await runBackendShellJson(script);
+  assert(
+    typeof encrypted?.encrypted === "string" &&
+      encrypted.encrypted.startsWith("enc::"),
+    "Falcon connector secret encryption helper did not return encrypted text.",
+  );
+  return encrypted.encrypted;
+}
+
+function assertFalconConnectorDbAudit(
+  audit,
+  {
+    name,
+    organizationId,
+    workspaceId,
+    userId,
+    deleted,
+    expectedEnabledToolCount,
+  },
+) {
+  assert(audit.connector_count === 1, "Falcon connector DB audit found no row.");
+  assert(audit.name === name, "Falcon connector DB audit name mismatch.");
+  assert(
+    audit.organization_id === organizationId,
+    "Falcon connector DB audit organization mismatch.",
+  );
+  assert(
+    audit.workspace_id === workspaceId,
+    "Falcon connector DB audit workspace mismatch.",
+  );
+  assert(
+    audit.created_by_id === userId,
+    "Falcon connector DB audit created_by mismatch.",
+  );
+  assert(
+    audit.deleted === deleted,
+    "Falcon connector DB audit deleted flag mismatch.",
+  );
+  assert(
+    Number(audit.enabled_tool_count) === expectedEnabledToolCount,
+    "Falcon connector DB audit enabled tool count mismatch.",
+  );
+}
+
+async function seedFalconConnectorToolsDb({
+  connectorId,
+  organizationId,
+  workspaceId,
+  tools,
+}) {
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlUuid(connectorId)} AS connector_id,
+    ${sqlUuid(organizationId)} AS organization_id,
+    ${sqlUuid(workspaceId)} AS workspace_id,
+    ${sqlJson(tools)} AS tools
+),
+updated AS (
+  UPDATE falcon_ai_mcpconnector connector
+  SET
+    discovered_tools = requested.tools,
+    is_verified = true,
+    last_discovery_at = NOW(),
+    updated_at = NOW()
+  FROM requested
+  WHERE connector.id = requested.connector_id
+    AND connector.organization_id = requested.organization_id
+    AND connector.workspace_id = requested.workspace_id
+    AND connector.deleted = false
+  RETURNING connector.id, connector.discovered_tools
+)
+SELECT json_build_object(
+  'updated_connector_count', (SELECT count(*) FROM updated),
+  'discovered_tool_count',
+    COALESCE((SELECT jsonb_array_length(discovered_tools::jsonb) FROM updated LIMIT 1), 0)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeleteFalconConnectorFixturesDb({
+  namePrefix,
+  organizationId,
+}) {
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlTextLiteral(`${namePrefix}%`)} AS name_like,
+    ${sqlUuid(organizationId)} AS organization_id
+),
+target_connectors AS (
+  SELECT connector.id
+  FROM falcon_ai_mcpconnector connector
+  JOIN requested r
+    ON connector.organization_id = r.organization_id
+   AND connector.name LIKE r.name_like
+),
+deleted_connectors AS (
+  DELETE FROM falcon_ai_mcpconnector connector
+  USING target_connectors target
+  WHERE connector.id = target.id
+  RETURNING connector.id
+)
+SELECT json_build_object(
+  'deleted_connector_count', (SELECT count(*) FROM deleted_connectors),
+  'remaining_connector_count',
+    (SELECT count(*) FROM target_connectors) - (SELECT count(*) FROM deleted_connectors)
+);
+`;
+  return runPostgresJson(sql);
+}
+
 async function loadGetStartedFirstChecksDbAudit({
   userId,
   organizationId,
@@ -6789,7 +7530,7 @@ async function runBackendShellJson(script) {
   if (container) {
     const command = [
       "cd /app/backend",
-      `UV_PROJECT_ENVIRONMENT=/tmp/ws2-backend-container-venv uv run --no-sync --python /usr/local/bin/python --no-managed-python --no-python-downloads python manage.py shell -c ${shellQuote(script)}`,
+      `python manage.py shell -c ${shellQuote(script)}`,
     ].join(" && ");
     ({ stdout } = await execFileAsync(
       "docker",
@@ -6888,6 +7629,10 @@ function sqlTextArray(values) {
   const rows = values || [];
   assert(rows.length > 0, "SQL text array cannot be empty.");
   return `ARRAY[${rows.map((value) => sqlTextLiteral(value)).join(", ")}]::text[]`;
+}
+
+function sqlJson(value) {
+  return `${sqlTextLiteral(JSON.stringify(value ?? null))}::jsonb`;
 }
 
 function shellQuote(value) {
