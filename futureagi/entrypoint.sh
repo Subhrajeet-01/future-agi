@@ -248,6 +248,15 @@ else
     echo "FAST_STARTUP mode: skipping DB checks, migrations, and static collection"
 fi
 
+# Seed the first admin account from FAGI_ADMIN_* (backend only; idempotent and
+# best-effort — never blocks boot). Lets a plain `docker compose up` produce a
+# usable login without running bin/install. No-ops if the account exists or the
+# env vars are unset; ensure_admin handles both cases internally.
+if [ "$SERVICE_TYPE" = "backend" ] && [ -n "${FAGI_ADMIN_EMAIL:-}" ] && [ -n "${FAGI_ADMIN_PASSWORD:-}" ]; then
+    echo "Seeding first admin account from FAGI_ADMIN_* env (idempotent)..."
+    python manage.py ensure_admin || echo "WARNING: admin seed failed (non-fatal), continuing startup..."
+fi
+
 python manage.py register_temporal_schedules || echo "WARNING: Temporal schedule registration failed (non-fatal), continuing startup..."
 
 # Start the appropriate service based on SERVICE_TYPE

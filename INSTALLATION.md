@@ -77,6 +77,18 @@ docker exec futureagi-backend-1 python manage.py create_user \
   --password yourpassword
 ```
 
+#### Auto-seed the admin on boot (no CLI)
+
+If you'd rather not run any command, set these in `.env` before `docker compose up`:
+
+```bash
+FAGI_ADMIN_EMAIL=you@example.com
+FAGI_ADMIN_NAME=Your Name
+FAGI_ADMIN_PASSWORD=at-least-8-chars
+```
+
+The backend creates this account on first boot. It's **idempotent** — restarting won't duplicate it, and it's a no-op if the account already exists. This is the same path `./bin/install` uses when you pass `FAGI_ADMIN_*` for an unattended install. By default the OSS stack accepts any email domain; set `ALLOW_ANY_EMAIL=false` to require work emails.
+
 > **Team invites and password resets require email (SMTP).** See the [Email configuration](#email-smtp) section below for setup. Mailgun offers a free tier (100 emails/day) that works well for small self-hosted deployments.
 
 To stop everything: `./bin/uninstall` (or `docker compose down`). Data persists in named volumes across restarts.

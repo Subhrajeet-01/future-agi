@@ -144,6 +144,11 @@ x-backend-env: &backend-env
   FUTURE_AGI_CLOUD_API_KEY: ${FUTURE_AGI_CLOUD_API_KEY:-}
   FUTURE_AGI_CLOUD_API_URL: ${FUTURE_AGI_CLOUD_API_URL:-https://api.futureagi.com}
 
+  # Accounts: OSS self-host allows any email domain for signup / admin seeding.
+  # The hosted SaaS gates this to work emails; self-hosters use whatever they
+  # have. Set ALLOW_ANY_EMAIL=false in .env to require work emails.
+  ALLOW_ANY_EMAIL: ${ALLOW_ANY_EMAIL:-true}
+
 
 services:
   # ==========================================================================
@@ -177,6 +182,11 @@ services:
       GRANIAN_THREADS: ${GRANIAN_THREADS:-2}
       ENABLE_HTTP: ${ENABLE_HTTP:-true}
       ENABLE_GRPC: ${ENABLE_GRPC:-true}
+      # First-run admin seed (idempotent). Set all three in .env and the
+      # backend creates this login on boot — no installer or CLI needed.
+      FAGI_ADMIN_EMAIL: ${FAGI_ADMIN_EMAIL:-}
+      FAGI_ADMIN_NAME: ${FAGI_ADMIN_NAME:-}
+      FAGI_ADMIN_PASSWORD: ${FAGI_ADMIN_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
