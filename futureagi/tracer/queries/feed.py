@@ -26,7 +26,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import TruncDate, TruncHour
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -208,10 +208,14 @@ def _fetch_users_affected_batch(cluster_ids: List[str]) -> dict:
     Goes ErrorClusterTraces → trace → ObservationSpan.end_user.
 
     Cross-store algorithm (post-CH25 cutover):
-      1. ECT (PG) → trace_id → cluster_id map (one query).
+      1. ECT (PG) → trace_id → set[cluster_id] map (one query). A trace
+         can belong to multiple clusters; the legacy SQL JOIN counted
+         the span once per (trace, cluster) pair so we must replicate
+         that fan-out in Python.
       2. CHSpanReader.list_by_trace_ids — single CH read for every
          affected trace.
-      3. Distinct(end_user_id) per cluster_id in Python.
+      3. Distinct(end_user_id) per cluster_id in Python — for each span
+         we add the user to every cluster the trace belongs to.
     """
     if not cluster_ids:
         return {}
@@ -220,31 +224,32 @@ def _fetch_users_affected_batch(cluster_ids: List[str]) -> dict:
         cluster__cluster_id__in=cluster_ids,
     ).values_list("trace_id", "cluster__cluster_id")
 
-    trace_to_cluster: dict[str, str] = {}
-    cluster_trace_ids: dict[str, set] = {cid: set() for cid in cluster_ids}
+    # trace_id → set of cluster_ids it belongs to (one trace can sit in
+    # many clusters via separate ECT rows).
+    trace_to_clusters: dict[str, set] = {}
     for tid, cid in ect_rows:
         if not tid or not cid:
             continue
-        tid_str = str(tid)
-        trace_to_cluster[tid_str] = cid
-        cluster_trace_ids.setdefault(cid, set()).add(tid_str)
+        trace_to_clusters.setdefault(str(tid), set()).add(cid)
 
-    all_trace_ids = list(trace_to_cluster.keys())
-    if not all_trace_ids:
+    if not trace_to_clusters:
         return {}
 
     with get_reader() as reader:
-        spans = reader.list_by_trace_ids(all_trace_ids)
+        spans = reader.list_by_trace_ids(list(trace_to_clusters.keys()))
 
-    # Distinct end_user_id per cluster_id.
-    users_by_cluster: dict[str, set] = {cid: set() for cid in cluster_ids}
+    # Distinct end_user_id per cluster_id — a span contributes its
+    # end_user to every cluster the trace is in (fan-out matches the
+    # legacy SQL join).
+    users_by_cluster: dict[str, set] = {}
     for s in spans:
         if not s.end_user_id:
             continue
-        cid = trace_to_cluster.get(str(s.trace_id))
-        if cid is None:
+        clusters_for_trace = trace_to_clusters.get(str(s.trace_id))
+        if not clusters_for_trace:
             continue
-        users_by_cluster.setdefault(cid, set()).add(s.end_user_id)
+        for cid in clusters_for_trace:
+            users_by_cluster.setdefault(cid, set()).add(s.end_user_id)
 
     return {cid: len(users) for cid, users in users_by_cluster.items() if users}
 
@@ -1106,36 +1111,43 @@ def _get_root_span(trace_id: str) -> Optional[CHSpan]:
     """Root span = no parent (NULL or empty string).
 
     Single-trace convenience — uses CHSpanReader.list_by_trace and picks
-    the first parentless span. Callers iterating many trace ids should
-    use _get_root_spans_batch to avoid N+1 CH reads.
+    the LAST parentless span (the legacy ObservationSpan.Meta.ordering
+    is `["-start_time"]`, so the old `.first()` returned the newest
+    root). Callers iterating many trace ids should use
+    _get_root_spans_batch to avoid N+1 CH reads.
     """
     with get_reader() as reader:
         spans = reader.list_by_trace(str(trace_id))
-    for s in spans:
+    # CH list_by_trace orders by (start_time, id) ASC; legacy PG default
+    # was `-start_time` so .first() returned the latest. Walk in reverse
+    # to preserve the "latest root" pick.
+    for s in reversed(spans):
         if not s.parent_span_id:  # CHSpan.parent_span_id is "" when absent
             return s
     return None
 
 
 def _get_root_spans_batch(trace_ids: List[str]) -> dict:
-    """Return {trace_id_str: CHSpan} — first root span per trace.
+    """Return {trace_id_str: CHSpan} — latest root span per trace.
 
-    Single CH read for the full batch (list_by_trace_ids orders by
-    trace_id, start_time, id — first parentless per group is the earliest
-    by start_time, which matches the legacy PG order-by-default semantics
-    most callers relied on).
+    Legacy ObservationSpan.Meta.ordering is `-start_time`, so the PG
+    queryset iteration consumed rows in descending start_time order and
+    the per-trace dict-assignment kept the *first seen* row = the
+    newest root. We match that with one CH read + Python pick of the
+    last parentless span per (start_time ASC) group.
     """
     if not trace_ids:
         return {}
     with get_reader() as reader:
         spans = reader.list_by_trace_ids([str(t) for t in trace_ids])
     out: dict = {}
+    # CH orders by (trace_id, start_time, id) ASC; we want the latest
+    # parentless row per trace_id. A single pass that always overwrites
+    # gives us the last (= newest) parentless span for each trace.
     for span in spans:
         if span.parent_span_id:
             continue
-        tid = str(span.trace_id)
-        if tid not in out:
-            out[tid] = span
+        out[str(span.trace_id)] = span
     return out
 
 
@@ -1162,30 +1174,36 @@ def _get_trace_totals_batch(trace_ids: List[str]) -> dict:
     by trace_id. Feed page sizes are bounded (~50 traces, span count per
     trace is bounded) so the in-Python aggregation is cheap.
 
-    Semantic note: CHSpan.{latency_ms,prompt_tokens,completion_tokens}
-    are non-nullable ints (CH schema default 0), so a trace with spans
-    always rolls up to a number. PG's Sum() returned None when every
-    span had a NULL field — this case now returns 0 instead. Trace-not-
-    in-batch (no spans at all) still returns None via the caller's
-    `.get(tid, (None, None, None))` default — matching legacy. Net
-    effect on consumers: percentile computations may pick up zero-rows
-    that the PG path would have excluded as None; acceptable for the
-    feed-page consumers (filtering on `t[0] is not None` still works).
+    Semantic preservation — None vs zero handling:
+      • Trace with no spans → not in the result dict at all. Callers
+        get (None, None, None) via .get default. Matches legacy
+        Sum()-over-empty-set = None.
+      • Trace with spans but every value is None (a defensive case;
+        CHSpan declares these int, not Optional[int]) → slot stays
+        None. Matches legacy Sum()-over-all-NULL = None.
+      • Trace with spans and any non-None value → slot accumulates
+        normally. A span reporting 0 contributes 0 (not promoting
+        None → 0). Matches legacy Sum() ignoring NULLs.
+
+    Caveat: CH schema stores latency_ms / prompt_tokens / completion_tokens
+    as non-nullable int (default 0), so spans that PG would have marked
+    NULL now arrive as 0. p50/p95 latency consumers may pick up zero
+    rows the PG path would have excluded as NULL. This is a schema-
+    level decision (CH25 migration) not a query-helper bug — flagged
+    for the migration's regression suite.
     """
     if not trace_ids:
         return {}
     with get_reader() as reader:
         spans = reader.list_by_trace_ids([str(t) for t in trace_ids])
-    rollup: dict[str, list[int]] = {}
+    rollup: dict[str, list[Optional[int]]] = {}
     for s in spans:
         tid = str(s.trace_id)
-        row = rollup.setdefault(tid, [0, 0, 0])
-        # CHSpan fields are non-nullable ints, but defensively handle None
-        # (older schema rows, optional fields a future CHSpan may add).
+        row = rollup.setdefault(tid, [None, None, None])
         for idx, val in enumerate((s.latency_ms, s.prompt_tokens, s.completion_tokens)):
             if val is None:
                 continue
-            row[idx] += val
+            row[idx] = (row[idx] or 0) + val
     return {tid: tuple(values) for tid, values in rollup.items()}
 
 

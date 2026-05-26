@@ -8,7 +8,7 @@ from typing import Any
 import structlog
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Avg, Count, Max, Min, Q, QuerySet
+from django.db.models import Count, Max, Min, Q, QuerySet
 from django.db.models.functions import TruncDate, TruncHour
 from django.utils import timezone
 
