@@ -91,7 +91,8 @@ export const appCoreJourneys = [
   },
   {
     id: "GST-API-001",
-    title: "Get Started first-checks workspace parity and provider setup safety",
+    title:
+      "Get Started first-checks workspace parity and provider setup safety",
     tags: ["get-started", "core", "safe", "db-audit", "credential-safety"],
     async run({ client, user, organizationId, workspaceId, evidence }) {
       const userId = currentUserId(user);
@@ -115,9 +116,13 @@ export const appCoreJourneys = [
         await client.get(apiPath("/accounts/workspace/list/")),
       );
       const activeWorkspace = workspaces.find(
-        (workspace) => (workspace?.id || workspace?.workspace_id) === workspaceId,
+        (workspace) =>
+          (workspace?.id || workspace?.workspace_id) === workspaceId,
       );
-      assert(activeWorkspace, "Workspace list did not include the active workspace.");
+      assert(
+        activeWorkspace,
+        "Workspace list did not include the active workspace.",
+      );
 
       const checks = await client.get(apiPath("/accounts/first-checks/"));
       assertGetStartedChecks(checks);
@@ -152,17 +157,22 @@ export const appCoreJourneys = [
       for (const provider of providers) {
         assertProviderStatusRow(provider);
       }
-      assertNoRawProviderSecretLeak(providerStatus, "Get Started provider status");
+      assertNoRawProviderSecretLeak(
+        providerStatus,
+        "Get Started provider status",
+      );
 
       evidence.push({
         user_id: userId,
         workspace_id: workspaceId,
-        active_workspace_name: activeWorkspace.name || activeWorkspace.display_name,
+        active_workspace_name:
+          activeWorkspace.name || activeWorkspace.display_name,
         checks,
         db_counts: audit,
         provider_count: providers.length,
-        configured_provider_count: providers.filter((provider) => provider.has_key)
-          .length,
+        configured_provider_count: providers.filter(
+          (provider) => provider.has_key,
+        ).length,
       });
     },
   },
@@ -3979,7 +3989,10 @@ export const appCoreJourneys = [
     }) {
       requireMutations();
       const userId = currentUserId(user);
-      assert(isUuid(userId), "Falcon connector journey requires current user id.");
+      assert(
+        isUuid(userId),
+        "Falcon connector journey requires current user id.",
+      );
       assert(
         isUuid(organizationId),
         "Falcon connector journey requires organization context.",
@@ -4133,7 +4146,9 @@ export const appCoreJourneys = [
       );
       const initialSecretHash = dbAudit.auth_value_hash;
 
-      const list = asArray(await client.get(apiPath("/falcon-ai/mcp-connectors/")));
+      const list = asArray(
+        await client.get(apiPath("/falcon-ai/mcp-connectors/")),
+      );
       assert(
         list.some((connector) => connector.id === created.id),
         "Falcon connector list did not include the created connector.",
@@ -4175,7 +4190,11 @@ export const appCoreJourneys = [
           updated.auth_header_name === "X-FutureAGI-Test-Updated",
         "Falcon connector PATCH did not persist display fields.",
       );
-      assertNoPayloadString(updated, rawSecret, "Falcon connector PATCH response");
+      assertNoPayloadString(
+        updated,
+        rawSecret,
+        "Falcon connector PATCH response",
+      );
 
       dbAudit = await loadFalconConnectorDbAudit({
         connectorId: created.id,
@@ -4212,7 +4231,11 @@ export const appCoreJourneys = [
         rotated.auth_header_name === "X-FutureAGI-Test-Rotated",
         "Falcon connector PATCH did not persist rotated auth header name.",
       );
-      assertNoPayloadString(rotated, rawSecret, "Falcon connector rotate response");
+      assertNoPayloadString(
+        rotated,
+        rawSecret,
+        "Falcon connector rotate response",
+      );
       assertNoPayloadString(
         rotated,
         rotatedSecret,
@@ -4294,7 +4317,11 @@ export const appCoreJourneys = [
         asArray(toolUpdate.enabled_tool_names).includes(toolName),
         "Falcon connector tools update did not persist enabled_tool_names.",
       );
-      assertNoPayloadString(toolUpdate, rawSecret, "Falcon connector tools update");
+      assertNoPayloadString(
+        toolUpdate,
+        rawSecret,
+        "Falcon connector tools update",
+      );
       assertNoPayloadString(
         toolUpdate,
         rotatedSecret,
@@ -4647,9 +4674,12 @@ export const appCoreJourneys = [
       const otherWorkspaceStream = await expectApiError(
         () =>
           client.get(
-            apiPath("/falcon-ai/conversations/{conversation_id}/stream-status/", {
-              conversation_id: otherWorkspace.conversation_id,
-            }),
+            apiPath(
+              "/falcon-ai/conversations/{conversation_id}/stream-status/",
+              {
+                conversation_id: otherWorkspace.conversation_id,
+              },
+            ),
           ),
         [404],
         "Falcon stream-status leaked a same-org other-workspace conversation.",
@@ -4778,10 +4808,7 @@ export const appCoreJourneys = [
           hidden.id,
           otherWorkspace.conversation_id,
         ],
-        messageIds: [
-          ...seededMessages.message_ids,
-          otherWorkspace.message_id,
-        ],
+        messageIds: [...seededMessages.message_ids, otherWorkspace.message_id],
         organizationId,
         workspaceId,
         userId,
@@ -5047,7 +5074,8 @@ export const appCoreJourneys = [
         }),
       );
       assert(
-        builtinDetail.is_builtin === true && builtinDetail.slug === seeded.builtin_slug,
+        builtinDetail.is_builtin === true &&
+          builtinDetail.slug === seeded.builtin_slug,
         "Falcon skill detail did not expose global builtin skill.",
       );
 
@@ -5137,7 +5165,9 @@ export const appCoreJourneys = [
           patchedSkill.is_active === false,
         "Falcon skill PATCH did not persist updated fields.",
       );
-      const inactiveSkills = asArray(await client.get(apiPath("/falcon-ai/skills/")));
+      const inactiveSkills = asArray(
+        await client.get(apiPath("/falcon-ai/skills/")),
+      );
       assert(
         !inactiveSkills.some((row) => row.id === skill.id) &&
           inactiveSkills.some((row) => row.id === seeded.builtin_skill_id),
@@ -5253,7 +5283,10 @@ export const appCoreJourneys = [
         isUuid(workspaceId),
         "Falcon file upload journey requires workspace context.",
       );
-      assert(tokens?.access, "Falcon file upload journey requires an access token.");
+      assert(
+        tokens?.access,
+        "Falcon file upload journey requires an access token.",
+      );
 
       const suffix = runId.replace(/[^a-z0-9]/gi, "-").toLowerCase();
       const marker = `api-journey-falcon-file-${suffix}`;
@@ -5420,6 +5453,96 @@ export const appCoreJourneys = [
     },
   },
   {
+    id: "CORE-API-019",
+    title: "System organization key bootstrap readback and API-key auth",
+    tags: ["core", "keys", "system-keys", "data-roundtrip", "security"],
+    async run({ apiBase, client, organizationId, workspaceId, evidence }) {
+      const unauthClient = createApiClient({ apiBase });
+      const unauthError = await expectApiError(
+        () => unauthClient.get(apiPath("/accounts/keys/")),
+        [401, 403],
+        "Unauthenticated system-key bootstrap request unexpectedly succeeded.",
+      );
+
+      const beforeAudit = await loadSystemOrgKeyDbAudit({
+        organizationId,
+      });
+      if (
+        Number(beforeAudit.enabled_system_key_count) === 0 &&
+        !envFlag("API_JOURNEY_MUTATIONS")
+      ) {
+        skip(
+          "No existing enabled system org key; set API_JOURNEY_MUTATIONS=1 to allow /accounts/keys/ to create the bootstrap key.",
+        );
+      }
+
+      const payload = await client.get(apiPath("/accounts/keys/"), {
+        unwrap: false,
+      });
+      assert(
+        payload?.status === "success",
+        "System-key bootstrap endpoint did not return status=success.",
+      );
+      const key = payload.data || {};
+      assert(isUuid(key.id), "System-key bootstrap did not return a key id.");
+      assertRawDeveloperKeyMaterial(key.api_key, "system api_key");
+      assertRawDeveloperKeyMaterial(key.secret_key, "system secret_key");
+
+      const dbAudit = await loadSystemOrgKeyDbAudit({
+        organizationId,
+        keyId: key.id,
+        apiKey: key.api_key,
+        secretKey: key.secret_key,
+      });
+      assert(
+        Number(dbAudit.enabled_system_key_count) === 1 &&
+          Number(dbAudit.matching_key_count) === 1 &&
+          dbAudit.matching_key_id === key.id &&
+          dbAudit.type === "system" &&
+          dbAudit.enabled === true &&
+          dbAudit.deleted === false &&
+          dbAudit.workspace_id === null &&
+          dbAudit.user_id === null &&
+          dbAudit.api_key_matches === true &&
+          dbAudit.secret_key_matches === true,
+        `System-key DB audit mismatch: ${JSON.stringify(dbAudit)}`,
+      );
+
+      const systemKeyClient = createApiClient({
+        apiBase,
+        organizationId,
+        workspaceId,
+      });
+      const systemUserInfo = await systemKeyClient.get(
+        apiPath("/accounts/user-info/"),
+        {
+          headers: {
+            "X-Api-Key": key.api_key,
+            "X-Secret-Key": key.secret_key,
+          },
+        },
+      );
+      const systemUserOrgId =
+        systemUserInfo?.organization_id ||
+        systemUserInfo?.organization?.id ||
+        systemUserInfo?.selected_organization?.id;
+      assert(
+        currentUserId(systemUserInfo) && systemUserOrgId === organizationId,
+        "System org key did not authenticate to the expected organization.",
+      );
+
+      evidence.push({
+        key_id: key.id,
+        unauth_status: unauthError.status,
+        created_system_key: Number(beforeAudit.enabled_system_key_count) === 0,
+        enabled_system_key_count: Number(dbAudit.enabled_system_key_count),
+        api_key_length: String(key.api_key).length,
+        secret_key_length: String(key.secret_key).length,
+        system_key_user_info_auth: true,
+      });
+    },
+  },
+  {
     id: "CORE-API-002",
     title:
       "Developer secret key create, masked list, API auth, disable, enable, and delete lifecycle",
@@ -5448,7 +5571,10 @@ export const appCoreJourneys = [
         );
       }
       const userId = currentUserId(user);
-      assert(userId, "Developer key journey requires an authenticated user id.");
+      assert(
+        userId,
+        "Developer key journey requires an authenticated user id.",
+      );
       assert(
         isUuid(organizationId),
         "Authenticated context did not resolve an organization id.",
@@ -6617,6 +6743,51 @@ SELECT json_build_object(
 FROM accounts_orgapikey
 WHERE id = ${sqlUuid(keyId)}
   AND organization_id = ${sqlUuid(organizationId)};
+`;
+  return runPostgresJson(sql);
+}
+
+async function loadSystemOrgKeyDbAudit({
+  organizationId,
+  keyId,
+  apiKey,
+  secretKey,
+}) {
+  const matchingKeyFilter = keyId
+    ? `WHERE id = ${sqlUuid(keyId)}`
+    : "WHERE false";
+  const apiKeyMatchExpression = apiKey
+    ? `api_key = ${sqlTextLiteral(apiKey)}`
+    : "NULL::boolean";
+  const secretKeyMatchExpression = secretKey
+    ? `secret_key = ${sqlTextLiteral(secretKey)}`
+    : "NULL::boolean";
+  const sql = `
+WITH system_keys AS (
+  SELECT *
+  FROM accounts_orgapikey
+  WHERE organization_id = ${sqlUuid(organizationId)}
+    AND type = 'system'
+    AND enabled = true
+    AND deleted = false
+),
+matching_key AS (
+  SELECT *
+  FROM system_keys
+  ${matchingKeyFilter}
+)
+SELECT json_build_object(
+  'enabled_system_key_count', (SELECT count(*) FROM system_keys),
+  'matching_key_count', (SELECT count(*) FROM matching_key),
+  'matching_key_id', (SELECT id::text FROM matching_key LIMIT 1),
+  'type', (SELECT type FROM matching_key LIMIT 1),
+  'enabled', (SELECT enabled FROM matching_key LIMIT 1),
+  'deleted', (SELECT deleted FROM matching_key LIMIT 1),
+  'workspace_id', (SELECT workspace_id::text FROM matching_key LIMIT 1),
+  'user_id', (SELECT user_id::text FROM matching_key LIMIT 1),
+  'api_key_matches', (SELECT ${apiKeyMatchExpression} FROM matching_key LIMIT 1),
+  'secret_key_matches', (SELECT ${secretKeyMatchExpression} FROM matching_key LIMIT 1)
+);
 `;
   return runPostgresJson(sql);
 }
@@ -8193,7 +8364,10 @@ function assertFalconConnectorDbAudit(
     expectedEnabledToolCount,
   },
 ) {
-  assert(audit.connector_count === 1, "Falcon connector DB audit found no row.");
+  assert(
+    audit.connector_count === 1,
+    "Falcon connector DB audit found no row.",
+  );
   assert(audit.name === name, "Falcon connector DB audit name mismatch.");
   assert(
     audit.organization_id === organizationId,
@@ -8323,17 +8497,11 @@ function assertFalconConversationDetail(
       Array.isArray(message.thoughts) && Array.isArray(message.tool_calls),
       "Falcon message omitted thoughts/tool_calls arrays.",
     );
-    assert(
-      Array.isArray(message.files),
-      "Falcon message omitted files array.",
-    );
+    assert(Array.isArray(message.files), "Falcon message omitted files array.");
   }
 }
 
-async function seedFalconConversationMessagesDb({
-  conversationId,
-  messages,
-}) {
+async function seedFalconConversationMessagesDb({ conversationId, messages }) {
   const rows = messages.map((message, index) => {
     const messageId = randomUUID();
     return {
@@ -9015,10 +9183,7 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
-async function hardDeleteFalconFileFixturesDb({
-  marker,
-  organizationId,
-}) {
+async function hardDeleteFalconFileFixturesDb({ marker, organizationId }) {
   const sql = `
 WITH target_files AS (
   SELECT id, storage_key
@@ -9132,7 +9297,9 @@ async function assertFalconMinioObjectsAbsent(storageKeys) {
     } catch {
       continue;
     }
-    throw new Error(`Falcon MinIO object still exists after cleanup: ${storageKey}`);
+    throw new Error(
+      `Falcon MinIO object still exists after cleanup: ${storageKey}`,
+    );
   }
 }
 
@@ -9145,7 +9312,8 @@ async function removeFalconMinioObjects(storageKeys) {
 }
 
 async function runFalconMinioCommand(args) {
-  const container = process.env.API_JOURNEY_MINIO_CONTAINER || "futureagi-ws2-minio-1";
+  const container =
+    process.env.API_JOURNEY_MINIO_CONTAINER || "futureagi-ws2-minio-1";
   const command = [
     'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null',
     `mc ${args.map((arg) => shellQuote(arg)).join(" ")}`,
