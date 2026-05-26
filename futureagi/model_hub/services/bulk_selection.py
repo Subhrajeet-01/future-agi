@@ -15,6 +15,49 @@ Scope in this module:
 
 Future phases will add sibling resolvers for ``observation_span``,
 ``trace_session``, and ``call_execution``.
+
+CH 25.3 migration status (KEEP-PG transitional bridge):
+
+  All ``ObservationSpan.objects`` reads in this module remain PG-bound
+  because the surrounding FilterEngine pipeline is built on Django Q
+  objects + Subquery/OuterRef. Routing through CHSpanReader requires
+  migrating ``tracer.utils.filters.FilterEngine`` first; that's a
+  cross-cutting refactor out of scope for the helpers chunk.
+
+  Hot-path production traffic already routes through ClickHouse via
+  ``_resolve_trace_ids_clickhouse`` and ``_resolve_voice_call_ids_clickhouse``
+  (lines 469-664) using the v2 ``query_builders`` package and the
+  ``ClickHouseFilterBuilder`` translator. The PG paths below are
+  fallbacks for: (a) missing time-filter case (see
+  ``_has_explicit_time_filter``), (b) span filter-mode (no CH dispatch
+  exists at this layer yet), and (c) session filter-mode.
+
+  Reader-extension proposals that would unblock further migration here:
+
+    list_root_spans_by_trace_ids(trace_ids, *, conversation_only=False)
+        -> dict[trace_id, CHSpan]
+        Replaces the root_span_qs Subquery pattern at lines 265-330
+        / 352-358. Returns the first root span (parent_span_id empty)
+        per trace, optionally filtered to observation_type="conversation"
+        for the voice-call path.
+
+    aggregate_by_session_ids(session_ids, *, project_id)
+        -> dict[sid, {span_count, total_cost, total_tokens,
+                      traces_count, start_time, end_time,
+                      first_message, last_message}]
+        Replaces the GROUP BY trace__session_id aggregation at lines
+        1117-1158. Would let ``_apply_session_filters`` route the
+        aggregate computation to CH while keeping FilterEngine for the
+        score-based filter branches.
+
+    list_spans_by_project_with_filters(project_id, *, filters,
+                                       annotation_label_ids,
+                                       organization, cap, exclude_ids)
+        -> list[span_id]
+        End-to-end CH dispatch for ``resolve_filtered_span_ids`` mirroring
+        the existing ``TraceListQueryBuilder`` shape. This is the largest
+        gap (no CH dispatch at all for span filter-mode today) and is
+        the highest-impact future extension.
 """
 
 from __future__ import annotations
@@ -262,6 +305,13 @@ def _build_trace_base_queryset(project_id, organization, workspace=None):
     """
     project = Project.objects.get(id=project_id, organization=organization)
 
+    # CH25-TODO: this is the heart of the FilterEngine bridge — root_span_qs
+    # is consumed as a Subquery/OuterRef inside Django Q-object filter
+    # branches further down (see ``_apply_trace_filters``). Routing through
+    # CHSpanReader requires migrating FilterEngine to a CH-aware filter
+    # builder (the v2 query_builders package already does this for the
+    # ClickHouse hot path — see ``_resolve_trace_ids_clickhouse``). PG
+    # fallback only; production traffic uses the CH path.
     root_span_qs = ObservationSpan.objects.filter(
         trace_id=OuterRef("id"), parent_span_id__isnull=True
     )
@@ -311,6 +361,11 @@ def _build_trace_base_queryset(project_id, organization, workspace=None):
                 _attrs=Coalesce("span_attributes", "eval_attributes")
             ).values("_attrs")[:1]
         ),
+        # CH25-TODO: end-user lookup via Subquery+order_by — would need
+        # a reader method like
+        #   first_end_user_id_by_trace_ids(trace_ids) -> dict[tid, uid]
+        # to push the per-trace MIN(start_time) selection into CH. Tied
+        # to the broader FilterEngine migration; PG fallback only.
         user_id=Subquery(
             ObservationSpan.objects.filter(
                 trace_id=OuterRef("id"), end_user__isnull=False
@@ -349,6 +404,14 @@ def _apply_voice_call_constraints(
     superset — grid shows N, queue receives N + non-conversation traces.
     This helper brings parity with the voice list view.
     """
+    # CH25-TODO: same FilterEngine-bridge story as _build_trace_base_queryset.
+    # The CH dispatch path (`_resolve_voice_call_ids_clickhouse`) handles
+    # voice-call filtering via `VoiceCallListQueryBuilder`; this PG fallback
+    # uses the Subquery+OuterRef pattern. Reader extension request:
+    #   list_root_spans_by_trace_ids(trace_ids, *, observation_type=None)
+    #       -> dict[trace_id, CHSpan]
+    # would let us materialise the same `has_conversation_root` flag with
+    # one CH query instead of an Exists Subquery.
     root_span_qs = ObservationSpan.objects.filter(
         trace_id=OuterRef("id"),
         parent_span_id__isnull=True,
@@ -392,6 +455,12 @@ def _apply_trace_filters(
 
     Mirrors ``tracer.views.trace.ObservationTraceViewSet.list_traces_of_session``
     lines 1668-1742. Any drift here is a bug — see parity tests.
+
+    CH25-TODO: FilterEngine is the Q-object filter compiler this function
+    wraps. Routing the entire branch through CH would require a CH-aware
+    FilterEngine variant — the v2 ``ClickHouseFilterBuilder`` already
+    handles this for SPAN_ATTRIBUTE filters in the CH dispatch path above,
+    but a full migration of FilterEngine is out of scope. PG fallback only.
     """
     if not filters:
         return base_qs
@@ -779,6 +848,13 @@ def resolve_filtered_trace_ids(
 
     # Mirror the list view's `start_time` annotation so ordering is identical:
     # prefer the root span's start_time, fall back to Trace.created_at.
+    #
+    # CH25-TODO: equivalent to `per_trace_root_span_start_times(trace_ids)`
+    # which DOES exist in CHSpanReader, but only after the candidate trace
+    # ids are known — at this point the Trace queryset hasn't been
+    # materialised yet so a CH lookup would be N+1 unless we reorder the
+    # whole pipeline. Defer until we restructure resolve_filtered_trace_ids
+    # to materialise trace_ids first, then sort via the CH reader.
     qs = qs.annotate(
         start_time=Coalesce(
             Subquery(
@@ -826,6 +902,18 @@ def _build_span_base_queryset(project_id, organization, workspace=None):
     ``tracer.views.observation_span.ObservationSpanViewSet.list_spans_observe``
     (lines 1528-1580). Raises ``Project.DoesNotExist`` if the project is
     not in the org.
+
+    CH25-TODO: this is the largest reader-surface gap for the file. The
+    span filter-mode bulk selection has NO ClickHouse dispatch at all
+    today (compare to trace filter-mode which has
+    `_resolve_trace_ids_clickhouse`). The proposed reader extension is
+        list_spans_by_project_with_filters(project_id, *, filters,
+            annotation_label_ids, organization, cap, exclude_ids)
+            -> list[span_id]
+    mirroring `TraceListQueryBuilder` for spans. Until that lands the PG
+    base queryset stays; FilterEngine + Subquery patterns below rely on
+    ORM joins (e.g. `trace__name`, `end_user__user_id`) that have CH
+    equivalents only via denormalised reads + Python join.
     """
     project = Project.objects.get(id=project_id, organization=organization)
 
@@ -1084,6 +1172,17 @@ def _apply_session_filters(base_sessions_qs, filters, *, project_id, organizatio
     Mirrors ``list_sessions`` lines 922-1157 (non-ClickHouse PG path)
     excluding pagination and sort ordering. Returns a queryset yielding
     dicts with a ``trace__session_id`` key.
+
+    CH25-TODO: highest-yield reader extension for this file —
+        aggregate_by_session_ids(session_ids, *, project_id)
+            -> dict[sid, {span_count, total_cost, total_tokens,
+                          traces_count, start_time, end_time,
+                          first_message, last_message}]
+    would let us drop the entire ObservationSpan.objects.filter(...)
+    .values("trace__session_id").annotate(Sum/Min/Max/Count) chain
+    (lines below) into a single CH GROUP BY pass. The score-based
+    filter branches that follow (lines 1189-1222) stay PG since Score
+    is a PG-only table.
     """
     trace_sessions_qs, remaining_filters = apply_created_at_filters(
         base_sessions_qs, filters or []
