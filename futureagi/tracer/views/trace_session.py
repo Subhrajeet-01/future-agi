@@ -241,21 +241,19 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
                 QueryType,
             )
 
+            # CH-only path post-migration. PG fallback removed; a CH error
+            # propagates so operators see real data-pipeline issues instead
+            # of silently degrading to incomplete legacy session data.
             analytics = AnalyticsQueryService()
             if analytics.should_use_clickhouse(QueryType.TRACE_DETAIL):
-                try:
-                    return self._retrieve_clickhouse(
-                        request,
-                        trace_session_id,
-                        trace_session,
-                        project_id,
-                        analytics,
-                        query_data,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "CH session retrieve failed, falling back to PG", error=str(e)
-                    )
+                return self._retrieve_clickhouse(
+                    request,
+                    trace_session_id,
+                    trace_session,
+                    project_id,
+                    analytics,
+                    query_data,
+                )
 
             serializer = self.get_serializer(trace_session)
             trace_session = serializer.data

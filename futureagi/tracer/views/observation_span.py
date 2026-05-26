@@ -364,16 +364,14 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
                 QueryType,
             )
 
+            # CH-only path post-migration. Legacy PG fallback removed; a CH
+            # error should propagate to the operator, not silently degrade
+            # to incomplete PG data.
             analytics = AnalyticsQueryService()
             if analytics.should_use_clickhouse(QueryType.TRACE_DETAIL):
-                try:
-                    return self._retrieve_clickhouse(
-                        request, observation_span_id, analytics
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "CH span retrieve failed, falling back to PG", error=str(e)
-                    )
+                return self._retrieve_clickhouse(
+                    request, observation_span_id, analytics
+                )
 
             try:
                 observation_span_obj = ObservationSpan.objects.get(
@@ -2967,21 +2965,13 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
         shapes to ``list[str]`` so callers never see dicts f-stringed
         into paths like ``traces.0.spans.0.{'key': '...', ...}``.
         """
-        raw = None
+        # CH-only path post-migration. The PG SQL_query_handler fallback was
+        # removed; span attribute keys are sourced from the CH attrs_*
+        # typed-Map indexes which is the authoritative inventory.
         analytics = AnalyticsQueryService()
         if analytics.should_use_clickhouse(QueryType.SPAN_LIST):
-            try:
-                ch_result = analytics.get_span_attribute_keys_ch(str(project_id))
-                if ch_result:
-                    raw = ch_result
-            except Exception as ch_err:
-                logger.warning(
-                    "CH span attribute keys failed in get_eval_attributes_list, "
-                    "falling back to PG",
-                    error=str(ch_err),
-                )
-
-        if raw is None:
+            raw = analytics.get_span_attribute_keys_ch(str(project_id))
+        else:
             raw = SQL_query_handler.get_span_attributes_for_project(project_id)
 
         keys = []
@@ -3222,15 +3212,11 @@ class ObservationSpanView(BaseModelViewSetMixin, ModelViewSet):
             )
 
             analytics = AnalyticsQueryService()
+            # CH-only path post-migration. PG fallback removed.
             if analytics.should_use_clickhouse(QueryType.TRACE_DETAIL):
-                try:
-                    return self._get_evaluation_details_clickhouse(
-                        observation_span_id, custom_eval_config_id, analytics
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "CH eval details failed, falling back to PG", error=str(e)
-                    )
+                return self._get_evaluation_details_clickhouse(
+                    observation_span_id, custom_eval_config_id, analytics
+                )
 
             # Mirror the ClickHouse filter; excludes session-target rows.
             eval_logger = EvalLogger.objects.filter(

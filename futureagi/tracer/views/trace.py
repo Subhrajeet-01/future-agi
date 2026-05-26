@@ -1079,15 +1079,12 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
             if not accessible_trace:
                 raise Trace.DoesNotExist
 
-            # ClickHouse dispatch for trace detail
+            # ClickHouse-only for trace detail. Legacy PG fallback removed —
+            # span data lives in CH post-migration. If CH errors, propagate;
+            # silent fallback to PG masks real data-pipeline issues.
             analytics = AnalyticsQueryService()
             if analytics.should_use_clickhouse(QueryType.TRACE_DETAIL):
-                try:
-                    return self._retrieve_clickhouse(request, trace_id, analytics)
-                except Exception as e:
-                    logger.warning(
-                        "CH trace retrieve failed, falling back to PG", error=str(e)
-                    )
+                return self._retrieve_clickhouse(request, trace_id, analytics)
 
             trace = accessible_trace
             serializer = self.get_serializer(trace)
@@ -1930,26 +1927,15 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
             # ClickHouse dispatch: resolve which eval config IDs have data
             analytics = AnalyticsQueryService()
             eval_config_ids = None
+            # CH-only path. Legacy PG fallback removed: EvalLogger lives in
+            # CH now and the PG `tracer_evallogger` table is destined for
+            # deletion. If CH errors, propagate so the operator sees it.
             if analytics.should_use_clickhouse(QueryType.EVAL_METRICS):
-                try:
-                    eval_config_ids = analytics.get_eval_config_ids_with_data_ch(
-                        str(project_id)
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "CH eval config IDs failed, falling back to PG", error=str(e)
-                    )
-                    eval_config_ids = None
-
-            if eval_config_ids is None:
-                # PG fallback
-                eval_config_ids = list(
-                    EvalLogger.objects.filter(
-                        trace__project_id=project_id, deleted=False
-                    )
-                    .values_list("custom_eval_config_id", flat=True)
-                    .distinct()
+                eval_config_ids = analytics.get_eval_config_ids_with_data_ch(
+                    str(project_id)
                 )
+            else:
+                eval_config_ids = []
 
             # Config lookup always from PG (small config table)
             configs = (
@@ -4111,160 +4097,21 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
             if not trace:
                 return self._gm.not_found("trace_id not found")
 
-            # ClickHouse dispatch
+            # ClickHouse-only path. The legacy PG fallback (reading from
+            # the soon-deleted `ObservationSpan` ORM + `EvalLogger` rows)
+            # was removed as part of PLAN_V2_NO_CDC: span data lives in
+            # CH, not PG. CH_ROUTE_VOICE_CALL_DETAIL must be set to
+            # `clickhouse` (default in .env) — if it ever resolves to
+            # postgres, that's a config error, not a fallback opportunity.
             analytics = AnalyticsQueryService()
-            if analytics.should_use_clickhouse(QueryType.VOICE_CALL_DETAIL):
-                try:
-                    return self._voice_call_detail_clickhouse(
-                        request, trace_id, analytics, str(trace.project_id)
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "CH voice-call-detail failed, falling back to PG",
-                        error=str(e),
-                    )
-
-            # --- PG path ---
-            project = trace.project
-
-            # Get root span (conversation type, no parent)
-            root_span = ObservationSpan.objects.filter(
-                trace_id=trace_id,
-                parent_span_id__isnull=True,
-                observation_type="conversation",
-            ).first()
-            if root_span is None:
-                return self._gm.not_found("No conversation root span found")
-
-            span_attrs = root_span.span_attributes or {}
-            eval_attrs = root_span.eval_attributes or {}
-            attrs = span_attrs or eval_attrs or {}
-            metadata = root_span.metadata or {}
-            raw_log = attrs.get("raw_log") or {}
-            provider = root_span.provider or "vapi"
-
-            processed_log = ObservabilityService.process_raw_logs(
-                raw_log, provider, span_attributes=attrs
-            )
-            simulation_context = _simulation_context_for_voice_call(
-                organization_id=request.user.organization_id,
-                span_attributes=span_attrs,
-                eval_attributes=eval_attrs,
-                raw_log=raw_log,
-                metadata=metadata,
-                processed_log=processed_log,
-            )
-            voice_metrics = self._extract_voice_turn_and_talk_metrics(attrs, raw_log)
-
-            recording = self._build_recording_dict(attrs)
-
-            # Serialize ALL observation spans (the expensive part)
-            observation_span = [
-                ObservationSpanSerializer(span).data
-                for span in trace.observation_spans.all()
-            ]
-
-            # Include ALL non-deleted eval configs for the project so the
-            # drawer always shows the same set of evals as the list columns.
-            # Entries without a log record get an empty `output` so the UI
-            # can render a placeholder.
-            eval_configs = CustomEvalConfig.objects.filter(
-                id__in=EvalLogger.objects.filter(trace__project_id=project.id)
-                .values("custom_eval_config_id")
-                .distinct(),
-                deleted=False,
-            ).select_related("eval_template")
-
-            eval_logs = (
-                EvalLogger.objects.filter(
-                    trace_id=trace_id,
-                    custom_eval_config_id__in=[c.id for c in eval_configs],
+            if not analytics.should_use_clickhouse(QueryType.VOICE_CALL_DETAIL):
+                return self._gm.bad_request(
+                    "CH_ROUTE_VOICE_CALL_DETAIL is not set to clickhouse — "
+                    "voice-call detail requires the ClickHouse path post-migration"
                 )
-                .order_by("custom_eval_config_id", "-created_at")
-                .distinct("custom_eval_config_id")
+            return self._voice_call_detail_clickhouse(
+                request, trace_id, analytics, str(trace.project_id)
             )
-            eval_log_map = {str(e.custom_eval_config_id): e for e in eval_logs}
-
-            eval_outputs = {}
-            for config in eval_configs:
-                config_id = str(config.id)
-                metric_name = getattr(config, "name", None) or (
-                    getattr(config, "eval_template", None).name
-                    if getattr(config, "eval_template", None)
-                    else None
-                )
-                eval_template_config = (
-                    config.eval_template.config
-                    if getattr(config, "eval_template", None)
-                    else {}
-                ) or {}
-                output_type = eval_template_config.get("output", "score")
-
-                log = eval_log_map.get(config_id)
-                if log is None:
-                    eval_outputs[config_id] = {
-                        "name": metric_name,
-                        "output_type": output_type,
-                        "output": None,
-                        "reason": None,
-                        "error": None,
-                    }
-                    continue
-
-                metric_entry = {
-                    "name": metric_name,
-                    "output_type": output_type,
-                    "reason": log.eval_explanation,
-                    "error": log.error,
-                }
-                if log.output_str_list:
-                    metric_entry["output"] = log.output_str_list
-                elif output_type == "Pass/Fail" and log.output_bool is not None:
-                    metric_entry["output"] = "Pass" if log.output_bool else "Fail"
-                elif log.output_float is not None:
-                    metric_entry["output"] = round(log.output_float * 100, 2)
-                else:
-                    metric_entry["output"] = None
-                eval_outputs[config_id] = metric_entry
-
-            # Use the stored call.duration from eval_attributes as the single
-            # source of truth so the API response always matches the metric.
-            stored_duration = attrs.get(CallAttributes.DURATION)
-            if stored_duration is not None:
-                stored_duration = int(stored_duration)
-
-            # NOTE: we intentionally do NOT set `customer_latency_metrics` or
-            # `customer_cost_breakdown` here. The correct values live on
-            # CallExecution and are already merged into the drawer data from
-            # the call-logs list endpoint (simulate path). For pure observe
-            # traffic with no CallExecution, the frontend falls back to the
-            # provider-reported metrics in `raw_log.artifact.performanceMetrics`
-            # and `raw_log.costBreakdown`. Writing anything here would clobber
-            # those with an unrelated span-aggregate of our own spans.
-            result = {
-                **processed_log,
-                **simulation_context,
-                "id": str(trace.id),
-                "trace_id": str(trace.id),
-                "project_id": str(trace.project_id),
-                "provider_call_id": processed_log.get("call_id"),
-                "recording": recording,
-                "call_metadata": metadata,
-                "observation_span": observation_span,
-                "eval_outputs": eval_outputs,
-                "turn_count": voice_metrics.get("turn_count"),
-                "talk_ratio": voice_metrics.get("talk_ratio"),
-                "agent_talk_percentage": voice_metrics.get("agent_talk_percentage"),
-                "avg_agent_latency_ms": attrs.get("avg_agent_latency_ms"),
-                "user_wpm": attrs.get(CallAttributes.USER_WPM),
-                "bot_wpm": attrs.get(CallAttributes.BOT_WPM),
-                "user_interruption_count": attrs.get("user_interruption_count"),
-                "ai_interruption_count": attrs.get("ai_interruption_count"),
-            }
-            if stored_duration is not None:
-                result["duration_seconds"] = stored_duration
-            return self._gm.success_response(result)
-
         except Exception as e:
             logger.exception("voice_call_detail_error", error=str(e))
             return self._gm.bad_request("error fetching voice call detail")
@@ -4288,7 +4135,13 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
             latency_ms,
             provider,
             span_attributes_raw,
-            eval_attributes,
+            -- `eval_attributes` lives on the LANDING table `tracer_observation_span`,
+            -- not on the denormalized `spans` table the dashboard reads. The
+            -- original query referenced it and CH errored with
+            -- `Unknown expression identifier eval_attributes`. The actual eval
+            -- output comes from the EvalLogger rows we already load further
+            -- down — eval_attrs here was only used by simulation_context as a
+            -- fallback, and that fallback resolves to {} on this path.
             span_attr_str,
             span_attr_num,
             metadata_map
@@ -4321,15 +4174,10 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
             )
         except (json.JSONDecodeError, TypeError):
             span_attrs = {}
-        eval_attrs_raw = row.get("eval_attributes", "{}")
-        try:
-            eval_attrs = (
-                json.loads(eval_attrs_raw)
-                if isinstance(eval_attrs_raw, str)
-                else (eval_attrs_raw or {})
-            )
-        except (json.JSONDecodeError, TypeError):
-            eval_attrs = {}
+        # eval_attributes was removed from the SELECT above (column doesn't
+        # exist on `spans`). Pass empty so simulation_context's fallback path
+        # behaves the same as the PG path did when span_attributes was set.
+        eval_attrs = {}
 
         raw_log = span_attrs.get("raw_log") or {}
         metadata = {}
@@ -6041,38 +5889,22 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                 node_query, node_params, timeout_ms=15000
             )
 
+            # CH-only path. The "agent graph returned no nodes → fall back
+            # to PG" branch and the outer-except PG fallback were both
+            # removed: an empty CH result means the project genuinely has no
+            # spans (or the data-pipeline is broken — that's an alert, not
+            # a fallback opportunity). PG was the legacy source of truth;
+            # post-migration it's incomplete.
             result = builder.format_result(
                 edge_result.data,
                 edge_result.columns or [],
                 node_result.data,
                 node_result.columns or [],
             )
-            has_pg_spans = ObservationSpan.no_workspace_objects.filter(
-                project_id=project_id,
-                deleted=False,
-                trace__deleted=False,
-                project__deleted=False,
-            ).exists()
-            if not result.get("nodes") and has_pg_spans:
-                logger.warning(
-                    "ClickHouse agent graph returned no nodes, falling back to PG",
-                    project_id=project_id,
-                )
-                result = _build_agent_graph_pg(project_id, filters, builder)
             return self._gm.success_response(result)
 
         except Exception as e:
             logger.exception("agent_graph failed", error=str(e))
-            if project_id and builder:
-                try:
-                    return self._gm.success_response(
-                        _build_agent_graph_pg(project_id, filters, builder)
-                    )
-                except Exception as fallback_error:
-                    logger.exception(
-                        "agent_graph PG fallback failed",
-                        error=str(fallback_error),
-                    )
             return self._gm.bad_request("Failed to compute agent graph")
 
 

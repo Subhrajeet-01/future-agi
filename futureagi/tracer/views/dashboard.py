@@ -1843,23 +1843,16 @@ class DashboardViewSet(BaseModelViewSetMixin, ModelViewSet):
         except (ImportError, Exception):
             pass
 
+        # CH-only span attribute key inventory. PG fallback removed
+        # post-migration — the attrs_* typed-Map indexes on CH are the
+        # authoritative source of which keys exist for a project.
         custom_attributes = []
+        analytics = AnalyticsQueryService() if is_clickhouse_enabled() else None
         for pid in project_ids:
-            try:
-                if is_clickhouse_enabled():
-                    analytics = AnalyticsQueryService()
-                    keys = analytics.get_span_attribute_keys_ch(pid)
-                else:
-                    keys = SQL_query_handler.get_span_attributes_for_project(pid)
-            except Exception as e:
-                logger.warning(
-                    f"CH span attributes failed for {pid}, falling back to PG",
-                    error=str(e),
-                )
-                try:
-                    keys = SQL_query_handler.get_span_attributes_for_project(pid)
-                except Exception:
-                    keys = []
+            if analytics is not None:
+                keys = analytics.get_span_attribute_keys_ch(pid)
+            else:
+                keys = SQL_query_handler.get_span_attributes_for_project(pid)
             for key in keys:
                 attr = {"name": key, "display_name": key, "type": "string"}
                 if attr not in custom_attributes:
