@@ -7,6 +7,7 @@ import {
   asArray,
   assert,
   currentUserId,
+  envFlag,
   isUuid,
   requireMutations,
   skip,
@@ -35,7 +36,10 @@ export const simulationAgentccJourneys = [
       cleanup.defer("hard-delete API journey persona rows", () =>
         hardCleaned
           ? null
-          : deleteSimulationPersonaFixturesDb({ namePrefix: name, organizationId }),
+          : deleteSimulationPersonaFixturesDb({
+              namePrefix: name,
+              organizationId,
+            }),
       );
 
       const fieldOptions = await client.get(
@@ -310,7 +314,10 @@ export const simulationAgentccJourneys = [
       );
 
       const userId = currentUserId(user);
-      assert(userId, "Persona journey requires current user id for DB fixture.");
+      assert(
+        userId,
+        "Persona journey requires current user id for DB fixture.",
+      );
       const otherWorkspaceFixture =
         await insertOtherWorkspaceSimulationPersonaFixtureDb({
           namePrefix: name,
@@ -437,7 +444,14 @@ export const simulationAgentccJourneys = [
     title:
       "Simulation agent definition operations create, update, retrieve, and delete lifecycle",
     tags: ["simulation", "agents", "mutating", "data-roundtrip"],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const name = `api journey agent ${runId}`;
       const rawApiKey = `sk-agent-definition-${runId}-secret`;
@@ -494,17 +508,14 @@ export const simulationAgentccJourneys = [
       );
       const invalidOperationsCreate = await expectApiError(
         () =>
-          client.post(
-            apiPath("/simulate/api/agent-definition-operations/"),
-            {
-              agent_name: `${name} invalid operations`,
-              agent_type: "text",
-              inbound: true,
-              languages: ["en"],
-              description: "Invalid operations agent.",
-              legacy_extra: "reject me",
-            },
-          ),
+          client.post(apiPath("/simulate/api/agent-definition-operations/"), {
+            agent_name: `${name} invalid operations`,
+            agent_type: "text",
+            inbound: true,
+            languages: ["en"],
+            description: "Invalid operations agent.",
+            legacy_extra: "reject me",
+          }),
         [400],
         "Agent definition operations create accepted an unknown field.",
       );
@@ -545,7 +556,10 @@ export const simulationAgentccJourneys = [
         "Agent definition legacy create response leaked the raw provider API key.",
       );
       const created = createdEnvelope?.agent;
-      assert(created?.id, "Agent definition legacy create did not return agent.id.");
+      assert(
+        created?.id,
+        "Agent definition legacy create did not return agent.id.",
+      );
       cleanup.defer("delete legacy API journey agent definition", () =>
         ignoreNotFound(() =>
           client.delete(
@@ -597,7 +611,9 @@ export const simulationAgentccJourneys = [
         detail.id === created.id &&
           detail.version_count === 1 &&
           isUuid(initialVersionId) &&
-          asArray(detail.versions).some((version) => version.id === initialVersionId),
+          asArray(detail.versions).some(
+            (version) => version.id === initialVersionId,
+          ),
         "Agent definition detail did not include active version history.",
       );
 
@@ -632,7 +648,8 @@ export const simulationAgentccJourneys = [
       );
       assert(
         !initialVersionDetail.configuration_snapshot?.api_key &&
-          initialVersionDetail.configuration_snapshot?.model_details?.version === 1,
+          initialVersionDetail.configuration_snapshot?.model_details
+            ?.version === 1,
         "Agent definition version detail did not return the expected text-agent snapshot.",
       );
 
@@ -736,7 +753,8 @@ export const simulationAgentccJourneys = [
       );
       assert(
         versions.length === 2 &&
-          versions.filter((version) => version.status === "active").length === 1,
+          versions.filter((version) => version.status === "active").length ===
+            1,
         "Agent definition version list did not contain exactly one active version.",
       );
 
@@ -911,7 +929,10 @@ export const simulationAgentccJourneys = [
           model_details: { source: "api-journey" },
         },
       );
-      assert(operationsCreated?.id, "Agent definition operations create did not return id.");
+      assert(
+        operationsCreated?.id,
+        "Agent definition operations create did not return id.",
+      );
       cleanup.defer("delete operations API journey agent definition", () =>
         ignoreNotFound(() =>
           client.delete(
@@ -1474,14 +1495,23 @@ export const simulationAgentccJourneys = [
     }) {
       requireMutations();
       const userId = currentUserId(user);
-      assert(userId, "Scenario journey requires current user id for DB fixture.");
+      assert(
+        userId,
+        "Scenario journey requires current user id for DB fixture.",
+      );
       const name = `api journey scenario ${runId}`;
       let hardCleaned = false;
-      await deleteSimulationScenarioFixturesDb({ namePrefix: name, organizationId });
+      await deleteSimulationScenarioFixturesDb({
+        namePrefix: name,
+        organizationId,
+      });
       cleanup.defer("hard-delete API journey scenario rows", () =>
         hardCleaned
           ? null
-          : deleteSimulationScenarioFixturesDb({ namePrefix: name, organizationId }),
+          : deleteSimulationScenarioFixturesDb({
+              namePrefix: name,
+              organizationId,
+            }),
       );
 
       const fixture = await seedSimulationScenarioFixturesDb({
@@ -1729,7 +1759,8 @@ export const simulationAgentccJourneys = [
         [400, 402, 403],
         "Scenario add-columns accepted a scenario without dataset.",
       );
-      let addColumnsEntitlementDenied = isFeatureDeniedError(addColumnsNoDataset);
+      let addColumnsEntitlementDenied =
+        isFeatureDeniedError(addColumnsNoDataset);
       let addColumnsDuplicate = null;
       let addColumnsExisting = null;
       let addColumnsSucceeded = false;
@@ -3206,7 +3237,10 @@ export const simulationAgentccJourneys = [
       cleanup.defer("hard-delete API journey action scenario rows", () =>
         hardCleanedScenarios
           ? null
-          : deleteSimulationScenarioFixturesDb({ namePrefix: name, organizationId }),
+          : deleteSimulationScenarioFixturesDb({
+              namePrefix: name,
+              organizationId,
+            }),
       );
       cleanup.defer("hard-delete API journey action run rows", () =>
         hardCleanedRuns
@@ -3221,7 +3255,10 @@ export const simulationAgentccJourneys = [
         namePrefix: name,
         organizationId,
       });
-      await deleteSimulationScenarioFixturesDb({ namePrefix: name, organizationId });
+      await deleteSimulationScenarioFixturesDb({
+        namePrefix: name,
+        organizationId,
+      });
 
       const scenarioFixture = await seedSimulationScenarioFixturesDb({
         namePrefix: name,
@@ -3289,32 +3326,52 @@ export const simulationAgentccJourneys = [
         "Action DB fixture did not attach a dataset row to the call execution.",
       );
 
-      const chatResponse = await client.post(
-        apiPath(
-          "/simulate/call-executions/{call_execution_id}/chat/send-message/",
+      const realChatProviderEnabled = envFlag(
+        "API_JOURNEY_REAL_SIMULATION_CHAT",
+      );
+      let chatResponse = {
+        chat_ended: true,
+        output_message: [
           {
-            call_execution_id: callExecutionId,
+            role: "assistant",
+            content:
+              "Maximum conversation turns reached by seeded API journey fixture.",
           },
-        ),
-        {
-          messages: [
+        ],
+      };
+      let chatDispatchMode = "db_seeded_without_provider";
+
+      if (realChatProviderEnabled) {
+        chatResponse = await client.post(
+          apiPath(
+            "/simulate/call-executions/{call_execution_id}/chat/send-message/",
             {
-              role: "user",
-              content: "final message from successful action journey",
+              call_execution_id: callExecutionId,
             },
-          ],
-        },
-      );
-      assert(
-        chatResponse.chat_ended === true,
-        "Successful chat send-message did not end through the max-turn path.",
-      );
-      assert(
-        asArray(chatResponse.output_message).some((message) =>
-          String(message?.content || "").includes("Maximum conversation turns"),
-        ),
-        "Successful chat send-message did not return the max-turn output message.",
-      );
+          ),
+          {
+            messages: [
+              {
+                role: "user",
+                content: "final message from successful action journey",
+              },
+            ],
+          },
+        );
+        chatDispatchMode = "api_send_message";
+        assert(
+          chatResponse.chat_ended === true,
+          "Successful chat send-message did not end through the max-turn path.",
+        );
+        assert(
+          asArray(chatResponse.output_message).some((message) =>
+            String(message?.content || "").includes(
+              "Maximum conversation turns",
+            ),
+          ),
+          "Successful chat send-message did not return the max-turn output message.",
+        );
+      }
 
       const completionSeed = await markSimulationRunActionFixtureCompletedDb({
         testExecutionId,
@@ -3345,15 +3402,13 @@ export const simulationAgentccJourneys = [
       );
       assert(
         asArray(
-          sessionComparison.comparison_transcripts
-            ?.base_session_transcripts,
+          sessionComparison.comparison_transcripts?.base_session_transcripts,
         ).length >= 2,
         "Session comparison did not return base session transcripts.",
       );
       assert(
         asArray(
-          sessionComparison.comparison_transcripts
-            ?.comparison_call_transcripts,
+          sessionComparison.comparison_transcripts?.comparison_call_transcripts,
         ).length >= 2,
         "Session comparison did not return comparison call transcripts.",
       );
@@ -3366,8 +3421,8 @@ export const simulationAgentccJourneys = [
         {},
       );
       assert(
-        String(evalRefresh.message || "").includes("initiated"),
-        "Eval explanation refresh did not return an initiated message.",
+        /initiated|marked pending/i.test(String(evalRefresh.message || "")),
+        "Eval explanation refresh did not acknowledge the refresh request.",
       );
 
       const optimiserRefresh = await client.post(
@@ -3413,7 +3468,10 @@ export const simulationAgentccJourneys = [
         },
       );
       const evalConfig = asArray(addEvalConfig.created_eval_configs)[0];
-      assert(isUuid(evalConfig?.id), "Eval-config create did not return a UUID.");
+      assert(
+        isUuid(evalConfig?.id),
+        "Eval-config create did not return a UUID.",
+      );
 
       const runNewEvals = await client.post(
         apiPath("/simulate/run-tests/{run_test_id}/run-new-evals/", {
@@ -3430,13 +3488,73 @@ export const simulationAgentccJourneys = [
         "Run-new-evals did not dispatch all call executions.",
       );
 
-      await markSimulationRunActionFixtureCompletedDb({
+      const evalOutputSeed = await markSimulationEvalOutputsCompletedDb({
         testExecutionId,
-        callExecutionId,
         callExecutionIds,
+        evalConfigId: evalConfig.id,
+        evalName,
         organizationId,
         workspaceId,
       });
+      assert(
+        Number(evalOutputSeed.updated_call_count) === callExecutionIds.length &&
+          Number(evalOutputSeed.updated_execution_count) === 1,
+        `Eval-output DB seed failed: ${JSON.stringify(evalOutputSeed)}`,
+      );
+
+      const evalSummary = await client.get(
+        apiPath("/simulate/run-tests/{run_test_id}/eval-summary/", {
+          run_test_id: created.id,
+        }),
+        { query: { execution_id: testExecutionId } },
+      );
+      const evalSummaryRow = assertSimulationEvalSummary(evalSummary, {
+        template,
+        evalConfig,
+        expectedCalls: callExecutionIds.length,
+      });
+
+      const evalComparison = await client.get(
+        apiPath("/simulate/run-tests/{run_test_id}/eval-summary-comparison/", {
+          run_test_id: created.id,
+        }),
+        { query: { execution_ids: JSON.stringify([testExecutionId]) } },
+      );
+      const comparisonSummary = evalComparison?.[testExecutionId];
+      assert(
+        comparisonSummary,
+        "Eval-summary comparison did not include the completed test execution.",
+      );
+      assertSimulationEvalSummary(comparisonSummary, {
+        template,
+        evalConfig,
+        expectedCalls: callExecutionIds.length,
+      });
+
+      const callDetailAfterEval = await client.get(
+        apiPath("/simulate/call-executions/{call_execution_id}/", {
+          call_execution_id: callExecutionId,
+        }),
+      );
+      const structuredEval = callDetailAfterEval?.eval_outputs?.[evalConfig.id];
+      assert(
+        structuredEval?.name === evalName &&
+          structuredEval.status === "completed" &&
+          structuredEval.type === "Pass/Fail" &&
+          structuredEval.value === true,
+        "Call detail did not expose the completed eval output in the UI shape.",
+      );
+
+      const csvExport = await client.get(
+        apiPath("/simulate/export/{item_id}/", { item_id: testExecutionId }),
+        { query: { type: "testexecution", status: "completed" } },
+      );
+      assert(
+        String(csvExport).includes(evalName) &&
+          String(csvExport).includes("SIM eval journey reason") &&
+          String(csvExport).includes("True"),
+        "Simulation CSV export did not include the completed eval output columns.",
+      );
 
       const callRerun = await client.post(
         apiPath("/simulate/test-executions/{test_execution_id}/rerun-calls/", {
@@ -3555,7 +3673,12 @@ export const simulationAgentccJourneys = [
         call_execution_id: callExecutionId,
         call_execution_count: callExecutionIds.length,
         eval_config_id: evalConfig.id,
+        eval_summary_template_id: evalSummaryRow.id,
+        eval_summary_total_pass_rate: evalSummaryRow.total_pass_rate,
+        eval_output_seed: evalOutputSeed,
         chat_ended: chatResponse.chat_ended,
+        chat_dispatch_mode: chatDispatchMode,
+        real_chat_provider_enabled: realChatProviderEnabled,
         session_comparison_metric_count: asArray(
           sessionComparison.comparison_metrics,
         ).length,
@@ -3594,7 +3717,10 @@ export const simulationAgentccJourneys = [
     }) {
       requireMutations();
       const userId = currentUserId(user);
-      assert(userId, "Simulation cancellation journey requires current user id.");
+      assert(
+        userId,
+        "Simulation cancellation journey requires current user id.",
+      );
 
       const seed = await selectSimulationRunTestSeed(client);
       if (!seed) {
@@ -3609,7 +3735,10 @@ export const simulationAgentccJourneys = [
       cleanup.defer("hard-delete API journey cancellation scenario rows", () =>
         hardCleanedScenarios
           ? null
-          : deleteSimulationScenarioFixturesDb({ namePrefix: name, organizationId }),
+          : deleteSimulationScenarioFixturesDb({
+              namePrefix: name,
+              organizationId,
+            }),
       );
       cleanup.defer("hard-delete API journey cancellation run rows", () =>
         hardCleanedRuns
@@ -3624,7 +3753,10 @@ export const simulationAgentccJourneys = [
         namePrefix: name,
         organizationId,
       });
-      await deleteSimulationScenarioFixturesDb({ namePrefix: name, organizationId });
+      await deleteSimulationScenarioFixturesDb({
+        namePrefix: name,
+        organizationId,
+      });
 
       const scenarioFixture = await seedSimulationScenarioFixturesDb({
         namePrefix: name,
@@ -4151,9 +4283,7 @@ export const simulationAgentccJourneys = [
         "Custom property boolean number default was accepted.",
       );
       assert(
-        errorText(invalidNumberDefault)
-          .toLowerCase()
-          .includes("default_value"),
+        errorText(invalidNumberDefault).toLowerCase().includes("default_value"),
         "Custom property invalid number default error did not mention default_value.",
       );
 
@@ -4903,7 +5033,14 @@ export const simulationAgentccJourneys = [
       "data-roundtrip",
       "db-audit",
     ],
-    async run({ client, cleanup, runId, evidence, organizationId, workspaceId }) {
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
       requireMutations();
       const sessionId = `api_journey_session_${runId.replace(/[^a-z0-9]/gi, "_")}`;
       const marker = `api_journey_session_log_${runId.replace(/[^a-z0-9]/gi, "_")}`;
@@ -5047,8 +5184,12 @@ export const simulationAgentccJourneys = [
       assert(
         requests.length === 2 &&
           requests.every((request) => request.session_id === sessionId) &&
-          requests.some((request) => request.request_id === `${marker}_error`) &&
-          requests.some((request) => request.request_id === `${marker}_success`),
+          requests.some(
+            (request) => request.request_id === `${marker}_error`,
+          ) &&
+          requests.some(
+            (request) => request.request_id === `${marker}_success`,
+          ),
         "Gateway session requests did not return the seeded request chain.",
       );
 
@@ -7093,6 +7234,45 @@ function assertSimulationEvalParams(actual, expected) {
   }
 }
 
+function assertSimulationEvalSummary(
+  summary,
+  { template, evalConfig, expectedCalls },
+) {
+  const rows = asArray(summary);
+  const row = rows.find((item) => {
+    const isTemplateRow =
+      item?.id === template.id || item?.name === template.name;
+    const hasEvalConfig = asArray(item?.result).some(
+      (config) => config?.id === evalConfig.id,
+    );
+    return isTemplateRow && hasEvalConfig;
+  });
+  assert(
+    row,
+    `Eval summary did not include template ${template.name}: ${JSON.stringify(
+      summary,
+    )}`,
+  );
+
+  const configRow = asArray(row.result).find(
+    (config) => config?.id === evalConfig.id,
+  );
+  assert(
+    configRow?.name === evalConfig.name &&
+      Number(configRow.total_cells) === expectedCalls,
+    `Eval summary did not include the completed eval config cells: ${JSON.stringify(
+      row,
+    )}`,
+  );
+  assert(
+    Number(configRow.output?.pass_count) === expectedCalls &&
+      Number(configRow.output?.fail_count || 0) === 0 &&
+      Number(row.total_pass_rate) === 100,
+    `Eval summary pass/fail rollup was incorrect: ${JSON.stringify(row)}`,
+  );
+  return row;
+}
+
 function firstUuid(value) {
   return isUuid(value) ? String(value) : null;
 }
@@ -7704,41 +7884,19 @@ WITH target_scenarios AS (
     AND name LIKE ${sqlString(`${namePrefix}%`)}
 ),
 target_datasets AS (
-  SELECT id
-  FROM model_hub_dataset
-  WHERE organization_id = ${sqlUuid(organizationId)}
-    AND (
-      name LIKE ${sqlString(`${namePrefix}%`)}
-      OR id IN (
-        SELECT dataset_id FROM target_scenarios WHERE dataset_id IS NOT NULL
-      )
-    )
+  SELECT DISTINCT dataset_id AS id
+  FROM target_scenarios
+  WHERE dataset_id IS NOT NULL
 ),
 target_simulator_agents AS (
-  SELECT id
-  FROM simulator_agents
-  WHERE organization_id = ${sqlUuid(organizationId)}
-    AND (
-      name LIKE ${sqlString(`${namePrefix}%`)}
-      OR id IN (
-        SELECT simulator_agent_id
-        FROM target_scenarios
-        WHERE simulator_agent_id IS NOT NULL
-      )
-    )
+  SELECT DISTINCT simulator_agent_id AS id
+  FROM target_scenarios
+  WHERE simulator_agent_id IS NOT NULL
 ),
 target_agents AS (
-  SELECT id
-  FROM simulate_agent_definition
-  WHERE organization_id = ${sqlUuid(organizationId)}
-    AND (
-      agent_name LIKE ${sqlString(`${namePrefix}%`)}
-      OR id IN (
-        SELECT agent_definition_id
-        FROM target_scenarios
-        WHERE agent_definition_id IS NOT NULL
-      )
-    )
+  SELECT DISTINCT agent_definition_id AS id
+  FROM target_scenarios
+  WHERE agent_definition_id IS NOT NULL
 ),
 target_graphs AS (
   SELECT id
@@ -8751,6 +8909,7 @@ updated_execution AS (
     failed_calls = 0,
     updated_at = now()
   WHERE te.id = ${sqlUuid(testExecutionId)}
+    AND EXISTS (SELECT 1 FROM target_call)
   RETURNING te.id
 )
 SELECT json_build_object(
@@ -8895,6 +9054,93 @@ SELECT json_build_object(
   'updated_call_count', (SELECT count(*) FROM updated_call),
   'inserted_message_count', (SELECT count(*) FROM inserted_messages),
   'updated_execution_count', (SELECT count(*) FROM updated_execution)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function markSimulationEvalOutputsCompletedDb({
+  testExecutionId,
+  callExecutionIds,
+  evalConfigId,
+  evalName,
+  organizationId,
+  workspaceId,
+}) {
+  assert(
+    isUuid(testExecutionId),
+    "Eval-output seed needs a test execution UUID.",
+  );
+  assert(
+    asArray(callExecutionIds).every(isUuid),
+    "Eval-output seed needs call execution UUIDs.",
+  );
+  assert(isUuid(evalConfigId), "Eval-output seed needs an eval config UUID.");
+  const evalPayload = {
+    [evalConfigId]: {
+      name: evalName,
+      output: true,
+      output_type: "Pass/Fail",
+      reason: "SIM eval journey reason",
+      status: "completed",
+    },
+  };
+  const sql = `
+WITH target_call AS (
+  SELECT ce.id
+  FROM simulate_call_execution ce
+  JOIN simulate_test_execution te ON te.id = ce.test_execution_id
+  JOIN simulate_run_test rt ON rt.id = te.run_test_id
+  WHERE te.id = ${sqlUuid(testExecutionId)}
+    AND ce.id = ANY(${sqlUuidArray(callExecutionIds)})
+    AND rt.organization_id = ${sqlUuid(organizationId)}
+    AND rt.workspace_id = ${sqlUuid(workspaceId)}
+    AND rt.deleted = false
+    AND te.deleted = false
+    AND ce.deleted = false
+),
+updated_call AS (
+  UPDATE simulate_call_execution ce
+  SET
+    status = 'completed',
+    started_at = COALESCE(ce.started_at, now() - interval '45 seconds'),
+    completed_at = COALESCE(ce.completed_at, now()),
+    ended_at = COALESCE(ce.ended_at, now()),
+    duration_seconds = COALESCE(ce.duration_seconds, 45),
+    response_time_ms = COALESCE(ce.response_time_ms, 1000),
+    overall_score = COALESCE(ce.overall_score, 9.0),
+    message_count = COALESCE(ce.message_count, 2),
+    transcript_available = true,
+    call_metadata = COALESCE(ce.call_metadata, '{}'::jsonb)
+      || jsonb_build_object('eval_started', true, 'eval_completed', true),
+    eval_outputs = COALESCE(ce.eval_outputs, '{}'::jsonb) || ${sqlJson(evalPayload)},
+    updated_at = now()
+  FROM target_call target
+  WHERE ce.id = target.id
+  RETURNING ce.id
+),
+updated_execution AS (
+  UPDATE simulate_test_execution te
+  SET
+    status = 'completed',
+    completed_at = COALESCE(te.completed_at, now()),
+    total_calls = GREATEST(COALESCE(te.total_calls, 0), (SELECT count(*) FROM target_call)),
+    completed_calls = GREATEST(COALESCE(te.completed_calls, 0), (SELECT count(*) FROM target_call)),
+    failed_calls = 0,
+    picked_up_by_executor = true,
+    updated_at = now()
+  WHERE te.id = ${sqlUuid(testExecutionId)}
+  RETURNING te.id
+)
+SELECT json_build_object(
+  'updated_call_count', (SELECT count(*) FROM updated_call),
+  'updated_execution_count', (SELECT count(*) FROM updated_execution),
+  'eval_output_count', (
+    SELECT count(*)
+    FROM simulate_call_execution ce
+    WHERE ce.id IN (SELECT id FROM target_call)
+      AND ce.eval_outputs ? ${sqlString(evalConfigId)}
+  )
 );
 `;
   return runPostgresJson(sql);
@@ -9374,7 +9620,10 @@ SELECT COALESCE((
   return runPostgresJson(sql);
 }
 
-async function loadAgentccCustomPropertyDbAudit({ propertyId, organizationId }) {
+async function loadAgentccCustomPropertyDbAudit({
+  propertyId,
+  organizationId,
+}) {
   const sql = `
 SELECT COALESCE((
   SELECT json_build_object(
