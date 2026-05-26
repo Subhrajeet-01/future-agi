@@ -1915,6 +1915,258 @@ export const datasetEvalJourneys = [
     },
   },
   {
+    id: "DPE-API-033",
+    title:
+      "Dataset duplicate selected rows preserves copied data and guards rows",
+    tags: ["dataset", "duplicate", "mutating", "data-roundtrip", "db-audit"],
+    async run({
+      client,
+      cleanup,
+      runId,
+      evidence,
+      organizationId,
+      workspaceId,
+    }) {
+      requireMutations();
+      const sourceName = `api duplicate source ${runId}`;
+      const blockedName = `api duplicate blocked ${runId}`;
+      const duplicateName = `api duplicate copy ${runId}`;
+      const copiedValue = `duplicate copied value ${runId}`;
+      const excludedValue = `duplicate excluded value ${runId}`;
+      let sourceDatasetId;
+      let duplicateDatasetId;
+      let sourceDeleted = false;
+      let duplicateDeleted = false;
+
+      try {
+        const created = await client.post(
+          apiPath("/model-hub/develops/create-dataset-manually/"),
+          {
+            dataset_name: sourceName,
+            number_of_rows: 2,
+            number_of_columns: 2,
+          },
+        );
+        sourceDatasetId = created?.dataset_id;
+      } catch (error) {
+        if (error?.status !== 429) throw error;
+        evidence.push({
+          source_creation: "plan-limited",
+          status: error.status,
+        });
+        skip("Source dataset creation is plan-limited for this org/workspace.");
+      }
+      assert(
+        sourceDatasetId,
+        "Duplicate source create did not return dataset_id.",
+      );
+      cleanup.defer("delete API journey duplicate source dataset", () =>
+        sourceDeleted
+          ? Promise.resolve()
+          : client.delete(apiPath("/model-hub/develops/delete_dataset/"), {
+              body: { dataset_ids: [sourceDatasetId] },
+              okStatuses: [200, 404],
+            }),
+      );
+
+      const sourceTable = await getDatasetTable(client, sourceDatasetId);
+      const sourceRows = asArray(sourceTable.table).filter(
+        (row) => row?.row_id,
+      );
+      const sourceColumns = asArray(sourceTable.column_config);
+      assert(sourceRows.length === 2, "Duplicate source did not have 2 rows.");
+      const sourceColumnOne = sourceColumns.find(
+        (column) => column?.name === "Column 1",
+      );
+      const sourceColumnTwo = sourceColumns.find(
+        (column) => column?.name === "Column 2",
+      );
+      assert(sourceColumnOne?.id, "Duplicate source was missing Column 1.");
+      assert(sourceColumnTwo?.id, "Duplicate source was missing Column 2.");
+
+      await client.post(
+        apiPath("/model-hub/develops/{dataset_id}/update_cell_value/", {
+          dataset_id: sourceDatasetId,
+        }),
+        {
+          row_id: sourceRows[0].row_id,
+          column_id: sourceColumnOne.id,
+          new_value: copiedValue,
+        },
+      );
+      await client.post(
+        apiPath("/model-hub/develops/{dataset_id}/update_cell_value/", {
+          dataset_id: sourceDatasetId,
+        }),
+        {
+          row_id: sourceRows[1].row_id,
+          column_id: sourceColumnTwo.id,
+          new_value: excludedValue,
+        },
+      );
+
+      await expectApiErrorStatus(
+        () =>
+          client.post(
+            apiPath("/model-hub/datasets/{dataset_id}/duplicate/", {
+              dataset_id: sourceDatasetId,
+            }),
+            {
+              name: blockedName,
+              row_ids: [randomUUID()],
+              selected_all_rows: false,
+            },
+          ),
+        400,
+        "Duplicate dataset accepted a row id outside the source dataset.",
+      );
+      const blockedAudit = await loadDatasetNameActiveCount({
+        organizationId,
+        expectedName: blockedName,
+      });
+      assert(
+        Number(blockedAudit.active_count) === 0,
+        "Duplicate dataset bad-row guard left an active dataset behind.",
+      );
+
+      let duplicated;
+      try {
+        duplicated = await client.post(
+          apiPath("/model-hub/datasets/{dataset_id}/duplicate/", {
+            dataset_id: sourceDatasetId,
+          }),
+          {
+            name: duplicateName,
+            row_ids: [sourceRows[0].row_id],
+            selected_all_rows: false,
+          },
+        );
+      } catch (error) {
+        if (error?.status !== 429) throw error;
+        evidence.push({
+          duplicate_creation: "plan-limited",
+          status: error.status,
+        });
+        skip(
+          "Dataset duplicate creation is plan-limited for this org/workspace.",
+        );
+      }
+      duplicateDatasetId = duplicated?.new_dataset_id;
+      assert(
+        duplicateDatasetId,
+        "Duplicate API did not return new_dataset_id.",
+      );
+      cleanup.defer("delete API journey duplicate dataset", () =>
+        duplicateDeleted
+          ? Promise.resolve()
+          : client.delete(apiPath("/model-hub/develops/delete_dataset/"), {
+              body: { dataset_ids: [duplicateDatasetId] },
+              okStatuses: [200, 404],
+            }),
+      );
+      assert(
+        Number(duplicated?.rows_copied) === 1 &&
+          Number(duplicated?.columns_copied) === 2,
+        "Duplicate API did not report the selected row and columns copied.",
+      );
+
+      const duplicateTable = await getDatasetTable(client, duplicateDatasetId);
+      const duplicateRows = asArray(duplicateTable.table).filter(
+        (row) => row?.row_id,
+      );
+      const duplicateColumns = asArray(duplicateTable.column_config);
+      assert(
+        duplicateRows.length === 1,
+        "Duplicate dataset did not copy exactly one selected row.",
+      );
+      const duplicateColumnOne = duplicateColumns.find(
+        (column) => column?.name === "Column 1",
+      );
+      const duplicateColumnTwo = duplicateColumns.find(
+        (column) => column?.name === "Column 2",
+      );
+      assert(duplicateColumnOne?.id, "Duplicate dataset was missing Column 1.");
+      assert(duplicateColumnTwo?.id, "Duplicate dataset was missing Column 2.");
+      assert(
+        duplicateColumnOne.id !== sourceColumnOne.id &&
+          duplicateColumnTwo.id !== sourceColumnTwo.id,
+        "Duplicate dataset reused source column ids.",
+      );
+      assert(
+        duplicateRows[0].row_id !== sourceRows[0].row_id,
+        "Duplicate dataset reused the source row id.",
+      );
+      assert(
+        cellValueFor(duplicateRows[0], duplicateColumnOne.id) === copiedValue,
+        "Duplicate dataset did not preserve selected row value.",
+      );
+      assert(
+        !String(JSON.stringify(duplicateRows)).includes(excludedValue),
+        "Duplicate dataset copied an unselected row value.",
+      );
+
+      const sourceAudit = await loadDatasetCloneDbAudit({
+        datasetId: sourceDatasetId,
+        organizationId,
+        workspaceId,
+        expectedName: sourceName,
+      });
+      assertDatasetCloneAudit(sourceAudit, {
+        expectedDeleted: false,
+        expectedValues: [copiedValue, excludedValue],
+        expectedWorkspaceId: workspaceId,
+      });
+      const duplicateAudit = await loadDatasetCloneDbAudit({
+        datasetId: duplicateDatasetId,
+        organizationId,
+        workspaceId,
+        expectedName: duplicateName,
+      });
+      assertDatasetCloneAudit(duplicateAudit, {
+        expectedDeleted: false,
+        expectedRows: 1,
+        expectedColumns: 2,
+        expectedCells: 2,
+        expectedValues: [copiedValue],
+        expectedWorkspaceId: workspaceId,
+      });
+
+      await client.delete(apiPath("/model-hub/develops/delete_dataset/"), {
+        body: { dataset_ids: [duplicateDatasetId] },
+      });
+      duplicateDeleted = true;
+      await client.delete(apiPath("/model-hub/develops/delete_dataset/"), {
+        body: { dataset_ids: [sourceDatasetId] },
+      });
+      sourceDeleted = true;
+
+      const deletedDuplicateAudit = await loadDatasetCloneDbAudit({
+        datasetId: duplicateDatasetId,
+        organizationId,
+        workspaceId,
+        expectedName: duplicateName,
+      });
+      assertDatasetCloneAudit(deletedDuplicateAudit, {
+        expectedDeleted: true,
+        expectedRows: 1,
+        expectedColumns: 2,
+        expectedCells: 2,
+        expectedValues: [copiedValue],
+        expectedWorkspaceId: workspaceId,
+      });
+
+      evidence.push({
+        source_dataset_id: sourceDatasetId,
+        duplicate_dataset_id: duplicateDatasetId,
+        rows_copied: Number(duplicated.rows_copied),
+        columns_copied: Number(duplicated.columns_copied),
+        duplicate_cells: Number(duplicateAudit.cell_count),
+        blocked_active_count: Number(blockedAudit.active_count),
+        cleanup_deleted_at: deletedDuplicateAudit.deleted_at_set,
+      });
+    },
+  },
+  {
     id: "DPE-API-016",
     title: "Dataset advanced row/column readbacks and cleanup audit",
     tags: ["dataset", "develop", "mutating", "data-roundtrip", "db-audit"],
@@ -23935,9 +24187,31 @@ FROM dataset_row d;
   return runPostgresJson(sql);
 }
 
+async function loadDatasetNameActiveCount({ organizationId, expectedName }) {
+  assert(isUuid(organizationId), "organizationId must be a UUID for DB audit.");
+  assert(typeof expectedName === "string", "expectedName must be a string.");
+  const sql = `
+SELECT json_build_object(
+  'active_count', count(*)
+)
+FROM model_hub_dataset
+WHERE organization_id = ${sqlUuid(organizationId)}
+  AND name = ${sqlText(expectedName)}
+  AND deleted = false;
+`;
+  return runPostgresJson(sql);
+}
+
 function assertDatasetCloneAudit(
   audit,
-  { expectedDeleted, expectedValues, expectedWorkspaceId },
+  {
+    expectedDeleted,
+    expectedRows = 2,
+    expectedColumns = 2,
+    expectedCells = 4,
+    expectedValues,
+    expectedWorkspaceId,
+  },
 ) {
   assert(audit?.dataset_id, "Dataset clone DB audit did not find dataset.");
   assert(
@@ -23960,27 +24234,33 @@ function assertDatasetCloneAudit(
       "Deleted clone dataset did not set deleted_at.",
     );
   }
-  assert(Number(audit.row_count) === 2, "Dataset clone row count mismatch.");
   assert(
-    Number(audit.column_count) === 2,
+    Number(audit.row_count) === expectedRows,
+    "Dataset clone row count mismatch.",
+  );
+  assert(
+    Number(audit.column_count) === expectedColumns,
     "Dataset clone column count mismatch.",
   );
-  assert(Number(audit.cell_count) === 4, "Dataset clone cell count mismatch.");
   assert(
-    Number(audit.column_order_count) === 2,
+    Number(audit.cell_count) === expectedCells,
+    "Dataset clone cell count mismatch.",
+  );
+  assert(
+    Number(audit.column_order_count) === expectedColumns,
     "Dataset clone column_order count mismatch.",
   );
   assert(
-    Number(audit.column_config_count) === 2,
+    Number(audit.column_config_count) === expectedColumns,
     "Dataset clone column_config count mismatch.",
   );
   assert(
-    asArray(audit.column_ids).length === 2,
-    "Dataset clone DB audit did not return 2 column ids.",
+    asArray(audit.column_ids).length === expectedColumns,
+    "Dataset clone DB audit column id count mismatch.",
   );
   assert(
-    asArray(audit.row_ids).length === 2,
-    "Dataset clone DB audit did not return 2 row ids.",
+    asArray(audit.row_ids).length === expectedRows,
+    "Dataset clone DB audit row id count mismatch.",
   );
   const actualValues = asArray(audit.cell_values).sort();
   const expectedSorted = [...expectedValues].sort();
