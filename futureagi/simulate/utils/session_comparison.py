@@ -3,15 +3,10 @@ from collections import ChainMap
 from datetime import datetime
 from typing import List
 
-from django.db import models
-from django.db.models import Count, F, Max, Min, Q, Sum
-from django.db.models.functions import Coalesce
-
 from simulate.models import CallExecution
 from simulate.models.chat_message import ChatMessageModel
 from simulate.pydantic_schemas.chat import ChatRole
 from simulate.serializers.chat_message import ChatMessageSerializer
-from tracer.models.observation_span import ObservationSpan
 from tracer.models.trace import Trace
 from tracer.utils.otel import CallAttributes, ConversationAttributes
 
@@ -28,38 +23,45 @@ def fetch_base_session_metrics(session_id: str):
     if not session_id:
         raise ValueError("Session ID is required")
 
-    # Calculate session-level aggregates
-    base_session_aggregates = ObservationSpan.objects.filter(
-        trace__session_id=session_id
-    ).aggregate(
-        start_time=Min("start_time"),
-        end_time=Max("end_time"),
-        total_tokens=Coalesce(
-            Sum(F("total_tokens"), output_field=models.IntegerField()),
-            0,
-        ),
-        total_traces=Count("trace_id", distinct=True),
-        total_tools_count=Count(
-            "id",
-            filter=Q(observation_type="tool"),
-            distinct=False,
-        ),
-    )
+    # Session-level aggregates from ClickHouse via wave-3 reader extension
+    # ``CHSpanReader.aggregate_by_session_ids`` (commit 93c5c415f).
+    #
+    # Original PG query was a single .aggregate() call producing:
+    #   {start_time, end_time, total_tokens, total_traces, total_tools_count}
+    #
+    # The reader returns most of those in one query
+    # (span_count, traces_count, tokens, cost, start_time, end_time) but NOT
+    # the conditional ``Count(filter=Q(observation_type="tool"))``. For a
+    # single session a second narrow CH read via ``count_with_filters`` is
+    # cheap and avoids burdening the bulk-rollup helper with a special
+    # case (no N+1 — this function takes one session at a time).
+    from tracer.services.clickhouse.v2 import get_reader
 
-    base_session_duration = (
-        base_session_aggregates["end_time"] - base_session_aggregates["start_time"]
-    )
+    with get_reader() as reader:
+        per_session = reader.aggregate_by_session_ids([str(session_id)])
+        tools_count = reader.count_with_filters(
+            session_id=str(session_id),
+            observation_type="tool",
+        )
+
+    agg = per_session.get(str(session_id))
+    if not agg or agg["start_time"] is None or agg["end_time"] is None:
+        # PG path raised on missing duration via the subsequent subtraction;
+        # surface the same ValueError shape here when CH has no spans for
+        # the session yet (or the session_id is unknown).
+        raise ValueError("Session duration is required")
+
+    base_session_duration = (agg["end_time"] - agg["start_time"]).total_seconds()
     if not base_session_duration:
         raise ValueError("Session duration is required")
 
-    base_session_duration = base_session_duration.total_seconds()
-
-    # Coalesce(..., 0) and Count() guarantee non-null integers
+    # Reader guarantees non-null ints for tokens/traces_count (sum/uniqExact
+    # return 0 on empty groups); count_with_filters returns 0 on no match.
     base_session_metrics = {
         "duration": base_session_duration,
-        "tokens": base_session_aggregates["total_tokens"],
-        "turn_count": base_session_aggregates["total_traces"],
-        "tools_count": base_session_aggregates["total_tools_count"],
+        "tokens": int(agg["tokens"] or 0),
+        "turn_count": int(agg["traces_count"] or 0),
+        "tools_count": int(tools_count or 0),
     }
 
     return base_session_metrics
