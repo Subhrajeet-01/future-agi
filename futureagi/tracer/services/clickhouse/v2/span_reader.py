@@ -408,6 +408,366 @@ class CHSpanReader:
         """Equivalent to ObservationSpan.objects.filter(trace_id=).exists()."""
         return self.count_by_trace(trace_id) > 0
 
+    # ─── Per-trace aggregates (replaces feed.py / project_version.py rollups) ─
+    def per_trace_aggregate(self, trace_ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Equivalent to:
+            ObservationSpan.objects.filter(trace_id__in=trace_ids)
+                .values("trace_id")
+                .annotate(span_count=Count("id"), prompt_tokens=Sum(...),
+                          completion_tokens=Sum(...), total_tokens=Sum(...),
+                          cost=Sum(...), start_time=Min(...), end_time=Max(...),
+                          latency_ms=Sum(...))
+
+        Returns a dict keyed by trace_id (str). Missing trace_ids return an
+        empty entry (use .get(tid, {}) for safety). Empty input returns {}.
+        """
+        if not trace_ids:
+            return {}
+        rows = self._client.query(
+            "SELECT toString(trace_id) AS tid, "
+            "count() AS n, "
+            "sum(prompt_tokens) AS pt, sum(completion_tokens) AS ct, "
+            "sum(total_tokens) AS tt, sum(cost) AS cost, "
+            "min(start_time) AS st, max(end_time) AS et, "
+            "sum(latency_ms) AS lat "
+            "FROM spans FINAL "
+            "WHERE trace_id IN %(tids)s AND is_deleted = 0 "
+            "GROUP BY toString(trace_id)",
+            parameters={"tids": tuple(trace_ids)},
+        ).result_rows
+        return {
+            tid: {
+                "span_count": int(n or 0),
+                "prompt_tokens": int(pt or 0),
+                "completion_tokens": int(ct or 0),
+                "total_tokens": int(tt or 0),
+                "cost": float(c or 0.0),
+                "start_time": st,
+                "end_time": et,
+                "latency_ms": int(lat or 0),
+            }
+            for (tid, n, pt, ct, tt, c, st, et, lat) in rows
+        }
+
+    # ─── Root-span start_time per trace (replay_session ordering helper) ─────
+    def per_trace_root_span_start_times(
+        self, trace_ids: list[str]
+    ) -> dict[str, Optional[datetime]]:
+        """Equivalent to:
+            Subquery(ObservationSpan.objects.filter(trace_id=OuterRef("id"),
+                                                     parent_span_id__isnull=True)
+                                              .values("start_time")[:1])
+
+        Returns a dict trace_id → start_time of the trace's root span (or
+        None if no root span exists in CH yet). Used to order trace lists
+        by their first activity time without joining cross-store.
+
+        CH stores parent_span_id as non-nullable String (schema 001); root
+        spans have an empty string. We pick min(start_time) for ties.
+        """
+        if not trace_ids:
+            return {}
+        rows = self._client.query(
+            "SELECT toString(trace_id) AS tid, min(start_time) AS st "
+            "FROM spans FINAL "
+            "WHERE trace_id IN %(tids)s AND is_deleted = 0 "
+            "  AND parent_span_id = '' "
+            "GROUP BY toString(trace_id)",
+            parameters={"tids": tuple(trace_ids)},
+        ).result_rows
+        result: dict[str, Optional[datetime]] = {tid: None for tid in trace_ids}
+        for tid, st in rows:
+            result[tid] = st
+        return result
+
+    # ─── Distinct end_users per trace (feed user-count rollup) ────────────────
+    def distinct_end_users_by_trace_ids(
+        self, trace_ids: list[str]
+    ) -> dict[str, set[str]]:
+        """Equivalent to:
+            ObservationSpan.objects.filter(trace_id__in=trace_ids,
+                                            end_user__isnull=False)
+                .values("trace_id", "end_user_id").distinct()
+            grouped into {trace_id: {end_user_id, ...}}
+
+        Pushes DISTINCT into CH so we don't materialize all spans Python-
+        side just to count distinct users. Empty trace_ids returns {}.
+        """
+        if not trace_ids:
+            return {}
+        rows = self._client.query(
+            "SELECT toString(trace_id) AS tid, toString(end_user_id) AS uid "
+            "FROM spans FINAL "
+            "WHERE trace_id IN %(tids)s AND is_deleted = 0 "
+            "  AND end_user_id IS NOT NULL "
+            "GROUP BY toString(trace_id), toString(end_user_id)",
+            parameters={"tids": tuple(trace_ids)},
+        ).result_rows
+        out: dict[str, set[str]] = {tid: set() for tid in trace_ids}
+        for tid, uid in rows:
+            if uid and uid != "00000000-0000-0000-0000-000000000000":
+                out[tid].add(uid)
+        return out
+
+    # ─── End-user metrics (tasks/session.py user rollups) ─────────────────────
+    def aggregate_by_end_user(
+        self,
+        end_user_id: str,
+        *,
+        project_id: Optional[str] = None,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+    ) -> dict[str, Any]:
+        """User-scoped roll-up used by session.py background tasks. Equivalent to:
+            ObservationSpan.objects.filter(end_user=user[, optional ...])
+                .aggregate(Sum(total_tokens), Sum(cost), Count("id"),
+                           Min(start_time), Max(end_time))
+
+        Plus distinct trace_count via COUNT(DISTINCT trace_id) in one CH pass.
+        Returns zeros + None timestamps if no spans match (rather than {}).
+        """
+        where = ["is_deleted = 0", "end_user_id = %(uid)s"]
+        params: dict[str, Any] = {"uid": end_user_id}
+        if project_id:
+            where.append("project_id = %(pid)s")
+            params["pid"] = project_id
+        if since:
+            where.append("start_time >= %(since)s")
+            params["since"] = since
+        if until:
+            where.append("start_time <  %(until)s")
+            params["until"] = until
+        rows = self._client.query(
+            "SELECT count() AS n, "
+            "uniqExact(trace_id) AS traces, "
+            "uniqExact(trace_session_id) AS sessions, "
+            "sum(prompt_tokens) AS pt, sum(completion_tokens) AS ct, "
+            "sum(total_tokens) AS tt, sum(cost) AS cost, "
+            "min(start_time) AS first_seen, max(end_time) AS last_seen "
+            f"FROM spans FINAL WHERE {' AND '.join(where)}",
+            parameters=params,
+        ).result_rows
+        if not rows:
+            return {
+                "span_count": 0, "trace_count": 0, "session_count": 0,
+                "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                "cost": 0.0, "first_seen": None, "last_seen": None,
+            }
+        n, traces, sessions, pt, ct, tt, c, fs, ls = rows[0]
+        return {
+            "span_count": int(n or 0),
+            "trace_count": int(traces or 0),
+            "session_count": int(sessions or 0),
+            "prompt_tokens": int(pt or 0),
+            "completion_tokens": int(ct or 0),
+            "total_tokens": int(tt or 0),
+            "cost": float(c or 0.0),
+            "first_seen": fs,
+            "last_seen": ls,
+        }
+
+    # ─── Time-bucketed aggregates (graphs.py / monitor.py) ───────────────────
+    def time_bucket_aggregate(
+        self,
+        project_id: str,
+        *,
+        interval: str = "hour",
+        since: datetime,
+        until: datetime,
+        observation_type: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """Equivalent to:
+            ObservationSpan.objects.filter(project_id=, start_time__range=...)
+                .annotate(bucket=TruncHour/Day/Month("start_time"))
+                .values("bucket")
+                .annotate(span_count=Count, tokens=Sum, cost=Sum, latency=Avg)
+                .order_by("bucket")
+
+        `interval` ∈ {"hour", "day", "week", "month"}; mapped to the CH
+        toStartOfX function. Returns one row per non-empty bucket.
+        """
+        bucket_fn = {
+            "hour":  "toStartOfHour",
+            "day":   "toStartOfDay",
+            "week":  "toStartOfWeek",
+            "month": "toStartOfMonth",
+        }.get(interval)
+        if bucket_fn is None:
+            raise ValueError(
+                f"interval={interval!r} not in {{'hour','day','week','month'}}"
+            )
+        where = [
+            "is_deleted = 0",
+            "project_id = %(pid)s",
+            "start_time >= %(since)s",
+            "start_time <  %(until)s",
+        ]
+        params: dict[str, Any] = {"pid": project_id, "since": since, "until": until}
+        if observation_type:
+            where.append("observation_type = %(otype)s")
+            params["otype"] = observation_type
+        rows = self._client.query(
+            f"SELECT {bucket_fn}(start_time) AS bucket, "
+            "count() AS span_count, sum(total_tokens) AS tokens, "
+            "sum(cost) AS cost, avg(latency_ms) AS latency_ms "
+            f"FROM spans FINAL WHERE {' AND '.join(where)} "
+            f"GROUP BY {bucket_fn}(start_time) "
+            f"ORDER BY {bucket_fn}(start_time)",
+            parameters=params,
+        ).result_rows
+        return [
+            {
+                "bucket": bucket,
+                "span_count": int(n or 0),
+                "tokens": int(toks or 0),
+                "cost": float(c or 0.0),
+                "latency_ms": float(lat or 0.0),
+            }
+            for (bucket, n, toks, c, lat) in rows
+        ]
+
+    # ─── Generic filtered count (eval_task.py Q-object replacement) ──────────
+    def count_with_filters(
+        self,
+        *,
+        project_id: Optional[str] = None,
+        trace_ids: Optional[list[str]] = None,
+        observation_type: Optional[list[str] | str] = None,
+        session_id: Optional[str] = None,
+        created_at_gte: Optional[datetime] = None,
+        created_at_range: Optional[tuple[datetime, datetime]] = None,
+    ) -> int:
+        """Replaces ObservationSpan.objects.filter(<Q-object>).count() for
+        the specific filter set produced by parsing_evaltask_filters().
+
+        Equivalent to building a Q with those kwargs and counting. NOT
+        a general-purpose Q→CH translator; intentionally narrow to the
+        eval-task filter shape so behavior is testable in isolation.
+        """
+        where = ["is_deleted = 0"]
+        params: dict[str, Any] = {}
+        if project_id:
+            where.append("project_id = %(pid)s")
+            params["pid"] = project_id
+        if trace_ids:
+            where.append("trace_id IN %(tids)s")
+            params["tids"] = tuple(trace_ids)
+        if observation_type:
+            if isinstance(observation_type, (list, tuple, set)):
+                if len(observation_type) == 0:
+                    return 0
+                where.append("observation_type IN %(otypes)s")
+                params["otypes"] = tuple(observation_type)
+            else:
+                where.append("observation_type = %(otype)s")
+                params["otype"] = observation_type
+        if session_id:
+            where.append("trace_session_id = %(sid)s")
+            params["sid"] = session_id
+        if created_at_gte:
+            # CH spans don't have a `created_at` column; map to start_time
+            # which is the closest equivalent observable timestamp.
+            where.append("start_time >= %(cag)s")
+            params["cag"] = created_at_gte
+        if created_at_range:
+            where.append("start_time BETWEEN %(cr_s)s AND %(cr_e)s")
+            params["cr_s"], params["cr_e"] = created_at_range
+        rows = self._client.query(
+            "SELECT count() FROM spans FINAL " f"WHERE {' AND '.join(where)}",
+            parameters=params,
+        ).result_rows
+        return int(rows[0][0]) if rows else 0
+
+    # ─── Group-by name with aggregates (error_analysis tool patterns) ────────
+    def per_project_group_by_name(
+        self,
+        project_id: str,
+        *,
+        observation_type: Optional[str] = None,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        status_filter: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Equivalent to:
+            ObservationSpan.objects.filter(project_id=[, observation_type=]
+                                            [, start_time__gte=since])
+                .values("name").annotate(usage_count=Count("id"),
+                                          error_count=Count("id", filter=Q(status="error")),
+                                          avg_latency=Avg("latency_ms"),
+                                          total_cost=Sum("cost"))
+                .order_by("-usage_count")[:limit]
+
+        Used by AI-tool patterns (tool-usage analysis, retrieval patterns).
+        `status_filter` ANDs into the WHERE (e.g. include only error rows).
+        """
+        where = ["is_deleted = 0", "project_id = %(pid)s"]
+        params: dict[str, Any] = {"pid": project_id}
+        if observation_type:
+            where.append("observation_type = %(otype)s")
+            params["otype"] = observation_type
+        if since:
+            where.append("start_time >= %(since)s")
+            params["since"] = since
+        if until:
+            where.append("start_time <  %(until)s")
+            params["until"] = until
+        if status_filter:
+            where.append("status = %(stat)s")
+            params["stat"] = status_filter
+        rows = self._client.query(
+            "SELECT name, count() AS usage_count, "
+            "countIf(lower(status) = 'error') AS error_count, "
+            "avg(latency_ms) AS avg_latency, sum(cost) AS total_cost "
+            f"FROM spans FINAL WHERE {' AND '.join(where)} "
+            "GROUP BY name "
+            "ORDER BY count() DESC "
+            f"LIMIT {int(limit)}",
+            parameters=params,
+        ).result_rows
+        return [
+            {
+                "name": name,
+                "usage_count": int(usage or 0),
+                "error_count": int(errs or 0),
+                "avg_latency": float(lat or 0.0),
+                "total_cost": float(cost or 0.0),
+            }
+            for (name, usage, errs, lat, cost) in rows
+        ]
+
+    # ─── Parsing eval-task filters for CH (companion to PG Q-object) ─────────
+    @staticmethod
+    def parsing_evaltask_filters_for_ch(filters: dict) -> dict[str, Any]:
+        """Companion to tracer/utils/eval_tasks.py::parsing_evaltask_filters.
+        Same input shape — produces kwargs for count_with_filters() instead
+        of a Django Q object.
+
+        Returns a dict of kwargs ready for `**` into count_with_filters
+        (or any other CH method that accepts the same subset).
+
+        Limits: span_attributes_filters are NOT translated here (they need
+        the FilterEngine v2 path). Caller should fall back to the v2 query
+        builder for that subset.
+        """
+        out: dict[str, Any] = {}
+        if not filters:
+            return out
+        if (otype := filters.get("observation_type")):
+            out["observation_type"] = otype
+        if (sid := filters.get("session_id")):
+            out["session_id"] = str(sid)
+        if (dr := filters.get("date_range")):
+            if isinstance(dr, (list, tuple)) and len(dr) == 2:
+                out["created_at_range"] = (dr[0], dr[1])
+        if (cag := filters.get("created_at")):
+            out["created_at_gte"] = cag
+        if (pid := filters.get("project_id")):
+            out["project_id"] = str(pid)
+        # `trace_ids` derived from `session_id` (Trace lookup) is the
+        # caller's responsibility; this helper stays narrow.
+        return out
+
     # ─── Aggregations ────────────────────────────────────────────────────────
     def trace_aggregate(self, trace_id: str) -> dict[str, Any]:
         """Computes the same aggregate the eval runner needs for trace-level
