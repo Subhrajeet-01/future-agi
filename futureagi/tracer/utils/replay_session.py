@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -575,9 +575,21 @@ def _get_transcripts_from_session_query(trace_query: QuerySet) -> dict[str, list
     # PG; the CH reader picks min(start_time) for ties, which is the
     # only deterministic choice. For traces where CH has no root span,
     # we fall back to ``created_at`` — same Coalesce semantic as before.
+    #
+    # Tz normalization: PG datetimes are tz-aware (USE_TZ=True) but the
+    # CH driver returns DateTime64 as naive UTC. Mixing the two
+    # raises ``TypeError: can't compare offset-naive and offset-aware``
+    # when the trace list is a mix of CH-present and CH-missing rows.
+    # Normalize both sides to tz-aware UTC before sorting.
+    def _as_aware_utc(d):
+        if d is None:
+            return None
+        return d if d.tzinfo is not None else d.replace(tzinfo=timezone.utc)
+
     def _sort_key(t):
         rs = root_starts.get(str(t["id"]))
-        return rs if rs is not None else t["created_at"]
+        ts = rs if rs is not None else t["created_at"]
+        return _as_aware_utc(ts)
 
     traces.sort(key=_sort_key)
 

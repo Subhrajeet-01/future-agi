@@ -245,7 +245,14 @@ def _create_observation_span(project, provider, normalized_data, metadata):
 
 
 def _update_observation_span(existing_span, normalized_data):
-    """Updates an existing ObservationSpan and its associated Trace."""
+    """Updates an existing ObservationSpan and its associated Trace.
+
+    CH25-TODO: KEEP-PG. This is a write path — ``existing_span.save()``
+    below is the dual-write source-of-truth update (D-027). CH receives
+    the updated row via PeerDB CDC. Same rationale as
+    ``_create_observation_span`` above; the two helpers form the
+    upsert pair driven by ``process_and_store_logs``.
+    """
     attributes = normalized_data.get("span_attributes", {})
 
     existing_span.start_time = normalized_data.get("start_time")

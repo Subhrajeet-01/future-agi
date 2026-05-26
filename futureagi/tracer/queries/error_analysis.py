@@ -264,6 +264,12 @@ class TraceErrorAnalysisDB:
         identical. Acceptable for the recent-window usage pattern this
         method serves; flagged for callers who need exact PG parity.
 
+        ``limit=10000`` keeps parity with the prior unbounded Django path:
+        the reader's default cap of 50 would silently truncate tail
+        patterns for projects with many tool names. 10k is a safety
+        ceiling — projects with that many distinct tool names need a
+        product-level rethink anyway.
+
         Consumer (``ee/agenthub/traceerroragent/memory.py:72``) wraps the
         return in ``list(tool_patterns)`` and assigns directly to the
         ``tool_patterns`` key of the rollup dict, so list[dict] is the
@@ -274,6 +280,7 @@ class TraceErrorAnalysisDB:
                 project_id=str(project_id),
                 observation_type="tool",
                 since=cutoff_date,
+                limit=10000,
             )
 
     def get_error_category_aggregates(self, project_id, cutoff_date) -> QuerySet:
@@ -533,6 +540,10 @@ class TraceErrorAnalysisDB:
         same group-by-name aggregate shape. No time filter — the original
         Django query was unbounded, so we pass ``since=None``.
 
+        ``limit=10000`` keeps parity with the prior unbounded Django path
+        (reader default is 50 which would silently truncate tail
+        patterns). See ``get_tool_usage_patterns`` for the rationale.
+
         Consumer (``ee/agenthub/traceerroragent/memory.py:373``) wraps the
         return in ``list(retrieval_spans)`` and exposes it under the
         ``retrieval_patterns`` key. Returned dicts include
@@ -543,6 +554,7 @@ class TraceErrorAnalysisDB:
             return reader.per_project_group_by_name(
                 project_id=str(project_id),
                 observation_type="retriever",
+                limit=10000,
             )
 
     def get_chunk_usage_patterns(self, project_id) -> list[dict]:
