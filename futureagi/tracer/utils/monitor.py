@@ -271,6 +271,23 @@ def _get_metric_value(monitor, start_time, end_time):
             )
 
     # --- PostgreSQL fallback ---
+    # CH25-TODO(blocked-on-reader-extension): the CH primary path above
+    # uses MonitorMetricsQueryBuilder which fully handles span_attributes_
+    # filters, status-stratified counts, group-by-session and group-by-
+    # provider via the FilterEngine v2. This Django-ORM fallback exists
+    # as the safety net when the CH dispatch raises (and is also used
+    # when `should_use_clickhouse()` is False on a tenant/feature flag).
+    # Migrating the fallback to CH would defeat its purpose. To remove
+    # the ORM entirely, we'd need readers for:
+    #   • aggregate_window_with_filters(project_id, since, until,
+    #       **parsing_evaltask_filters_for_ch_output) -> dict
+    #   • aggregate_with_status_breakdown(project_id, since, until, *,
+    #       observation_type=None) -> {total, error_count}
+    #   • group_by_session_window(project_id, since, until, **filters)
+    #   • group_by_provider_window(project_id, since, until, **filters)
+    # The new time_bucket_aggregate (commit 46153d310) only accepts
+    # observation_type — it cannot consume the full Q-object that
+    # parsing_evaltask_filters(monitor.filters) produces.
     filters = parsing_evaltask_filters(monitor.filters)
     base_queryset = ObservationSpan.objects.filter(
         project=monitor.project, created_at__range=(start_time, end_time)
@@ -467,6 +484,20 @@ def _get_time_series_data_for_time_aggregated_metrics(
     """
     Groups spans in certain intervals and returns a dictionary of {timestamp: value}.
     `interval_kind` must be one of 'minute', 'hour', 'day', 'week', 'month', 'year'.
+
+    CH25-TODO(blocked-on-reader-extension): this helper is reached from both
+    the CH primary branch (via _get_stats_for_time_aggregated_metrics, when
+    metric_type is COUNT_OF_ERRORS / TOKEN_USAGE / DAILY_TOKENS_SPENT /
+    MONTHLY_TOKENS_SPENT) and the PG fallback branch. The new
+    time_bucket_aggregate(project_id, interval=, since=, until=,
+    observation_type=) reader covers TOKEN_USAGE but cannot serve
+    COUNT_OF_ERRORS (needs status-stratified count) and cannot consume the
+    full parsing_evaltask_filters Q-object (which can include
+    span_attributes_filters → FilterEngine territory). Migrating requires
+    a new reader signature roughly
+    `time_bucket_aggregate_with_filters(project_id, *, interval, since,
+    until, **parsing_evaltask_filters_for_ch_output)` that also emits a
+    status-stratified count column.
     """
     filters = parsing_evaltask_filters(monitor.filters)
     base_queryset = ObservationSpan.objects.filter(project=monitor.project).filter(
@@ -559,6 +590,10 @@ def _get_historical_stats(monitor, start_time, end_time):
             )
 
     # --- PostgreSQL fallback ---
+    # CH25-TODO(blocked-on-reader-extension): see _get_metric_value above.
+    # Same parsing_evaltask_filters Q-object + status-stratified Avg(Case)
+    # + group-by-session/provider pattern that the CH primary path covers
+    # via MonitorMetricsQueryBuilder. Fallback intentionally left as ORM.
     filters = parsing_evaltask_filters(monitor.filters)
     base_queryset = ObservationSpan.objects.filter(
         project=monitor.project, created_at__range=(start_time, end_time)
@@ -726,6 +761,13 @@ def _get_time_series_df_for_other_metrics(monitor, now):
     """
     For non-aggregated metrics, fetches individual data points and returns a
     Prophet-ready DataFrame, averaging values for duplicate timestamps.
+
+    CH25-TODO(dead-code; revisit when Prophet anomaly detection re-enabled):
+    only consumed by _check_anomaly_detection_threshold (currently fully
+    commented out at line 856+). Returns raw (created_at, y) row pairs
+    rather than bucket aggregates — would need a new reader signature
+    closer to `iter_rows_with_filters(project_id, ..., **filters)` than
+    a bucket aggregate. Defer until anomaly detection is re-enabled.
     """
     filters = parsing_evaltask_filters(monitor.filters)
     base_queryset = ObservationSpan.objects.filter(
