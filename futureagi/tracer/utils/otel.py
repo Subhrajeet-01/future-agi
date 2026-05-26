@@ -1072,6 +1072,7 @@ def _deduct_project_creation_cost(
         else APICallTypeChoices.OBSERVE_ADD.value
     )
 
+    call_log_row = None
     if log_and_deduct_cost_for_resource_request is not None:
         call_log_row = log_and_deduct_cost_for_resource_request(
             organization,
@@ -1086,7 +1087,7 @@ def _deduct_project_creation_cost(
         ):
             raise ResourceLimitError(
                 "Trace creation not allowed due to plan limits or insufficient credits."
-        )
+            )
 
     return call_log_row
 
