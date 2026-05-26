@@ -2652,6 +2652,19 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
         """
         try:
             export = kwargs.get("export", False) if kwargs else False
+            # CH-only path doesn't honor export=True (no unbounded-walk
+                # surface in TraceListQueryBuilder yet). Fail loud rather
+                # than serve a silently truncated CSV. Tracked as a
+                # follow-up: move the export to a Temporal job that streams
+                # unbounded rows from CH.
+            if export:
+                return self._gm.bad_request(
+                    "Non-voice trace export beyond the first page is not "
+                    "supported by the CH-only path post-migration. The "
+                    "legacy PG export skipped pagination; the CH path "
+                    "always paginates. Follow-up: a Temporal-driven "
+                    "unbounded-walk export against CH."
+                )
 
             validated_data = request.validated_query_data
             project_id = (
