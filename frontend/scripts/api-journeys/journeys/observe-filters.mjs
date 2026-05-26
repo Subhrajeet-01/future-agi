@@ -2172,6 +2172,301 @@ export const observeFilterJourneys = [
     },
   },
   {
+    id: "OBS-API-021",
+    title: "Observe charts trace, session, span, and attribute filters",
+    tags: ["observe", "charts", "mutating", "data-roundtrip", "db-audit"],
+    async run({ client, cleanup, runId, organizationId, workspaceId, evidence }) {
+      requireMutations();
+      assert(
+        isUuid(organizationId),
+        "Authenticated context did not resolve an organization id.",
+      );
+      assert(
+        isUuid(workspaceId),
+        "Authenticated context did not resolve a workspace id.",
+      );
+
+      const suffix = journeySafeId(runId);
+      const projectName = `api journey charts filters ${suffix}`;
+      const createdProject = await client.post(apiPath("/tracer/project/"), {
+        name: projectName,
+        model_type: "GenerativeLLM",
+        trace_type: "observe",
+        metadata: { source: "api-journey", run_id: runId },
+      });
+      const project = { id: createdProject.project_id, name: projectName };
+      assert(
+        isUuid(project.id),
+        "Charts filter project create returned no id.",
+      );
+
+      const projectVersion = await client.post(
+        apiPath("/tracer/project-version/"),
+        {
+          project: project.id,
+          name: `api journey charts filters run ${suffix}`,
+          metadata: { source: "api-journey", run_id: runId },
+        },
+      );
+      const projectVersionId =
+        projectVersion.project_version_id || projectVersion.id;
+      assert(
+        isUuid(projectVersionId),
+        "Charts filter project-version create returned no id.",
+      );
+
+      const createdSession = await client.post(
+        apiPath("/tracer/trace-session/"),
+        traceSessionWritePayload({
+          projectId: project.id,
+          name: `api journey charts filters session ${suffix}`,
+          bookmarked: false,
+        }),
+      );
+      const sessionId = createdSession.id || createdSession.trace_session_id;
+      assert(isUuid(sessionId), "Charts filter session create returned no id.");
+
+      const traceA = await client.post(
+        apiPath("/tracer/trace/"),
+        traceWritePayload({
+          projectId: project.id,
+          projectVersionId,
+          sessionId,
+          name: `api journey charts filters trace A ${suffix}`,
+          runId,
+          marker: "chart-a",
+        }),
+      );
+      const traceAId = traceA.id || traceA.trace_id || traceA.trace?.id;
+      assert(isUuid(traceAId), "Charts filter trace A create returned no id.");
+
+      const traceB = await client.post(
+        apiPath("/tracer/trace/"),
+        traceWritePayload({
+          projectId: project.id,
+          projectVersionId,
+          name: `api journey charts filters trace B ${suffix}`,
+          runId,
+          marker: "chart-b",
+        }),
+      );
+      const traceBId = traceB.id || traceB.trace_id || traceB.trace?.id;
+      assert(isUuid(traceBId), "Charts filter trace B create returned no id.");
+
+      const spanAId = `api_journey_chart_a_${suffix}`;
+      const spanAChildId = `api_journey_chart_a_child_${suffix}`;
+      const spanBId = `api_journey_chart_b_${suffix}`;
+      const now = new Date();
+      const spanStarts = [
+        new Date(now.getTime() - 600).toISOString(),
+        new Date(now.getTime() - 500).toISOString(),
+        new Date(now.getTime() - 400).toISOString(),
+      ];
+      const spanEnd = now.toISOString();
+      const spanSeeds = [
+        {
+          id: spanAId,
+          traceId: traceAId,
+          parentSpanId: null,
+          name: `api journey chart target ${suffix}`,
+          marker: "target",
+          latencyMs: 100,
+          totalTokens: 5,
+          cost: 0.01,
+          startTime: spanStarts[0],
+        },
+        {
+          id: spanAChildId,
+          traceId: traceAId,
+          parentSpanId: spanAId,
+          name: `api journey chart peer ${suffix}`,
+          marker: "peer",
+          latencyMs: 200,
+          totalTokens: 10,
+          cost: 0.02,
+          startTime: spanStarts[1],
+        },
+        {
+          id: spanBId,
+          traceId: traceBId,
+          parentSpanId: null,
+          name: `api journey chart other ${suffix}`,
+          marker: "other",
+          latencyMs: 300,
+          totalTokens: 20,
+          cost: 0.03,
+          startTime: spanStarts[2],
+        },
+      ];
+
+      const observationSpanPayloads = spanSeeds.map((seed) => {
+        const payload = observationSpanWritePayload({
+          id: seed.id,
+          projectId: project.id,
+          projectVersionId,
+          traceId: seed.traceId,
+          parentSpanId: seed.parentSpanId,
+          name: seed.name,
+          runId,
+          startTime: seed.startTime,
+          endTime: spanEnd,
+          metadata: {
+            source: "api-journey",
+            run_id: runId,
+            chart_filter_marker: seed.marker,
+          },
+        });
+        payload.latency_ms = seed.latencyMs;
+        payload.prompt_tokens = Math.floor(seed.totalTokens / 2);
+        payload.completion_tokens =
+          seed.totalTokens - Math.floor(seed.totalTokens / 2);
+        payload.total_tokens = seed.totalTokens;
+        payload.cost = seed.cost;
+        payload.span_attributes = {
+          api_journey_marker: `${seed.marker}-${suffix}`,
+        };
+        return payload;
+      });
+      const bulkSpanResult = await client.post(
+        apiPath("/tracer/observation-span/bulk_create/"),
+        { observation_spans: observationSpanPayloads },
+      );
+      const createdSpanIds = Array.isArray(bulkSpanResult?.["Observation Span IDs"])
+        ? bulkSpanResult["Observation Span IDs"]
+        : [];
+      for (const seed of spanSeeds) {
+        assert(
+          createdSpanIds.includes(seed.id),
+          `Charts filter span ${seed.marker} was not bulk-created.`,
+        );
+      }
+
+      let hardCleanupDone = false;
+      cleanup.defer("hard delete OBS-API-021 artifacts", async () => {
+        if (hardCleanupDone) return null;
+        return hardDeleteTraceSessionLifecycleArtifacts({
+          projectId: project.id,
+          projectVersionId,
+          sessionId,
+          traceIds: [traceAId, traceBId],
+          spanIds: [spanAId, spanAChildId, spanBId],
+          evalLogIds: [randomUUID()],
+        });
+      });
+
+      const seedAudit = await loadObserveChartsFilterDbAudit({
+        projectId: project.id,
+        projectVersionId,
+        sessionId,
+        traceIds: [traceAId, traceBId],
+        spanIds: [spanAId, spanAChildId, spanBId],
+      });
+      assertObserveChartsFilterDbAudit(seedAudit, {
+        organizationId,
+        workspaceId,
+        projectId: project.id,
+        projectVersionId,
+        sessionId,
+        expectedSpanCount: 3,
+        expectedTraceCount: 2,
+      });
+
+      const dateFilter = observeChartsDateFilter(1);
+      const baselineSummary = assertObserveChartsGraph(
+        await getObserveChartsGraph(client, project.id, [dateFilter]),
+        "chart filter baseline",
+      );
+      const traceSummary = assertObserveChartsGraph(
+        await getObserveChartsGraph(client, project.id, [
+          dateFilter,
+          observeChartsSystemFilter("trace_id", "text", "equals", traceAId),
+        ]),
+        "chart trace filter",
+      );
+      const sessionSummary = assertObserveChartsGraph(
+        await getObserveChartsGraph(client, project.id, [
+          dateFilter,
+          observeChartsSystemFilter("session_id", "text", "equals", sessionId),
+        ]),
+        "chart session filter",
+      );
+      const spanSummary = assertObserveChartsGraph(
+        await getObserveChartsGraph(client, project.id, [
+          dateFilter,
+          observeChartsSystemFilter("span_id", "text", "equals", spanBId),
+        ]),
+        "chart span filter",
+      );
+      const attributeSummary = assertObserveChartsGraph(
+        await getObserveChartsGraph(client, project.id, [
+          dateFilter,
+          observeChartsSpanAttributeFilter(
+            "api_journey_marker",
+            "text",
+            "equals",
+            `target-${suffix}`,
+          ),
+        ]),
+        "chart span attribute filter",
+      );
+
+      assert(
+        baselineSummary.traffic_sum === 3,
+        `Baseline chart traffic expected 3 seeded spans, got ${baselineSummary.traffic_sum}.`,
+      );
+      assert(
+        traceSummary.traffic_sum === 2,
+        `Trace chart filter expected 2 spans, got ${traceSummary.traffic_sum}.`,
+      );
+      assert(
+        sessionSummary.traffic_sum === 2,
+        `Session chart filter expected 2 spans, got ${sessionSummary.traffic_sum}.`,
+      );
+      assert(
+        spanSummary.traffic_sum === 1,
+        `Span chart filter expected 1 span, got ${spanSummary.traffic_sum}.`,
+      );
+      assert(
+        attributeSummary.traffic_sum === 1,
+        `Span-attribute chart filter expected 1 span, got ${attributeSummary.traffic_sum}.`,
+      );
+
+      const cleanupAudit = await hardDeleteTraceSessionLifecycleArtifacts({
+        projectId: project.id,
+        projectVersionId,
+        sessionId,
+        traceIds: [traceAId, traceBId],
+        spanIds: [spanAId, spanAChildId, spanBId],
+        evalLogIds: [randomUUID()],
+      });
+      hardCleanupDone = true;
+      assert(
+        cleanupAudit.remaining_project_count === 0 &&
+          cleanupAudit.remaining_project_version_count === 0 &&
+          cleanupAudit.remaining_session_count === 0 &&
+          cleanupAudit.remaining_trace_count === 0 &&
+          cleanupAudit.remaining_span_count === 0,
+        "Charts filter hard cleanup left disposable residue.",
+      );
+
+      evidence.push({
+        project_id: project.id,
+        project_version_id: projectVersionId,
+        session_id: sessionId,
+        trace_a_id: traceAId,
+        trace_b_id: traceBId,
+        span_ids: [spanAId, spanAChildId, spanBId],
+        baseline_traffic_sum: baselineSummary.traffic_sum,
+        trace_filter_traffic_sum: traceSummary.traffic_sum,
+        session_filter_traffic_sum: sessionSummary.traffic_sum,
+        span_filter_traffic_sum: spanSummary.traffic_sum,
+        attribute_filter_traffic_sum: attributeSummary.traffic_sum,
+        cleanup_remaining_project_count: cleanupAudit.remaining_project_count,
+        cleanup_remaining_span_count: cleanupAudit.remaining_span_count,
+      });
+    },
+  },
+  {
     id: "OBS-API-019",
     title:
       "Dashboard widget full PUT route persists replacement and scope guards",
@@ -7631,6 +7926,127 @@ SELECT json_build_object(
   return runPostgresJson(sql);
 }
 
+async function loadObserveChartsFilterDbAudit({
+  projectId,
+  projectVersionId,
+  sessionId,
+  traceIds,
+  spanIds,
+}) {
+  assert(isUuid(projectId), "projectId must be a UUID for chart audit.");
+  assert(
+    isUuid(projectVersionId),
+    "projectVersionId must be a UUID for chart audit.",
+  );
+  assert(isUuid(sessionId), "sessionId must be a UUID for chart audit.");
+  assert(
+    asArray(traceIds).length > 0,
+    "traceIds must be set for chart audit.",
+  );
+  assert(asArray(spanIds).length > 0, "spanIds must be set for chart audit.");
+  const sql = `
+WITH requested AS (
+  SELECT
+    ${sqlUuid(projectId)} AS project_id,
+    ${sqlUuid(projectVersionId)} AS project_version_id,
+    ${sqlUuid(sessionId)} AS session_id,
+    ${sqlUuidArray(traceIds)} AS trace_ids,
+    ${sqlStringArray(spanIds)} AS span_ids
+)
+SELECT json_build_object(
+  'project_id', project.id::text,
+  'project_organization_id', project.organization_id::text,
+  'project_workspace_id', project.workspace_id::text,
+  'project_deleted', project.deleted,
+  'project_version_id', pv.id::text,
+  'project_version_project_id', pv.project_id::text,
+  'session_count', (
+    SELECT count(*) FROM trace_session session, requested r
+    WHERE session.id = r.session_id
+      AND session.project_id = r.project_id
+      AND session.deleted = false
+  ),
+  'trace_count', (
+    SELECT count(*) FROM tracer_trace trace, requested r
+    WHERE trace.id = ANY(r.trace_ids)
+      AND trace.project_id = r.project_id
+      AND trace.deleted = false
+  ),
+  'session_trace_count', (
+    SELECT count(*) FROM tracer_trace trace, requested r
+    WHERE trace.id = ANY(r.trace_ids)
+      AND trace.session_id = r.session_id
+      AND trace.deleted = false
+  ),
+  'span_count', (
+    SELECT count(*) FROM tracer_observation_span span, requested r
+    WHERE span.id = ANY(r.span_ids)
+      AND span.project_id = r.project_id
+      AND span.project_version_id = r.project_version_id
+      AND span.deleted = false
+  ),
+  'span_attribute_count', (
+    SELECT count(*) FROM tracer_observation_span span, requested r
+    WHERE span.id = ANY(r.span_ids)
+      AND span.span_attributes ? 'api_journey_marker'
+      AND span.deleted = false
+  )
+)
+FROM requested r
+JOIN tracer_project project ON project.id = r.project_id
+JOIN tracer_project_version pv ON pv.id = r.project_version_id;
+`;
+  return runPostgresJson(sql);
+}
+
+function assertObserveChartsFilterDbAudit(
+  audit,
+  {
+    organizationId,
+    workspaceId,
+    projectId,
+    projectVersionId,
+    sessionId,
+    expectedSpanCount,
+    expectedTraceCount,
+  },
+) {
+  assert(audit?.project_id === projectId, "Chart audit project id mismatch.");
+  assert(
+    audit?.project_organization_id === organizationId,
+    "Chart audit project organization mismatch.",
+  );
+  assert(
+    audit?.project_workspace_id === workspaceId,
+    "Chart audit project workspace mismatch.",
+  );
+  assert(
+    audit?.project_version_id === projectVersionId &&
+      audit?.project_version_project_id === projectId,
+    "Chart audit project-version mismatch.",
+  );
+  assert(
+    Number(audit?.session_count) === 1,
+    `Chart audit missing session ${sessionId}.`,
+  );
+  assert(
+    Number(audit?.trace_count) === expectedTraceCount,
+    "Chart audit trace count mismatch.",
+  );
+  assert(
+    Number(audit?.session_trace_count) === 1,
+    "Chart audit session trace count mismatch.",
+  );
+  assert(
+    Number(audit?.span_count) === expectedSpanCount,
+    "Chart audit span count mismatch.",
+  );
+  assert(
+    Number(audit?.span_attribute_count) === expectedSpanCount,
+    "Chart audit span attribute count mismatch.",
+  );
+}
+
 async function loadOtelProjectResolutionAudit({
   sourceProjectId,
   resolvedProjectId,
@@ -9526,6 +9942,45 @@ function observeChartsDateFilter(days) {
       filter_value: [start.toISOString(), end.toISOString()],
     },
   };
+}
+
+function observeChartsSystemFilter(columnId, filterType, filterOp, filterValue) {
+  return {
+    column_id: columnId,
+    filter_config: {
+      col_type: "SYSTEM_METRIC",
+      filter_type: filterType,
+      filter_op: filterOp,
+      filter_value: filterValue,
+    },
+  };
+}
+
+function observeChartsSpanAttributeFilter(
+  columnId,
+  filterType,
+  filterOp,
+  filterValue,
+) {
+  return {
+    column_id: columnId,
+    filter_config: {
+      col_type: "SPAN_ATTRIBUTE",
+      filter_type: filterType,
+      filter_op: filterOp,
+      filter_value: filterValue,
+    },
+  };
+}
+
+async function getObserveChartsGraph(client, projectId, filters) {
+  return client.get(apiPath("/tracer/project/get_graph_data/"), {
+    query: {
+      project_id: projectId,
+      interval: "day",
+      filters: JSON.stringify(filters),
+    },
+  });
 }
 
 function assertObserveChartsGraph(graph, label) {
