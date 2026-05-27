@@ -379,6 +379,14 @@ export const ActivationEventResultApiEventName = {
   trace_received: 'trace_received',
   trace_reviewed: 'trace_reviewed',
   trace_detail_opened: 'trace_detail_opened',
+  prompt_created: 'prompt_created',
+  prompt_test_input_added: 'prompt_test_input_added',
+  prompt_test_run_completed: 'prompt_test_run_completed',
+  prompt_version_created: 'prompt_version_created',
+  prompt_comparison_completed: 'prompt_comparison_completed',
+  dataset_example_added: 'dataset_example_added',
+  eval_scorer_created: 'eval_scorer_created',
+  prompt_version_promoted: 'prompt_version_promoted',
   team_member_invited: 'team_member_invited',
   trace_failure_detected: 'trace_failure_detected',
 } as const;
@@ -627,6 +635,10 @@ export interface ActivationSignalsApi {
   prompt_versions?: number;
   /** @minimum 0 */
   prompt_comparisons?: number;
+  first_prompt_id?: string;
+  latest_prompt_id?: string;
+  /** @minimum 0 */
+  prompt_sample_templates?: number;
   /** @minimum 0 */
   agents?: number;
   /** @minimum 0 */
@@ -787,6 +799,70 @@ export interface SampleProjectStateApi {
   entry_routes: string[];
   missing_artifacts: string[];
   last_opened_at?: string;
+}
+
+export type ActivationPromptStateApiStage = typeof ActivationPromptStateApiStage[keyof typeof ActivationPromptStateApiStage];
+
+
+export const ActivationPromptStateApiStage = {
+  feature_disabled: 'feature_disabled',
+  workspace_missing: 'workspace_missing',
+  permission_limited: 'permission_limited',
+  choose_goal: 'choose_goal',
+  selected_path_unavailable: 'selected_path_unavailable',
+  activated: 'activated',
+  daily_review: 'daily_review',
+  connect_observability: 'connect_observability',
+  waiting_for_first_trace: 'waiting_for_first_trace',
+  waiting_for_first_trace_sample_available: 'waiting_for_first_trace_sample_available',
+  review_first_trace: 'review_first_trace',
+  create_trace_evaluator: 'create_trace_evaluator',
+  review_sample_signal: 'review_sample_signal',
+  start_prompt: 'start_prompt',
+  run_prompt_test: 'run_prompt_test',
+  save_prompt_version: 'save_prompt_version',
+  compare_prompt_versions: 'compare_prompt_versions',
+  prompt_next_loop: 'prompt_next_loop',
+  create_agent: 'create_agent',
+  run_agent_scenario: 'run_agent_scenario',
+  review_agent_trace: 'review_agent_trace',
+  save_agent_eval: 'save_agent_eval',
+  agent_create_eval: 'agent_create_eval',
+  create_trace_dashboard: 'create_trace_dashboard',
+  create_trace_alert: 'create_trace_alert',
+  configure_gateway_provider: 'configure_gateway_provider',
+  create_gateway_key: 'create_gateway_key',
+  run_gateway_request: 'run_gateway_request',
+  review_gateway_log: 'review_gateway_log',
+  fix_gateway_failure: 'fix_gateway_failure',
+  add_gateway_policy: 'add_gateway_policy',
+  create_voice_agent: 'create_voice_agent',
+  run_voice_test_call: 'run_voice_test_call',
+  review_voice_call: 'review_voice_call',
+  add_voice_success_criteria: 'add_voice_success_criteria',
+  voice_monitor_calls: 'voice_monitor_calls',
+  create_eval_dataset: 'create_eval_dataset',
+  add_eval_scorer: 'add_eval_scorer',
+  run_eval: 'run_eval',
+  review_eval_failures: 'review_eval_failures',
+  eval_next_loop: 'eval_next_loop',
+  open_sample_project: 'open_sample_project',
+  connect_real_data: 'connect_real_data',
+} as const;
+
+export interface ActivationPromptStateApi {
+  prompt_id?: string;
+  prompt_name?: string;
+  stage: ActivationPromptStateApiStage;
+  has_real_prompt: boolean;
+  has_test_run: boolean;
+  has_committed_version: boolean;
+  has_comparison: boolean;
+  has_next_loop_action: boolean;
+  is_sample?: boolean;
+  /** @minimum 0 */
+  sample_prompt_count?: number;
+  diagnostics?: string[];
 }
 
 export type LifecyclePreviewApiStatus = typeof LifecyclePreviewApiStatus[keyof typeof LifecyclePreviewApiStatus];
@@ -1210,6 +1286,7 @@ export interface ActivationStateResponseApi {
   available_goals?: AvailableGoalApi[];
   available_paths: AvailablePathApi[];
   sample_project: SampleProjectStateApi;
+  prompt?: ActivationPromptStateApi;
   lifecycle?: LifecyclePreviewApi;
   daily_quality?: DailyQualityStateApi;
   email_eligibility: LifecycleEligibilityApi;

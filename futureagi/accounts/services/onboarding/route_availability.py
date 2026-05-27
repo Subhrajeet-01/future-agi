@@ -41,6 +41,47 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     can_write = context.permissions["can_write"]
     first_observe_id = signals.first_observe_id
     first_trace_id = signals.first_trace_id
+    prompt_id = signals.latest_prompt_id or signals.first_prompt_id
+    prompt_route_modes_enabled = bool(flags.get("onboarding_prompt_route_modes"))
+    prompt_path_enabled = bool(flags.get("onboarding_prompt_path"))
+
+    prompt_workbench_href = "/dashboard/workbench/all?source=onboarding"
+    prompt_create_href = (
+        f"{prompt_workbench_href}&action=create-prompt"
+        if prompt_route_modes_enabled
+        else "/dashboard/workbench/all"
+    )
+    prompt_editor_href = (
+        f"/dashboard/workbench/create/{prompt_id}"
+        if prompt_id
+        else "/dashboard/workbench/all"
+    )
+
+    def prompt_route(mode, fallback_reason="missing_id", requires_write=True):
+        if not prompt_path_enabled:
+            return route_entry(
+                prompt_editor_href,
+                is_available=False,
+                reason="feature_disabled",
+            )
+        if requires_write and not can_write:
+            return route_entry(
+                prompt_editor_href,
+                is_available=False,
+                reason="missing_permission",
+            )
+        if not prompt_id:
+            return route_entry(
+                prompt_workbench_href,
+                is_available=False,
+                reason=fallback_reason,
+            )
+        suffix = (
+            f"?source=onboarding&onboarding={mode}"
+            if prompt_route_modes_enabled
+            else ""
+        )
+        return route_entry(f"{prompt_editor_href}{suffix}", is_available=True)
 
     routes = {
         "home": route_entry("/dashboard/home"),
@@ -83,18 +124,36 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
             flags.get("onboarding_daily_quality_home"),
             "/dashboard/home?mode=daily-quality",
         ),
+        "prompt_workbench": _available_if(
+            prompt_path_enabled,
+            prompt_workbench_href,
+        ),
+        "prompt_create": route_entry(
+            prompt_create_href,
+            is_available=prompt_path_enabled and can_write,
+            reason="missing_permission" if prompt_path_enabled else "feature_disabled",
+        ),
+        "prompt_run_test": prompt_route("run-test"),
+        "prompt_save_version": prompt_route("save-version"),
+        "prompt_compare_versions": prompt_route("compare"),
+        "prompt_add_failure": prompt_route("add-failure"),
+        "prompt_metrics": prompt_route("metrics", requires_write=False),
     }
 
     for path in PRODUCT_PATHS:
+        sample_hidden = (
+            path == "sample" and sample_project and sample_project["is_hidden"]
+        )
         routes[f"path_{path}"] = route_entry(
             f"/dashboard/home?path={path}",
-            is_available=path in {"observe", "sample"}
-            and not (
-                path == "sample" and sample_project and sample_project["is_hidden"]
-            ),
+            is_available=(
+                path in {"observe", "sample"}
+                or (path == "prompt" and prompt_path_enabled)
+            )
+            and not sample_hidden,
             reason=(
                 sample_project.get("blocked_reason") or "sample_hidden"
-                if path == "sample" and sample_project and sample_project["is_hidden"]
+                if sample_hidden
                 else "route_not_implemented"
             ),
         )

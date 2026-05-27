@@ -111,6 +111,31 @@ export const ONBOARDING_STAGE_COPY = {
     title: "Start with an available path",
     description: "This selected path is not available in the product yet.",
   },
+  start_prompt: {
+    eyebrow: "Prompt",
+    title: "Start a prompt loop",
+    description: "Create one prompt and run it against a focused example.",
+  },
+  run_prompt_test: {
+    eyebrow: "Prompt test",
+    title: "Run a prompt test",
+    description: "Run the prompt once before saving a baseline version.",
+  },
+  save_prompt_version: {
+    eyebrow: "Prompt version",
+    title: "Save the prompt version",
+    description: "Save the tested version so the next edit has a baseline.",
+  },
+  compare_prompt_versions: {
+    eyebrow: "Prompt compare",
+    title: "Compare prompt versions",
+    description: "Compare the baseline against the edited version.",
+  },
+  prompt_next_loop: {
+    eyebrow: "Prompt loop",
+    title: "Continue the prompt loop",
+    description: "Turn the comparison into the next reusable quality check.",
+  },
   connect_observability: {
     eyebrow: "Observe",
     title: "Connect observability",

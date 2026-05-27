@@ -64,7 +64,7 @@ paths:
   prompt:
     label: Improve prompts
     description: Test and compare prompt versions.
-    first_action_id:
+    first_action_id: create_prompt
     requires_permission: prompt:write
   agent:
     label: Build an AI agent
@@ -165,6 +165,84 @@ actions:
     priority: 100
     fallback_route_key: get_started
     target_path:
+  create_prompt:
+    kind: setup
+    title: Create a prompt
+    description: Create one prompt before running a focused test.
+    route_key: prompt_create
+    cta_label: Create prompt
+    priority: 100
+    estimated_minutes: 2
+    requires_permission: prompt:write
+    completion_event: prompt_created
+    target_path: prompt
+    fallback_route_key: prompt_workbench
+  run_prompt_test:
+    kind: send_signal
+    title: Run prompt test
+    description: Run the prompt on one example before saving a baseline.
+    route_key: prompt_run_test
+    cta_label: Run test
+    priority: 100
+    estimated_minutes: 2
+    requires_permission: prompt:write
+    completion_event: prompt_test_run_completed
+    target_path: prompt
+    fallback_route_key: prompt_workbench
+  save_prompt_version:
+    kind: improve
+    title: Save baseline version
+    description: Save a baseline so later edits can be compared.
+    route_key: prompt_save_version
+    cta_label: Save baseline
+    priority: 100
+    estimated_minutes: 2
+    requires_permission: prompt:write
+    completion_event: prompt_version_created
+    target_path: prompt
+    fallback_route_key: prompt_workbench
+  compare_prompt_versions:
+    kind: review
+    title: Compare prompt versions
+    description: Compare the baseline against an edit on the same example.
+    route_key: prompt_compare_versions
+    cta_label: Compare versions
+    priority: 100
+    estimated_minutes: 3
+    requires_permission: prompt:write
+    completion_event: prompt_comparison_completed
+    target_path: prompt
+    fallback_route_key: prompt_workbench
+  add_prompt_failure_example:
+    kind: adjacent_loop
+    title: Add a failing example
+    description: Turn the comparison into a reusable example or evaluator.
+    route_key: prompt_add_failure
+    cta_label: Add example
+    priority: 90
+    estimated_minutes: 4
+    requires_permission: prompt:write
+    completion_event: dataset_example_added
+    target_path: prompt
+    fallback_route_key: prompt_workbench
+  open_prompt_metrics:
+    kind: review
+    title: Open prompt metrics
+    description: Review prompt quality signals and continue improving.
+    route_key: prompt_metrics
+    cta_label: Open prompt metrics
+    priority: 80
+    target_path: prompt
+    fallback_route_key: prompt_workbench
+  open_prompt_workbench:
+    kind: fallback
+    title: Open prompt workbench
+    description: Open the prompt workbench.
+    route_key: prompt_workbench
+    cta_label: Open workbench
+    priority: 20
+    target_path: prompt
+    fallback_route_key: get_started
   create_observe_project:
     kind: setup
     title: Connect observability
@@ -482,6 +560,15 @@ stages:
     next:
       - connect_real_data
   start_prompt:
+    progress:
+      build: selected
+      test: not_started
+      observe: available
+      ship: available
+      improve: available
+    recommended_action: create_prompt
+    fallback_action: open_prompt_workbench
+    requires_write: true
     copy:
       eyebrow: Prompt
       title: Start a prompt loop
@@ -489,6 +576,15 @@ stages:
     next:
       - run_prompt_test
   run_prompt_test:
+    progress:
+      build: complete
+      test: in_progress
+      observe: available
+      ship: available
+      improve: available
+    recommended_action: run_prompt_test
+    fallback_action: open_prompt_workbench
+    requires_write: true
     copy:
       eyebrow: Prompt test
       title: Run a prompt test
@@ -496,6 +592,15 @@ stages:
     next:
       - save_prompt_version
   save_prompt_version:
+    progress:
+      build: complete
+      test: complete
+      observe: available
+      ship: available
+      improve: in_progress
+    recommended_action: save_prompt_version
+    fallback_action: open_prompt_workbench
+    requires_write: true
     copy:
       eyebrow: Prompt version
       title: Save the prompt version
@@ -503,6 +608,15 @@ stages:
     next:
       - compare_prompt_versions
   compare_prompt_versions:
+    progress:
+      build: complete
+      test: complete
+      observe: available
+      ship: available
+      improve: in_progress
+    recommended_action: compare_prompt_versions
+    fallback_action: open_prompt_workbench
+    requires_write: true
     copy:
       eyebrow: Prompt compare
       title: Compare prompt versions
@@ -510,6 +624,15 @@ stages:
     next:
       - prompt_next_loop
   prompt_next_loop:
+    progress:
+      build: complete
+      test: complete
+      observe: available
+      ship: available
+      improve: selected
+    recommended_action: add_prompt_failure_example
+    fallback_action: open_prompt_workbench
+    requires_write: true
     copy:
       eyebrow: Prompt loop
       title: Continue the prompt loop
@@ -703,17 +826,66 @@ stage_rules:
       missing: selected_goal
   - stage: selected_path_unavailable
     when:
-      context_not_equals:
-        primary_path: observe
+      all:
+        - context_not_equals:
+            primary_path: observe
+        - not:
+            all:
+              - context_equals:
+                  primary_path: prompt
+              - flag_enabled: onboarding_prompt_path
   - stage: daily_review
     when:
       all:
+        - context_equals:
+            primary_path: observe
         - signal: first_loop_completed
         - flag_enabled: onboarding_daily_quality_home
         - signal: useful_daily_signal
   - stage: activated
     when:
-      signal: first_loop_completed
+      all:
+        - context_equals:
+            primary_path: observe
+        - signal: first_loop_completed
+  - stage: activated
+    when:
+      all:
+        - context_equals:
+            primary_path: prompt
+        - signal: prompt_first_loop_completed
+  - stage: prompt_next_loop
+    when:
+      all:
+        - context_equals:
+            primary_path: prompt
+        - signal: prompt_comparison_completed
+        - signal_not: prompt_next_loop_action_exists
+  - stage: compare_prompt_versions
+    when:
+      all:
+        - context_equals:
+            primary_path: prompt
+        - signal: prompt_committed_version_exists
+        - signal_not: prompt_comparison_completed
+  - stage: save_prompt_version
+    when:
+      all:
+        - context_equals:
+            primary_path: prompt
+        - signal: prompt_run_exists
+        - signal_not: prompt_committed_version_exists
+  - stage: run_prompt_test
+    when:
+      all:
+        - context_equals:
+            primary_path: prompt
+        - signal: latest_prompt_id
+        - signal_not: prompt_run_exists
+  - stage: start_prompt
+    when:
+      context_equals:
+        primary_path: prompt
   - stage: connect_observability
     when:
       signal_not: observe_project_exists
@@ -794,6 +966,14 @@ activation_events:
     - trace_received
     - trace_reviewed
     - trace_detail_opened
+    - prompt_created
+    - prompt_test_input_added
+    - prompt_test_run_completed
+    - prompt_version_created
+    - prompt_comparison_completed
+    - dataset_example_added
+    - eval_scorer_created
+    - prompt_version_promoted
     - team_member_invited
     - trace_failure_detected
   aliases:
@@ -804,3 +984,6 @@ activation_events:
     quality_dashboard_viewed: weekly_quality_review_opened
     trace_ingested: trace_received
     trace_detail_opened: trace_reviewed
+    prompt_test_run: prompt_test_run_completed
+    SDK_prompt_run_template: prompt_test_run_completed
+    SDK_prompt_commit: prompt_version_created

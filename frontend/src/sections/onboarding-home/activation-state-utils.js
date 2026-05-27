@@ -160,6 +160,10 @@ const normalizeSignals = (raw = {}) => ({
   promptTemplates: raw.prompt_templates ?? raw.promptTemplates ?? 0,
   promptVersions: raw.prompt_versions ?? raw.promptVersions ?? 0,
   promptComparisons: raw.prompt_comparisons ?? raw.promptComparisons ?? 0,
+  firstPromptId: raw.first_prompt_id ?? raw.firstPromptId ?? null,
+  latestPromptId: raw.latest_prompt_id ?? raw.latestPromptId ?? null,
+  promptSampleTemplates:
+    raw.prompt_sample_templates ?? raw.promptSampleTemplates ?? 0,
   agents: raw.agents ?? 0,
   agentPrototypeRuns: raw.agent_prototype_runs ?? raw.agentPrototypeRuns ?? 0,
   observeProjects: raw.observe_projects ?? raw.observeProjects ?? 0,
@@ -253,6 +257,31 @@ const normalizeSampleProject = (raw = {}) => {
       ? raw.missing_artifacts
       : raw.missingArtifacts || [],
     lastOpenedAt: raw.last_opened_at ?? raw.lastOpenedAt ?? null,
+  };
+};
+
+const normalizePromptState = (raw) => {
+  if (!raw) return null;
+  const isSample = Boolean(raw.is_sample ?? raw.isSample);
+  if (isSample && Boolean(raw.has_real_prompt ?? raw.hasRealPrompt)) {
+    throw new Error("Sample prompt state cannot count as a real prompt");
+  }
+  return {
+    promptId: raw.prompt_id ?? raw.promptId ?? null,
+    promptName: raw.prompt_name ?? raw.promptName ?? null,
+    stage: raw.stage ?? null,
+    hasRealPrompt: Boolean(raw.has_real_prompt ?? raw.hasRealPrompt),
+    hasTestRun: Boolean(raw.has_test_run ?? raw.hasTestRun),
+    hasCommittedVersion: Boolean(
+      raw.has_committed_version ?? raw.hasCommittedVersion,
+    ),
+    hasComparison: Boolean(raw.has_comparison ?? raw.hasComparison),
+    hasNextLoopAction: Boolean(
+      raw.has_next_loop_action ?? raw.hasNextLoopAction,
+    ),
+    isSample,
+    samplePromptCount: raw.sample_prompt_count ?? raw.samplePromptCount ?? 0,
+    diagnostics: raw.diagnostics ?? [],
   };
 };
 
@@ -536,6 +565,7 @@ export const normalizeActivationState = (raw) => {
     ),
     availablePaths: (raw.available_paths || []).map(normalizeAvailablePath),
     sampleProject: normalizeSampleProject(raw.sample_project),
+    prompt: normalizePromptState(raw.prompt),
     dailyQuality: normalizeDailyQuality(raw.daily_quality ?? raw.dailyQuality),
     emailEligibility: normalizeEmailEligibility(raw.email_eligibility),
     permissions: normalizePermissions(raw.permissions),

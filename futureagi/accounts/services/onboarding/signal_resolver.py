@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.db.models import Q
 
@@ -6,6 +6,10 @@ from accounts.services.onboarding.activation_events import (
     first_quality_loop_completed,
     has_event,
     latest_event,
+)
+from accounts.services.onboarding.prompt_signals import (
+    PromptOnboardingSignals,
+    collect_prompt_onboarding_signals,
 )
 
 
@@ -19,6 +23,18 @@ class OnboardingSignals:
     prompt_templates: int = 0
     prompt_versions: int = 0
     prompt_comparisons: int = 0
+    first_prompt_id: str | None = None
+    latest_prompt_id: str | None = None
+    latest_prompt_name: str | None = None
+    prompt_sample_templates: int = 0
+    prompt_run_exists: bool = False
+    prompt_committed_version_exists: bool = False
+    prompt_comparison_completed: bool = False
+    prompt_next_loop_action_exists: bool = False
+    prompt_first_loop_completed: bool = False
+    prompt_signals: PromptOnboardingSignals = field(
+        default_factory=PromptOnboardingSignals
+    )
     agents: int = 0
     agent_prototype_runs: int = 0
     observe_projects: int = 0
@@ -57,6 +73,9 @@ class OnboardingSignals:
             "prompt_templates": self.prompt_templates,
             "prompt_versions": self.prompt_versions,
             "prompt_comparisons": self.prompt_comparisons,
+            "first_prompt_id": self.first_prompt_id,
+            "latest_prompt_id": self.latest_prompt_id,
+            "prompt_sample_templates": self.prompt_sample_templates,
             "agents": self.agents,
             "agent_prototype_runs": self.agent_prototype_runs,
             "observe_projects": self.observe_projects,
@@ -205,6 +224,11 @@ def collect_onboarding_signals(*, user, organization, workspace):
         workspace=workspace,
         is_sample=False,
     )
+    prompt_signals = collect_prompt_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
 
     return OnboardingSignals(
         first_checks=first_checks,
@@ -212,6 +236,20 @@ def collect_onboarding_signals(*, user, organization, workspace):
         datasets=_as_count(first_checks.get("dataset")),
         evals=_as_count(first_checks.get("evaluation")),
         eval_runs=_as_count(first_checks.get("experiment")),
+        prompt_templates=prompt_signals.prompt_count,
+        prompt_versions=prompt_signals.committed_version_count
+        + prompt_signals.draft_version_count,
+        prompt_comparisons=_as_count(prompt_signals.comparison_completed),
+        first_prompt_id=prompt_signals.first_prompt_id,
+        latest_prompt_id=prompt_signals.latest_prompt_id,
+        latest_prompt_name=prompt_signals.latest_prompt_name,
+        prompt_sample_templates=prompt_signals.sample_prompt_count,
+        prompt_run_exists=prompt_signals.has_test_run,
+        prompt_committed_version_exists=prompt_signals.has_committed_version,
+        prompt_comparison_completed=prompt_signals.comparison_completed,
+        prompt_next_loop_action_exists=prompt_signals.has_next_loop_action,
+        prompt_first_loop_completed=prompt_signals.first_loop_completed,
+        prompt_signals=prompt_signals,
         observe_projects=_as_count(bool(observe_project_ids)),
         traces=_as_count(first_trace is not None),
         trace_reviews=_as_count(trace_reviewed),

@@ -8,6 +8,8 @@ ONBOARDING_FLAG_NAMES = (
     "onboarding_path_cards",
     "onboarding_sample_project",
     "onboarding_daily_quality_home",
+    "onboarding_prompt_path",
+    "onboarding_prompt_route_modes",
     "onboarding_lifecycle_email_dry_run",
     "onboarding_email_welcome_enabled",
     "onboarding_email_first_action_recovery_enabled",
@@ -15,6 +17,7 @@ ONBOARDING_FLAG_NAMES = (
     "onboarding_email_next_loop_enabled",
     "onboarding_email_sample_bridge_enabled",
     "onboarding_email_daily_digest_enabled",
+    "onboarding_email_prompt_enabled",
     "onboarding_lifecycle_send_enabled",
 )
 

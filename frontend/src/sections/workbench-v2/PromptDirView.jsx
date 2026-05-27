@@ -2,6 +2,7 @@ import { Box, Divider, useTheme } from "@mui/material";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import FileSystem from "../../components/FileSystem/FileSystem";
 import { Outlet } from "react-router";
+import { useSearchParams } from "react-router-dom";
 import AddFolder from "./components/AddFolder";
 import CreateNewPrompt from "./components/CreateNewPrompt";
 import { resetPromptState, usePromptStore } from "./store/usePromptStore";
@@ -17,6 +18,8 @@ export default function PromptDirView() {
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef(null);
+  const onboardingActionHandledRef = useRef(false);
+  const [searchParams] = useSearchParams();
 
   const {
     newPromptModal,
@@ -84,6 +87,20 @@ export default function PromptDirView() {
       resetPromptState();
     };
   }, []);
+
+  useEffect(() => {
+    if (onboardingActionHandledRef.current) return;
+    if (
+      searchParams.get("source") === "onboarding" &&
+      searchParams.get("action") === "create-prompt"
+    ) {
+      onboardingActionHandledRef.current = true;
+      setNewPromptModal(true);
+      trackEvent(Events.promptCreateClicked, {
+        source: "onboarding",
+      });
+    }
+  }, [searchParams, setNewPromptModal]);
 
   const handleAddNewFolder = () => {
     setOpenNewFOlderModal(true);

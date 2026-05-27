@@ -39,6 +39,101 @@ campaigns:
     owner: product
     qa_fixture: selected_goal_no_first_action
 
+  - campaign_key: prompt_create_first
+    template_key: prompt_create_first_v1
+    template_version: "2026-05-27.1"
+    campaign_group: prompt
+    primary_path: prompt
+    entry_stages:
+      - start_prompt
+    wait_window_minutes: 60
+    priority: 85
+    target_action_id: create_prompt
+    target_success_event: prompt_created
+    route_strategy: activation_recommendation
+    dry_run_flag: onboarding_email_prompt_enabled
+    send_flag: onboarding_lifecycle_send_enabled
+    frequency_cap_key: standard
+    sample_policy: real_only
+    owner: product
+    qa_fixture: prompt_no_prompt_after_wait
+
+  - campaign_key: prompt_run_first_test
+    template_key: prompt_run_first_test_v1
+    template_version: "2026-05-27.1"
+    campaign_group: prompt
+    primary_path: prompt
+    entry_stages:
+      - run_prompt_test
+    wait_window_minutes: 240
+    priority: 80
+    target_action_id: run_prompt_test
+    target_success_event: prompt_test_run_completed
+    route_strategy: activation_recommendation
+    dry_run_flag: onboarding_email_prompt_enabled
+    send_flag: onboarding_lifecycle_send_enabled
+    frequency_cap_key: standard
+    sample_policy: real_only
+    owner: product
+    qa_fixture: prompt_created_no_run_after_wait
+
+  - campaign_key: prompt_save_baseline
+    template_key: prompt_save_baseline_v1
+    template_version: "2026-05-27.1"
+    campaign_group: prompt
+    primary_path: prompt
+    entry_stages:
+      - save_prompt_version
+    wait_window_minutes: 1440
+    priority: 75
+    target_action_id: save_prompt_version
+    target_success_event: prompt_version_created
+    route_strategy: activation_recommendation
+    dry_run_flag: onboarding_email_prompt_enabled
+    send_flag: onboarding_lifecycle_send_enabled
+    frequency_cap_key: standard
+    sample_policy: real_only
+    owner: product
+    qa_fixture: prompt_run_no_version_after_wait
+
+  - campaign_key: prompt_compare_candidate
+    template_key: prompt_compare_candidate_v1
+    template_version: "2026-05-27.1"
+    campaign_group: prompt
+    primary_path: prompt
+    entry_stages:
+      - compare_prompt_versions
+    wait_window_minutes: 1440
+    priority: 75
+    target_action_id: compare_prompt_versions
+    target_success_event: prompt_comparison_completed
+    route_strategy: activation_recommendation
+    dry_run_flag: onboarding_email_prompt_enabled
+    send_flag: onboarding_lifecycle_send_enabled
+    frequency_cap_key: standard
+    sample_policy: real_only
+    owner: product
+    qa_fixture: prompt_version_no_comparison_after_wait
+
+  - campaign_key: prompt_add_failure_example
+    template_key: prompt_add_failure_example_v1
+    template_version: "2026-05-27.1"
+    campaign_group: prompt
+    primary_path: prompt
+    entry_stages:
+      - prompt_next_loop
+    wait_window_minutes: 1440
+    priority: 70
+    target_action_id: add_prompt_failure_example
+    target_success_event: dataset_example_added
+    route_strategy: activation_recommendation
+    dry_run_flag: onboarding_email_prompt_enabled
+    send_flag: onboarding_lifecycle_send_enabled
+    frequency_cap_key: standard
+    sample_policy: real_only
+    owner: product
+    qa_fixture: prompt_comparison_no_next_loop_after_wait
+
   - campaign_key: observe_connect_first
     template_key: observe_connect_first_v1
     template_version: "2026-05-27.1"

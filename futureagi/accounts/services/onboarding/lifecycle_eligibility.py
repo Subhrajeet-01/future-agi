@@ -162,6 +162,22 @@ def _first_trace_created_at(activation_state, workspace):
     return trace.created_at if trace else None
 
 
+def _first_prompt_created_at(activation_state, workspace):
+    prompt_id = (activation_state.get("prompt") or {}).get("prompt_id") or (
+        activation_state.get("signals") or {}
+    ).get("latest_prompt_id")
+    if not prompt_id:
+        return None
+    from model_hub.models.run_prompt import PromptTemplate
+
+    prompt = PromptTemplate.no_workspace_objects.filter(
+        id=prompt_id,
+        workspace=workspace,
+        is_sample=False,
+    ).first()
+    return prompt.created_at if prompt else None
+
+
 def _latest_event_at(organization, workspace, event_name, *, is_sample=False):
     event = (
         OnboardingActivationEvent.no_workspace_objects.filter(
@@ -196,6 +212,43 @@ def stage_started_at(*, activation_state, organization, workspace, now):
             organization,
             workspace,
             "trace_reviewed",
+            is_sample=False,
+        )
+    if stage == "start_prompt":
+        return _latest_goal_selected_at(organization, workspace) or getattr(
+            workspace,
+            "created_at",
+            None,
+        )
+    if stage == "run_prompt_test":
+        return _first_prompt_created_at(
+            activation_state,
+            workspace,
+        ) or _latest_event_at(
+            organization,
+            workspace,
+            "prompt_created",
+            is_sample=False,
+        )
+    if stage == "save_prompt_version":
+        return _latest_event_at(
+            organization,
+            workspace,
+            "prompt_test_run_completed",
+            is_sample=False,
+        )
+    if stage == "compare_prompt_versions":
+        return _latest_event_at(
+            organization,
+            workspace,
+            "prompt_version_created",
+            is_sample=False,
+        )
+    if stage == "prompt_next_loop":
+        return _latest_event_at(
+            organization,
+            workspace,
+            "prompt_comparison_completed",
             is_sample=False,
         )
     if stage in {"activated", "daily_review"}:
@@ -368,6 +421,7 @@ def apply_lifecycle_suppressions(
                 "recovery": "first_action_recovery_enabled",
                 "sample": "sample_bridge_enabled",
                 "first_signal": "first_action_recovery_enabled",
+                "prompt": "first_action_recovery_enabled",
                 "next_loop": "next_loop_enabled",
                 "activation_success": "daily_digest_enabled",
             }.get(campaign["campaign_group"])

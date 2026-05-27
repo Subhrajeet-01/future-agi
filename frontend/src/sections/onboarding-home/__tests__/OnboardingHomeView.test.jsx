@@ -369,6 +369,28 @@ describe("OnboardingHomeView", () => {
     );
   });
 
+  it("renders prompt onboarding as one recommended prompt action", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("promptCreatedNoRun"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    expect(screen.getByText("Run a prompt test")).toBeVisible();
+    expect(screen.getByText("Run prompt test")).toBeVisible();
+    expect(screen.getByRole("link", { name: /run test/i })).toHaveAttribute(
+      "href",
+      "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test",
+    );
+    expect(screen.getByText("Selected path")).toBeVisible();
+    expect(screen.getByText("prompt")).toBeVisible();
+  });
+
   it("saves a selected goal through the goal mutation", async () => {
     const mutateAsync = vi
       .fn()

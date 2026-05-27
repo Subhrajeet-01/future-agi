@@ -229,6 +229,11 @@ def resolve_activation_state(*, context, flags, signals):
         "available_goals": configured_goal_options(),
         "available_paths": _available_paths(context, flags, routes, sample_project),
         "sample_project": sample_project,
+        "prompt": (
+            signals.prompt_signals.to_activation_prompt_state(stage)
+            if context.primary_path == "prompt"
+            else None
+        ),
         "permissions": context.permissions,
         "feature_flags": flags,
         "route_availability": routes,

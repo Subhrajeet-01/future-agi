@@ -15,6 +15,7 @@ SUBJECTS = {
     "recovery": "Continue your FutureAGI setup",
     "sample": "Use a sample trace while you connect data",
     "first_signal": "Your first trace is ready to review",
+    "prompt": "Continue your prompt quality loop",
     "next_loop": "Turn the trace review into coverage",
     "activation_success": "Review today's AI quality signal",
 }
@@ -105,6 +106,12 @@ def _label_from_action(action_id, campaign_group):
         "open_sample_trace": "Open sample trace",
         "review_first_trace": "Review trace",
         "create_trace_evaluator": "Create evaluator",
+        "create_prompt": "Create prompt",
+        "run_prompt_test": "Run prompt test",
+        "save_prompt_version": "Save baseline",
+        "compare_prompt_versions": "Compare versions",
+        "add_prompt_failure_example": "Add failing example",
+        "open_prompt_metrics": "Open prompt metrics",
         "review_daily_quality": "Review quality signal",
     }
     if action_id in labels:

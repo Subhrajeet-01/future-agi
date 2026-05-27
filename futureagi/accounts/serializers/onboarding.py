@@ -109,6 +109,17 @@ class ActivationSignalsSerializer(serializers.Serializer):
     prompt_templates = serializers.IntegerField(min_value=0, default=0)
     prompt_versions = serializers.IntegerField(min_value=0, default=0)
     prompt_comparisons = serializers.IntegerField(min_value=0, default=0)
+    first_prompt_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    latest_prompt_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    prompt_sample_templates = serializers.IntegerField(min_value=0, default=0)
     agents = serializers.IntegerField(min_value=0, default=0)
     agent_prototype_runs = serializers.IntegerField(min_value=0, default=0)
     observe_projects = serializers.IntegerField(min_value=0, default=0)
@@ -249,6 +260,38 @@ class SampleProjectStateSerializer(serializers.Serializer):
             )
         if status in {"ready", "ready_for_observe"} and not attrs["entry_routes"]:
             raise serializers.ValidationError("Ready samples must list entry_routes.")
+        return attrs
+
+
+class ActivationPromptStateSerializer(serializers.Serializer):
+    prompt_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    prompt_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    stage = serializers.ChoiceField(choices=choices(ACTIVATION_STAGES))
+    has_real_prompt = serializers.BooleanField()
+    has_test_run = serializers.BooleanField()
+    has_committed_version = serializers.BooleanField()
+    has_comparison = serializers.BooleanField()
+    has_next_loop_action = serializers.BooleanField()
+    is_sample = serializers.BooleanField(default=False)
+    sample_prompt_count = serializers.IntegerField(min_value=0, default=0)
+    diagnostics = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+    )
+
+    def validate(self, attrs):
+        if attrs["is_sample"] and attrs.get("has_real_prompt"):
+            raise serializers.ValidationError(
+                "Sample prompt state cannot count as a real prompt."
+            )
         return attrs
 
 
@@ -585,6 +628,7 @@ class ActivationStateResponseSerializer(serializers.Serializer):
     available_goals = AvailableGoalSerializer(many=True, required=False)
     available_paths = AvailablePathSerializer(many=True)
     sample_project = SampleProjectStateSerializer()
+    prompt = ActivationPromptStateSerializer(required=False, allow_null=True)
     lifecycle = LifecyclePreviewSerializer(required=False, allow_null=True)
     daily_quality = DailyQualityStateSerializer(required=False, allow_null=True)
     email_eligibility = LifecycleEligibilitySerializer()

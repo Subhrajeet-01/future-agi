@@ -93,6 +93,11 @@ def _fallback_for_stage(stage, flags, routes):
 
 
 def resolve_recommended_action(*, context, flags, signals, stage, routes):
+    if stage == "activated" and context.primary_path == "prompt":
+        return (
+            configured_activation_action("open_prompt_metrics", routes),
+            configured_activation_action("open_prompt_workbench", routes),
+        )
     fallback = _fallback_for_stage(stage, flags, routes)
     action_id = configured_stage(stage)["recommended_action"]
     action = configured_activation_action(action_id, routes)

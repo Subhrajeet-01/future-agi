@@ -71,8 +71,88 @@ const routeAvailability = (overrides = {}) => ({
     is_available: false,
     reason: "route_not_implemented",
   },
+  prompt_workbench: {
+    href: "/dashboard/workbench/all?source=onboarding",
+    is_available: false,
+    reason: "feature_disabled",
+  },
+  prompt_create: {
+    href: "/dashboard/workbench/all?source=onboarding&action=create-prompt",
+    is_available: false,
+    reason: "feature_disabled",
+  },
+  prompt_run_test: {
+    href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test",
+    is_available: false,
+    reason: "missing_id",
+  },
+  prompt_save_version: {
+    href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=save-version",
+    is_available: false,
+    reason: "missing_id",
+  },
+  prompt_compare_versions: {
+    href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=compare",
+    is_available: false,
+    reason: "missing_id",
+  },
+  prompt_add_failure: {
+    href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=add-failure",
+    is_available: false,
+    reason: "missing_id",
+  },
+  prompt_metrics: {
+    href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=metrics",
+    is_available: false,
+    reason: "missing_id",
+  },
   ...overrides,
 });
+
+const promptRouteAvailability = (overrides = {}) =>
+  routeAvailability({
+    path_prompt: {
+      href: "/dashboard/home?path=prompt",
+      is_available: true,
+      reason: null,
+    },
+    prompt_workbench: {
+      href: "/dashboard/workbench/all?source=onboarding",
+      is_available: true,
+      reason: null,
+    },
+    prompt_create: {
+      href: "/dashboard/workbench/all?source=onboarding&action=create-prompt",
+      is_available: true,
+      reason: null,
+    },
+    prompt_run_test: {
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test",
+      is_available: true,
+      reason: null,
+    },
+    prompt_save_version: {
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=save-version",
+      is_available: true,
+      reason: null,
+    },
+    prompt_compare_versions: {
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=compare",
+      is_available: true,
+      reason: null,
+    },
+    prompt_add_failure: {
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=add-failure",
+      is_available: true,
+      reason: null,
+    },
+    prompt_metrics: {
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=metrics",
+      is_available: true,
+      reason: null,
+    },
+    ...overrides,
+  });
 
 const action = (overrides = {}) => ({
   id: "create_observe_project",
@@ -122,6 +202,57 @@ const fallbackAction = (overrides = {}) =>
     },
     ...overrides,
   });
+
+const promptAction = (overrides = {}) =>
+  action({
+    id: "create_prompt",
+    kind: "setup",
+    title: "Create a prompt",
+    description: "Create one prompt before running a focused test.",
+    href: "/dashboard/workbench/all?source=onboarding&action=create-prompt",
+    cta_label: "Create prompt",
+    estimated_minutes: 2,
+    priority: 100,
+    requires_permission: "prompt:write",
+    completion_event: "prompt_created",
+    analytics: {
+      event_name: "onboarding_recommended_action_clicked",
+      source: "home",
+      target_path: "prompt",
+    },
+    ...overrides,
+  });
+
+const promptFallbackAction = (overrides = {}) =>
+  promptAction({
+    id: "open_prompt_workbench",
+    kind: "fallback",
+    title: "Open prompt workbench",
+    description: "Open the prompt workbench.",
+    href: "/dashboard/workbench/all?source=onboarding",
+    cta_label: "Open workbench",
+    estimated_minutes: null,
+    priority: 20,
+    requires_permission: null,
+    completion_event: null,
+    fallback_href: "/dashboard/get-started",
+    ...overrides,
+  });
+
+const promptState = (overrides = {}) => ({
+  prompt_id: "prompt-1",
+  prompt_name: "Support classifier",
+  stage: "start_prompt",
+  has_real_prompt: true,
+  has_test_run: false,
+  has_committed_version: false,
+  has_comparison: false,
+  has_next_loop_action: false,
+  is_sample: false,
+  sample_prompt_count: 0,
+  diagnostics: [],
+  ...overrides,
+});
 
 const availableGoals = [
   {
@@ -294,6 +425,9 @@ const baseState = (overrides = {}) => ({
     prompt_templates: 0,
     prompt_versions: 0,
     prompt_comparisons: 0,
+    first_prompt_id: null,
+    latest_prompt_id: null,
+    prompt_sample_templates: 0,
     agents: 0,
     agent_prototype_runs: 0,
     observe_projects: 0,
@@ -365,6 +499,8 @@ const baseState = (overrides = {}) => ({
     onboarding_sample_project: true,
     onboarding_lifecycle_send_enabled: false,
     onboarding_daily_quality_home: true,
+    onboarding_prompt_path: false,
+    onboarding_prompt_route_modes: false,
   },
   route_availability: routeAvailability(),
   email_context: null,
@@ -373,6 +509,31 @@ const baseState = (overrides = {}) => ({
   warnings: [],
   ...overrides,
 });
+
+const promptAvailablePaths = () => [
+  {
+    id: "prompt",
+    label: "Improve prompts",
+    description: "Test and compare prompt versions.",
+    status: "selected",
+    href: "/dashboard/home?path=prompt",
+    is_available: true,
+    blocked_reason: null,
+    requires_permission: "prompt:write",
+    first_action_id: "create_prompt",
+  },
+  {
+    id: "sample",
+    label: "Explore with sample data",
+    description: "Use a sample workspace while real data is pending.",
+    status: "available",
+    href: "/dashboard/home?path=sample",
+    is_available: true,
+    blocked_reason: null,
+    requires_permission: null,
+    first_action_id: "open_sample_project",
+  },
+];
 
 export const activationStateFixtures = {
   newWorkspaceNoGoal: baseState({
@@ -765,6 +926,293 @@ export const activationStateFixtures = {
         is_available: false,
         reason: "route_not_implemented",
       },
+    }),
+  }),
+
+  promptNoPrompt: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "start_prompt",
+    recommended_action: promptAction(),
+    fallback_action: promptFallbackAction(),
+    progress: {
+      build: "selected",
+      test: "not_started",
+      observe: "available",
+      ship: "available",
+      improve: "available",
+    },
+    signals: {
+      ...baseState().signals,
+      prompt_templates: 0,
+      prompt_versions: 0,
+      prompt_comparisons: 0,
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability({
+      prompt_run_test: {
+        href: "/dashboard/workbench/all?source=onboarding",
+        is_available: false,
+        reason: "missing_id",
+      },
+    }),
+    prompt: promptState({
+      prompt_id: null,
+      prompt_name: null,
+      has_real_prompt: false,
+    }),
+  }),
+
+  promptCreatedNoRun: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "run_prompt_test",
+    recommended_action: promptAction({
+      id: "run_prompt_test",
+      kind: "send_signal",
+      title: "Run prompt test",
+      description: "Run the prompt on one example before saving a baseline.",
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test",
+      cta_label: "Run test",
+      completion_event: "prompt_test_run_completed",
+    }),
+    fallback_action: promptFallbackAction(),
+    progress: {
+      build: "complete",
+      test: "in_progress",
+      observe: "available",
+      ship: "available",
+      improve: "available",
+    },
+    signals: {
+      ...baseState().signals,
+      prompt_templates: 1,
+      first_prompt_id: "prompt-1",
+      latest_prompt_id: "prompt-1",
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability(),
+    prompt: promptState({
+      stage: "run_prompt_test",
+    }),
+  }),
+
+  promptRunNoVersion: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "save_prompt_version",
+    recommended_action: promptAction({
+      id: "save_prompt_version",
+      kind: "improve",
+      title: "Save baseline version",
+      description: "Save a baseline so later edits can be compared.",
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=save-version",
+      cta_label: "Save baseline",
+      completion_event: "prompt_version_created",
+    }),
+    fallback_action: promptFallbackAction(),
+    progress: {
+      build: "complete",
+      test: "complete",
+      observe: "available",
+      ship: "available",
+      improve: "in_progress",
+    },
+    signals: {
+      ...baseState().signals,
+      prompt_templates: 1,
+      prompt_versions: 1,
+      first_prompt_id: "prompt-1",
+      latest_prompt_id: "prompt-1",
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability(),
+    prompt: promptState({
+      stage: "save_prompt_version",
+      has_test_run: true,
+    }),
+  }),
+
+  promptVersionNoComparison: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "compare_prompt_versions",
+    recommended_action: promptAction({
+      id: "compare_prompt_versions",
+      kind: "review",
+      title: "Compare prompt versions",
+      description: "Compare the baseline against an edit on the same example.",
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=compare",
+      cta_label: "Compare versions",
+      estimated_minutes: 3,
+      completion_event: "prompt_comparison_completed",
+    }),
+    fallback_action: promptFallbackAction(),
+    progress: {
+      build: "complete",
+      test: "complete",
+      observe: "available",
+      ship: "available",
+      improve: "in_progress",
+    },
+    signals: {
+      ...baseState().signals,
+      prompt_templates: 1,
+      prompt_versions: 1,
+      first_prompt_id: "prompt-1",
+      latest_prompt_id: "prompt-1",
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability(),
+    prompt: promptState({
+      stage: "compare_prompt_versions",
+      has_test_run: true,
+      has_committed_version: true,
+    }),
+  }),
+
+  promptComparisonComplete: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "prompt_next_loop",
+    recommended_action: promptAction({
+      id: "add_prompt_failure_example",
+      kind: "adjacent_loop",
+      title: "Add a failing example",
+      description: "Turn the comparison into a reusable example or evaluator.",
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=add-failure",
+      cta_label: "Add example",
+      estimated_minutes: 4,
+      completion_event: "dataset_example_added",
+    }),
+    fallback_action: promptFallbackAction(),
+    progress: {
+      build: "complete",
+      test: "complete",
+      observe: "available",
+      ship: "available",
+      improve: "selected",
+    },
+    signals: {
+      ...baseState().signals,
+      prompt_templates: 1,
+      prompt_versions: 1,
+      prompt_comparisons: 1,
+      first_prompt_id: "prompt-1",
+      latest_prompt_id: "prompt-1",
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability(),
+    prompt: promptState({
+      stage: "prompt_next_loop",
+      has_test_run: true,
+      has_committed_version: true,
+      has_comparison: true,
+    }),
+  }),
+
+  promptActivated: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "activated",
+    is_activated: true,
+    activated_at: "2026-05-26T15:20:00Z",
+    recommended_action: promptAction({
+      id: "open_prompt_metrics",
+      kind: "review",
+      title: "Open prompt metrics",
+      description: "Review prompt quality signals and continue improving.",
+      href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=metrics",
+      cta_label: "Open prompt metrics",
+      estimated_minutes: null,
+      completion_event: null,
+    }),
+    fallback_action: promptFallbackAction(),
+    progress: {
+      build: "complete",
+      test: "available",
+      observe: "complete",
+      ship: "available",
+      improve: "complete",
+    },
+    signals: {
+      ...baseState().signals,
+      prompt_templates: 1,
+      prompt_versions: 1,
+      prompt_comparisons: 1,
+      first_prompt_id: "prompt-1",
+      latest_prompt_id: "prompt-1",
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability(),
+    prompt: promptState({
+      stage: "activated",
+      has_test_run: true,
+      has_committed_version: true,
+      has_comparison: true,
+      has_next_loop_action: true,
+    }),
+    last_meaningful_event: {
+      name: "dataset_example_added",
+      occurred_at: "2026-05-26T15:20:00Z",
+      is_sample: false,
+      path: "prompt",
+      metadata: {},
+    },
+  }),
+
+  samplePromptOnly: baseState({
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    stage: "start_prompt",
+    recommended_action: promptAction(),
+    fallback_action: promptFallbackAction(),
+    signals: {
+      ...baseState().signals,
+      prompt_sample_templates: 1,
+    },
+    available_paths: promptAvailablePaths(),
+    feature_flags: {
+      ...baseState().feature_flags,
+      onboarding_prompt_path: true,
+      onboarding_prompt_route_modes: true,
+    },
+    route_availability: promptRouteAvailability(),
+    prompt: promptState({
+      prompt_id: null,
+      prompt_name: null,
+      has_real_prompt: false,
+      sample_prompt_count: 1,
     }),
   }),
 

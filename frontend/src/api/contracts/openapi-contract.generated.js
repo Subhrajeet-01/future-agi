@@ -75031,6 +75031,14 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "trace_received",
             "trace_reviewed",
             "trace_detail_opened",
+            "prompt_created",
+            "prompt_test_input_added",
+            "prompt_test_run_completed",
+            "prompt_version_created",
+            "prompt_comparison_completed",
+            "dataset_example_added",
+            "eval_scorer_created",
+            "prompt_version_promoted",
             "team_member_invited",
             "trace_failure_detected"
           ]
@@ -75267,6 +75275,9 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "sample_project": {
           "$ref": "#/definitions/SampleProjectState"
+        },
+        "prompt": {
+          "$ref": "#/definitions/ActivationPromptState"
         },
         "lifecycle": {
           "$ref": "#/definitions/LifecyclePreview"
@@ -91371,6 +91382,117 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ActivationPromptState": {
+      "required": [
+        "stage",
+        "has_real_prompt",
+        "has_test_run",
+        "has_committed_version",
+        "has_comparison",
+        "has_next_loop_action"
+      ],
+      "type": "object",
+      "properties": {
+        "prompt_id": {
+          "title": "Prompt id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "prompt_name": {
+          "title": "Prompt name",
+          "type": "string",
+          "x-nullable": true
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string",
+          "enum": [
+            "feature_disabled",
+            "workspace_missing",
+            "permission_limited",
+            "choose_goal",
+            "selected_path_unavailable",
+            "activated",
+            "daily_review",
+            "connect_observability",
+            "waiting_for_first_trace",
+            "waiting_for_first_trace_sample_available",
+            "review_first_trace",
+            "create_trace_evaluator",
+            "review_sample_signal",
+            "start_prompt",
+            "run_prompt_test",
+            "save_prompt_version",
+            "compare_prompt_versions",
+            "prompt_next_loop",
+            "create_agent",
+            "run_agent_scenario",
+            "review_agent_trace",
+            "save_agent_eval",
+            "agent_create_eval",
+            "create_trace_dashboard",
+            "create_trace_alert",
+            "configure_gateway_provider",
+            "create_gateway_key",
+            "run_gateway_request",
+            "review_gateway_log",
+            "fix_gateway_failure",
+            "add_gateway_policy",
+            "create_voice_agent",
+            "run_voice_test_call",
+            "review_voice_call",
+            "add_voice_success_criteria",
+            "voice_monitor_calls",
+            "create_eval_dataset",
+            "add_eval_scorer",
+            "run_eval",
+            "review_eval_failures",
+            "eval_next_loop",
+            "open_sample_project",
+            "connect_real_data"
+          ]
+        },
+        "has_real_prompt": {
+          "title": "Has real prompt",
+          "type": "boolean"
+        },
+        "has_test_run": {
+          "title": "Has test run",
+          "type": "boolean"
+        },
+        "has_committed_version": {
+          "title": "Has committed version",
+          "type": "boolean"
+        },
+        "has_comparison": {
+          "title": "Has comparison",
+          "type": "boolean"
+        },
+        "has_next_loop_action": {
+          "title": "Has next loop action",
+          "type": "boolean"
+        },
+        "is_sample": {
+          "title": "Is sample",
+          "type": "boolean",
+          "default": false
+        },
+        "sample_prompt_count": {
+          "title": "Sample prompt count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "x-nullable": true
+    },
     "ActivationSignals": {
       "type": "object",
       "properties": {
@@ -91412,6 +91534,22 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "prompt_comparisons": {
           "title": "Prompt comparisons",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "first_prompt_id": {
+          "title": "First prompt id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "latest_prompt_id": {
+          "title": "Latest prompt id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "prompt_sample_templates": {
+          "title": "Prompt sample templates",
           "type": "integer",
           "default": 0,
           "minimum": 0

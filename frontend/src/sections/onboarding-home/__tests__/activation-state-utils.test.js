@@ -72,6 +72,43 @@ describe("activation-state utilities", () => {
     );
   });
 
+  it("normalizes prompt onboarding state and route modes", () => {
+    const normalized = normalizeActivationState(
+      getActivationStateFixture("promptCreatedNoRun"),
+    );
+
+    expect(normalized.primaryPath).toBe("prompt");
+    expect(normalized.stage).toBe("run_prompt_test");
+    expect(normalized.prompt.promptId).toBe("prompt-1");
+    expect(normalized.prompt.hasRealPrompt).toBe(true);
+    expect(normalized.prompt.hasTestRun).toBe(false);
+    expect(normalized.signals.latestPromptId).toBe("prompt-1");
+    expect(normalized.recommendedAction.href).toContain("onboarding=run-test");
+  });
+
+  it("keeps sample prompt activity out of real activation", () => {
+    const normalized = normalizeActivationState(
+      getActivationStateFixture("samplePromptOnly"),
+    );
+
+    expect(normalized.isActivated).toBe(false);
+    expect(normalized.prompt.hasRealPrompt).toBe(false);
+    expect(normalized.prompt.samplePromptCount).toBe(1);
+    expect(normalized.signals.promptSampleTemplates).toBe(1);
+
+    const fixture = getActivationStateFixture("promptCreatedNoRun");
+    expect(() =>
+      normalizeActivationState({
+        ...fixture,
+        prompt: {
+          ...fixture.prompt,
+          is_sample: true,
+          has_real_prompt: true,
+        },
+      }),
+    ).toThrow(/Sample prompt state/);
+  });
+
   it("normalizes daily quality state and rejects sample signals", () => {
     const normalized = normalizeActivationState(
       getActivationStateFixture("dailyQualityObserveNewSignal"),
