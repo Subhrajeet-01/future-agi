@@ -2619,6 +2619,131 @@ export interface ActivationGoalConflictResponseApi {
   result: ActivationGoalConflictResultApi;
 }
 
+export type OnboardingLifecycleDigestReviewItemApiSourceType = typeof OnboardingLifecycleDigestReviewItemApiSourceType[keyof typeof OnboardingLifecycleDigestReviewItemApiSourceType];
+
+
+export const OnboardingLifecycleDigestReviewItemApiSourceType = {
+  evaluation_log: 'evaluation_log',
+  send_log: 'send_log',
+} as const;
+
+export interface OnboardingLifecycleDigestActionApi {
+  /** @minLength 1 */
+  action_id: string;
+  /** @minLength 1 */
+  label: string;
+  /** @minLength 1 */
+  route: string;
+  /** @minLength 1 */
+  fallback_route: string;
+  /** @minLength 1 */
+  source_type: string;
+  source_id?: string;
+  primary_path?: string;
+  status?: string;
+  /** @minimum 0 */
+  age_minutes: number;
+  last_event_at?: string;
+  assigned_to_user_id?: string;
+  due_at?: string;
+  is_overdue?: boolean;
+}
+
+export interface OnboardingLifecycleDigestPreviewApi {
+  /** @minLength 1 */
+  kind: string;
+  /** @minLength 1 */
+  campaign_key: string;
+  /** @minLength 1 */
+  template_key: string;
+  generated_at?: string;
+  /** @minLength 1 */
+  workspace_id: string;
+  /** @minimum 0 */
+  action_count: number;
+  /** @minimum 0 */
+  omitted_action_count: number;
+  actions: OnboardingLifecycleDigestActionApi[];
+}
+
+export interface OnboardingLifecycleDigestSummaryApi {
+  /** @minimum 0 */
+  action_count: number;
+  /** @minimum 0 */
+  visible_action_count: number;
+  /** @minimum 0 */
+  omitted_action_count: number;
+  /** @minimum 0 */
+  overdue_count: number;
+  /** @minimum 0 */
+  assigned_count: number;
+}
+
+export type OnboardingLifecycleDigestDeliveryLogApiStatus = typeof OnboardingLifecycleDigestDeliveryLogApiStatus[keyof typeof OnboardingLifecycleDigestDeliveryLogApiStatus];
+
+
+export const OnboardingLifecycleDigestDeliveryLogApiStatus = {
+  eligible: 'eligible',
+  suppressed: 'suppressed',
+  sent: 'sent',
+  failed: 'failed',
+  clicked: 'clicked',
+  completed: 'completed',
+} as const;
+
+export interface OnboardingLifecycleDigestDeliveryLogApi {
+  id: string;
+  /** @minLength 1 */
+  channel: string;
+  status: OnboardingLifecycleDigestDeliveryLogApiStatus;
+  suppressed_reason?: string;
+  sent_at?: string;
+  created_at: string;
+}
+
+export interface OnboardingLifecycleDigestReviewItemApi {
+  source_type: OnboardingLifecycleDigestReviewItemApiSourceType;
+  source_id: string;
+  /** @minLength 1 */
+  campaign_key: string;
+  /** @minLength 1 */
+  campaign_group?: string;
+  /** @minLength 1 */
+  template_key?: string;
+  /** @minLength 1 */
+  template_version?: string;
+  /** @minLength 1 */
+  status: string;
+  suppression_reason?: string;
+  user_id: string;
+  workspace_id?: string;
+  evaluated_at?: string;
+  queued_at?: string;
+  sent_at?: string;
+  created_at: string;
+  preview: OnboardingLifecycleDigestPreviewApi;
+  summary: OnboardingLifecycleDigestSummaryApi;
+  delivery_logs: OnboardingLifecycleDigestDeliveryLogApi[];
+}
+
+export interface OnboardingLifecycleDigestReviewResultApi {
+  generated_at: string;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  limit: number;
+  campaign_key?: string;
+  /** @minimum 0 */
+  count: number;
+  items: OnboardingLifecycleDigestReviewItemApi[];
+}
+
+export interface OnboardingLifecycleDigestReviewResponseApi {
+  status: boolean;
+  result: OnboardingLifecycleDigestReviewResultApi;
+}
+
 export interface OrgTwoFactorPolicyResponseApi {
   require_2fa: boolean;
   require_2fa_grace_period_days: number;
@@ -24242,6 +24367,22 @@ export type AccountsAwsMarketplaceVerifyTokenCreateBody = {
   'x-amzn-marketplace-product-id'?: string;
   'x-amzn-marketplace-agreement-id'?: string;
 };
+
+export type AccountsOnboardingLifecycleDigestPreviewsListParams = {
+campaign_key?: AccountsOnboardingLifecycleDigestPreviewsListCampaignKey;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type AccountsOnboardingLifecycleDigestPreviewsListCampaignKey = typeof AccountsOnboardingLifecycleDigestPreviewsListCampaignKey[keyof typeof AccountsOnboardingLifecycleDigestPreviewsListCampaignKey];
+
+
+export const AccountsOnboardingLifecycleDigestPreviewsListCampaignKey = {
+  daily_quality_open_actions: 'daily_quality_open_actions',
+} as const;
 
 export type AccountsOrganizationMembersListParams = {
 /**

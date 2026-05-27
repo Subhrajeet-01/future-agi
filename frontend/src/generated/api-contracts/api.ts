@@ -27,6 +27,7 @@ import type {
   AccountsEmptyRequestApi,
   AccountsErrorResponseApi,
   AccountsMessageResponseApi,
+  AccountsOnboardingLifecycleDigestPreviewsListParams,
   AccountsOrganizationMembersListParams,
   AccountsPaginatedUserResponseApi,
   AccountsRedisDeleteResponseApi,
@@ -760,6 +761,7 @@ import type {
   ObservationSpanApi,
   ObserveGraphDataRequestApi,
   ObserveGraphDataResponseApi,
+  OnboardingLifecycleDigestReviewResponseApi,
   OperationConfigResponseApi,
   OptimiserAnalysisRefreshResponseApi,
   OptimiserAnalysisResponseApi,
@@ -4260,6 +4262,82 @@ export const accountsOnboardingGoalCreate = async (activationGoalRequestApi: Act
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       activationGoalRequestApi,)
+  }
+);}
+
+
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse200 = {
+  data: OnboardingLifecycleDigestReviewResponseApi
+  status: 200
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse400 = {
+  data: AccountsErrorResponseApi
+  status: 400
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse401 = {
+  data: AccountsErrorResponseApi
+  status: 401
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse403 = {
+  data: AccountsErrorResponseApi
+  status: 403
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse404 = {
+  data: AccountsErrorResponseApi
+  status: 404
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse500 = {
+  data: AccountsErrorResponseApi
+  status: 500
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponseDefault = {
+  data: ManagementAPIErrorResponseApi
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 404 | 500>
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponseSuccess = (accountsOnboardingLifecycleDigestPreviewsListResponse200) & {
+  headers: Headers;
+};
+export type accountsOnboardingLifecycleDigestPreviewsListResponseError = (accountsOnboardingLifecycleDigestPreviewsListResponse400 | accountsOnboardingLifecycleDigestPreviewsListResponse401 | accountsOnboardingLifecycleDigestPreviewsListResponse403 | accountsOnboardingLifecycleDigestPreviewsListResponse404 | accountsOnboardingLifecycleDigestPreviewsListResponse500 | accountsOnboardingLifecycleDigestPreviewsListResponseDefault) & {
+  headers: Headers;
+};
+
+export type accountsOnboardingLifecycleDigestPreviewsListResponse = (accountsOnboardingLifecycleDigestPreviewsListResponseSuccess | accountsOnboardingLifecycleDigestPreviewsListResponseError)
+
+export const getAccountsOnboardingLifecycleDigestPreviewsListUrl = (params?: AccountsOnboardingLifecycleDigestPreviewsListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (Array.isArray(value)) {
+      value
+        .filter((item) => item !== undefined && item !== null)
+        .forEach((item) => normalizedParams.append(key, item.toString()))
+    } else if (value !== undefined && value !== null) {
+      normalizedParams.append(key, value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/accounts/onboarding/lifecycle/digest-previews/?${stringifiedParams}` : `/accounts/onboarding/lifecycle/digest-previews/`
+}
+
+export const accountsOnboardingLifecycleDigestPreviewsList = async (params?: AccountsOnboardingLifecycleDigestPreviewsListParams, options?: RequestInit): Promise<accountsOnboardingLifecycleDigestPreviewsListResponse> => {
+
+  return apiMutator<accountsOnboardingLifecycleDigestPreviewsListResponse>(getAccountsOnboardingLifecycleDigestPreviewsListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
   }
 );}
 

@@ -5,7 +5,7 @@
 export const OPENAPI_CONTRACT = Object.freeze({
   "generatedFrom": "api_contracts/openapi/swagger.json",
   "swaggerVersion": "2.0",
-  "endpointCount": 987,
+  "endpointCount": 988,
   "endpoints": {
     "/accounts/2fa/recovery-codes/": {
       "get": {
@@ -1533,6 +1533,57 @@ export const OPENAPI_CONTRACT = Object.freeze({
           },
           "409": {
             "$ref": "#/definitions/ActivationGoalConflictResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "default": {
+            "$ref": "#/definitions/ManagementAPIErrorResponse"
+          }
+        }
+      }
+    },
+    "/accounts/onboarding/lifecycle/digest-previews/": {
+      "get": {
+        "operationId": "accounts_onboarding_lifecycle_digest-previews_list",
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
+        "requestBody": null,
+        "queryParameters": {
+          "campaign_key": {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "daily_quality_open_actions"
+              ]
+            }
+          },
+          "limit": {
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestReviewResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "401": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/AccountsErrorResponse"
           },
           "500": {
             "$ref": "#/definitions/AccountsErrorResponse"
@@ -61785,6 +61836,22 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "OnboardingLifecycleDigestReviewResponse": {
+      "required": [
+        "status",
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean"
+        },
+        "result": {
+          "$ref": "#/definitions/OnboardingLifecycleDigestReviewResult"
+        }
+      }
+    },
     "OperationConfigResponse": {
       "required": [
         "status",
@@ -84980,6 +85047,43 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "OnboardingLifecycleDigestReviewResult": {
+      "required": [
+        "generated_at",
+        "limit",
+        "count",
+        "items"
+      ],
+      "type": "object",
+      "properties": {
+        "generated_at": {
+          "title": "Generated at",
+          "type": "string",
+          "format": "date-time"
+        },
+        "limit": {
+          "title": "Limit",
+          "type": "integer",
+          "maximum": 100,
+          "minimum": 1
+        },
+        "campaign_key": {
+          "title": "Campaign key",
+          "type": "string"
+        },
+        "count": {
+          "title": "Count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestReviewItem"
+          }
+        }
+      }
+    },
     "OperationConfigResult": {
       "required": [
         "column_id",
@@ -98923,6 +99027,114 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "OnboardingLifecycleDigestReviewItem": {
+      "required": [
+        "source_type",
+        "source_id",
+        "campaign_key",
+        "status",
+        "user_id",
+        "created_at",
+        "preview",
+        "summary",
+        "delivery_logs"
+      ],
+      "type": "object",
+      "properties": {
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "enum": [
+            "evaluation_log",
+            "send_log"
+          ]
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "campaign_key": {
+          "title": "Campaign key",
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_group": {
+          "title": "Campaign group",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        },
+        "template_key": {
+          "title": "Template key",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        },
+        "template_version": {
+          "title": "Template version",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        },
+        "status": {
+          "title": "Status",
+          "type": "string",
+          "minLength": 1
+        },
+        "suppression_reason": {
+          "title": "Suppression reason",
+          "type": "string",
+          "x-nullable": true
+        },
+        "user_id": {
+          "title": "User id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "workspace_id": {
+          "title": "Workspace id",
+          "type": "string",
+          "format": "uuid",
+          "x-nullable": true
+        },
+        "evaluated_at": {
+          "title": "Evaluated at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "queued_at": {
+          "title": "Queued at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "sent_at": {
+          "title": "Sent at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "created_at": {
+          "title": "Created at",
+          "type": "string",
+          "format": "date-time"
+        },
+        "preview": {
+          "$ref": "#/definitions/OnboardingLifecycleDigestPreview"
+        },
+        "summary": {
+          "$ref": "#/definitions/OnboardingLifecycleDigestSummary"
+        },
+        "delivery_logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestDeliveryLog"
+          }
+        }
+      }
+    },
     "MetricSerializerNameAndId": {
       "required": [
         "name"
@@ -102319,6 +102531,148 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "OnboardingLifecycleDigestDeliveryLog": {
+      "required": [
+        "id",
+        "channel",
+        "status",
+        "created_at"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "channel": {
+          "title": "Channel",
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "title": "Status",
+          "type": "string",
+          "enum": [
+            "eligible",
+            "suppressed",
+            "sent",
+            "failed",
+            "clicked",
+            "completed"
+          ]
+        },
+        "suppressed_reason": {
+          "title": "Suppressed reason",
+          "type": "string",
+          "x-nullable": true
+        },
+        "sent_at": {
+          "title": "Sent at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "created_at": {
+          "title": "Created at",
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OnboardingLifecycleDigestPreview": {
+      "required": [
+        "kind",
+        "campaign_key",
+        "template_key",
+        "workspace_id",
+        "action_count",
+        "omitted_action_count",
+        "actions"
+      ],
+      "type": "object",
+      "properties": {
+        "kind": {
+          "title": "Kind",
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_key": {
+          "title": "Campaign key",
+          "type": "string",
+          "minLength": 1
+        },
+        "template_key": {
+          "title": "Template key",
+          "type": "string",
+          "minLength": 1
+        },
+        "generated_at": {
+          "title": "Generated at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "workspace_id": {
+          "title": "Workspace id",
+          "type": "string",
+          "minLength": 1
+        },
+        "action_count": {
+          "title": "Action count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "omitted_action_count": {
+          "title": "Omitted action count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestAction"
+          }
+        }
+      }
+    },
+    "OnboardingLifecycleDigestSummary": {
+      "required": [
+        "action_count",
+        "visible_action_count",
+        "omitted_action_count",
+        "overdue_count",
+        "assigned_count"
+      ],
+      "type": "object",
+      "properties": {
+        "action_count": {
+          "title": "Action count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "visible_action_count": {
+          "title": "Visible action count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "omitted_action_count": {
+          "title": "Omitted action count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "overdue_count": {
+          "title": "Overdue count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "assigned_count": {
+          "title": "Assigned count",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "KeyMoment": {
       "required": [
         "kevinified",
@@ -102750,6 +103104,83 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Avg score",
           "type": "number",
           "x-nullable": true
+        }
+      }
+    },
+    "OnboardingLifecycleDigestAction": {
+      "required": [
+        "action_id",
+        "label",
+        "route",
+        "fallback_route",
+        "source_type",
+        "age_minutes"
+      ],
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "title": "Action id",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "title": "Label",
+          "type": "string",
+          "minLength": 1
+        },
+        "route": {
+          "title": "Route",
+          "type": "string",
+          "minLength": 1
+        },
+        "fallback_route": {
+          "title": "Fallback route",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string"
+        },
+        "primary_path": {
+          "title": "Primary path",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "age_minutes": {
+          "title": "Age minutes",
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_event_at": {
+          "title": "Last event at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "assigned_to_user_id": {
+          "title": "Assigned to user id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "due_at": {
+          "title": "Due at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "is_overdue": {
+          "title": "Is overdue",
+          "type": "boolean",
+          "default": false
         }
       }
     },

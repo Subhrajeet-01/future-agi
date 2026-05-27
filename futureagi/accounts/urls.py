@@ -17,6 +17,9 @@ from accounts.views.onboarding import (
     SampleProjectView,
 )
 from accounts.views.onboarding_lifecycle_clicks import OnboardingLifecycleClickView
+from accounts.views.onboarding_lifecycle_digest_review import (
+    OnboardingLifecycleDigestPreviewReviewView,
+)
 from accounts.views.onboarding_lifecycle_preferences import (
     OnboardingLifecycleSnoozeView,
     OnboardingLifecycleUnsubscribeView,
@@ -176,6 +179,11 @@ user_urls = [
         "onboarding/lifecycle/click/",
         OnboardingLifecycleClickView.as_view(),
         name="onboarding-lifecycle-click",
+    ),
+    path(
+        "onboarding/lifecycle/digest-previews/",
+        OnboardingLifecycleDigestPreviewReviewView.as_view(),
+        name="onboarding-lifecycle-digest-previews",
     ),
     path(
         "onboarding/lifecycle/unsubscribe/",

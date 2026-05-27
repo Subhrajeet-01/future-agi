@@ -3706,6 +3706,120 @@ export const AccountsOnboardingGoalCreateResponse = zod.object({
 })
 
 
+export const accountsOnboardingLifecycleDigestPreviewsListQueryLimitDefault = 25;
+export const accountsOnboardingLifecycleDigestPreviewsListQueryLimitMax = 100;
+
+
+
+export const AccountsOnboardingLifecycleDigestPreviewsListQueryParams = zod.object({
+  "campaign_key": zod.enum(['daily_quality_open_actions']).optional(),
+  "limit": zod.number().min(1).max(accountsOnboardingLifecycleDigestPreviewsListQueryLimitMax).default(accountsOnboardingLifecycleDigestPreviewsListQueryLimitDefault)
+})
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultLimitMax = 100;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultCountMin = 0;
+
+
+
+
+
+
+
+
+
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewActionCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewOmittedActionCountMin = 0;
+
+
+
+
+
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewActionsItemAgeMinutesMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewActionsItemIsOverdueDefault = false;
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryActionCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryVisibleActionCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryOmittedActionCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryOverdueCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryAssignedCountMin = 0;
+
+
+
+
+export const AccountsOnboardingLifecycleDigestPreviewsListResponse = zod.object({
+  "status": zod.boolean(),
+  "result": zod.object({
+  "generated_at": zod.string().datetime({"offset":true}),
+  "limit": zod.number().min(1).max(accountsOnboardingLifecycleDigestPreviewsListResponseResultLimitMax),
+  "campaign_key": zod.string().optional(),
+  "count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultCountMin),
+  "items": zod.array(zod.object({
+  "source_type": zod.enum(['evaluation_log', 'send_log']),
+  "source_id": zod.string().uuid(),
+  "campaign_key": zod.string().min(1),
+  "campaign_group": zod.string().min(1).optional(),
+  "template_key": zod.string().min(1).optional(),
+  "template_version": zod.string().min(1).optional(),
+  "status": zod.string().min(1),
+  "suppression_reason": zod.string().optional(),
+  "user_id": zod.string().uuid(),
+  "workspace_id": zod.string().uuid().optional(),
+  "evaluated_at": zod.string().datetime({"offset":true}).optional(),
+  "queued_at": zod.string().datetime({"offset":true}).optional(),
+  "sent_at": zod.string().datetime({"offset":true}).optional(),
+  "created_at": zod.string().datetime({"offset":true}),
+  "preview": zod.object({
+  "kind": zod.string().min(1),
+  "campaign_key": zod.string().min(1),
+  "template_key": zod.string().min(1),
+  "generated_at": zod.string().datetime({"offset":true}).optional(),
+  "workspace_id": zod.string().min(1),
+  "action_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewActionCountMin),
+  "omitted_action_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewOmittedActionCountMin),
+  "actions": zod.array(zod.object({
+  "action_id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().optional(),
+  "primary_path": zod.string().optional(),
+  "status": zod.string().optional(),
+  "age_minutes": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewActionsItemAgeMinutesMin),
+  "last_event_at": zod.string().datetime({"offset":true}).optional(),
+  "assigned_to_user_id": zod.string().optional(),
+  "due_at": zod.string().datetime({"offset":true}).optional(),
+  "is_overdue": zod.boolean().default(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemPreviewActionsItemIsOverdueDefault)
+}))
+}),
+  "summary": zod.object({
+  "action_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryActionCountMin),
+  "visible_action_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryVisibleActionCountMin),
+  "omitted_action_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryOmittedActionCountMin),
+  "overdue_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryOverdueCountMin),
+  "assigned_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsListResponseResultItemsItemSummaryAssignedCountMin)
+}),
+  "delivery_logs": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "channel": zod.string().min(1),
+  "status": zod.enum(['eligible', 'suppressed', 'sent', 'failed', 'clicked', 'completed']),
+  "suppressed_reason": zod.string().optional(),
+  "sent_at": zod.string().datetime({"offset":true}).optional(),
+  "created_at": zod.string().datetime({"offset":true})
+}))
+}))
+})
+})
+
+
 /**
  * GET is available to all authenticated members (read policy).
 PUT is admin-gated inline (Level.ADMIN+) rather than via a permission
