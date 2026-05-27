@@ -95,7 +95,7 @@ def _email_eligibility(stage, flags, now, lifecycle=None):
             "next_email_key": lifecycle["template_key"],
             "next_email_after": lifecycle["eligible_at"],
             "digest_eligible": lifecycle.get("next_campaign_key")
-            == "first_loop_complete_next",
+            in {"first_loop_complete_next", "daily_quality_open_actions"},
             "last_email_sent_at": None,
             "frequency_cap_remaining": 0 if suppressed else 1,
             "dry_run_only": True,

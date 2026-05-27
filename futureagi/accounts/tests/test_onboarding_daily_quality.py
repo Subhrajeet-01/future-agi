@@ -224,7 +224,7 @@ def test_daily_quality_carries_forward_open_quality_action(
             "source_type": "project",
             "source_id": str(project.id),
         },
-        occurred_at=now - timedelta(minutes=20),
+        occurred_at=now - timedelta(minutes=80),
     )
     record_event(
         user=user,
@@ -234,7 +234,7 @@ def test_daily_quality_carries_forward_open_quality_action(
         source="test",
         product_path="observe",
         metadata={"action_id": "trace-action-1"},
-        occurred_at=now - timedelta(minutes=10),
+        occurred_at=now - timedelta(minutes=70),
     )
 
     payload = _activation_state(
@@ -248,8 +248,12 @@ def test_daily_quality_carries_forward_open_quality_action(
     assert daily_quality["mode"] == "open_action"
     assert daily_quality["primary_action"]["id"] == "trace-action-1"
     assert daily_quality["primary_action"]["label"] == "Assign trace owner"
-    assert daily_quality["digest_suppression_reason"] == "open_action"
-    assert payload["email_eligibility"]["suppression_reason"] == "open_action"
+    assert daily_quality["digest_eligible"] is True
+    assert daily_quality["digest_suppression_reason"] is None
+    assert payload["lifecycle"]["next_campaign_key"] == "daily_quality_open_actions"
+    assert payload["email_eligibility"]["eligible"] is True
+    assert payload["email_eligibility"]["digest_eligible"] is True
+    assert payload["email_eligibility"]["suppression_reason"] is None
     assert daily_quality["weekly_review"]["due"] is True
     assert daily_quality["weekly_review"]["unresolved_count"] == 1
 

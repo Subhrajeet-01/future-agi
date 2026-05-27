@@ -497,3 +497,25 @@ campaigns:
     sample_policy: real_only
     owner: product
     qa_fixture: first_loop_complete_next
+
+  - campaign_key: daily_quality_open_actions
+    template_key: daily_quality_open_actions_v1
+    template_version: "2026-05-27.1"
+    campaign_group: activation_success
+    primary_path: observe
+    entry_stages:
+      - activated
+      - daily_review
+    daily_quality_modes:
+      - open_action
+    wait_window_minutes: 60
+    priority: 70
+    target_action_id: review_daily_quality
+    target_success_event: daily_quality_action_completed
+    route_strategy: daily_quality
+    dry_run_flag: onboarding_email_daily_digest_enabled
+    send_flag: onboarding_lifecycle_send_enabled
+    frequency_cap_key: daily_digest
+    sample_policy: real_only
+    owner: product
+    qa_fixture: daily_quality_open_actions

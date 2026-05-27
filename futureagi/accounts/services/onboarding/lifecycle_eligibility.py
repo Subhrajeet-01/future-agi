@@ -100,6 +100,13 @@ def choose_lifecycle_campaign(
         campaign_path = campaign.get("primary_path")
         if campaign_path not in {"any", primary_path}:
             continue
+        daily_quality_modes = campaign.get("daily_quality_modes")
+        if daily_quality_modes is not None:
+            daily_quality_mode = (activation_state.get("daily_quality") or {}).get(
+                "mode"
+            )
+            if daily_quality_mode not in daily_quality_modes:
+                continue
         matches.append(campaign)
     if not matches:
         return None
@@ -438,6 +445,8 @@ def _preference_for(user, organization, workspace):
 
 def _target_event_complete(organization, workspace, campaign):
     if not campaign:
+        return False
+    if campaign.get("frequency_cap_key") == "daily_digest":
         return False
     is_sample = campaign.get("sample_policy") == "sample_only"
     if campaign.get("campaign_key") == "gateway_sample_bridge":

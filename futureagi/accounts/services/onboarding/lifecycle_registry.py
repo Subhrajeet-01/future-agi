@@ -42,6 +42,13 @@ ROUTE_STRATEGIES = {
 }
 
 SAMPLE_POLICIES = {"real_only", "sample_only", "allow_sample"}
+DAILY_QUALITY_MODES = {
+    "new_signal",
+    "open_action",
+    "no_new_signal",
+    "permission_limited",
+    "unavailable",
+}
 
 
 def _config_error(message: str) -> ImproperlyConfigured:
@@ -119,6 +126,17 @@ def _validate_campaign(campaign: dict, path: str) -> None:
     for stage in stages:
         if stage not in ACTIVATION_STAGES:
             raise _config_error(f"{path}.entry_stages contains unknown stage.")
+
+    modes = campaign.get("daily_quality_modes")
+    if modes is not None:
+        modes = _sequence(modes, f"{path}.daily_quality_modes")
+        if not modes:
+            raise _config_error(f"{path}.daily_quality_modes cannot be empty.")
+        for mode in modes:
+            if mode not in DAILY_QUALITY_MODES:
+                raise _config_error(
+                    f"{path}.daily_quality_modes contains unknown mode."
+                )
 
 
 def _validate_config(config: dict) -> None:

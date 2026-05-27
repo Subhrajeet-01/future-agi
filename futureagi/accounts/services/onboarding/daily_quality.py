@@ -787,8 +787,8 @@ def resolve_daily_quality_state(*, context, flags, signals, routes, stage, now):
         }
         open_actions = open_actions[1:]
         mode = "open_action"
-        digest_eligible = False
-        digest_suppression_reason = "open_action"
+        digest_eligible = bool(flags.get("onboarding_email_daily_digest_enabled"))
+        digest_suppression_reason = None if digest_eligible else "flag_disabled"
         diagnostics = ["open_action"]
     else:
         primary_action, diagnostics = _next_action(context, signals, routes)

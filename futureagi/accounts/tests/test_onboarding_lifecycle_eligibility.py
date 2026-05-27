@@ -238,6 +238,69 @@ def test_completed_target_event_suppresses_campaign(
 
 
 @pytest.mark.django_db
+def test_daily_quality_open_action_digest_is_repeatable_after_prior_completion(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="daily_quality_action_completed",
+        product_path="observe",
+        source="test",
+        occurred_at=now - timedelta(minutes=30),
+    )
+    flags = _flags()
+    activation_state = {
+        "stage": "daily_review",
+        "primary_path": "observe",
+        "is_activated": True,
+        "recommended_action": {
+            "id": "review_daily_quality",
+            "href": "/dashboard/home?mode=daily-quality",
+        },
+        "fallback_action": {"id": "open_get_started"},
+        "permissions": {
+            "can_write": True,
+            "permission_limited": False,
+        },
+        "sample_project": {},
+        "signals": {},
+        "daily_quality": {"mode": "open_action"},
+        "route_availability": {
+            "daily_quality_home": {
+                "href": "/dashboard/home?mode=daily-quality",
+                "is_available": True,
+                "reason": None,
+            }
+        },
+        "last_meaningful_event": {
+            "occurred_at": now - timedelta(hours=2),
+            "is_sample": False,
+        },
+    }
+
+    decision = evaluate_lifecycle_decision(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        activation_state=activation_state,
+        flags=flags,
+        now=now,
+    )
+
+    assert decision.status == OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE
+    assert decision.campaign["campaign_key"] == "daily_quality_open_actions"
+    assert decision.campaign["target_success_event"] == (
+        "daily_quality_action_completed"
+    )
+    assert "campaign_key=daily_quality_open_actions" in decision.target_url
+
+
+@pytest.mark.django_db
 def test_hidden_sample_suppresses_sample_bridge(
     organization,
     workspace,

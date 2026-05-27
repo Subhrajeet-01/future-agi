@@ -72,12 +72,12 @@ def test_activation_state_response_serializer_accepts_open_daily_action():
     }
     payload["email_eligibility"].update(
         {
-            "eligible": False,
-            "suppressed": True,
-            "suppression_reason": "open_action",
-            "next_email_key": None,
-            "next_email_after": None,
-            "digest_eligible": False,
+            "eligible": True,
+            "suppressed": False,
+            "suppression_reason": None,
+            "next_email_key": "daily_quality_open_actions_v1",
+            "next_email_after": "2026-05-27T09:00:00Z",
+            "digest_eligible": True,
         }
     )
     payload["daily_quality"] = {
@@ -129,8 +129,8 @@ def test_activation_state_response_serializer_accepts_open_daily_action():
             "last_completed_at": None,
             "action_label": "Open weekly review",
         },
-        "digest_eligible": False,
-        "digest_suppression_reason": "open_action",
+        "digest_eligible": True,
+        "digest_suppression_reason": None,
         "diagnostics": ["open_action"],
     }
 
