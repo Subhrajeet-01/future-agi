@@ -1,0 +1,83 @@
+from uuid import uuid4
+
+from accounts.services.onboarding.context import OnboardingContext
+from accounts.services.onboarding.route_availability import resolve_route_availability
+from accounts.services.onboarding.signal_resolver import OnboardingSignals
+
+
+def _context(*, can_write=True):
+    return OnboardingContext(
+        user=None,
+        organization=None,
+        workspace=None,
+        organization_role="Owner" if can_write else "Viewer",
+        workspace_role="workspace_admin" if can_write else "workspace_viewer",
+        organization_level=15 if can_write else 1,
+        workspace_level=8 if can_write else 1,
+        selected_goal="monitor_production_ai_app",
+        primary_path="observe",
+        persona="developer",
+        source="test",
+        email_context=None,
+        permissions={
+            "role": "Owner" if can_write else "Viewer",
+            "can_read": True,
+            "can_write": can_write,
+            "can_manage_workspace": can_write,
+            "missing_permissions": [] if can_write else ["workspace:write"],
+            "request_access_href": "/dashboard/settings/user-management",
+            "permission_limited": not can_write,
+        },
+        warnings=[],
+    )
+
+
+def test_trace_detail_route_requires_owned_ids():
+    routes = resolve_route_availability(
+        context=_context(),
+        flags={
+            "onboarding_sample_project": False,
+            "onboarding_daily_quality_home": False,
+        },
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert routes["observe_trace_detail"]["is_available"] is False
+    assert routes["observe_trace_detail"]["reason"] == "missing_id"
+
+
+def test_trace_detail_route_uses_signal_ids():
+    observe_id = uuid4()
+    trace_id = uuid4()
+    routes = resolve_route_availability(
+        context=_context(),
+        flags={
+            "onboarding_sample_project": False,
+            "onboarding_daily_quality_home": False,
+        },
+        signals=OnboardingSignals(
+            first_checks={},
+            first_observe_id=str(observe_id),
+            first_trace_id=str(trace_id),
+        ),
+    )
+
+    assert routes["observe_trace_detail"] == {
+        "href": f"/dashboard/observe/{observe_id}/trace/{trace_id}",
+        "is_available": True,
+        "reason": None,
+    }
+
+
+def test_write_route_is_unavailable_for_read_only_user():
+    routes = resolve_route_availability(
+        context=_context(can_write=False),
+        flags={
+            "onboarding_sample_project": False,
+            "onboarding_daily_quality_home": False,
+        },
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert routes["observe_setup"]["is_available"] is False
+    assert routes["observe_setup"]["reason"] == "missing_permission"

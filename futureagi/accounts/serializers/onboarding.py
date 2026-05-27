@@ -401,6 +401,32 @@ class ActivationStateResponseSerializer(serializers.Serializer):
         return attrs
 
 
+class ActivationStateQuerySerializer(serializers.Serializer):
+    source = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    campaign_key = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    email_key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    target_stage = serializers.ChoiceField(
+        choices=choices(ACTIVATION_STAGES),
+        required=False,
+        allow_null=True,
+    )
+    target_event = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    target_route = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    debug = serializers.BooleanField(required=False)
+
+
 class ActivationGoalRequestSerializer(serializers.Serializer):
     goal = serializers.CharField()
     persona = serializers.CharField(required=False, allow_blank=True, allow_null=True)

@@ -1,0 +1,324 @@
+import pytest
+
+from accounts.services.onboarding.activation_events import record_event
+from accounts.services.onboarding.activation_state import resolve_activation_state
+from accounts.services.onboarding.context import OnboardingContext
+from accounts.services.onboarding.signal_resolver import (
+    OnboardingSignals,
+    collect_onboarding_signals,
+)
+from accounts.tests.onboarding_model_factories import (
+    create_custom_eval,
+    create_observe_project,
+    create_trace,
+)
+
+
+def _flags(**overrides):
+    flags = {
+        "onboarding_activation_state_api": True,
+        "onboarding_goal_picker": True,
+        "onboarding_path_cards": True,
+        "onboarding_sample_project": False,
+        "onboarding_daily_quality_home": False,
+        "onboarding_lifecycle_email_dry_run": False,
+        "onboarding_home_enabled": True,
+        "onboarding_observe_mvp_enabled": True,
+        "onboarding_sample_project_enabled": False,
+        "onboarding_lifecycle_dry_run_enabled": False,
+        "onboarding_lifecycle_send_enabled": False,
+        "daily_quality_home_enabled": False,
+        "activation_state_debug_enabled": False,
+    }
+    flags.update(overrides)
+    return flags
+
+
+def _context(
+    user, organization, workspace, *, goal="monitor_production_ai_app", can_write=True
+):
+    return OnboardingContext(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        organization_role="Owner" if can_write else "Viewer",
+        workspace_role="workspace_admin" if can_write else "workspace_viewer",
+        organization_level=15 if can_write else 1,
+        workspace_level=8 if can_write else 1,
+        selected_goal=goal,
+        primary_path="observe" if goal == "monitor_production_ai_app" else None,
+        persona="developer",
+        source="test",
+        email_context=None,
+        permissions={
+            "role": "Owner" if can_write else "Viewer",
+            "can_read": True,
+            "can_write": can_write,
+            "can_manage_workspace": can_write,
+            "missing_permissions": [] if can_write else ["workspace:write"],
+            "request_access_href": "/dashboard/settings/user-management",
+            "permission_limited": not can_write,
+        },
+        warnings=[],
+    )
+
+
+@pytest.mark.django_db
+def test_flag_off_returns_feature_disabled(organization, workspace, user):
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(
+            onboarding_activation_state_api=False, onboarding_home_enabled=False
+        ),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "feature_disabled"
+    assert payload["recommended_action"]["id"] == "open_get_started"
+
+
+@pytest.mark.django_db
+def test_missing_workspace_returns_workspace_missing(organization, user):
+    payload = resolve_activation_state(
+        context=_context(user, organization, None),
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "workspace_missing"
+
+
+@pytest.mark.django_db
+def test_no_goal_returns_choose_goal(organization, workspace, user):
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace, goal=None),
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "choose_goal"
+
+
+@pytest.mark.django_db
+def test_observe_path_no_setup_returns_connect_observability(
+    organization,
+    workspace,
+    user,
+):
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "connect_observability"
+    assert payload["recommended_action"]["id"] == "create_observe_project"
+
+
+@pytest.mark.django_db
+def test_observe_project_without_trace_waits_for_trace(organization, workspace, user):
+    create_observe_project(organization=organization, workspace=workspace, user=user)
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "waiting_for_first_trace"
+
+
+@pytest.mark.django_db
+def test_sample_flag_adds_sample_waiting_stage(organization, workspace, user):
+    create_observe_project(organization=organization, workspace=workspace, user=user)
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(
+            onboarding_sample_project=True,
+            onboarding_sample_project_enabled=True,
+        ),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "waiting_for_first_trace_sample_available"
+    assert payload["fallback_action"]["id"] == "open_sample_trace"
+
+
+@pytest.mark.django_db
+def test_trace_without_review_returns_review_first_trace(organization, workspace, user):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    create_trace(project=project)
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "review_first_trace"
+
+
+@pytest.mark.django_db
+def test_trace_review_without_improvement_returns_create_evaluator(
+    organization,
+    workspace,
+    user,
+):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    create_trace(project=project)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="trace_reviewed",
+        source="trace_detail",
+        product_path="observe",
+    )
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "create_trace_evaluator"
+
+
+@pytest.mark.django_db
+def test_evaluator_after_trace_review_activates(organization, workspace, user):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    create_trace(project=project)
+    create_custom_eval(organization=organization, workspace=workspace, project=project)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="trace_reviewed",
+        source="trace_detail",
+        product_path="observe",
+    )
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "activated"
+    assert payload["is_activated"] is True
+
+
+@pytest.mark.django_db
+def test_daily_flag_moves_activated_workspace_to_daily_review(
+    organization,
+    workspace,
+    user,
+):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    create_trace(project=project)
+    create_custom_eval(organization=organization, workspace=workspace, project=project)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="trace_reviewed",
+        source="trace_detail",
+        product_path="observe",
+    )
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(
+            onboarding_daily_quality_home=True,
+            daily_quality_home_enabled=True,
+        ),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "daily_review"
+
+
+@pytest.mark.django_db
+def test_permission_limited_user_does_not_receive_write_action(
+    organization,
+    workspace,
+    user,
+):
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace, can_write=False),
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "permission_limited"
+    assert payload["recommended_action"]["kind"] == "request_access"
+
+
+@pytest.mark.django_db
+def test_unavailable_goal_returns_selected_path_unavailable(
+    organization,
+    workspace,
+    user,
+):
+    context = _context(user, organization, workspace, goal="improve_prompts")
+    context = OnboardingContext(
+        **{
+            **context.__dict__,
+            "primary_path": "prompt",
+        }
+    )
+
+    payload = resolve_activation_state(
+        context=context,
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "selected_path_unavailable"

@@ -9,6 +9,7 @@ from accounts.views.aws_marketplace import (
 )
 from accounts.views.config import public_config
 from accounts.views.keys import GetKeysView, SecretKeyAPIViewSet
+from accounts.views.onboarding import ActivationStateView
 from accounts.views.organization_selection import (
     OrganizationSelectionView,
     SwitchOrganizationView,
@@ -132,6 +133,7 @@ signup_urls = [
 user_urls = [
     path("user-info/", get_user_info, name="user-info"),
     path("first-checks/", FirstChecksView.as_view(), name="first-checks"),
+    path("activation-state/", ActivationStateView.as_view(), name="activation-state"),
     path("onboarding/", user_onboarding, name="user-onboarding"),
     path(
         "me/timezone/",
