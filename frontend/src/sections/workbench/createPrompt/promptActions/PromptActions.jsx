@@ -40,7 +40,7 @@ import { enqueueSnackbar } from "src/components/snackbar";
 import { useAuthContext } from "src/auth/hooks";
 import { PERMISSIONS, RolePermission } from "src/utils/rolePermissionMapping";
 import { usePromptStore } from "../../../workbench-v2/store/usePromptStore";
-import { NavLink } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 import { createDraftPayload } from "../../constant";
 import { getMetricsTabSx } from "../Metrics/common";
 import SaveAndCommit from "./SaveAndCommit";
@@ -49,10 +49,12 @@ import { DraftBadge } from "../SharedStyledComponents";
 import VersionStyle from "./VersionStyle";
 import MoreActions from "./MoreActions";
 import { getColorMap as getTagColorMap } from "../VersionHistory/common";
+import PromptOnboardingFocusPanel from "./PromptOnboardingFocusPanel";
 
 const PromptActions = () => {
   const theme = useTheme();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [editName, setEdit] = useState(false);
   const [title, setTitle] = useState("");
@@ -313,6 +315,52 @@ const PromptActions = () => {
     () => !!selectedVersions?.some((version) => version?.isDraft),
     [selectedVersions],
   );
+  const isRunPromptDisabled =
+    loadingPrompt ||
+    currentTab === "Evaluation" ||
+    currentTab === "Metrics" ||
+    !RolePermission.PROMPTS[PERMISSIONS.UPDATE][userRole];
+  const onboardingMode = searchParams.get("onboarding");
+  const onboardingSource = searchParams.get("source");
+
+  const handleRunPrompt = () => {
+    if (buttonTooltip) {
+      if (noModelIndex !== -1) {
+        setOpenSelectModel(noModelIndex);
+        trackEvent(Events.promptSelectModelClicked, {
+          [PropertyName.promptId]: id,
+          [PropertyName.type]: "system",
+          [PropertyName.version]: selectedVersions?.map(
+            (item) => item?.version,
+          ),
+        });
+      } else if (!isVariablesDefined) {
+        setVariableDrawerOpen(true);
+      }
+      return;
+    }
+    trackEvent(Events.promptRunPromptClicked, {
+      [PropertyName.promptId]: id,
+      [PropertyName.type]: "overall",
+      [PropertyName.version]: selectedVersions?.map((item) => item?.version),
+    });
+    if (!checkIfAudioModelHasAudioContent(modelConfig, prompts)) {
+      enqueueSnackbar(
+        "Audio input is missing. Please add audio before running the prompt.",
+        { variant: "error" },
+      );
+      return;
+    }
+    saveAndRun();
+  };
+
+  const handleOpenPlayground = () => setCurrentTab("Playground");
+  const handleOpenEvaluation = () => setCurrentTab("Evaluation");
+  const handleOpenMetrics = () => setCurrentTab("Metrics");
+  const handleOpenSaveVersion = () => {
+    setCurrentTab("Playground");
+    setSaveCommitOpen(true);
+  };
 
   // const selectedVersion = useMemo(() => {
   //   return versions?.find(
@@ -641,46 +689,8 @@ const PromptActions = () => {
               </ShowComponent>
               <ShowComponent condition={!isGenerating}>
                 <RunPromptButton
-                  disabled={
-                    loadingPrompt ||
-                    currentTab === "Evaluation" ||
-                    currentTab === "Metrics" ||
-                    !RolePermission.PROMPTS[PERMISSIONS.UPDATE][userRole]
-                  }
-                  onClick={() => {
-                    if (buttonTooltip) {
-                      if (noModelIndex !== -1) {
-                        setOpenSelectModel(noModelIndex);
-                        trackEvent(Events.promptSelectModelClicked, {
-                          [PropertyName.promptId]: id,
-                          [PropertyName.type]: "system",
-                          [PropertyName.version]: selectedVersions?.map(
-                            (item) => item?.version,
-                          ),
-                        });
-                      } else if (!isVariablesDefined) {
-                        setVariableDrawerOpen(true);
-                      }
-                      return;
-                    }
-                    trackEvent(Events.promptRunPromptClicked, {
-                      [PropertyName.promptId]: id,
-                      [PropertyName.type]: "overall",
-                      [PropertyName.version]: selectedVersions?.map(
-                        (item) => item?.version,
-                      ),
-                    });
-                    if (
-                      !checkIfAudioModelHasAudioContent(modelConfig, prompts)
-                    ) {
-                      enqueueSnackbar(
-                        "Audio input is missing. Please add audio before running the prompt.",
-                        { variant: "error" },
-                      );
-                      return;
-                    }
-                    saveAndRun();
-                  }}
+                  disabled={isRunPromptDisabled}
+                  onClick={handleRunPrompt}
                 >
                   {" "}
                   <Typography variant="s1" fontWeight={"fontWeightMedium"}>
@@ -692,6 +702,20 @@ const PromptActions = () => {
           </ShowComponent>
         </Box>
       </Box>
+
+      <PromptOnboardingFocusPanel
+        blocker={buttonTooltip}
+        currentTab={currentTab}
+        isRunDisabled={isRunPromptDisabled}
+        mode={onboardingMode}
+        onOpenEvaluation={handleOpenEvaluation}
+        onOpenMetrics={handleOpenMetrics}
+        onOpenPlayground={handleOpenPlayground}
+        onOpenSaveVersion={handleOpenSaveVersion}
+        onOpenVersionHistory={() => setVersionHistoryOpen(true)}
+        onRunPrompt={handleRunPrompt}
+        source={onboardingSource}
+      />
 
       <Divider
         sx={{
