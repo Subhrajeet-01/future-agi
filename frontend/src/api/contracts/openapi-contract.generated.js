@@ -5,7 +5,7 @@
 export const OPENAPI_CONTRACT = Object.freeze({
   "generatedFrom": "api_contracts/openapi/swagger.json",
   "swaggerVersion": "2.0",
-  "endpointCount": 988,
+  "endpointCount": 989,
   "endpoints": {
     "/accounts/2fa/recovery-codes/": {
       "get": {
@@ -1572,6 +1572,40 @@ export const OPENAPI_CONTRACT = Object.freeze({
         "responses": {
           "200": {
             "$ref": "#/definitions/OnboardingLifecycleDigestReviewResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "401": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "default": {
+            "$ref": "#/definitions/ManagementAPIErrorResponse"
+          }
+        }
+      }
+    },
+    "/accounts/onboarding/lifecycle/digest-previews/promote/": {
+      "post": {
+        "operationId": "accounts_onboarding_lifecycle_digest-previews_promote_create",
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
+        "requestBody": {
+          "$ref": "#/definitions/OnboardingLifecycleDigestPromotionRequest"
+        },
+        "queryParameters": {},
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestPromotionResponse"
           },
           "400": {
             "$ref": "#/definitions/AccountsErrorResponse"
@@ -61836,6 +61870,55 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "OnboardingLifecycleDigestPromotionRequest": {
+      "required": [
+        "sources"
+      ],
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestPromotionSource"
+          }
+        },
+        "scope_type": {
+          "title": "Scope type",
+          "type": "string",
+          "enum": [
+            "user",
+            "workspace"
+          ],
+          "default": "user"
+        },
+        "dry_run": {
+          "title": "Dry run",
+          "type": "boolean",
+          "default": false
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string",
+          "maxLength": 180
+        }
+      }
+    },
+    "OnboardingLifecycleDigestPromotionResponse": {
+      "required": [
+        "status",
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean"
+        },
+        "result": {
+          "$ref": "#/definitions/OnboardingLifecycleDigestPromotionResult"
+        }
+      }
+    },
     "OnboardingLifecycleDigestReviewResponse": {
       "required": [
         "status",
@@ -85047,6 +85130,105 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "OnboardingLifecycleDigestPromotionSource": {
+      "required": [
+        "source_type",
+        "source_id"
+      ],
+      "type": "object",
+      "properties": {
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "enum": [
+            "evaluation_log",
+            "send_log"
+          ]
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "OnboardingLifecycleDigestPromotionResult": {
+      "required": [
+        "generated_at",
+        "environment",
+        "campaign_key",
+        "scope_type",
+        "dry_run",
+        "promoted_count",
+        "skipped_count",
+        "created_count",
+        "updated_count",
+        "entries",
+        "skipped"
+      ],
+      "type": "object",
+      "properties": {
+        "generated_at": {
+          "title": "Generated at",
+          "type": "string",
+          "format": "date-time"
+        },
+        "environment": {
+          "title": "Environment",
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_key": {
+          "title": "Campaign key",
+          "type": "string",
+          "minLength": 1
+        },
+        "scope_type": {
+          "title": "Scope type",
+          "type": "string",
+          "enum": [
+            "user",
+            "workspace"
+          ]
+        },
+        "dry_run": {
+          "title": "Dry run",
+          "type": "boolean"
+        },
+        "promoted_count": {
+          "title": "Promoted count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped_count": {
+          "title": "Skipped count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "created_count": {
+          "title": "Created count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_count": {
+          "title": "Updated count",
+          "type": "integer",
+          "minimum": 0
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestPromotionEntry"
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OnboardingLifecycleDigestPromotionSkipped"
+          }
+        }
+      }
+    },
     "OnboardingLifecycleDigestReviewResult": {
       "required": [
         "generated_at",
@@ -99024,6 +99206,112 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Primary traffic",
           "type": "number",
           "x-nullable": true
+        }
+      }
+    },
+    "OnboardingLifecycleDigestPromotionEntry": {
+      "required": [
+        "source_type",
+        "source_id",
+        "operation",
+        "scope_type",
+        "scope_value",
+        "user_id",
+        "workspace_id"
+      ],
+      "type": "object",
+      "properties": {
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "enum": [
+            "evaluation_log",
+            "send_log"
+          ]
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "allowlist_id": {
+          "title": "Allowlist id",
+          "type": "string",
+          "format": "uuid",
+          "x-nullable": true
+        },
+        "operation": {
+          "title": "Operation",
+          "type": "string",
+          "enum": [
+            "created",
+            "updated",
+            "would_create",
+            "would_update"
+          ]
+        },
+        "scope_type": {
+          "title": "Scope type",
+          "type": "string",
+          "enum": [
+            "user",
+            "workspace"
+          ]
+        },
+        "scope_value": {
+          "title": "Scope value",
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_group": {
+          "title": "Campaign group",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        },
+        "user_id": {
+          "title": "User id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "workspace_id": {
+          "title": "Workspace id",
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "OnboardingLifecycleDigestPromotionSkipped": {
+      "required": [
+        "source_type",
+        "source_id",
+        "reason"
+      ],
+      "type": "object",
+      "properties": {
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "enum": [
+            "evaluation_log",
+            "send_log"
+          ]
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "format": "uuid"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string",
+          "enum": [
+            "duplicate_source",
+            "duplicate_target",
+            "missing_digest_preview",
+            "not_found",
+            "unsupported_campaign"
+          ]
         }
       }
     },

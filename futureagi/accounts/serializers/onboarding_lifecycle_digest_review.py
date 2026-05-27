@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
 from accounts.models import NotificationDeliveryLog, OnboardingLifecycleSendLog
+from accounts.services.onboarding.lifecycle_digest_promotion import (
+    DIGEST_PROMOTION_SCOPE_TYPES,
+    DIGEST_PROMOTION_SOURCE_TYPES,
+    MAX_DIGEST_PROMOTION_SOURCES,
+)
 from accounts.services.onboarding.lifecycle_digest_review import (
     DIGEST_REVIEW_CAMPAIGNS,
     MAX_DIGEST_REVIEW_LIMIT,
@@ -116,3 +121,85 @@ class OnboardingLifecycleDigestReviewResultSerializer(serializers.Serializer):
 class OnboardingLifecycleDigestReviewResponseSerializer(serializers.Serializer):
     status = serializers.BooleanField()
     result = OnboardingLifecycleDigestReviewResultSerializer()
+
+
+class OnboardingLifecycleDigestPromotionSourceSerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(
+        choices=tuple((source, source) for source in DIGEST_PROMOTION_SOURCE_TYPES),
+    )
+    source_id = serializers.UUIDField()
+
+
+class OnboardingLifecycleDigestPromotionRequestSerializer(serializers.Serializer):
+    sources = OnboardingLifecycleDigestPromotionSourceSerializer(many=True)
+    scope_type = serializers.ChoiceField(
+        choices=tuple((scope, scope) for scope in DIGEST_PROMOTION_SCOPE_TYPES),
+        required=False,
+        default="user",
+    )
+    dry_run = serializers.BooleanField(required=False, default=False)
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=180)
+
+    def validate_sources(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one source is required.")
+        if len(value) > MAX_DIGEST_PROMOTION_SOURCES:
+            raise serializers.ValidationError(
+                f"At most {MAX_DIGEST_PROMOTION_SOURCES} sources are allowed."
+            )
+        return value
+
+
+class OnboardingLifecycleDigestPromotionEntrySerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(
+        choices=tuple((source, source) for source in DIGEST_PROMOTION_SOURCE_TYPES),
+    )
+    source_id = serializers.UUIDField()
+    allowlist_id = serializers.UUIDField(required=False, allow_null=True)
+    operation = serializers.ChoiceField(
+        choices=("created", "updated", "would_create", "would_update"),
+    )
+    scope_type = serializers.ChoiceField(
+        choices=tuple((scope, scope) for scope in DIGEST_PROMOTION_SCOPE_TYPES),
+    )
+    scope_value = serializers.CharField()
+    campaign_group = serializers.CharField(required=False, allow_null=True)
+    user_id = serializers.UUIDField()
+    workspace_id = serializers.UUIDField()
+
+
+class OnboardingLifecycleDigestPromotionSkippedSerializer(serializers.Serializer):
+    source_type = serializers.ChoiceField(
+        choices=tuple((source, source) for source in DIGEST_PROMOTION_SOURCE_TYPES),
+    )
+    source_id = serializers.UUIDField()
+    reason = serializers.ChoiceField(
+        choices=(
+            "duplicate_source",
+            "duplicate_target",
+            "missing_digest_preview",
+            "not_found",
+            "unsupported_campaign",
+        ),
+    )
+
+
+class OnboardingLifecycleDigestPromotionResultSerializer(serializers.Serializer):
+    generated_at = serializers.DateTimeField()
+    environment = serializers.CharField()
+    campaign_key = serializers.CharField()
+    scope_type = serializers.ChoiceField(
+        choices=tuple((scope, scope) for scope in DIGEST_PROMOTION_SCOPE_TYPES),
+    )
+    dry_run = serializers.BooleanField()
+    promoted_count = serializers.IntegerField(min_value=0)
+    skipped_count = serializers.IntegerField(min_value=0)
+    created_count = serializers.IntegerField(min_value=0)
+    updated_count = serializers.IntegerField(min_value=0)
+    entries = OnboardingLifecycleDigestPromotionEntrySerializer(many=True)
+    skipped = OnboardingLifecycleDigestPromotionSkippedSerializer(many=True)
+
+
+class OnboardingLifecycleDigestPromotionResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField()
+    result = OnboardingLifecycleDigestPromotionResultSerializer()

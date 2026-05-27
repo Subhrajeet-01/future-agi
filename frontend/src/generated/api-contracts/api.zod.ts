@@ -3820,6 +3820,68 @@ export const AccountsOnboardingLifecycleDigestPreviewsListResponse = zod.object(
 })
 
 
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateBodyScopeTypeDefault = `user`;
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateBodyDryRunDefault = false;
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateBodyReasonMax = 180;
+
+
+
+export const AccountsOnboardingLifecycleDigestPreviewsPromoteCreateBody = zod.object({
+  "sources": zod.array(zod.object({
+  "source_type": zod.enum(['evaluation_log', 'send_log']),
+  "source_id": zod.string().uuid()
+})),
+  "scope_type": zod.enum(['user', 'workspace']).default(accountsOnboardingLifecycleDigestPreviewsPromoteCreateBodyScopeTypeDefault),
+  "dry_run": zod.boolean().default(accountsOnboardingLifecycleDigestPreviewsPromoteCreateBodyDryRunDefault),
+  "reason": zod.string().max(accountsOnboardingLifecycleDigestPreviewsPromoteCreateBodyReasonMax).optional()
+})
+
+
+
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultPromotedCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultSkippedCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultCreatedCountMin = 0;
+
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultUpdatedCountMin = 0;
+
+
+
+
+
+export const AccountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse = zod.object({
+  "status": zod.boolean(),
+  "result": zod.object({
+  "generated_at": zod.string().datetime({"offset":true}),
+  "environment": zod.string().min(1),
+  "campaign_key": zod.string().min(1),
+  "scope_type": zod.enum(['user', 'workspace']),
+  "dry_run": zod.boolean(),
+  "promoted_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultPromotedCountMin),
+  "skipped_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultSkippedCountMin),
+  "created_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultCreatedCountMin),
+  "updated_count": zod.number().min(accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseResultUpdatedCountMin),
+  "entries": zod.array(zod.object({
+  "source_type": zod.enum(['evaluation_log', 'send_log']),
+  "source_id": zod.string().uuid(),
+  "allowlist_id": zod.string().uuid().optional(),
+  "operation": zod.enum(['created', 'updated', 'would_create', 'would_update']),
+  "scope_type": zod.enum(['user', 'workspace']),
+  "scope_value": zod.string().min(1),
+  "campaign_group": zod.string().min(1).optional(),
+  "user_id": zod.string().uuid(),
+  "workspace_id": zod.string().uuid()
+})),
+  "skipped": zod.array(zod.object({
+  "source_type": zod.enum(['evaluation_log', 'send_log']),
+  "source_id": zod.string().uuid(),
+  "reason": zod.enum(['duplicate_source', 'duplicate_target', 'missing_digest_preview', 'not_found', 'unsupported_campaign'])
+}))
+})
+})
+
+
 /**
  * GET is available to all authenticated members (read policy).
 PUT is admin-gated inline (Level.ADMIN+) rather than via a permission

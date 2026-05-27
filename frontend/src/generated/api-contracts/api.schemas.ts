@@ -2744,6 +2744,133 @@ export interface OnboardingLifecycleDigestReviewResponseApi {
   result: OnboardingLifecycleDigestReviewResultApi;
 }
 
+export type OnboardingLifecycleDigestPromotionRequestApiScopeType = typeof OnboardingLifecycleDigestPromotionRequestApiScopeType[keyof typeof OnboardingLifecycleDigestPromotionRequestApiScopeType];
+
+
+export const OnboardingLifecycleDigestPromotionRequestApiScopeType = {
+  user: 'user',
+  workspace: 'workspace',
+} as const;
+
+export type OnboardingLifecycleDigestPromotionSourceApiSourceType = typeof OnboardingLifecycleDigestPromotionSourceApiSourceType[keyof typeof OnboardingLifecycleDigestPromotionSourceApiSourceType];
+
+
+export const OnboardingLifecycleDigestPromotionSourceApiSourceType = {
+  evaluation_log: 'evaluation_log',
+  send_log: 'send_log',
+} as const;
+
+export interface OnboardingLifecycleDigestPromotionSourceApi {
+  source_type: OnboardingLifecycleDigestPromotionSourceApiSourceType;
+  source_id: string;
+}
+
+export interface OnboardingLifecycleDigestPromotionRequestApi {
+  sources: OnboardingLifecycleDigestPromotionSourceApi[];
+  scope_type?: OnboardingLifecycleDigestPromotionRequestApiScopeType;
+  dry_run?: boolean;
+  /** @maxLength 180 */
+  reason?: string;
+}
+
+export type OnboardingLifecycleDigestPromotionResultApiScopeType = typeof OnboardingLifecycleDigestPromotionResultApiScopeType[keyof typeof OnboardingLifecycleDigestPromotionResultApiScopeType];
+
+
+export const OnboardingLifecycleDigestPromotionResultApiScopeType = {
+  user: 'user',
+  workspace: 'workspace',
+} as const;
+
+export type OnboardingLifecycleDigestPromotionEntryApiSourceType = typeof OnboardingLifecycleDigestPromotionEntryApiSourceType[keyof typeof OnboardingLifecycleDigestPromotionEntryApiSourceType];
+
+
+export const OnboardingLifecycleDigestPromotionEntryApiSourceType = {
+  evaluation_log: 'evaluation_log',
+  send_log: 'send_log',
+} as const;
+
+export type OnboardingLifecycleDigestPromotionEntryApiOperation = typeof OnboardingLifecycleDigestPromotionEntryApiOperation[keyof typeof OnboardingLifecycleDigestPromotionEntryApiOperation];
+
+
+export const OnboardingLifecycleDigestPromotionEntryApiOperation = {
+  created: 'created',
+  updated: 'updated',
+  would_create: 'would_create',
+  would_update: 'would_update',
+} as const;
+
+export type OnboardingLifecycleDigestPromotionEntryApiScopeType = typeof OnboardingLifecycleDigestPromotionEntryApiScopeType[keyof typeof OnboardingLifecycleDigestPromotionEntryApiScopeType];
+
+
+export const OnboardingLifecycleDigestPromotionEntryApiScopeType = {
+  user: 'user',
+  workspace: 'workspace',
+} as const;
+
+export interface OnboardingLifecycleDigestPromotionEntryApi {
+  source_type: OnboardingLifecycleDigestPromotionEntryApiSourceType;
+  source_id: string;
+  allowlist_id?: string;
+  operation: OnboardingLifecycleDigestPromotionEntryApiOperation;
+  scope_type: OnboardingLifecycleDigestPromotionEntryApiScopeType;
+  /** @minLength 1 */
+  scope_value: string;
+  /** @minLength 1 */
+  campaign_group?: string;
+  user_id: string;
+  workspace_id: string;
+}
+
+export type OnboardingLifecycleDigestPromotionSkippedApiSourceType = typeof OnboardingLifecycleDigestPromotionSkippedApiSourceType[keyof typeof OnboardingLifecycleDigestPromotionSkippedApiSourceType];
+
+
+export const OnboardingLifecycleDigestPromotionSkippedApiSourceType = {
+  evaluation_log: 'evaluation_log',
+  send_log: 'send_log',
+} as const;
+
+export type OnboardingLifecycleDigestPromotionSkippedApiReason = typeof OnboardingLifecycleDigestPromotionSkippedApiReason[keyof typeof OnboardingLifecycleDigestPromotionSkippedApiReason];
+
+
+export const OnboardingLifecycleDigestPromotionSkippedApiReason = {
+  duplicate_source: 'duplicate_source',
+  duplicate_target: 'duplicate_target',
+  missing_digest_preview: 'missing_digest_preview',
+  not_found: 'not_found',
+  unsupported_campaign: 'unsupported_campaign',
+} as const;
+
+export interface OnboardingLifecycleDigestPromotionSkippedApi {
+  source_type: OnboardingLifecycleDigestPromotionSkippedApiSourceType;
+  source_id: string;
+  reason: OnboardingLifecycleDigestPromotionSkippedApiReason;
+}
+
+export interface OnboardingLifecycleDigestPromotionResultApi {
+  generated_at: string;
+  /** @minLength 1 */
+  environment: string;
+  /** @minLength 1 */
+  campaign_key: string;
+  scope_type: OnboardingLifecycleDigestPromotionResultApiScopeType;
+  dry_run: boolean;
+  /** @minimum 0 */
+  promoted_count: number;
+  /** @minimum 0 */
+  skipped_count: number;
+  /** @minimum 0 */
+  created_count: number;
+  /** @minimum 0 */
+  updated_count: number;
+  entries: OnboardingLifecycleDigestPromotionEntryApi[];
+  skipped: OnboardingLifecycleDigestPromotionSkippedApi[];
+}
+
+export interface OnboardingLifecycleDigestPromotionResponseApi {
+  status: boolean;
+  result: OnboardingLifecycleDigestPromotionResultApi;
+}
+
 export interface OrgTwoFactorPolicyResponseApi {
   require_2fa: boolean;
   require_2fa_grace_period_days: number;

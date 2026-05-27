@@ -7,6 +7,7 @@ from accounts.models import (
     NotificationDeliveryLog,
     NotificationPreference,
     OnboardingLifecycleEvaluationLog,
+    OnboardingLifecycleSendAllowlist,
     OnboardingLifecycleSendLog,
 )
 from accounts.services.onboarding.lifecycle_registry import lifecycle_campaign_by_key
@@ -81,7 +82,11 @@ def _evaluation_log(organization, workspace, user, *, now, preview=None):
             "primary_path": "observe",
         },
         registry_snapshot=campaign,
-        metadata={"digest_preview": preview or _safe_preview(workspace, now=now)},
+        metadata={
+            "digest_preview": _safe_preview(workspace, now=now)
+            if preview is None
+            else preview
+        },
     )
 
 
@@ -190,3 +195,114 @@ def test_digest_preview_review_filters_campaign_and_skips_missing_preview(
     result = response.json()["result"]
     assert result["count"] == 1
     assert result["items"][0]["campaign_key"] == "daily_quality_open_actions"
+
+
+@pytest.mark.django_db
+def test_digest_preview_promotion_creates_reviewed_user_allowlist(
+    auth_client,
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    evaluation_log = _evaluation_log(organization, workspace, user, now=now)
+
+    response = auth_client.post(
+        "/accounts/onboarding/lifecycle/digest-previews/promote/",
+        {
+            "sources": [
+                {
+                    "source_type": "evaluation_log",
+                    "source_id": str(evaluation_log.id),
+                }
+            ],
+            "scope_type": "user",
+            "reason": "Reviewed internal digest candidate",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["promoted_count"] == 1
+    assert result["created_count"] == 1
+    assert result["skipped_count"] == 0
+    assert result["entries"][0]["operation"] == "created"
+    allowlist = OnboardingLifecycleSendAllowlist.no_workspace_objects.get(
+        scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
+        scope_value=str(user.id),
+        campaign_group=evaluation_log.campaign_group,
+        environment="local",
+    )
+    assert allowlist.enabled is True
+    assert allowlist.created_by == user
+    assert "Reviewed internal digest candidate" in allowlist.reason
+    assert str(evaluation_log.id) in allowlist.reason
+
+
+@pytest.mark.django_db
+def test_digest_preview_promotion_dry_run_skips_unreviewable_sources(
+    auth_client,
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    missing_preview_log = _evaluation_log(
+        organization,
+        workspace,
+        user,
+        now=now,
+        preview={},
+    )
+    campaign = lifecycle_campaign_by_key("welcome_choose_goal")
+    unsupported_log = OnboardingLifecycleEvaluationLog.no_workspace_objects.create(
+        run_id="00000000-0000-0000-0000-000000000203",
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        campaign_key=campaign["campaign_key"],
+        campaign_group=campaign["campaign_group"],
+        template_key=campaign["template_key"],
+        template_version=campaign["template_version"],
+        activation_stage="choose_goal",
+        primary_path="observe",
+        target_action_id=campaign["target_action_id"],
+        target_success_event=campaign["target_success_event"],
+        target_url="/dashboard/home?onboarding=choose-goal",
+        status=OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE,
+        eligible_at=now - timedelta(minutes=20),
+        evaluated_at=now - timedelta(minutes=10),
+        activation_state_snapshot={"stage": "choose_goal"},
+        registry_snapshot=campaign,
+        metadata={"digest_preview": _safe_preview(workspace, now=now)},
+    )
+
+    response = auth_client.post(
+        "/accounts/onboarding/lifecycle/digest-previews/promote/",
+        {
+            "sources": [
+                {
+                    "source_type": "evaluation_log",
+                    "source_id": str(missing_preview_log.id),
+                },
+                {
+                    "source_type": "evaluation_log",
+                    "source_id": str(unsupported_log.id),
+                },
+            ],
+            "dry_run": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["dry_run"] is True
+    assert result["promoted_count"] == 0
+    assert result["created_count"] == 0
+    assert {item["reason"] for item in result["skipped"]} == {
+        "missing_digest_preview",
+        "unsupported_campaign",
+    }
+    assert not OnboardingLifecycleSendAllowlist.no_workspace_objects.exists()

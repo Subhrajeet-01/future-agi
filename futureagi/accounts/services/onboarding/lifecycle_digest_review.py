@@ -65,7 +65,7 @@ def _safe_action(action):
     }
 
 
-def _safe_digest_preview(preview, *, workspace_id=None):
+def safe_digest_preview_from_metadata(preview, *, workspace_id=None):
     if not isinstance(preview, dict):
         return None
     actions = []
@@ -206,14 +206,14 @@ def digest_preview_review_payload(
     delivery_logs = _delivery_payloads_for_send_logs(send_logs)
     items = []
     for log in evaluation_logs:
-        preview = _safe_digest_preview(
+        preview = safe_digest_preview_from_metadata(
             (log.metadata or {}).get("digest_preview"),
             workspace_id=log.workspace_id,
         )
         if preview:
             items.append(_evaluation_item(log, preview))
     for log in send_logs:
-        preview = _safe_digest_preview(
+        preview = safe_digest_preview_from_metadata(
             (log.metadata or {}).get("digest_preview"),
             workspace_id=log.workspace_id or log.evaluation_log.workspace_id,
         )

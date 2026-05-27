@@ -18,6 +18,7 @@ from accounts.views.onboarding import (
 )
 from accounts.views.onboarding_lifecycle_clicks import OnboardingLifecycleClickView
 from accounts.views.onboarding_lifecycle_digest_review import (
+    OnboardingLifecycleDigestPreviewPromotionView,
     OnboardingLifecycleDigestPreviewReviewView,
 )
 from accounts.views.onboarding_lifecycle_preferences import (
@@ -184,6 +185,11 @@ user_urls = [
         "onboarding/lifecycle/digest-previews/",
         OnboardingLifecycleDigestPreviewReviewView.as_view(),
         name="onboarding-lifecycle-digest-previews",
+    ),
+    path(
+        "onboarding/lifecycle/digest-previews/promote/",
+        OnboardingLifecycleDigestPreviewPromotionView.as_view(),
+        name="onboarding-lifecycle-digest-preview-promote",
     ),
     path(
         "onboarding/lifecycle/unsubscribe/",

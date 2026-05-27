@@ -761,6 +761,8 @@ import type {
   ObservationSpanApi,
   ObserveGraphDataRequestApi,
   ObserveGraphDataResponseApi,
+  OnboardingLifecycleDigestPromotionRequestApi,
+  OnboardingLifecycleDigestPromotionResponseApi,
   OnboardingLifecycleDigestReviewResponseApi,
   OperationConfigResponseApi,
   OptimiserAnalysisRefreshResponseApi,
@@ -4338,6 +4340,72 @@ export const accountsOnboardingLifecycleDigestPreviewsList = async (params?: Acc
     method: 'GET'
 
 
+  }
+);}
+
+
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse200 = {
+  data: OnboardingLifecycleDigestPromotionResponseApi
+  status: 200
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse400 = {
+  data: AccountsErrorResponseApi
+  status: 400
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse401 = {
+  data: AccountsErrorResponseApi
+  status: 401
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse403 = {
+  data: AccountsErrorResponseApi
+  status: 403
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse404 = {
+  data: AccountsErrorResponseApi
+  status: 404
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse500 = {
+  data: AccountsErrorResponseApi
+  status: 500
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseDefault = {
+  data: ManagementAPIErrorResponseApi
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 404 | 500>
+}
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseSuccess = (accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse200) & {
+  headers: Headers;
+};
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseError = (accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse400 | accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse401 | accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse403 | accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse404 | accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse500 | accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseDefault) & {
+  headers: Headers;
+};
+
+export type accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse = (accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseSuccess | accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponseError)
+
+export const getAccountsOnboardingLifecycleDigestPreviewsPromoteCreateUrl = () => {
+
+
+
+
+  return `/accounts/onboarding/lifecycle/digest-previews/promote/`
+}
+
+export const accountsOnboardingLifecycleDigestPreviewsPromoteCreate = async (onboardingLifecycleDigestPromotionRequestApi: OnboardingLifecycleDigestPromotionRequestApi, options?: RequestInit): Promise<accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse> => {
+
+  return apiMutator<accountsOnboardingLifecycleDigestPreviewsPromoteCreateResponse>(getAccountsOnboardingLifecycleDigestPreviewsPromoteCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      onboardingLifecycleDigestPromotionRequestApi,)
   }
 );}
 
