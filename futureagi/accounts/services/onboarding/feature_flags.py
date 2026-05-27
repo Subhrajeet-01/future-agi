@@ -14,6 +14,8 @@ ONBOARDING_FLAG_NAMES = (
     "onboarding_agent_route_modes",
     "onboarding_gateway_path",
     "onboarding_gateway_route_modes",
+    "onboarding_eval_path",
+    "onboarding_eval_route_modes",
     "onboarding_lifecycle_email_dry_run",
     "onboarding_email_welcome_enabled",
     "onboarding_email_first_action_recovery_enabled",
@@ -26,6 +28,8 @@ ONBOARDING_FLAG_NAMES = (
     "onboarding_email_agent",
     "onboarding_email_gateway_enabled",
     "onboarding_email_gateway",
+    "onboarding_email_eval",
+    "onboarding_eval_notifications",
     "onboarding_lifecycle_send_enabled",
 )
 

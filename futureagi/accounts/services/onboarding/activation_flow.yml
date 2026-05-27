@@ -89,7 +89,7 @@ paths:
   evals:
     label: Evaluate quality
     description: Create datasets, scorers, and failure review loops.
-    first_action_id:
+    first_action_id: create_eval_dataset
     requires_permission: evals:write
   dashboards:
     label: Build quality dashboards
@@ -407,6 +407,83 @@ actions:
     cta_label: Open gateway
     priority: 20
     target_path: gateway
+    fallback_route_key: get_started
+  create_eval_dataset:
+    kind: setup
+    title: Create eval source
+    description: Add the first dataset or trace source for the eval loop.
+    route_key: eval_create_data
+    cta_label: Add source
+    priority: 100
+    estimated_minutes: 3
+    requires_permission: evals:write
+    completion_event: eval_dataset_created
+    target_path: evals
+    fallback_route_key: eval_list
+  add_eval_scorer:
+    kind: improve
+    title: Add eval scorer
+    description: Add the metric that decides whether the output is good.
+    route_key: eval_add_scorer
+    cta_label: Add scorer
+    priority: 100
+    estimated_minutes: 3
+    requires_permission: evals:write
+    completion_event: eval_scorer_created
+    target_path: evals
+    fallback_route_key: eval_list
+  run_eval:
+    kind: send_signal
+    title: Run eval
+    description: Run the eval once before reviewing the result.
+    route_key: eval_run_first
+    cta_label: Run eval
+    priority: 100
+    estimated_minutes: 3
+    requires_permission: evals:write
+    completion_event: eval_run_completed
+    target_path: evals
+    fallback_route_key: eval_list
+  review_eval_failures:
+    kind: review
+    title: Review eval result
+    description: Inspect failures or summary before moving the loop forward.
+    route_key: eval_review_failures
+    cta_label: Review result
+    priority: 100
+    estimated_minutes: 4
+    completion_event: eval_failures_reviewed
+    target_path: evals
+    fallback_route_key: eval_list
+  fix_eval_source:
+    kind: adjacent_loop
+    title: Fix the source
+    description: Use the failure review to update the source or expected behavior.
+    route_key: eval_next_loop
+    cta_label: Fix source
+    priority: 95
+    estimated_minutes: 5
+    requires_permission: evals:write
+    completion_event: eval_failure_action_created
+    target_path: evals
+    fallback_route_key: eval_review_failures
+  open_eval_usage:
+    kind: review
+    title: Open eval results
+    description: Review eval usage, failures, and quality trends.
+    route_key: eval_review_failures
+    cta_label: Open results
+    priority: 80
+    target_path: evals
+    fallback_route_key: eval_list
+  open_evals:
+    kind: fallback
+    title: Open evaluations
+    description: Open the evaluations workspace.
+    route_key: eval_list
+    cta_label: Open evaluations
+    priority: 20
+    target_path: evals
     fallback_route_key: get_started
   create_observe_project:
     kind: setup
@@ -1025,6 +1102,15 @@ stages:
       description: Keep reviewing calls against the success criteria.
     next: []
   create_eval_dataset:
+    progress:
+      build: selected
+      test: not_started
+      observe: available
+      ship: available
+      improve: available
+    recommended_action: create_eval_dataset
+    fallback_action: open_evals
+    requires_write: true
     copy:
       eyebrow: Eval dataset
       title: Create a dataset
@@ -1032,6 +1118,15 @@ stages:
     next:
       - add_eval_scorer
   add_eval_scorer:
+    progress:
+      build: complete
+      test: not_started
+      observe: available
+      ship: available
+      improve: in_progress
+    recommended_action: add_eval_scorer
+    fallback_action: open_evals
+    requires_write: true
     copy:
       eyebrow: Eval scorer
       title: Add a scorer
@@ -1039,6 +1134,15 @@ stages:
     next:
       - run_eval
   run_eval:
+    progress:
+      build: complete
+      test: in_progress
+      observe: available
+      ship: available
+      improve: in_progress
+    recommended_action: run_eval
+    fallback_action: open_evals
+    requires_write: true
     copy:
       eyebrow: Eval run
       title: Run an eval
@@ -1046,6 +1150,15 @@ stages:
     next:
       - review_eval_failures
   review_eval_failures:
+    progress:
+      build: complete
+      test: complete
+      observe: in_progress
+      ship: available
+      improve: available
+    recommended_action: review_eval_failures
+    fallback_action: open_evals
+    requires_write: false
     copy:
       eyebrow: Eval failures
       title: Review failures
@@ -1053,6 +1166,15 @@ stages:
     next:
       - eval_next_loop
   eval_next_loop:
+    progress:
+      build: complete
+      test: complete
+      observe: complete
+      ship: available
+      improve: selected
+    recommended_action: fix_eval_source
+    fallback_action: open_eval_usage
+    requires_write: true
     copy:
       eyebrow: Eval loop
       title: Continue the eval loop
@@ -1106,6 +1228,10 @@ stage_rules:
                   - context_equals:
                       primary_path: gateway
                   - flag_enabled: onboarding_gateway_path
+              - all:
+                  - context_equals:
+                      primary_path: evals
+                  - flag_enabled: onboarding_eval_path
   - stage: daily_review
     when:
       all:
@@ -1251,6 +1377,37 @@ stage_rules:
     when:
       context_equals:
         primary_path: gateway
+  - stage: activated
+    when:
+      all:
+        - context_equals:
+            primary_path: evals
+        - signal: eval_first_loop_completed
+  - stage: review_eval_failures
+    when:
+      all:
+        - context_equals:
+            primary_path: evals
+        - signal: eval_has_completed_run
+        - signal_not: eval_has_review
+  - stage: run_eval
+    when:
+      all:
+        - context_equals:
+            primary_path: evals
+        - signal: eval_has_scorer
+        - signal_not: eval_has_completed_run
+  - stage: add_eval_scorer
+    when:
+      all:
+        - context_equals:
+            primary_path: evals
+        - signal: eval_has_source
+        - signal_not: eval_has_scorer
+  - stage: create_eval_dataset
+    when:
+      context_equals:
+        primary_path: evals
   - stage: connect_observability
     when:
       signal_not: observe_project_exists
@@ -1337,7 +1494,19 @@ activation_events:
     - prompt_version_created
     - prompt_comparison_completed
     - dataset_example_added
+    - eval_dataset_created
     - eval_scorer_created
+    - eval_run_started
+    - eval_run_completed
+    - eval_failures_reviewed
+    - eval_failure_action_created
+    - eval_group_created
+    - onboarding_eval_source_selected
+    - onboarding_eval_route_focus_viewed
+    - onboarding_eval_run_clicked
+    - onboarding_eval_failure_detail_opened
+    - onboarding_eval_source_fix_cta_clicked
+    - onboarding_eval_sample_viewed
     - prompt_version_promoted
     - agent_created
     - agent_scenario_created
@@ -1374,3 +1543,6 @@ activation_events:
     graph_execution_completed: agent_prototype_run_completed
     gateway_request_succeeded: gateway_request_seen
     gateway_request_reviewed: gateway_log_opened
+    evaluation_created: eval_scorer_created
+    evaluation_run_completed: eval_run_completed
+    eval_result_reviewed: eval_failures_reviewed

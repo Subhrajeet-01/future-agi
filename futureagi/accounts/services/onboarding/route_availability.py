@@ -66,6 +66,12 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     gateway_path_enabled = bool(flags.get("onboarding_gateway_path"))
     gateway_request_id = signals.gateway_request_id
     gateway_policy_route = signals.gateway_policy_route or "budget"
+    eval_route_modes_enabled = bool(flags.get("onboarding_eval_route_modes"))
+    eval_path_enabled = bool(flags.get("onboarding_eval_path"))
+    eval_source_type = signals.eval_source_type
+    eval_source_id = signals.eval_source_id
+    eval_scorer_template_id = signals.eval_scorer_template_id
+    eval_run_id = signals.eval_run_id
 
     prompt_workbench_href = "/dashboard/workbench/all?source=onboarding"
     prompt_create_href = (
@@ -127,6 +133,13 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
                 is_available=False,
                 reason=reason or "route_not_implemented",
             )
+        if requires_write and not can_write:
+            return route_entry(href, is_available=False, reason="missing_permission")
+        return route_entry(href, is_available=is_available, reason=reason)
+
+    def eval_route(href, *, requires_write=True, is_available=True, reason=None):
+        if not eval_path_enabled:
+            return route_entry(href, is_available=False, reason="feature_disabled")
         if requires_write and not can_write:
             return route_entry(href, is_available=False, reason="missing_permission")
         return route_entry(href, is_available=is_available, reason=reason)
@@ -220,6 +233,78 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
         gateway_policy_params["request_id"] = gateway_request_id
     gateway_policy_href = _with_query(gateway_policy_path, gateway_policy_params)
 
+    eval_list_href = "/dashboard/evaluations"
+    eval_create_data_href = (
+        "/dashboard/evaluations/create?source=onboarding&step=data"
+        if eval_route_modes_enabled
+        else "/dashboard/evaluations/create"
+    )
+    eval_scorer_params = {}
+    if eval_route_modes_enabled:
+        eval_scorer_params.update(
+            {
+                "source": "onboarding",
+                "step": "scorer",
+                "source_type": eval_source_type,
+                "source_id": eval_source_id,
+            }
+        )
+    eval_add_scorer_href = _with_query(
+        "/dashboard/evaluations/create",
+        eval_scorer_params,
+    )
+    eval_run_base = (
+        f"/dashboard/evaluations/create/{eval_scorer_template_id}"
+        if eval_scorer_template_id
+        else "/dashboard/evaluations/create"
+    )
+    eval_run_params = {}
+    if eval_route_modes_enabled:
+        eval_run_params.update(
+            {
+                "source": "onboarding",
+                "step": "run",
+                "source_type": eval_source_type,
+                "source_id": eval_source_id,
+            }
+        )
+    eval_run_href = _with_query(eval_run_base, eval_run_params)
+    eval_review_base = (
+        f"/dashboard/evaluations/{eval_scorer_template_id}"
+        if eval_scorer_template_id
+        else "/dashboard/evaluations/usage"
+    )
+    eval_review_params = {}
+    if eval_route_modes_enabled:
+        eval_review_params.update(
+            {
+                "tab": "usage",
+                "source": "onboarding",
+                "step": "review",
+                "run_id": eval_run_id,
+            }
+        )
+    eval_review_href = _with_query(eval_review_base, eval_review_params)
+    if eval_source_type == "dataset" and eval_source_id:
+        eval_source_fix_base = f"/dashboard/develop/{eval_source_id}"
+    elif eval_source_type == "trace_project" and eval_source_id:
+        eval_source_fix_base = f"/dashboard/observe/{eval_source_id}"
+    else:
+        eval_source_fix_base = "/dashboard/evaluations/usage"
+    eval_source_fix_params = {}
+    if eval_route_modes_enabled:
+        eval_source_fix_params.update(
+            {
+                "source": "onboarding",
+                "step": "fix-eval-failure",
+                "run_id": eval_run_id,
+            }
+        )
+    eval_source_fix_href = _with_query(
+        eval_source_fix_base,
+        eval_source_fix_params,
+    )
+
     routes = {
         "home": route_entry("/dashboard/home"),
         "get_started": route_entry("/dashboard/get-started"),
@@ -308,6 +393,29 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
             reason="missing_id",
         ),
         "gateway_policy": gateway_route(gateway_policy_href),
+        "eval_list": _available_if(eval_path_enabled, eval_list_href),
+        "eval_create_data": eval_route(eval_create_data_href),
+        "eval_add_scorer": eval_route(
+            eval_add_scorer_href,
+            is_available=bool(signals.eval_has_source),
+            reason="missing_id",
+        ),
+        "eval_run_first": eval_route(
+            eval_run_href,
+            is_available=bool(signals.eval_has_scorer),
+            reason="missing_id",
+        ),
+        "eval_review_failures": eval_route(
+            eval_review_href,
+            requires_write=False,
+            is_available=bool(signals.eval_has_completed_run),
+            reason="missing_id",
+        ),
+        "eval_next_loop": eval_route(
+            eval_source_fix_href,
+            is_available=bool(signals.eval_has_review and signals.eval_has_failures),
+            reason="missing_id",
+        ),
     }
 
     for path in PRODUCT_PATHS:
@@ -321,6 +429,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
                 or (path == "prompt" and prompt_path_enabled)
                 or (path == "agent" and agent_path_enabled)
                 or (path == "gateway" and gateway_path_enabled)
+                or (path == "evals" and eval_path_enabled)
             )
             and not sample_hidden,
             reason=(

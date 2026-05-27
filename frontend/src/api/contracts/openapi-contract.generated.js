@@ -42444,6 +42444,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "graph_execution",
             "test_execution",
             "call_execution",
+            "dataset",
+            "eval",
+            "eval_group",
+            "eval_run",
+            "eval_scorer",
+            "eval_task",
             "gateway",
             "gateway_provider",
             "gateway_key",
@@ -75194,7 +75200,19 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "prompt_version_created",
             "prompt_comparison_completed",
             "dataset_example_added",
+            "eval_dataset_created",
             "eval_scorer_created",
+            "eval_run_started",
+            "eval_run_completed",
+            "eval_failures_reviewed",
+            "eval_failure_action_created",
+            "eval_group_created",
+            "onboarding_eval_source_selected",
+            "onboarding_eval_route_focus_viewed",
+            "onboarding_eval_run_clicked",
+            "onboarding_eval_failure_detail_opened",
+            "onboarding_eval_source_fix_cta_clicked",
+            "onboarding_eval_sample_viewed",
             "prompt_version_promoted",
             "agent_created",
             "agent_scenario_created",
@@ -75453,6 +75471,9 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "agent": {
           "$ref": "#/definitions/ActivationAgentState"
+        },
+        "eval": {
+          "$ref": "#/definitions/ActivationEvalState"
         },
         "gateway": {
           "$ref": "#/definitions/ActivationGatewayState"
@@ -91729,6 +91750,186 @@ export const OPENAPI_CONTRACT = Object.freeze({
       },
       "x-nullable": true
     },
+    "ActivationEvalState": {
+      "required": [
+        "stage"
+      ],
+      "type": "object",
+      "properties": {
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "x-nullable": true
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "source_name": {
+          "title": "Source name",
+          "type": "string",
+          "x-nullable": true
+        },
+        "scorer_id": {
+          "title": "Scorer id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "scorer_template_id": {
+          "title": "Scorer template id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "scorer_name": {
+          "title": "Scorer name",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_group_id": {
+          "title": "Eval group id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "run_id": {
+          "title": "Run id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "run_status": {
+          "title": "Run status",
+          "type": "string",
+          "x-nullable": true
+        },
+        "run_completed_at": {
+          "title": "Run completed at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "failure_count": {
+          "title": "Failure count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "reviewed_at": {
+          "title": "Reviewed at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "failure_action_at": {
+          "title": "Failure action at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string",
+          "enum": [
+            "feature_disabled",
+            "workspace_missing",
+            "permission_limited",
+            "choose_goal",
+            "selected_path_unavailable",
+            "activated",
+            "daily_review",
+            "connect_observability",
+            "waiting_for_first_trace",
+            "waiting_for_first_trace_sample_available",
+            "review_first_trace",
+            "create_trace_evaluator",
+            "review_sample_signal",
+            "start_prompt",
+            "run_prompt_test",
+            "save_prompt_version",
+            "compare_prompt_versions",
+            "prompt_next_loop",
+            "create_agent",
+            "run_agent_scenario",
+            "review_agent_trace",
+            "save_agent_eval",
+            "agent_create_eval",
+            "create_trace_dashboard",
+            "create_trace_alert",
+            "configure_gateway_provider",
+            "create_gateway_key",
+            "run_gateway_request",
+            "review_gateway_log",
+            "fix_gateway_failure",
+            "add_gateway_policy",
+            "create_voice_agent",
+            "run_voice_test_call",
+            "review_voice_call",
+            "add_voice_success_criteria",
+            "voice_monitor_calls",
+            "create_eval_dataset",
+            "add_eval_scorer",
+            "run_eval",
+            "review_eval_failures",
+            "eval_next_loop",
+            "open_sample_project",
+            "connect_real_data"
+          ]
+        },
+        "has_source": {
+          "title": "Has source",
+          "type": "boolean",
+          "default": false
+        },
+        "has_scorer": {
+          "title": "Has scorer",
+          "type": "boolean",
+          "default": false
+        },
+        "has_completed_run": {
+          "title": "Has completed run",
+          "type": "boolean",
+          "default": false
+        },
+        "has_failures": {
+          "title": "Has failures",
+          "type": "boolean",
+          "default": false
+        },
+        "has_review": {
+          "title": "Has review",
+          "type": "boolean",
+          "default": false
+        },
+        "has_failure_action": {
+          "title": "Has failure action",
+          "type": "boolean",
+          "default": false
+        },
+        "is_sample": {
+          "title": "Is sample",
+          "type": "boolean",
+          "default": false
+        },
+        "sample_source_count": {
+          "title": "Sample source count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "permission_limited": {
+          "title": "Permission limited",
+          "type": "boolean",
+          "default": false
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "x-nullable": true
+    },
     "ActivationGatewayState": {
       "required": [
         "gateway_available",
@@ -92307,6 +92508,138 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "type": "integer",
           "default": 0,
           "minimum": 0
+        },
+        "eval_source_count": {
+          "title": "Eval source count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "eval_source_type": {
+          "title": "Eval source type",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_source_id": {
+          "title": "Eval source id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_source_name": {
+          "title": "Eval source name",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_scorer_count": {
+          "title": "Eval scorer count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "eval_scorer_id": {
+          "title": "Eval scorer id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_scorer_template_id": {
+          "title": "Eval scorer template id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_scorer_name": {
+          "title": "Eval scorer name",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_group_count": {
+          "title": "Eval group count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "eval_group_id": {
+          "title": "Eval group id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_run_count": {
+          "title": "Eval run count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "eval_run_id": {
+          "title": "Eval run id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_run_status": {
+          "title": "Eval run status",
+          "type": "string",
+          "x-nullable": true
+        },
+        "eval_run_completed_at": {
+          "title": "Eval run completed at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "eval_failure_count": {
+          "title": "Eval failure count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "eval_has_source": {
+          "title": "Eval has source",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_has_scorer": {
+          "title": "Eval has scorer",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_has_completed_run": {
+          "title": "Eval has completed run",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_has_failures": {
+          "title": "Eval has failures",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_has_review": {
+          "title": "Eval has review",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_has_failure_action": {
+          "title": "Eval has failure action",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_first_loop_completed": {
+          "title": "Eval first loop completed",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_is_sample_only": {
+          "title": "Eval is sample only",
+          "type": "boolean",
+          "default": false
+        },
+        "eval_sample_source_count": {
+          "title": "Eval sample source count",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "eval_permission_limited": {
+          "title": "Eval permission limited",
+          "type": "boolean",
+          "default": false
         },
         "prompt_templates": {
           "title": "Prompt templates",

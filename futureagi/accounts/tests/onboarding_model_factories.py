@@ -15,7 +15,9 @@ from agentcc.models.guardrail_policy import AgentccGuardrailPolicy
 from agentcc.models.provider_credential import AgentccProviderCredential
 from agentcc.models.routing_policy import AgentccRoutingPolicy
 from model_hub.models.ai_model import AIModel
-from model_hub.models.evals_metric import EvalTemplate
+from model_hub.models.choices import DatasetSourceChoices
+from model_hub.models.develop_dataset import Dataset
+from model_hub.models.evals_metric import EvalTemplate, UserEvalMetric
 from model_hub.models.run_prompt import (
     PromptEvalConfig,
     PromptTemplate,
@@ -62,6 +64,52 @@ def create_custom_eval(*, organization, workspace, project, name=None):
         name=name or f"quality-{uuid.uuid4().hex[:8]}",
         eval_template=template,
         project=project,
+    )
+
+
+def create_eval_dataset(
+    *,
+    organization,
+    workspace,
+    user=None,
+    name=None,
+    source=DatasetSourceChoices.BUILD.value,
+):
+    return Dataset.no_workspace_objects.create(
+        name=name or f"Eval dataset {uuid.uuid4().hex[:8]}",
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        source=source,
+        model_type=AIModel.ModelTypes.GENERATIVE_LLM,
+        column_order=[],
+        column_config={},
+        dataset_config={},
+    )
+
+
+def create_user_eval_metric(
+    *,
+    organization,
+    workspace,
+    dataset,
+    user=None,
+    name=None,
+):
+    eval_template = EvalTemplate.no_workspace_objects.create(
+        name=name or f"eval-quality-{uuid.uuid4().hex[:8]}",
+        organization=organization,
+        workspace=workspace,
+    )
+    return UserEvalMetric.no_workspace_objects.create(
+        name=name or f"eval-quality-{uuid.uuid4().hex[:8]}",
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        template=eval_template,
+        dataset=dataset,
+        config={"mapping": {}, "config": {}},
+        show_in_sidebar=True,
     )
 
 

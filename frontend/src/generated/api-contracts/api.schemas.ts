@@ -315,6 +315,12 @@ export const ActivationEventRequestApiArtifactType = {
   graph_execution: 'graph_execution',
   test_execution: 'test_execution',
   call_execution: 'call_execution',
+  dataset: 'dataset',
+  eval: 'eval',
+  eval_group: 'eval_group',
+  eval_run: 'eval_run',
+  eval_scorer: 'eval_scorer',
+  eval_task: 'eval_task',
   gateway: 'gateway',
   gateway_provider: 'gateway_provider',
   gateway_key: 'gateway_key',
@@ -395,7 +401,19 @@ export const ActivationEventResultApiEventName = {
   prompt_version_created: 'prompt_version_created',
   prompt_comparison_completed: 'prompt_comparison_completed',
   dataset_example_added: 'dataset_example_added',
+  eval_dataset_created: 'eval_dataset_created',
   eval_scorer_created: 'eval_scorer_created',
+  eval_run_started: 'eval_run_started',
+  eval_run_completed: 'eval_run_completed',
+  eval_failures_reviewed: 'eval_failures_reviewed',
+  eval_failure_action_created: 'eval_failure_action_created',
+  eval_group_created: 'eval_group_created',
+  onboarding_eval_source_selected: 'onboarding_eval_source_selected',
+  onboarding_eval_route_focus_viewed: 'onboarding_eval_route_focus_viewed',
+  onboarding_eval_run_clicked: 'onboarding_eval_run_clicked',
+  onboarding_eval_failure_detail_opened: 'onboarding_eval_failure_detail_opened',
+  onboarding_eval_source_fix_cta_clicked: 'onboarding_eval_source_fix_cta_clicked',
+  onboarding_eval_sample_viewed: 'onboarding_eval_sample_viewed',
   prompt_version_promoted: 'prompt_version_promoted',
   agent_created: 'agent_created',
   agent_scenario_created: 'agent_scenario_created',
@@ -654,6 +672,37 @@ export interface ActivationSignalsApi {
   evals?: number;
   /** @minimum 0 */
   eval_runs?: number;
+  /** @minimum 0 */
+  eval_source_count?: number;
+  eval_source_type?: string;
+  eval_source_id?: string;
+  eval_source_name?: string;
+  /** @minimum 0 */
+  eval_scorer_count?: number;
+  eval_scorer_id?: string;
+  eval_scorer_template_id?: string;
+  eval_scorer_name?: string;
+  /** @minimum 0 */
+  eval_group_count?: number;
+  eval_group_id?: string;
+  /** @minimum 0 */
+  eval_run_count?: number;
+  eval_run_id?: string;
+  eval_run_status?: string;
+  eval_run_completed_at?: string;
+  /** @minimum 0 */
+  eval_failure_count?: number;
+  eval_has_source?: boolean;
+  eval_has_scorer?: boolean;
+  eval_has_completed_run?: boolean;
+  eval_has_failures?: boolean;
+  eval_has_review?: boolean;
+  eval_has_failure_action?: boolean;
+  eval_first_loop_completed?: boolean;
+  eval_is_sample_only?: boolean;
+  /** @minimum 0 */
+  eval_sample_source_count?: number;
+  eval_permission_limited?: boolean;
   /** @minimum 0 */
   prompt_templates?: number;
   /** @minimum 0 */
@@ -1027,6 +1076,84 @@ export interface ActivationAgentStateApi {
   /** @minimum 0 */
   sample_agent_count?: number;
   voice_feature_unavailable?: boolean;
+  permission_limited?: boolean;
+  diagnostics?: string[];
+}
+
+export type ActivationEvalStateApiStage = typeof ActivationEvalStateApiStage[keyof typeof ActivationEvalStateApiStage];
+
+
+export const ActivationEvalStateApiStage = {
+  feature_disabled: 'feature_disabled',
+  workspace_missing: 'workspace_missing',
+  permission_limited: 'permission_limited',
+  choose_goal: 'choose_goal',
+  selected_path_unavailable: 'selected_path_unavailable',
+  activated: 'activated',
+  daily_review: 'daily_review',
+  connect_observability: 'connect_observability',
+  waiting_for_first_trace: 'waiting_for_first_trace',
+  waiting_for_first_trace_sample_available: 'waiting_for_first_trace_sample_available',
+  review_first_trace: 'review_first_trace',
+  create_trace_evaluator: 'create_trace_evaluator',
+  review_sample_signal: 'review_sample_signal',
+  start_prompt: 'start_prompt',
+  run_prompt_test: 'run_prompt_test',
+  save_prompt_version: 'save_prompt_version',
+  compare_prompt_versions: 'compare_prompt_versions',
+  prompt_next_loop: 'prompt_next_loop',
+  create_agent: 'create_agent',
+  run_agent_scenario: 'run_agent_scenario',
+  review_agent_trace: 'review_agent_trace',
+  save_agent_eval: 'save_agent_eval',
+  agent_create_eval: 'agent_create_eval',
+  create_trace_dashboard: 'create_trace_dashboard',
+  create_trace_alert: 'create_trace_alert',
+  configure_gateway_provider: 'configure_gateway_provider',
+  create_gateway_key: 'create_gateway_key',
+  run_gateway_request: 'run_gateway_request',
+  review_gateway_log: 'review_gateway_log',
+  fix_gateway_failure: 'fix_gateway_failure',
+  add_gateway_policy: 'add_gateway_policy',
+  create_voice_agent: 'create_voice_agent',
+  run_voice_test_call: 'run_voice_test_call',
+  review_voice_call: 'review_voice_call',
+  add_voice_success_criteria: 'add_voice_success_criteria',
+  voice_monitor_calls: 'voice_monitor_calls',
+  create_eval_dataset: 'create_eval_dataset',
+  add_eval_scorer: 'add_eval_scorer',
+  run_eval: 'run_eval',
+  review_eval_failures: 'review_eval_failures',
+  eval_next_loop: 'eval_next_loop',
+  open_sample_project: 'open_sample_project',
+  connect_real_data: 'connect_real_data',
+} as const;
+
+export interface ActivationEvalStateApi {
+  source_type?: string;
+  source_id?: string;
+  source_name?: string;
+  scorer_id?: string;
+  scorer_template_id?: string;
+  scorer_name?: string;
+  eval_group_id?: string;
+  run_id?: string;
+  run_status?: string;
+  run_completed_at?: string;
+  /** @minimum 0 */
+  failure_count?: number;
+  reviewed_at?: string;
+  failure_action_at?: string;
+  stage: ActivationEvalStateApiStage;
+  has_source?: boolean;
+  has_scorer?: boolean;
+  has_completed_run?: boolean;
+  has_failures?: boolean;
+  has_review?: boolean;
+  has_failure_action?: boolean;
+  is_sample?: boolean;
+  /** @minimum 0 */
+  sample_source_count?: number;
   permission_limited?: boolean;
   diagnostics?: string[];
 }
@@ -1552,6 +1679,7 @@ export interface ActivationStateResponseApi {
   sample_project: SampleProjectStateApi;
   prompt?: ActivationPromptStateApi;
   agent?: ActivationAgentStateApi;
+  eval?: ActivationEvalStateApi;
   gateway?: ActivationGatewayStateApi;
   lifecycle?: LifecyclePreviewApi;
   daily_quality?: DailyQualityStateApi;

@@ -106,6 +106,67 @@ class ActivationSignalsSerializer(serializers.Serializer):
     datasets = serializers.IntegerField(min_value=0, default=0)
     evals = serializers.IntegerField(min_value=0, default=0)
     eval_runs = serializers.IntegerField(min_value=0, default=0)
+    eval_source_count = serializers.IntegerField(min_value=0, default=0)
+    eval_source_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_source_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_source_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_scorer_count = serializers.IntegerField(min_value=0, default=0)
+    eval_scorer_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_scorer_template_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_scorer_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_group_count = serializers.IntegerField(min_value=0, default=0)
+    eval_group_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_run_count = serializers.IntegerField(min_value=0, default=0)
+    eval_run_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_run_status = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_run_completed_at = serializers.DateTimeField(required=False, allow_null=True)
+    eval_failure_count = serializers.IntegerField(min_value=0, default=0)
+    eval_has_source = serializers.BooleanField(default=False)
+    eval_has_scorer = serializers.BooleanField(default=False)
+    eval_has_completed_run = serializers.BooleanField(default=False)
+    eval_has_failures = serializers.BooleanField(default=False)
+    eval_has_review = serializers.BooleanField(default=False)
+    eval_has_failure_action = serializers.BooleanField(default=False)
+    eval_first_loop_completed = serializers.BooleanField(default=False)
+    eval_is_sample_only = serializers.BooleanField(default=False)
+    eval_sample_source_count = serializers.IntegerField(min_value=0, default=0)
+    eval_permission_limited = serializers.BooleanField(default=False)
     prompt_templates = serializers.IntegerField(min_value=0, default=0)
     prompt_versions = serializers.IntegerField(min_value=0, default=0)
     prompt_comparisons = serializers.IntegerField(min_value=0, default=0)
@@ -684,6 +745,81 @@ class ActivationGatewayStateSerializer(serializers.Serializer):
         return attrs
 
 
+class ActivationEvalStateSerializer(serializers.Serializer):
+    source_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    source_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    source_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    scorer_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    scorer_template_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    scorer_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    eval_group_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    run_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    run_status = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    run_completed_at = serializers.DateTimeField(required=False, allow_null=True)
+    failure_count = serializers.IntegerField(min_value=0, default=0)
+    reviewed_at = serializers.DateTimeField(required=False, allow_null=True)
+    failure_action_at = serializers.DateTimeField(required=False, allow_null=True)
+    stage = serializers.ChoiceField(choices=choices(ACTIVATION_STAGES))
+    has_source = serializers.BooleanField(default=False)
+    has_scorer = serializers.BooleanField(default=False)
+    has_completed_run = serializers.BooleanField(default=False)
+    has_failures = serializers.BooleanField(default=False)
+    has_review = serializers.BooleanField(default=False)
+    has_failure_action = serializers.BooleanField(default=False)
+    is_sample = serializers.BooleanField(default=False)
+    sample_source_count = serializers.IntegerField(min_value=0, default=0)
+    permission_limited = serializers.BooleanField(default=False)
+    diagnostics = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+    )
+
+    def validate(self, attrs):
+        if attrs["is_sample"] and attrs.get("has_source"):
+            raise serializers.ValidationError(
+                "Sample eval source state cannot count as a real source."
+            )
+        if attrs.get("has_review") and not attrs.get("has_completed_run"):
+            raise serializers.ValidationError("Eval review requires a completed run.")
+        return attrs
+
+
 class LifecycleEligibilitySerializer(serializers.Serializer):
     eligible = serializers.BooleanField()
     suppressed = serializers.BooleanField()
@@ -1019,6 +1155,7 @@ class ActivationStateResponseSerializer(serializers.Serializer):
     sample_project = SampleProjectStateSerializer()
     prompt = ActivationPromptStateSerializer(required=False, allow_null=True)
     agent = ActivationAgentStateSerializer(required=False, allow_null=True)
+    eval = ActivationEvalStateSerializer(required=False, allow_null=True)
     gateway = ActivationGatewayStateSerializer(required=False, allow_null=True)
     lifecycle = LifecyclePreviewSerializer(required=False, allow_null=True)
     daily_quality = DailyQualityStateSerializer(required=False, allow_null=True)
@@ -1222,6 +1359,12 @@ class ActivationEventRequestSerializer(serializers.Serializer):
                 "graph_execution",
                 "test_execution",
                 "call_execution",
+                "dataset",
+                "eval",
+                "eval_group",
+                "eval_run",
+                "eval_scorer",
+                "eval_task",
                 "gateway",
                 "gateway_provider",
                 "gateway_key",

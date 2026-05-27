@@ -11,6 +11,10 @@ from accounts.services.onboarding.agent_signals import (
     AgentOnboardingSignals,
     collect_agent_onboarding_signals,
 )
+from accounts.services.onboarding.eval_signals import (
+    EvalOnboardingSignals,
+    collect_eval_onboarding_signals,
+)
 from accounts.services.onboarding.gateway_signals import (
     GatewayOnboardingSignals,
     collect_gateway_onboarding_signals,
@@ -28,6 +32,32 @@ class OnboardingSignals:
     datasets: int = 0
     evals: int = 0
     eval_runs: int = 0
+    eval_source_count: int = 0
+    eval_source_type: str | None = None
+    eval_source_id: str | None = None
+    eval_source_name: str | None = None
+    eval_scorer_count: int = 0
+    eval_scorer_id: str | None = None
+    eval_scorer_template_id: str | None = None
+    eval_scorer_name: str | None = None
+    eval_group_count: int = 0
+    eval_group_id: str | None = None
+    eval_run_count: int = 0
+    eval_run_id: str | None = None
+    eval_run_status: str | None = None
+    eval_run_completed_at: object | None = None
+    eval_failure_count: int = 0
+    eval_has_source: bool = False
+    eval_has_scorer: bool = False
+    eval_has_completed_run: bool = False
+    eval_has_failures: bool = False
+    eval_has_review: bool = False
+    eval_has_failure_action: bool = False
+    eval_first_loop_completed: bool = False
+    eval_is_sample_only: bool = False
+    eval_sample_source_count: int = 0
+    eval_permission_limited: bool = False
+    eval_signals: EvalOnboardingSignals = field(default_factory=EvalOnboardingSignals)
     prompt_templates: int = 0
     prompt_versions: int = 0
     prompt_comparisons: int = 0
@@ -146,6 +176,31 @@ class OnboardingSignals:
             "datasets": self.datasets,
             "evals": self.evals,
             "eval_runs": self.eval_runs,
+            "eval_source_count": self.eval_source_count,
+            "eval_source_type": self.eval_source_type,
+            "eval_source_id": self.eval_source_id,
+            "eval_source_name": self.eval_source_name,
+            "eval_scorer_count": self.eval_scorer_count,
+            "eval_scorer_id": self.eval_scorer_id,
+            "eval_scorer_template_id": self.eval_scorer_template_id,
+            "eval_scorer_name": self.eval_scorer_name,
+            "eval_group_count": self.eval_group_count,
+            "eval_group_id": self.eval_group_id,
+            "eval_run_count": self.eval_run_count,
+            "eval_run_id": self.eval_run_id,
+            "eval_run_status": self.eval_run_status,
+            "eval_run_completed_at": self.eval_run_completed_at,
+            "eval_failure_count": self.eval_failure_count,
+            "eval_has_source": self.eval_has_source,
+            "eval_has_scorer": self.eval_has_scorer,
+            "eval_has_completed_run": self.eval_has_completed_run,
+            "eval_has_failures": self.eval_has_failures,
+            "eval_has_review": self.eval_has_review,
+            "eval_has_failure_action": self.eval_has_failure_action,
+            "eval_first_loop_completed": self.eval_first_loop_completed,
+            "eval_is_sample_only": self.eval_is_sample_only,
+            "eval_sample_source_count": self.eval_sample_source_count,
+            "eval_permission_limited": self.eval_permission_limited,
             "prompt_templates": self.prompt_templates,
             "prompt_versions": self.prompt_versions,
             "prompt_comparisons": self.prompt_comparisons,
@@ -373,6 +428,11 @@ def collect_onboarding_signals(*, user, organization, workspace):
         organization=organization,
         workspace=workspace,
     )
+    eval_signals = collect_eval_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
     gateway_signals = collect_gateway_onboarding_signals(
         user=user,
         organization=organization,
@@ -382,9 +442,37 @@ def collect_onboarding_signals(*, user, organization, workspace):
     return OnboardingSignals(
         first_checks=first_checks,
         provider_keys=_as_count(first_checks.get("keys")),
-        datasets=_as_count(first_checks.get("dataset")),
-        evals=_as_count(first_checks.get("evaluation")),
-        eval_runs=_as_count(first_checks.get("experiment")),
+        datasets=max(_as_count(first_checks.get("dataset")), eval_signals.source_count),
+        evals=max(_as_count(first_checks.get("evaluation")), eval_signals.scorer_count),
+        eval_runs=max(
+            _as_count(first_checks.get("experiment")), eval_signals.run_count
+        ),
+        eval_source_count=eval_signals.source_count,
+        eval_source_type=eval_signals.source_type,
+        eval_source_id=eval_signals.source_id,
+        eval_source_name=eval_signals.source_name,
+        eval_scorer_count=eval_signals.scorer_count,
+        eval_scorer_id=eval_signals.scorer_id,
+        eval_scorer_template_id=eval_signals.scorer_template_id,
+        eval_scorer_name=eval_signals.scorer_name,
+        eval_group_count=eval_signals.eval_group_count,
+        eval_group_id=eval_signals.eval_group_id,
+        eval_run_count=eval_signals.run_count,
+        eval_run_id=eval_signals.run_id,
+        eval_run_status=eval_signals.run_status,
+        eval_run_completed_at=eval_signals.run_completed_at,
+        eval_failure_count=eval_signals.failure_count,
+        eval_has_source=eval_signals.has_source,
+        eval_has_scorer=eval_signals.has_scorer,
+        eval_has_completed_run=eval_signals.has_completed_run,
+        eval_has_failures=eval_signals.has_failures,
+        eval_has_review=eval_signals.has_review,
+        eval_has_failure_action=eval_signals.has_failure_action,
+        eval_first_loop_completed=eval_signals.first_loop_completed,
+        eval_is_sample_only=eval_signals.is_sample_only,
+        eval_sample_source_count=eval_signals.sample_source_count,
+        eval_permission_limited=eval_signals.permission_limited,
+        eval_signals=eval_signals,
         prompt_templates=prompt_signals.prompt_count,
         prompt_versions=prompt_signals.committed_version_count
         + prompt_signals.draft_version_count,

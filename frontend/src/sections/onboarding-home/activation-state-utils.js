@@ -157,6 +157,42 @@ const normalizeSignals = (raw = {}) => ({
   datasets: raw.datasets ?? 0,
   evals: raw.evals ?? 0,
   evalRuns: raw.eval_runs ?? raw.evalRuns ?? 0,
+  evalSourceCount: raw.eval_source_count ?? raw.evalSourceCount ?? 0,
+  evalSourceType: raw.eval_source_type ?? raw.evalSourceType ?? null,
+  evalSourceId: raw.eval_source_id ?? raw.evalSourceId ?? null,
+  evalSourceName: raw.eval_source_name ?? raw.evalSourceName ?? null,
+  evalScorerCount: raw.eval_scorer_count ?? raw.evalScorerCount ?? 0,
+  evalScorerId: raw.eval_scorer_id ?? raw.evalScorerId ?? null,
+  evalScorerTemplateId:
+    raw.eval_scorer_template_id ?? raw.evalScorerTemplateId ?? null,
+  evalScorerName: raw.eval_scorer_name ?? raw.evalScorerName ?? null,
+  evalGroupCount: raw.eval_group_count ?? raw.evalGroupCount ?? 0,
+  evalGroupId: raw.eval_group_id ?? raw.evalGroupId ?? null,
+  evalRunCount: raw.eval_run_count ?? raw.evalRunCount ?? 0,
+  evalRunId: raw.eval_run_id ?? raw.evalRunId ?? null,
+  evalRunStatus: raw.eval_run_status ?? raw.evalRunStatus ?? null,
+  evalRunCompletedAt:
+    raw.eval_run_completed_at ?? raw.evalRunCompletedAt ?? null,
+  evalFailureCount: raw.eval_failure_count ?? raw.evalFailureCount ?? 0,
+  evalHasSource: Boolean(raw.eval_has_source ?? raw.evalHasSource),
+  evalHasScorer: Boolean(raw.eval_has_scorer ?? raw.evalHasScorer),
+  evalHasCompletedRun: Boolean(
+    raw.eval_has_completed_run ?? raw.evalHasCompletedRun,
+  ),
+  evalHasFailures: Boolean(raw.eval_has_failures ?? raw.evalHasFailures),
+  evalHasReview: Boolean(raw.eval_has_review ?? raw.evalHasReview),
+  evalHasFailureAction: Boolean(
+    raw.eval_has_failure_action ?? raw.evalHasFailureAction,
+  ),
+  evalFirstLoopCompleted: Boolean(
+    raw.eval_first_loop_completed ?? raw.evalFirstLoopCompleted,
+  ),
+  evalIsSampleOnly: Boolean(raw.eval_is_sample_only ?? raw.evalIsSampleOnly),
+  evalSampleSourceCount:
+    raw.eval_sample_source_count ?? raw.evalSampleSourceCount ?? 0,
+  evalPermissionLimited: Boolean(
+    raw.eval_permission_limited ?? raw.evalPermissionLimited,
+  ),
   promptTemplates: raw.prompt_templates ?? raw.promptTemplates ?? 0,
   promptVersions: raw.prompt_versions ?? raw.promptVersions ?? 0,
   promptComparisons: raw.prompt_comparisons ?? raw.promptComparisons ?? 0,
@@ -498,6 +534,40 @@ const normalizeGatewayState = (raw) => {
   };
 };
 
+const normalizeEvalState = (raw) => {
+  if (!raw) return null;
+  const isSample = Boolean(raw.is_sample ?? raw.isSample);
+  if (isSample && Boolean(raw.has_source ?? raw.hasSource)) {
+    throw new Error("Sample eval source state cannot count as a real source");
+  }
+  return {
+    sourceType: raw.source_type ?? raw.sourceType ?? null,
+    sourceId: raw.source_id ?? raw.sourceId ?? null,
+    sourceName: raw.source_name ?? raw.sourceName ?? null,
+    scorerId: raw.scorer_id ?? raw.scorerId ?? null,
+    scorerTemplateId: raw.scorer_template_id ?? raw.scorerTemplateId ?? null,
+    scorerName: raw.scorer_name ?? raw.scorerName ?? null,
+    evalGroupId: raw.eval_group_id ?? raw.evalGroupId ?? null,
+    runId: raw.run_id ?? raw.runId ?? null,
+    runStatus: raw.run_status ?? raw.runStatus ?? null,
+    runCompletedAt: raw.run_completed_at ?? raw.runCompletedAt ?? null,
+    failureCount: raw.failure_count ?? raw.failureCount ?? 0,
+    reviewedAt: raw.reviewed_at ?? raw.reviewedAt ?? null,
+    failureActionAt: raw.failure_action_at ?? raw.failureActionAt ?? null,
+    stage: raw.stage ?? null,
+    hasSource: Boolean(raw.has_source ?? raw.hasSource),
+    hasScorer: Boolean(raw.has_scorer ?? raw.hasScorer),
+    hasCompletedRun: Boolean(raw.has_completed_run ?? raw.hasCompletedRun),
+    hasFailures: Boolean(raw.has_failures ?? raw.hasFailures),
+    hasReview: Boolean(raw.has_review ?? raw.hasReview),
+    hasFailureAction: Boolean(raw.has_failure_action ?? raw.hasFailureAction),
+    isSample,
+    sampleSourceCount: raw.sample_source_count ?? raw.sampleSourceCount ?? 0,
+    permissionLimited: Boolean(raw.permission_limited ?? raw.permissionLimited),
+    diagnostics: raw.diagnostics ?? [],
+  };
+};
+
 export const hasSampleRoute = (sampleProject) =>
   Boolean(
     sampleProject &&
@@ -780,6 +850,7 @@ export const normalizeActivationState = (raw) => {
     sampleProject: normalizeSampleProject(raw.sample_project),
     prompt: normalizePromptState(raw.prompt),
     agent: normalizeAgentState(raw.agent),
+    eval: normalizeEvalState(raw.eval),
     gateway: normalizeGatewayState(raw.gateway),
     dailyQuality: normalizeDailyQuality(raw.daily_quality ?? raw.dailyQuality),
     emailEligibility: normalizeEmailEligibility(raw.email_eligibility),
