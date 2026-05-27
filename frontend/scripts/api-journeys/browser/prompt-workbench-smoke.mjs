@@ -1,36 +1,56 @@
 /* eslint-disable no-console */
+import { execFile as execFileCallback } from "node:child_process";
 import { createRequire } from "node:module";
 import process from "node:process";
+import { promisify } from "node:util";
 import {
   apiPath,
+  asArray,
   assert,
   createAuthenticatedContext,
   isUuid,
+  requireMutations,
 } from "../lib/api-client.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
+const execFile = promisify(execFileCallback);
 
 const APP_BASE = process.env.APP_BASE || "http://127.0.0.1:3032";
 const FOLDER_SCREENSHOT_PATH = "/tmp/prompt-workbench-folder-smoke.png";
+const FOLDER_ACTION_MENU_SCREENSHOT_PATH =
+  "/tmp/prompt-workbench-folder-action-menu-smoke.png";
+const FOLDER_RENAMED_SCREENSHOT_PATH =
+  "/tmp/prompt-workbench-folder-renamed-smoke.png";
+const FOLDER_DELETED_SCREENSHOT_PATH =
+  "/tmp/prompt-workbench-folder-deleted-smoke.png";
 const DETAIL_SCREENSHOT_PATH = "/tmp/prompt-workbench-detail-smoke.png";
 const FAILURE_SCREENSHOT_PATH = "/tmp/prompt-workbench-smoke-failure.png";
 
 async function main() {
+  requireMutations();
   const auth = await createAuthenticatedContext();
   const suffix = shortRunId(auth.runId);
   const folderName = `ui_prompt_folder_${suffix}`;
+  const renamedFolderName = `ui_prompt_folder_renamed_${suffix}`;
   const promptName = `ui prompt workbench ${suffix}`;
   const promptText = `Hello {{customer}} from ${auth.runId}`;
   let folderId = null;
   let promptId = null;
   let browser = null;
   let caughtError = null;
+  let uiDeletedFolder = false;
+  let deleteAudit = null;
+  let hardCleanup = null;
 
   const apiFailures = [];
   const pageErrors = [];
   const promptRequests = [];
-  const evidence = { folder_name: folderName, prompt_name: promptName };
+  const evidence = {
+    folder_name: folderName,
+    folder_renamed_name: renamedFolderName,
+    prompt_name: promptName,
+  };
 
   try {
     browser = await puppeteer.launch({
@@ -114,6 +134,41 @@ async function main() {
     await waitForPath(page, `/dashboard/workbench/${folderId}`);
     await waitForVisibleText(page, folderName, { exact: true });
 
+    await clickFolderActionMenu(page, { folderId, folderName });
+    await waitForVisibleText(page, "Rename", { exact: true });
+    await waitForVisibleText(page, "Delete", { exact: true });
+    await page.screenshot({
+      path: FOLDER_ACTION_MENU_SCREENSHOT_PATH,
+      fullPage: true,
+    });
+    evidence.folder_action_menu_screenshot = FOLDER_ACTION_MENU_SCREENSHOT_PATH;
+
+    await clickVisibleMenuItem(page, "Rename");
+    await waitForVisibleText(page, "Rename folder", { exact: true });
+    await waitForResponseDuring(
+      page,
+      "UI folder rename",
+      (response) =>
+        response.url().includes(`/model-hub/prompt-folders/${folderId}/`) &&
+        response.request().method() === "PATCH" &&
+        response.status() < 400,
+      async () => {
+        await typeIntoDialogInput(page, renamedFolderName);
+        await clickDialogButton(page, "Save");
+      },
+    );
+    await waitForNoVisibleText(page, folderName, { exact: true });
+    await waitForVisibleText(page, renamedFolderName);
+    await assertPromptFolderReadback(auth.client, {
+      folderId,
+      name: renamedFolderName,
+    });
+    await page.screenshot({
+      path: FOLDER_RENAMED_SCREENSHOT_PATH,
+      fullPage: true,
+    });
+    evidence.folder_renamed_screenshot = FOLDER_RENAMED_SCREENSHOT_PATH;
+
     promptId = await createWorkbenchPrompt(auth.client, {
       folderId,
       name: promptName,
@@ -140,7 +195,7 @@ async function main() {
           waitUntil: "domcontentloaded",
         }),
     );
-    await waitForVisibleText(page, folderName, { exact: true });
+    await waitForVisibleText(page, renamedFolderName);
     await waitForVisibleText(page, promptName, { exact: true });
     await waitForVisibleText(page, "No.of prompts: 1", { exact: true });
     await page.screenshot({ path: FOLDER_SCREENSHOT_PATH, fullPage: true });
@@ -165,7 +220,7 @@ async function main() {
       () => typeSearch(page, promptName),
     );
     await waitForVisibleText(page, promptName, { exact: true });
-    await waitForVisibleText(page, folderName, { exact: true });
+    await waitForVisibleText(page, renamedFolderName);
 
     await waitForResponseDuring(
       page,
@@ -184,6 +239,99 @@ async function main() {
     await waitForNoVisibleText(page, "Invalid Date");
     await page.screenshot({ path: DETAIL_SCREENSHOT_PATH, fullPage: true });
     evidence.detail_screenshot = DETAIL_SCREENSHOT_PATH;
+
+    await waitForResponseDuring(
+      page,
+      "folder prompt list before delete",
+      (response) => {
+        if (
+          !response.url().includes("/model-hub/prompt-executions/") ||
+          response.status() >= 400
+        ) {
+          return false;
+        }
+        const url = new URL(response.url());
+        return url.searchParams.get("prompt_folder") === folderId;
+      },
+      () =>
+        page.goto(`${APP_BASE}/dashboard/workbench/${folderId}`, {
+          waitUntil: "domcontentloaded",
+        }),
+    );
+    await waitForVisibleText(page, renamedFolderName);
+    await waitForVisibleText(page, promptName, { exact: true });
+    await clickFolderActionMenu(page, {
+      folderId,
+      folderName: renamedFolderName,
+    });
+    await clickVisibleMenuItem(page, "Delete");
+    await waitForVisibleText(page, "Delete folder", { exact: true });
+    await waitForVisibleText(page, renamedFolderName);
+    await waitForResponseDuring(
+      page,
+      "UI folder delete",
+      (response) =>
+        response.url().includes(`/model-hub/prompt-folders/${folderId}/`) &&
+        response.request().method() === "DELETE" &&
+        response.status() < 400,
+      () => clickDialogButton(page, "Delete"),
+    );
+    uiDeletedFolder = true;
+    await waitForPath(page, "/dashboard/workbench/all");
+    await waitForNoVisibleText(page, renamedFolderName);
+    await assertPromptFolderAbsentFromList(auth.client, {
+      folderId,
+      name: renamedFolderName,
+    });
+    deleteAudit = await auditDeletedPromptFolderDb({
+      folderId,
+      promptId,
+      organizationId: auth.organizationId,
+      workspaceId: auth.workspaceId,
+    });
+    assert(
+      Number(deleteAudit.folder_row_count) === 1 &&
+        deleteAudit.folder_deleted_at_set === true,
+      `Folder delete audit failed: ${JSON.stringify(deleteAudit)}`,
+    );
+    assert(
+      Number(deleteAudit.prompt_row_count) === 1 &&
+        deleteAudit.prompt_deleted_at_set === true &&
+        Number(deleteAudit.version_row_count) > 0 &&
+        deleteAudit.version_deleted_at_set === true,
+      `Folder delete cascade audit failed: ${JSON.stringify(deleteAudit)}`,
+    );
+    hardCleanup = await hardDeletePromptWorkbenchFixtureDb({
+      folderId,
+      promptId,
+      organizationId: auth.organizationId,
+      workspaceId: auth.workspaceId,
+    });
+    assert(
+      Number(hardCleanup.remaining_folder_count) === 0 &&
+        Number(hardCleanup.remaining_prompt_count) === 0 &&
+        Number(hardCleanup.remaining_version_count) === 0,
+      `Hard cleanup left prompt workbench rows behind: ${JSON.stringify(hardCleanup)}`,
+    );
+    await page.screenshot({
+      path: FOLDER_DELETED_SCREENSHOT_PATH,
+      fullPage: true,
+    });
+    evidence.folder_deleted_screenshot = FOLDER_DELETED_SCREENSHOT_PATH;
+    evidence.ui_folder_deleted = true;
+    evidence.folder_deleted_at_set = deleteAudit.folder_deleted_at_set;
+    evidence.cascade_prompt_deleted_at_set = deleteAudit.prompt_deleted_at_set;
+    evidence.cascade_versions_deleted_at_set =
+      deleteAudit.version_deleted_at_set;
+    evidence.hard_cleanup_remaining_folder_count = Number(
+      hardCleanup.remaining_folder_count,
+    );
+    evidence.hard_cleanup_remaining_prompt_count = Number(
+      hardCleanup.remaining_prompt_count,
+    );
+    evidence.hard_cleanup_remaining_version_count = Number(
+      hardCleanup.remaining_version_count,
+    );
 
     assert(apiFailures.length === 0, `API failures: ${apiFailures.join("; ")}`);
     assert(pageErrors.length === 0, `Page errors: ${pageErrors.join("; ")}`);
@@ -231,12 +379,28 @@ async function main() {
     }
   } finally {
     if (browser) await browser.close();
-    await cleanupPromptTemplate(auth.client, promptId).catch((error) => {
-      caughtError = appendCleanupError(caughtError, error);
-    });
-    await cleanupPromptFolder(auth.client, folderId).catch((error) => {
-      caughtError = appendCleanupError(caughtError, error);
-    });
+    if (!hardCleanup) {
+      await cleanupPromptTemplate(auth.client, promptId).catch((error) => {
+        caughtError = appendCleanupError(caughtError, error);
+      });
+      await cleanupPromptFolder(auth.client, folderId).catch((error) => {
+        caughtError = appendCleanupError(caughtError, error);
+      });
+      if (folderId || promptId) {
+        await hardDeletePromptWorkbenchFixtureDb({
+          folderId,
+          promptId,
+          organizationId: auth.organizationId,
+          workspaceId: auth.workspaceId,
+        }).catch((error) => {
+          caughtError = appendCleanupError(caughtError, error);
+        });
+      }
+    } else if (!uiDeletedFolder) {
+      await cleanupPromptFolder(auth.client, folderId).catch((error) => {
+        caughtError = appendCleanupError(caughtError, error);
+      });
+    }
   }
 
   if (caughtError) throw caughtError;
@@ -306,6 +470,177 @@ async function cleanupPromptFolder(client, folderId) {
     },
   );
   console.error(`cleanup prompt workbench folder: ${folderId}`);
+}
+
+async function assertPromptFolderReadback(client, { folderId, name }) {
+  const folder = unwrapResult(
+    await client.get(
+      apiPath("/model-hub/prompt-folders/{id}/", { id: folderId }),
+    ),
+  );
+  assert(
+    folder?.id === folderId,
+    "Prompt folder detail returned the wrong id.",
+  );
+  assert(
+    folder?.name === name,
+    `Prompt folder detail returned ${folder?.name} instead of ${name}.`,
+  );
+}
+
+async function assertPromptFolderAbsentFromList(client, { folderId, name }) {
+  const folders = asArray(
+    await client.get(apiPath("/model-hub/prompt-folders/")),
+  );
+  assert(
+    !folders.some((folder) => folder?.id === folderId || folder?.name === name),
+    "Deleted prompt folder was still visible in the folder list.",
+  );
+}
+
+async function auditDeletedPromptFolderDb({
+  folderId,
+  promptId,
+  organizationId,
+  workspaceId,
+}) {
+  assert(isUuid(folderId), "Folder delete audit requires a folder UUID.");
+  assert(isUuid(promptId), "Folder delete audit requires a prompt UUID.");
+  const sql = `
+WITH target_folder AS (
+  SELECT id, deleted, deleted_at
+  FROM model_hub_prompt_folder
+  WHERE id = ${sqlUuid(folderId)}
+    AND organization_id = ${sqlUuid(organizationId)}
+    AND workspace_id = ${sqlUuid(workspaceId)}
+),
+target_prompts AS (
+  SELECT id, deleted, deleted_at
+  FROM model_hub_prompttemplate
+  WHERE id = ${sqlUuid(promptId)}
+    AND prompt_folder_id = ${sqlUuid(folderId)}
+    AND organization_id = ${sqlUuid(organizationId)}
+    AND workspace_id = ${sqlUuid(workspaceId)}
+),
+target_versions AS (
+  SELECT id, deleted, deleted_at
+  FROM model_hub_promptversion
+  WHERE original_template_id IN (SELECT id FROM target_prompts)
+)
+SELECT json_build_object(
+  'folder_row_count', (SELECT count(*) FROM target_folder),
+  'folder_deleted_at_set', COALESCE((
+    SELECT bool_and(deleted = true AND deleted_at IS NOT NULL)
+    FROM target_folder
+  ), false),
+  'prompt_row_count', (SELECT count(*) FROM target_prompts),
+  'prompt_deleted_at_set', COALESCE((
+    SELECT bool_and(deleted = true AND deleted_at IS NOT NULL)
+    FROM target_prompts
+  ), false),
+  'version_row_count', (SELECT count(*) FROM target_versions),
+  'version_deleted_at_set', COALESCE((
+    SELECT bool_and(deleted = true AND deleted_at IS NOT NULL)
+    FROM target_versions
+  ), false)
+);
+`;
+  return runPostgresJson(sql);
+}
+
+async function hardDeletePromptWorkbenchFixtureDb({
+  folderId,
+  promptId,
+  organizationId,
+  workspaceId,
+}) {
+  if (!folderId && !promptId) {
+    return {
+      remaining_folder_count: 0,
+      remaining_prompt_count: 0,
+      remaining_version_count: 0,
+    };
+  }
+  const folderPredicate = folderId ? `id = ${sqlUuid(folderId)}` : "false";
+  const promptPredicate = promptId ? `id = ${sqlUuid(promptId)}` : "false";
+  const sql = `
+BEGIN;
+CREATE TEMP TABLE _pwb_folder_ids(id uuid) ON COMMIT DROP;
+INSERT INTO _pwb_folder_ids
+SELECT id
+FROM model_hub_prompt_folder
+WHERE organization_id = ${sqlUuid(organizationId)}
+  AND workspace_id = ${sqlUuid(workspaceId)}
+  AND (${folderPredicate});
+
+CREATE TEMP TABLE _pwb_prompt_ids(id uuid) ON COMMIT DROP;
+INSERT INTO _pwb_prompt_ids
+SELECT id
+FROM model_hub_prompttemplate
+WHERE organization_id = ${sqlUuid(organizationId)}
+  AND workspace_id = ${sqlUuid(workspaceId)}
+  AND (
+    ${promptPredicate}
+    OR prompt_folder_id IN (SELECT id FROM _pwb_folder_ids)
+  );
+
+CREATE TEMP TABLE _pwb_version_ids(id uuid) ON COMMIT DROP;
+INSERT INTO _pwb_version_ids
+SELECT id
+FROM model_hub_promptversion
+WHERE original_template_id IN (SELECT id FROM _pwb_prompt_ids);
+
+DELETE FROM model_hub_promptversion_labels
+WHERE promptversion_id IN (SELECT id FROM _pwb_version_ids);
+DELETE FROM model_hub_prompttemplate_collaborators
+WHERE prompttemplate_id IN (SELECT id FROM _pwb_prompt_ids);
+DELETE FROM model_hub_promptversion
+WHERE id IN (SELECT id FROM _pwb_version_ids);
+DELETE FROM model_hub_prompttemplate
+WHERE id IN (SELECT id FROM _pwb_prompt_ids);
+DELETE FROM model_hub_prompt_folder
+WHERE id IN (SELECT id FROM _pwb_folder_ids);
+
+SELECT json_build_object(
+  'remaining_folder_count', (
+    SELECT count(*) FROM model_hub_prompt_folder
+    WHERE id IN (SELECT id FROM _pwb_folder_ids)
+  ),
+  'remaining_prompt_count', (
+    SELECT count(*) FROM model_hub_prompttemplate
+    WHERE id IN (SELECT id FROM _pwb_prompt_ids)
+  ),
+  'remaining_version_count', (
+    SELECT count(*) FROM model_hub_promptversion
+    WHERE id IN (SELECT id FROM _pwb_version_ids)
+  )
+);
+COMMIT;
+`;
+  return runPostgresJson(sql);
+}
+
+async function runPostgresJson(sql) {
+  const container = process.env.API_JOURNEY_DB_CONTAINER || "ws2-postgres";
+  const user = process.env.API_JOURNEY_DB_USER || "user";
+  const database = process.env.API_JOURNEY_DB_NAME || "tfc";
+  const { stdout } = await execFile(
+    "docker",
+    ["exec", container, "psql", "-qAt", "-U", user, "-d", database, "-c", sql],
+    { maxBuffer: 10 * 1024 * 1024 },
+  );
+  const jsonLine = stdout
+    .trim()
+    .split(/\r?\n/)
+    .reverse()
+    .find((line) => line.trim().startsWith("{"));
+  assert(jsonLine, "Postgres DB command returned no JSON output.");
+  return JSON.parse(jsonLine);
+}
+
+function sqlUuid(value) {
+  assert(isUuid(value), `Expected UUID, got ${value}`);
+  return `'${String(value).replaceAll("'", "''")}'::uuid`;
 }
 
 function appendCleanupError(caughtError, cleanupError) {
@@ -501,6 +836,127 @@ async function clickVisibleText(
   assert(clicked, `Could not click visible text: ${text}`);
 }
 
+async function clickFolderActionMenu(page, { folderId, folderName }) {
+  await page.waitForFunction(
+    ({ id, name }) =>
+      window
+        .visibleElements(`a[href$="/dashboard/workbench/${id}"]`)
+        .some((anchor) =>
+          window.normalizeText(anchor.textContent).includes(name),
+        ),
+    { timeout: 30000 },
+    { id: folderId, name: folderName },
+  );
+  const clicked = await page.evaluate(
+    ({ id, name }) => {
+      const anchor = window
+        .visibleElements(`a[href$="/dashboard/workbench/${id}"]`)
+        .find((candidate) =>
+          window.normalizeText(candidate.textContent).includes(name),
+        );
+      const button = Array.from(anchor?.querySelectorAll("button") || [])
+        .reverse()
+        .find((candidate) => !candidate.disabled);
+      if (!button) return false;
+      button.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+      );
+      button.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
+      );
+      button.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+      return true;
+    },
+    { id: folderId, name: folderName },
+  );
+  assert(clicked, `Could not click folder action menu: ${folderName}.`);
+}
+
+async function clickVisibleMenuItem(page, text) {
+  await page.waitForFunction(
+    (expectedText) =>
+      window.visibleElements().some((element) => {
+        const menuItem = element.closest('[role="menuitem"]');
+        return (
+          menuItem &&
+          window.normalizeText(menuItem.textContent) === expectedText
+        );
+      }),
+    { timeout: 30000 },
+    text,
+  );
+  const clicked = await page.evaluate((expectedText) => {
+    const element = window.visibleElements().find((candidate) => {
+      const menuItem = candidate.closest('[role="menuitem"]');
+      return (
+        menuItem && window.normalizeText(menuItem.textContent) === expectedText
+      );
+    });
+    const menuItem = element?.closest('[role="menuitem"]');
+    if (!menuItem) return false;
+    menuItem.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    menuItem.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
+    );
+    menuItem.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    return true;
+  }, text);
+  assert(clicked, `Could not click menu item ${text}.`);
+}
+
+async function clickDialogButton(page, text) {
+  await page.waitForFunction(
+    (expectedText) => {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (!dialog) return false;
+      return window.visibleElements().some((element) => {
+        if (!dialog.contains(element)) return false;
+        const button = element.closest("button,[role='button']");
+        return (
+          button &&
+          dialog.contains(button) &&
+          !button.disabled &&
+          window.normalizeText(button.textContent) === expectedText
+        );
+      });
+    },
+    { timeout: 30000 },
+    text,
+  );
+  const clicked = await page.evaluate((expectedText) => {
+    const dialog = document.querySelector('[role="dialog"]');
+    const element = window.visibleElements().find((candidate) => {
+      if (!dialog?.contains(candidate)) return false;
+      const button = candidate.closest("button,[role='button']");
+      return (
+        button &&
+        dialog.contains(button) &&
+        !button.disabled &&
+        window.normalizeText(button.textContent) === expectedText
+      );
+    });
+    const button = element?.closest("button,[role='button']");
+    if (!button) return false;
+    button.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    button.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
+    );
+    button.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    return true;
+  }, text);
+  assert(clicked, `Could not click dialog button ${text}.`);
+}
+
 async function typeIntoVisibleInput(page, value) {
   await page.waitForFunction(
     () => window.visibleElements("input").some((input) => !input.disabled),
@@ -526,6 +982,47 @@ async function typeIntoVisibleInput(page, value) {
     return;
   }
   throw new Error("No visible input found.");
+}
+
+async function typeIntoDialogInput(page, value) {
+  await page.waitForFunction(
+    () => {
+      const dialog = document.querySelector('[role="dialog"]');
+      return Boolean(
+        dialog &&
+          window
+            .visibleElements("input")
+            .some((input) => dialog.contains(input) && !input.disabled),
+      );
+    },
+    { timeout: 30000 },
+  );
+  const inputs = await page.$$('[role="dialog"] input');
+  for (const input of inputs) {
+    const visible = await input.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return (
+        !element.disabled &&
+        style.visibility !== "hidden" &&
+        style.display !== "none" &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    });
+    if (!visible) continue;
+    await input.evaluate((element, nextValue) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(element, nextValue);
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+    return;
+  }
+  throw new Error("No visible dialog input found.");
 }
 
 async function typeSearch(page, value) {
