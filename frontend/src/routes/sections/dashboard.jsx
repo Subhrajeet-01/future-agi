@@ -233,6 +233,9 @@ const CrossProjectUserDetailPage = lazyWithRetry(
 const GetStarted = lazyWithRetry(
   () => import("src/pages/dashboard/get-started/GetStarted"),
 );
+const OnboardingHome = lazyWithRetry(
+  () => import("src/pages/dashboard/onboarding-home/Home"),
+);
 const ErrorFallbackView = lazyWithRetry(
   () => import("src/sections/error/ErrorFallbackView"),
 );
@@ -827,6 +830,10 @@ export const dashboardRoutes = (
     {
       index: true,
       element: <Navigate to="/dashboard/prototype" replace />,
+    },
+    {
+      path: "home",
+      element: <OnboardingHome />,
     },
     {
       path: "/dashboard/get-started",

@@ -57,6 +57,7 @@ export const paths = {
     develop: `${ROOTS.DASHBOARD}/develop`,
     prompt: `${ROOTS.DASHBOARD}/prompt`,
     workbench: `${ROOTS.DASHBOARD}/workbench`,
+    home: `${ROOTS.DASHBOARD}/home`,
     getstarted: `${ROOTS.DASHBOARD}/get-started`,
     // projects: `${ROOTS.DASHBOARD}/projects/experiment`,
     huggingface: `${ROOTS.DASHBOARD}/huggingface`,
