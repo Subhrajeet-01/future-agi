@@ -470,6 +470,34 @@ export const accountsActivationEventsCreateResponseResultActivationStateSamplePr
 
 export const accountsActivationEventsCreateResponseResultActivationStateLifecycleSendEnabledDefault = false;
 export const accountsActivationEventsCreateResponseResultActivationStateLifecycleDryRunOnlyDefault = true;
+
+
+
+
+
+
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityTopSignalIsSampleDefault = false;
+
+
+
+
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityPrimaryActionRouteAvailableDefault = true;
+
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityPrimaryActionIsPrimaryDefault = false;
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityPrimaryActionIsSampleDefault = false;
+
+
+
+
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityActionCardsItemRouteAvailableDefault = true;
+
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityActionCardsItemIsPrimaryDefault = false;
+export const accountsActivationEventsCreateResponseResultActivationStateDailyQualityActionCardsItemIsSampleDefault = false;
+
+
+
+
+
 export const accountsActivationEventsCreateResponseResultActivationStateEmailEligibilityFrequencyCapRemainingMin = 0;
 
 export const accountsActivationEventsCreateResponseResultActivationStateEmailEligibilityDryRunOnlyDefault = true;
@@ -492,7 +520,7 @@ export const AccountsActivationEventsCreateResponse = zod.object({
   "status": zod.boolean().default(accountsActivationEventsCreateResponseStatusDefault),
   "result": zod.object({
   "event_id": zod.string().min(1),
-  "event_name": zod.enum(['onboarding_transition_viewed', 'onboarding_home_viewed', 'onboarding_goal_selected', 'onboarding_goal_changed', 'onboarding_recommended_action_viewed', 'onboarding_recommended_action_clicked', 'onboarding_path_card_clicked', 'onboarding_blocked_state_viewed', 'onboarding_diagnostics_opened', 'onboarding_sample_project_opened', 'onboarding_fallback_action_clicked', 'sample_trace_available', 'sample_signal_viewed', 'sample_to_real_setup_clicked', 'first_quality_loop_completed', 'daily_quality_home_viewed', 'daily_quality_top_change_reviewed', 'daily_quality_item_reviewed', 'daily_quality_action_created', 'daily_quality_action_opened', 'daily_quality_action_assigned', 'daily_quality_action_completed', 'daily_quality_action_dismissed', 'daily_quality_no_signal_viewed', 'weekly_quality_review_opened', 'weekly_quality_action_assigned', 'weekly_quality_action_completed', 'weekly_quality_review_completed', 'reactivation_reason_clicked', 'observe_project_created', 'trace_received', 'trace_reviewed', 'trace_detail_opened', 'team_member_invited', 'trace_failure_detected']),
+  "event_name": zod.enum(['onboarding_transition_viewed', 'onboarding_home_viewed', 'onboarding_goal_selected', 'onboarding_goal_changed', 'onboarding_recommended_action_viewed', 'onboarding_recommended_action_clicked', 'onboarding_path_card_clicked', 'onboarding_blocked_state_viewed', 'onboarding_diagnostics_opened', 'onboarding_sample_project_opened', 'onboarding_fallback_action_clicked', 'sample_trace_available', 'sample_signal_viewed', 'sample_to_real_setup_clicked', 'first_quality_loop_completed', 'daily_quality_home_viewed', 'daily_quality_top_signal_shown', 'daily_quality_top_change_reviewed', 'daily_quality_item_reviewed', 'daily_quality_action_created', 'daily_quality_action_opened', 'daily_quality_action_assigned', 'daily_quality_action_completed', 'daily_quality_action_dismissed', 'daily_quality_no_signal_viewed', 'daily_quality_empty_state_viewed', 'daily_quality_digest_destination_opened', 'daily_quality_route_fallback_used', 'weekly_quality_review_opened', 'weekly_quality_action_assigned', 'weekly_quality_action_completed', 'weekly_quality_review_completed', 'reactivation_reason_clicked', 'observe_project_created', 'trace_received', 'trace_reviewed', 'trace_detail_opened', 'team_member_invited', 'trace_failure_detected']),
   "activation_state": zod.object({
   "schema_version": zod.string().min(1),
   "request_id": zod.string().min(1),
@@ -643,16 +671,79 @@ export const AccountsActivationEventsCreateResponse = zod.object({
   "template_key": zod.string().optional(),
   "eligible_at": zod.string().datetime({"offset":true}).optional(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "target_success_event": zod.string().optional(),
   "target_action_id": zod.string().optional(),
   "target_url": zod.string().optional(),
   "dry_run_only": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateLifecycleDryRunOnlyDefault)
 }).optional(),
+  "daily_quality": zod.object({
+  "mode": zod.enum(['new_signal', 'open_action', 'no_new_signal', 'permission_limited', 'unavailable']),
+  "last_reviewed_at": zod.string().datetime({"offset":true}).optional(),
+  "window": zod.object({
+  "start_at": zod.string().datetime({"offset":true}),
+  "end_at": zod.string().datetime({"offset":true})
+}),
+  "top_signal": zod.object({
+  "id": zod.string().min(1),
+  "type": zod.enum(['trace_failure', 'span_latency', 'span_cost', 'eval_failure', 'alert_triggered', 'feed_issue', 'dashboard_missing', 'alert_missing', 'evaluator_missing', 'saved_view_missing']),
+  "severity": zod.enum(['critical', 'warning', 'info']),
+  "title": zod.string().min(1),
+  "body": zod.string().min(1),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1),
+  "project_id": zod.string().min(1).optional(),
+  "route": zod.string().min(1),
+  "is_sample": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityTopSignalIsSampleDefault),
+  "created_at": zod.string().datetime({"offset":true})
+}).optional(),
+  "primary_action": zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityPrimaryActionRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityPrimaryActionIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityPrimaryActionIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+}).optional(),
+  "action_cards": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityActionCardsItemRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityActionCardsItemIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsActivationEventsCreateResponseResultActivationStateDailyQualityActionCardsItemIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+})).optional(),
+  "product_cards": zod.array(zod.object({
+  "path": zod.enum(['prompt', 'agent', 'observe', 'gateway', 'voice', 'evals', 'dashboards', 'sample']),
+  "status": zod.string().min(1),
+  "label": zod.string().min(1),
+  "summary": zod.string().min(1),
+  "metric": zod.string().min(1),
+  "change": zod.string().optional(),
+  "route": zod.string().min(1)
+})).optional(),
+  "digest_eligible": zod.boolean(),
+  "digest_suppression_reason": zod.string().optional(),
+  "diagnostics": zod.array(zod.string().min(1)).optional()
+}).optional(),
   "email_eligibility": zod.object({
   "eligible": zod.boolean(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "next_email_key": zod.string().optional(),
   "next_email_after": zod.string().datetime({"offset":true}).optional(),
   "digest_eligible": zod.boolean(),
@@ -817,6 +908,34 @@ export const accountsActivationStateListResponseResultSampleProjectIsRepairableD
 
 export const accountsActivationStateListResponseResultLifecycleSendEnabledDefault = false;
 export const accountsActivationStateListResponseResultLifecycleDryRunOnlyDefault = true;
+
+
+
+
+
+
+export const accountsActivationStateListResponseResultDailyQualityTopSignalIsSampleDefault = false;
+
+
+
+
+export const accountsActivationStateListResponseResultDailyQualityPrimaryActionRouteAvailableDefault = true;
+
+export const accountsActivationStateListResponseResultDailyQualityPrimaryActionIsPrimaryDefault = false;
+export const accountsActivationStateListResponseResultDailyQualityPrimaryActionIsSampleDefault = false;
+
+
+
+
+export const accountsActivationStateListResponseResultDailyQualityActionCardsItemRouteAvailableDefault = true;
+
+export const accountsActivationStateListResponseResultDailyQualityActionCardsItemIsPrimaryDefault = false;
+export const accountsActivationStateListResponseResultDailyQualityActionCardsItemIsSampleDefault = false;
+
+
+
+
+
 export const accountsActivationStateListResponseResultEmailEligibilityFrequencyCapRemainingMin = 0;
 
 export const accountsActivationStateListResponseResultEmailEligibilityDryRunOnlyDefault = true;
@@ -987,16 +1106,79 @@ export const AccountsActivationStateListResponse = zod.object({
   "template_key": zod.string().optional(),
   "eligible_at": zod.string().datetime({"offset":true}).optional(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "target_success_event": zod.string().optional(),
   "target_action_id": zod.string().optional(),
   "target_url": zod.string().optional(),
   "dry_run_only": zod.boolean().default(accountsActivationStateListResponseResultLifecycleDryRunOnlyDefault)
 }).optional(),
+  "daily_quality": zod.object({
+  "mode": zod.enum(['new_signal', 'open_action', 'no_new_signal', 'permission_limited', 'unavailable']),
+  "last_reviewed_at": zod.string().datetime({"offset":true}).optional(),
+  "window": zod.object({
+  "start_at": zod.string().datetime({"offset":true}),
+  "end_at": zod.string().datetime({"offset":true})
+}),
+  "top_signal": zod.object({
+  "id": zod.string().min(1),
+  "type": zod.enum(['trace_failure', 'span_latency', 'span_cost', 'eval_failure', 'alert_triggered', 'feed_issue', 'dashboard_missing', 'alert_missing', 'evaluator_missing', 'saved_view_missing']),
+  "severity": zod.enum(['critical', 'warning', 'info']),
+  "title": zod.string().min(1),
+  "body": zod.string().min(1),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1),
+  "project_id": zod.string().min(1).optional(),
+  "route": zod.string().min(1),
+  "is_sample": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityTopSignalIsSampleDefault),
+  "created_at": zod.string().datetime({"offset":true})
+}).optional(),
+  "primary_action": zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityPrimaryActionRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityPrimaryActionIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityPrimaryActionIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+}).optional(),
+  "action_cards": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityActionCardsItemRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityActionCardsItemIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsActivationStateListResponseResultDailyQualityActionCardsItemIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+})).optional(),
+  "product_cards": zod.array(zod.object({
+  "path": zod.enum(['prompt', 'agent', 'observe', 'gateway', 'voice', 'evals', 'dashboards', 'sample']),
+  "status": zod.string().min(1),
+  "label": zod.string().min(1),
+  "summary": zod.string().min(1),
+  "metric": zod.string().min(1),
+  "change": zod.string().optional(),
+  "route": zod.string().min(1)
+})).optional(),
+  "digest_eligible": zod.boolean(),
+  "digest_suppression_reason": zod.string().optional(),
+  "diagnostics": zod.array(zod.string().min(1)).optional()
+}).optional(),
   "email_eligibility": zod.object({
   "eligible": zod.boolean(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "next_email_key": zod.string().optional(),
   "next_email_after": zod.string().datetime({"offset":true}).optional(),
   "digest_eligible": zod.boolean(),
@@ -1614,6 +1796,34 @@ export const accountsOnboardingGoalCreateResponseResultSampleProjectIsRepairable
 
 export const accountsOnboardingGoalCreateResponseResultLifecycleSendEnabledDefault = false;
 export const accountsOnboardingGoalCreateResponseResultLifecycleDryRunOnlyDefault = true;
+
+
+
+
+
+
+export const accountsOnboardingGoalCreateResponseResultDailyQualityTopSignalIsSampleDefault = false;
+
+
+
+
+export const accountsOnboardingGoalCreateResponseResultDailyQualityPrimaryActionRouteAvailableDefault = true;
+
+export const accountsOnboardingGoalCreateResponseResultDailyQualityPrimaryActionIsPrimaryDefault = false;
+export const accountsOnboardingGoalCreateResponseResultDailyQualityPrimaryActionIsSampleDefault = false;
+
+
+
+
+export const accountsOnboardingGoalCreateResponseResultDailyQualityActionCardsItemRouteAvailableDefault = true;
+
+export const accountsOnboardingGoalCreateResponseResultDailyQualityActionCardsItemIsPrimaryDefault = false;
+export const accountsOnboardingGoalCreateResponseResultDailyQualityActionCardsItemIsSampleDefault = false;
+
+
+
+
+
 export const accountsOnboardingGoalCreateResponseResultEmailEligibilityFrequencyCapRemainingMin = 0;
 
 export const accountsOnboardingGoalCreateResponseResultEmailEligibilityDryRunOnlyDefault = true;
@@ -1784,16 +1994,79 @@ export const AccountsOnboardingGoalCreateResponse = zod.object({
   "template_key": zod.string().optional(),
   "eligible_at": zod.string().datetime({"offset":true}).optional(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "target_success_event": zod.string().optional(),
   "target_action_id": zod.string().optional(),
   "target_url": zod.string().optional(),
   "dry_run_only": zod.boolean().default(accountsOnboardingGoalCreateResponseResultLifecycleDryRunOnlyDefault)
 }).optional(),
+  "daily_quality": zod.object({
+  "mode": zod.enum(['new_signal', 'open_action', 'no_new_signal', 'permission_limited', 'unavailable']),
+  "last_reviewed_at": zod.string().datetime({"offset":true}).optional(),
+  "window": zod.object({
+  "start_at": zod.string().datetime({"offset":true}),
+  "end_at": zod.string().datetime({"offset":true})
+}),
+  "top_signal": zod.object({
+  "id": zod.string().min(1),
+  "type": zod.enum(['trace_failure', 'span_latency', 'span_cost', 'eval_failure', 'alert_triggered', 'feed_issue', 'dashboard_missing', 'alert_missing', 'evaluator_missing', 'saved_view_missing']),
+  "severity": zod.enum(['critical', 'warning', 'info']),
+  "title": zod.string().min(1),
+  "body": zod.string().min(1),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1),
+  "project_id": zod.string().min(1).optional(),
+  "route": zod.string().min(1),
+  "is_sample": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityTopSignalIsSampleDefault),
+  "created_at": zod.string().datetime({"offset":true})
+}).optional(),
+  "primary_action": zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityPrimaryActionRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityPrimaryActionIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityPrimaryActionIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+}).optional(),
+  "action_cards": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityActionCardsItemRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityActionCardsItemIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsOnboardingGoalCreateResponseResultDailyQualityActionCardsItemIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+})).optional(),
+  "product_cards": zod.array(zod.object({
+  "path": zod.enum(['prompt', 'agent', 'observe', 'gateway', 'voice', 'evals', 'dashboards', 'sample']),
+  "status": zod.string().min(1),
+  "label": zod.string().min(1),
+  "summary": zod.string().min(1),
+  "metric": zod.string().min(1),
+  "change": zod.string().optional(),
+  "route": zod.string().min(1)
+})).optional(),
+  "digest_eligible": zod.boolean(),
+  "digest_suppression_reason": zod.string().optional(),
+  "diagnostics": zod.array(zod.string().min(1)).optional()
+}).optional(),
   "email_eligibility": zod.object({
   "eligible": zod.boolean(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "next_email_key": zod.string().optional(),
   "next_email_after": zod.string().datetime({"offset":true}).optional(),
   "digest_eligible": zod.boolean(),
@@ -2726,6 +2999,34 @@ export const accountsSampleProjectCreateResponseResultActivationStateSampleProje
 
 export const accountsSampleProjectCreateResponseResultActivationStateLifecycleSendEnabledDefault = false;
 export const accountsSampleProjectCreateResponseResultActivationStateLifecycleDryRunOnlyDefault = true;
+
+
+
+
+
+
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityTopSignalIsSampleDefault = false;
+
+
+
+
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityPrimaryActionRouteAvailableDefault = true;
+
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityPrimaryActionIsPrimaryDefault = false;
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityPrimaryActionIsSampleDefault = false;
+
+
+
+
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityActionCardsItemRouteAvailableDefault = true;
+
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityActionCardsItemIsPrimaryDefault = false;
+export const accountsSampleProjectCreateResponseResultActivationStateDailyQualityActionCardsItemIsSampleDefault = false;
+
+
+
+
+
 export const accountsSampleProjectCreateResponseResultActivationStateEmailEligibilityFrequencyCapRemainingMin = 0;
 
 export const accountsSampleProjectCreateResponseResultActivationStateEmailEligibilityDryRunOnlyDefault = true;
@@ -2922,16 +3223,79 @@ export const AccountsSampleProjectCreateResponse = zod.object({
   "template_key": zod.string().optional(),
   "eligible_at": zod.string().datetime({"offset":true}).optional(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "target_success_event": zod.string().optional(),
   "target_action_id": zod.string().optional(),
   "target_url": zod.string().optional(),
   "dry_run_only": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateLifecycleDryRunOnlyDefault)
 }).optional(),
+  "daily_quality": zod.object({
+  "mode": zod.enum(['new_signal', 'open_action', 'no_new_signal', 'permission_limited', 'unavailable']),
+  "last_reviewed_at": zod.string().datetime({"offset":true}).optional(),
+  "window": zod.object({
+  "start_at": zod.string().datetime({"offset":true}),
+  "end_at": zod.string().datetime({"offset":true})
+}),
+  "top_signal": zod.object({
+  "id": zod.string().min(1),
+  "type": zod.enum(['trace_failure', 'span_latency', 'span_cost', 'eval_failure', 'alert_triggered', 'feed_issue', 'dashboard_missing', 'alert_missing', 'evaluator_missing', 'saved_view_missing']),
+  "severity": zod.enum(['critical', 'warning', 'info']),
+  "title": zod.string().min(1),
+  "body": zod.string().min(1),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1),
+  "project_id": zod.string().min(1).optional(),
+  "route": zod.string().min(1),
+  "is_sample": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityTopSignalIsSampleDefault),
+  "created_at": zod.string().datetime({"offset":true})
+}).optional(),
+  "primary_action": zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityPrimaryActionRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityPrimaryActionIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityPrimaryActionIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+}).optional(),
+  "action_cards": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityActionCardsItemRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityActionCardsItemIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsSampleProjectCreateResponseResultActivationStateDailyQualityActionCardsItemIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+})).optional(),
+  "product_cards": zod.array(zod.object({
+  "path": zod.enum(['prompt', 'agent', 'observe', 'gateway', 'voice', 'evals', 'dashboards', 'sample']),
+  "status": zod.string().min(1),
+  "label": zod.string().min(1),
+  "summary": zod.string().min(1),
+  "metric": zod.string().min(1),
+  "change": zod.string().optional(),
+  "route": zod.string().min(1)
+})).optional(),
+  "digest_eligible": zod.boolean(),
+  "digest_suppression_reason": zod.string().optional(),
+  "diagnostics": zod.array(zod.string().min(1)).optional()
+}).optional(),
   "email_eligibility": zod.object({
   "eligible": zod.boolean(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "next_email_key": zod.string().optional(),
   "next_email_after": zod.string().datetime({"offset":true}).optional(),
   "digest_eligible": zod.boolean(),
@@ -3095,6 +3459,34 @@ export const accountsSampleProjectHideCreateResponseResultActivationStateSampleP
 
 export const accountsSampleProjectHideCreateResponseResultActivationStateLifecycleSendEnabledDefault = false;
 export const accountsSampleProjectHideCreateResponseResultActivationStateLifecycleDryRunOnlyDefault = true;
+
+
+
+
+
+
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityTopSignalIsSampleDefault = false;
+
+
+
+
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityPrimaryActionRouteAvailableDefault = true;
+
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityPrimaryActionIsPrimaryDefault = false;
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityPrimaryActionIsSampleDefault = false;
+
+
+
+
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityActionCardsItemRouteAvailableDefault = true;
+
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityActionCardsItemIsPrimaryDefault = false;
+export const accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityActionCardsItemIsSampleDefault = false;
+
+
+
+
+
 export const accountsSampleProjectHideCreateResponseResultActivationStateEmailEligibilityFrequencyCapRemainingMin = 0;
 
 export const accountsSampleProjectHideCreateResponseResultActivationStateEmailEligibilityDryRunOnlyDefault = true;
@@ -3291,16 +3683,79 @@ export const AccountsSampleProjectHideCreateResponse = zod.object({
   "template_key": zod.string().optional(),
   "eligible_at": zod.string().datetime({"offset":true}).optional(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "target_success_event": zod.string().optional(),
   "target_action_id": zod.string().optional(),
   "target_url": zod.string().optional(),
   "dry_run_only": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateLifecycleDryRunOnlyDefault)
 }).optional(),
+  "daily_quality": zod.object({
+  "mode": zod.enum(['new_signal', 'open_action', 'no_new_signal', 'permission_limited', 'unavailable']),
+  "last_reviewed_at": zod.string().datetime({"offset":true}).optional(),
+  "window": zod.object({
+  "start_at": zod.string().datetime({"offset":true}),
+  "end_at": zod.string().datetime({"offset":true})
+}),
+  "top_signal": zod.object({
+  "id": zod.string().min(1),
+  "type": zod.enum(['trace_failure', 'span_latency', 'span_cost', 'eval_failure', 'alert_triggered', 'feed_issue', 'dashboard_missing', 'alert_missing', 'evaluator_missing', 'saved_view_missing']),
+  "severity": zod.enum(['critical', 'warning', 'info']),
+  "title": zod.string().min(1),
+  "body": zod.string().min(1),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1),
+  "project_id": zod.string().min(1).optional(),
+  "route": zod.string().min(1),
+  "is_sample": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityTopSignalIsSampleDefault),
+  "created_at": zod.string().datetime({"offset":true})
+}).optional(),
+  "primary_action": zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityPrimaryActionRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityPrimaryActionIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityPrimaryActionIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+}).optional(),
+  "action_cards": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "label": zod.string().min(1),
+  "body": zod.string().min(1),
+  "route": zod.string().min(1),
+  "fallback_route": zod.string().min(1),
+  "route_available": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityActionCardsItemRouteAvailableDefault),
+  "source_type": zod.string().min(1),
+  "source_id": zod.string().min(1).optional(),
+  "success_event": zod.string().optional(),
+  "is_primary": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityActionCardsItemIsPrimaryDefault),
+  "is_sample": zod.boolean().default(accountsSampleProjectHideCreateResponseResultActivationStateDailyQualityActionCardsItemIsSampleDefault),
+  "requires_permission": zod.string().optional(),
+  "activation_kind": zod.enum(['choose_goal', 'setup', 'send_signal', 'review', 'improve', 'sample_project', 'request_access', 'fallback', 'daily_quality', 'adjacent_loop']).optional()
+})).optional(),
+  "product_cards": zod.array(zod.object({
+  "path": zod.enum(['prompt', 'agent', 'observe', 'gateway', 'voice', 'evals', 'dashboards', 'sample']),
+  "status": zod.string().min(1),
+  "label": zod.string().min(1),
+  "summary": zod.string().min(1),
+  "metric": zod.string().min(1),
+  "change": zod.string().optional(),
+  "route": zod.string().min(1)
+})).optional(),
+  "digest_eligible": zod.boolean(),
+  "digest_suppression_reason": zod.string().optional(),
+  "diagnostics": zod.array(zod.string().min(1)).optional()
+}).optional(),
   "email_eligibility": zod.object({
   "eligible": zod.boolean(),
   "suppressed": zod.boolean(),
-  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause']).optional(),
+  "suppression_reason": zod.enum(['activated', 'target_event_complete', 'workspace_suppressed', 'user_unsubscribed', 'user_snoozed', 'sample_hidden', 'sample_not_allowed', 'route_unavailable', 'permission_limited', 'feature_disabled', 'dry_run_flag_off', 'send_flag_off', 'frequency_cap', 'frequency_cap_user_24h', 'frequency_cap_user_7d', 'frequency_cap_workspace_24h', 'frequency_cap_campaign_7d', 'wait_window_open', 'recent_goal_change', 'recent_same_task_activity', 'path_changed', 'missing_email', 'workspace_inactive', 'activation_state_error', 'no_matching_campaign', 'manual_pause', 'not_activated', 'sample_only', 'no_useful_signal', 'already_reviewed', 'frequency_capped', 'flag_disabled', 'preferences_blocked']).optional(),
   "next_email_key": zod.string().optional(),
   "next_email_after": zod.string().datetime({"offset":true}).optional(),
   "digest_eligible": zod.boolean(),

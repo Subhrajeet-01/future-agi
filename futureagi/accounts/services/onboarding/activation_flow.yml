@@ -765,6 +765,7 @@ activation_events:
     - sample_to_real_setup_clicked
     - first_quality_loop_completed
     - daily_quality_home_viewed
+    - daily_quality_top_signal_shown
     - daily_quality_top_change_reviewed
     - daily_quality_item_reviewed
     - daily_quality_action_created
@@ -773,6 +774,9 @@ activation_events:
     - daily_quality_action_completed
     - daily_quality_action_dismissed
     - daily_quality_no_signal_viewed
+    - daily_quality_empty_state_viewed
+    - daily_quality_digest_destination_opened
+    - daily_quality_route_fallback_used
     - weekly_quality_review_opened
     - weekly_quality_action_assigned
     - weekly_quality_action_completed

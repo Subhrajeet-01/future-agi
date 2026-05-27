@@ -41,6 +41,11 @@ const routeAvailability = (overrides = {}) => ({
     is_available: true,
     reason: null,
   },
+  daily_quality_signal: {
+    href: "/dashboard/observe/observe-1/trace/trace-2",
+    is_available: true,
+    reason: null,
+  },
   get_started: {
     href: "/dashboard/get-started",
     is_available: true,
@@ -162,6 +167,84 @@ const sampleAction = (overrides = {}) =>
       event_name: "onboarding_recommended_action_clicked",
       source: "home",
       target_path: "sample",
+    },
+    ...overrides,
+  });
+
+const dailyQualitySignal = (overrides = {}) => ({
+  id: "trace_failure:trace-2",
+  type: "trace_failure",
+  severity: "critical",
+  title: "Review the latest failed trace",
+  body: "A real observe trace failed since the last quality review.",
+  source_type: "trace",
+  source_id: "trace-2",
+  project_id: "observe-1",
+  route: "/dashboard/observe/observe-1/trace/trace-2",
+  is_sample: false,
+  created_at: "2026-05-27T09:40:00Z",
+  ...overrides,
+});
+
+const dailyQualityPrimaryAction = (overrides = {}) => ({
+  id: "review_failed_trace",
+  label: "Review trace",
+  body: "Open the failed trace and inspect the failure context.",
+  route: "/dashboard/observe/observe-1/trace/trace-2",
+  fallback_route: "/dashboard/get-started",
+  route_available: true,
+  source_type: "trace",
+  source_id: "trace-2",
+  success_event: "daily_quality_item_reviewed",
+  is_primary: true,
+  is_sample: false,
+  requires_permission: null,
+  activation_kind: "daily_quality",
+  ...overrides,
+});
+
+const dailyQualityState = (overrides = {}) => ({
+  mode: "new_signal",
+  last_reviewed_at: "2026-05-27T08:00:00Z",
+  window: {
+    start_at: "2026-05-27T08:00:00Z",
+    end_at: "2026-05-27T10:00:00Z",
+  },
+  top_signal: dailyQualitySignal(),
+  primary_action: dailyQualityPrimaryAction(),
+  action_cards: [],
+  product_cards: [
+    {
+      path: "observe",
+      status: "needs_review",
+      label: "Observe",
+      summary: "1 trace failure needs review",
+      metric: "1",
+      change: "New since last review",
+      route: "/dashboard/observe/observe-1",
+    },
+  ],
+  digest_eligible: true,
+  digest_suppression_reason: null,
+  diagnostics: [],
+  ...overrides,
+});
+
+const dailyQualityActivationAction = (overrides = {}) =>
+  action({
+    id: "review_failed_trace",
+    kind: "daily_quality",
+    title: "Review trace",
+    description: "Open the failed trace and inspect the failure context.",
+    href: "/dashboard/observe/observe-1/trace/trace-2",
+    cta_label: "Review trace",
+    estimated_minutes: 4,
+    requires_permission: null,
+    completion_event: "daily_quality_item_reviewed",
+    analytics: {
+      event_name: "daily_quality_action_opened",
+      source: "daily_quality_home",
+      target_path: "observe",
     },
     ...overrides,
   });
@@ -464,22 +547,12 @@ export const activationStateFixtures = {
     },
   }),
 
-  dailyQualityObserve: baseState({
+  dailyQualityObserveNewSignal: baseState({
     stage: "daily_review",
     home_mode: "daily_quality",
     is_activated: true,
-    activated_at: "2026-05-26T15:10:00Z",
-    recommended_action: action({
-      id: "review_daily_quality",
-      kind: "daily_quality",
-      title: "Review today's quality signal",
-      description: "Open the daily quality view and resolve the top item.",
-      href: "/dashboard/home?mode=daily-quality",
-      cta_label: "Review signal",
-      estimated_minutes: 4,
-      requires_permission: null,
-      completion_event: "daily_quality_item_reviewed",
-    }),
+    activated_at: "2026-05-27T08:00:00Z",
+    recommended_action: dailyQualityActivationAction(),
     progress: {
       build: "complete",
       test: "available",
@@ -487,6 +560,212 @@ export const activationStateFixtures = {
       ship: "available",
       improve: "complete",
     },
+    daily_quality: dailyQualityState(),
+    signals: {
+      ...baseState().signals,
+      observe_projects: 1,
+      traces: 1,
+      trace_reviews: 1,
+      dashboards: 1,
+      alerts: 1,
+      first_observe_id: "observe-1",
+      first_trace_id: "trace-1",
+    },
+    email_eligibility: {
+      ...baseState().email_eligibility,
+      digest_eligible: true,
+      next_email_key: "first_loop_complete_next_v1",
+    },
+    last_meaningful_event: {
+      name: "first_quality_loop_completed",
+      occurred_at: "2026-05-27T08:00:00Z",
+      is_sample: false,
+      path: "observe",
+      metadata: {},
+    },
+  }),
+
+  dailyQualityObserve: baseState({
+    stage: "daily_review",
+    home_mode: "daily_quality",
+    is_activated: true,
+    activated_at: "2026-05-27T08:00:00Z",
+    recommended_action: dailyQualityActivationAction(),
+    daily_quality: dailyQualityState(),
+    progress: {
+      build: "complete",
+      test: "available",
+      observe: "complete",
+      ship: "available",
+      improve: "complete",
+    },
+  }),
+
+  dailyQualityObserveNoSignal: baseState({
+    stage: "daily_review",
+    home_mode: "daily_quality",
+    is_activated: true,
+    activated_at: "2026-05-27T08:00:00Z",
+    recommended_action: dailyQualityActivationAction({
+      id: "create_trace_alert",
+      title: "Create alert",
+      description: "Get notified when a future trace needs attention.",
+      href: "/dashboard/observe/observe-1",
+      cta_label: "Create alert",
+      completion_event: "first_quality_loop_completed",
+    }),
+    daily_quality: dailyQualityState({
+      mode: "no_new_signal",
+      top_signal: null,
+      primary_action: dailyQualityPrimaryAction({
+        id: "create_trace_alert",
+        label: "Create alert",
+        body: "Get notified when a future trace needs attention.",
+        route: "/dashboard/observe/observe-1",
+        source_type: "project",
+        source_id: "observe-1",
+        success_event: "first_quality_loop_completed",
+        requires_permission: "observe:write",
+      }),
+      product_cards: [
+        {
+          path: "observe",
+          status: "healthy",
+          label: "Observe",
+          summary: "Create alert",
+          metric: "0",
+          change: "No new signal",
+          route: "/dashboard/observe/observe-1",
+        },
+      ],
+      digest_eligible: false,
+      digest_suppression_reason: "no_useful_signal",
+      diagnostics: ["no_new_signal", "route_fallback_used"],
+    }),
+    email_eligibility: {
+      ...baseState().email_eligibility,
+      eligible: false,
+      suppressed: true,
+      suppression_reason: "no_useful_signal",
+      digest_eligible: false,
+      next_email_key: null,
+      next_email_after: null,
+    },
+  }),
+
+  dailyQualityObserveOpenAction: baseState({
+    stage: "daily_review",
+    home_mode: "daily_quality",
+    is_activated: true,
+    activated_at: "2026-05-27T08:00:00Z",
+    recommended_action: dailyQualityActivationAction({
+      id: "continue_trace_action",
+      title: "Continue trace action",
+      description: "Return to the unresolved action from the latest review.",
+      href: "/dashboard/observe/observe-1",
+      cta_label: "Continue action",
+      completion_event: "daily_quality_action_completed",
+    }),
+    daily_quality: dailyQualityState({
+      mode: "open_action",
+      primary_action: dailyQualityPrimaryAction({
+        id: "continue_trace_action",
+        label: "Continue action",
+        body: "Return to the unresolved action from the latest review.",
+        route: "/dashboard/observe/observe-1",
+        source_type: "project",
+        source_id: "observe-1",
+        success_event: "daily_quality_action_completed",
+      }),
+    }),
+  }),
+
+  dailyQualityPermissionLimited: baseState({
+    stage: "daily_review",
+    home_mode: "daily_quality",
+    is_activated: true,
+    activated_at: "2026-05-27T08:00:00Z",
+    recommended_action: action({
+      id: "request_workspace_access",
+      kind: "request_access",
+      title: "Request access",
+      description:
+        "Ask an admin for workspace access before changing the quality setup.",
+      href: "/dashboard/settings/user-management",
+      cta_label: "Request access",
+      estimated_minutes: 4,
+      requires_permission: null,
+      completion_event: null,
+      analytics: {
+        event_name: "daily_quality_action_opened",
+        source: "daily_quality_home",
+        target_path: "observe",
+      },
+    }),
+    daily_quality: dailyQualityState({
+      mode: "permission_limited",
+      top_signal: null,
+      primary_action: dailyQualityPrimaryAction({
+        id: "request_workspace_access",
+        label: "Request access",
+        body: "Ask an admin for workspace access before changing the quality setup.",
+        route: "/dashboard/settings/user-management",
+        source_type: "workspace",
+        source_id: "wrk_onboarding",
+        success_event: null,
+        activation_kind: "request_access",
+      }),
+      product_cards: [
+        {
+          path: "observe",
+          status: "permission_limited",
+          label: "Observe",
+          summary: "Access needed for the next setup action",
+          metric: "View",
+          change: "No new signal",
+          route: "/dashboard/observe/observe-1",
+        },
+      ],
+      digest_eligible: false,
+      digest_suppression_reason: "permission_limited",
+      diagnostics: ["permission_limited"],
+    }),
+    permissions: {
+      ...baseState().permissions,
+      role: "viewer",
+      can_write: false,
+      can_manage_workspace: false,
+      missing_permissions: ["workspace:write"],
+      permission_limited: true,
+    },
+  }),
+
+  dailyQualityRouteFallback: baseState({
+    stage: "daily_review",
+    home_mode: "daily_quality",
+    is_activated: true,
+    activated_at: "2026-05-27T08:00:00Z",
+    recommended_action: dailyQualityActivationAction({
+      href: null,
+      blocked: true,
+      blocked_reason: "route_not_implemented",
+      route_available: false,
+    }),
+    daily_quality: dailyQualityState({
+      primary_action: dailyQualityPrimaryAction({
+        route: "/dashboard/not-available",
+        fallback_route: "/dashboard/get-started",
+        route_available: false,
+      }),
+      diagnostics: ["route_fallback_used"],
+    }),
+    route_availability: routeAvailability({
+      daily_quality_signal: {
+        href: "/dashboard/observe/observe-1/trace/trace-2",
+        is_available: false,
+        reason: "route_not_implemented",
+      },
+    }),
   }),
 
   sampleTraceReady: baseState({

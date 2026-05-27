@@ -293,6 +293,109 @@ const normalizeEmailEligibility = (raw = {}) => ({
   dryRunOnly: Boolean(raw.dry_run_only ?? raw.dryRunOnly),
 });
 
+const normalizeDailyQualitySignal = (raw) => {
+  if (!raw) return null;
+  const route = raw.route ?? "";
+  if (!isInternalHref(route)) {
+    throw new Error(`Daily quality signal has external route: ${route}`);
+  }
+  const isSample = Boolean(raw.is_sample ?? raw.isSample);
+  if (isSample) {
+    throw new Error("Daily quality signal cannot use sample data");
+  }
+  return {
+    id: raw.id,
+    type: raw.type,
+    severity: raw.severity || "info",
+    title: raw.title,
+    body: raw.body,
+    sourceType: raw.source_type ?? raw.sourceType ?? null,
+    sourceId: raw.source_id ?? raw.sourceId ?? null,
+    projectId: raw.project_id ?? raw.projectId ?? null,
+    route,
+    isSample,
+    createdAt: raw.created_at ?? raw.createdAt ?? null,
+  };
+};
+
+const normalizeDailyQualityAction = (raw) => {
+  if (!raw) return null;
+  const route = raw.route ?? "";
+  const fallbackRoute = raw.fallback_route ?? raw.fallbackRoute ?? "";
+  if (!isInternalHref(route)) {
+    throw new Error(`Daily quality action has external route: ${route}`);
+  }
+  if (!isInternalHref(fallbackRoute)) {
+    throw new Error(
+      `Daily quality action has external fallback route: ${fallbackRoute}`,
+    );
+  }
+  const isSample = Boolean(raw.is_sample ?? raw.isSample);
+  if (isSample) {
+    throw new Error("Daily quality action cannot use sample data");
+  }
+  return {
+    id: raw.id,
+    label: raw.label,
+    body: raw.body,
+    route,
+    fallbackRoute,
+    routeAvailable: Boolean(raw.route_available ?? raw.routeAvailable ?? true),
+    sourceType: raw.source_type ?? raw.sourceType ?? null,
+    sourceId: raw.source_id ?? raw.sourceId ?? null,
+    successEvent: raw.success_event ?? raw.successEvent ?? null,
+    isPrimary: Boolean(raw.is_primary ?? raw.isPrimary),
+    isSample,
+    requiresPermission:
+      raw.requires_permission ?? raw.requiresPermission ?? null,
+    activationKind: raw.activation_kind ?? raw.activationKind ?? null,
+  };
+};
+
+const normalizeDailyQualityProductCard = (raw) => {
+  const route = raw.route ?? "";
+  if (!isInternalHref(route)) {
+    throw new Error(`Daily quality product card has external route: ${route}`);
+  }
+  return {
+    path: normalizeProductPath(raw.path),
+    status: raw.status,
+    label: raw.label,
+    summary: raw.summary,
+    metric: raw.metric,
+    change: raw.change ?? null,
+    route,
+  };
+};
+
+const normalizeDailyQuality = (raw) => {
+  if (!raw) return null;
+  return {
+    mode: raw.mode,
+    lastReviewedAt: raw.last_reviewed_at ?? raw.lastReviewedAt ?? null,
+    window: {
+      startAt: raw.window?.start_at ?? raw.window?.startAt ?? null,
+      endAt: raw.window?.end_at ?? raw.window?.endAt ?? null,
+    },
+    topSignal: normalizeDailyQualitySignal(
+      raw.top_signal ?? raw.topSignal ?? null,
+    ),
+    primaryAction: normalizeDailyQualityAction(
+      raw.primary_action ?? raw.primaryAction ?? null,
+    ),
+    actionCards: (raw.action_cards ?? raw.actionCards ?? []).map(
+      normalizeDailyQualityAction,
+    ),
+    productCards: (raw.product_cards ?? raw.productCards ?? []).map(
+      normalizeDailyQualityProductCard,
+    ),
+    digestEligible: Boolean(raw.digest_eligible ?? raw.digestEligible),
+    digestSuppressionReason:
+      raw.digest_suppression_reason ?? raw.digestSuppressionReason ?? null,
+    diagnostics: raw.diagnostics ?? [],
+  };
+};
+
 const normalizePermissions = (raw = {}) => ({
   role: raw.role ?? null,
   canRead: Boolean(raw.can_read ?? raw.canRead),
@@ -433,6 +536,7 @@ export const normalizeActivationState = (raw) => {
     ),
     availablePaths: (raw.available_paths || []).map(normalizeAvailablePath),
     sampleProject: normalizeSampleProject(raw.sample_project),
+    dailyQuality: normalizeDailyQuality(raw.daily_quality ?? raw.dailyQuality),
     emailEligibility: normalizeEmailEligibility(raw.email_eligibility),
     permissions: normalizePermissions(raw.permissions),
     featureFlags: raw.feature_flags || {},

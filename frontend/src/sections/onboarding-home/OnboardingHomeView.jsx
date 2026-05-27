@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthContext } from "src/auth/hooks";
 import { useWorkspace } from "src/contexts/WorkspaceContext";
 import { useActivationState } from "./hooks/useActivationState";
+import { useRecordActivationEvent } from "./hooks/useRecordActivationEvent";
 import { useSaveOnboardingGoal } from "./hooks/useSaveOnboardingGoal";
 import { useSampleProject } from "./hooks/useSampleProject";
 import {
@@ -20,6 +21,7 @@ import {
   OnboardingHomeEvents,
   trackOnboardingHomeEvent,
 } from "./analytics/onboarding-events";
+import DailyQualityHome from "./components/DailyQualityHome";
 import FirstLoopCompletePanel from "./components/FirstLoopCompletePanel";
 import FirstSignalPanel from "./components/FirstSignalPanel";
 import GoalPicker from "./components/GoalPicker";
@@ -82,6 +84,7 @@ export default function OnboardingHomeView() {
   } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
+  const recordActivationEvent = useRecordActivationEvent();
   const saveGoal = useSaveOnboardingGoal();
   const sampleProjectActions = useSampleProject();
   const [selectedGoal, setSelectedGoal] = useState(null);
@@ -151,6 +154,42 @@ export default function OnboardingHomeView() {
     user?.id,
     workspaceId,
   ]);
+  const dailyTrackContext = useMemo(() => {
+    const dailyQuality = renderedState?.dailyQuality;
+    if (!trackContext || !dailyQuality) return null;
+    const topSignal = dailyQuality.topSignal;
+    const primaryAction = dailyQuality.primaryAction;
+
+    return {
+      ...trackContext,
+      home_mode: renderedState.homeMode,
+      daily_quality_mode: dailyQuality.mode,
+      signal_id: topSignal?.id,
+      signal_type: topSignal?.type,
+      source_type: topSignal?.sourceType || primaryAction?.sourceType,
+      source_id: topSignal?.sourceId || primaryAction?.sourceId,
+      recommended_action_id:
+        primaryAction?.id || renderedState.recommendedAction?.id,
+      route: primaryAction?.route || topSignal?.route,
+      route_available:
+        primaryAction?.routeAvailable ??
+        renderedState.recommendedAction?.routeAvailable,
+      is_sample: Boolean(topSignal?.isSample || primaryAction?.isSample),
+      digest_context_id: searchContext.campaignKey,
+      feature_flag_state: renderedState.featureFlags
+        ?.onboarding_daily_quality_home
+        ? "on"
+        : "off",
+    };
+  }, [
+    renderedState?.dailyQuality,
+    renderedState?.featureFlags?.onboarding_daily_quality_home,
+    renderedState?.homeMode,
+    renderedState?.recommendedAction?.id,
+    renderedState?.recommendedAction?.routeAvailable,
+    searchContext.campaignKey,
+    trackContext,
+  ]);
 
   useEffect(() => {
     setSelectedGoal(renderedState?.goal || null);
@@ -174,6 +213,41 @@ export default function OnboardingHomeView() {
       route_available: action.routeAvailable,
     });
   }, [isError, renderedState?.recommendedAction, trackContext]);
+
+  useEffect(() => {
+    if (!dailyTrackContext || isError) return;
+    const dailyQuality = renderedState?.dailyQuality;
+    trackOnboardingHomeEvent(
+      OnboardingHomeEvents.dailyQualityHomeViewed,
+      dailyTrackContext,
+    );
+    if (dailyQuality?.topSignal) {
+      trackOnboardingHomeEvent(
+        OnboardingHomeEvents.dailyQualityTopSignalShown,
+        dailyTrackContext,
+      );
+    } else {
+      trackOnboardingHomeEvent(
+        OnboardingHomeEvents.dailyQualityEmptyStateViewed,
+        dailyTrackContext,
+      );
+    }
+    if (
+      searchContext.mode === "daily-quality" ||
+      searchContext.source === "onboarding_email"
+    ) {
+      trackOnboardingHomeEvent(
+        OnboardingHomeEvents.dailyQualityDigestDestinationOpened,
+        dailyTrackContext,
+      );
+    }
+  }, [
+    dailyTrackContext,
+    isError,
+    renderedState?.dailyQuality,
+    searchContext.mode,
+    searchContext.source,
+  ]);
 
   if (isLoading || waitingForWorkspace || (!renderedState && !isError)) {
     return <OnboardingHomeSkeleton />;
@@ -230,6 +304,7 @@ export default function OnboardingHomeView() {
   };
 
   const handleActionClick = (action) => {
+    if (!action) return;
     trackOnboardingHomeEvent(OnboardingHomeEvents.recommendedActionClicked, {
       ...trackContext,
       action_id: action.id,
@@ -237,6 +312,59 @@ export default function OnboardingHomeView() {
       action_path: action.analytics?.targetPath,
       is_sample: action.isSample,
       completion_event: action.completionEvent,
+    });
+  };
+
+  const handleDailyActionClick = (action, dailyAction) => {
+    handleActionClick(action);
+    trackOnboardingHomeEvent(OnboardingHomeEvents.dailyQualityActionOpened, {
+      ...dailyTrackContext,
+      recommended_action_id: dailyAction?.id || action?.id,
+      route: dailyAction?.route || action?.href,
+      route_available: dailyAction?.routeAvailable ?? action?.routeAvailable,
+    });
+    if (dailyAction && !dailyAction.routeAvailable) {
+      trackOnboardingHomeEvent(
+        OnboardingHomeEvents.dailyQualityRouteFallbackUsed,
+        {
+          ...dailyTrackContext,
+          recommended_action_id: dailyAction.id,
+          route: dailyAction.fallbackRoute,
+          route_available: false,
+        },
+      );
+    }
+  };
+
+  const handleDailySignalReview = (signal, dailyAction) => {
+    trackOnboardingHomeEvent(OnboardingHomeEvents.dailyQualityItemReviewed, {
+      ...dailyTrackContext,
+      signal_id: signal.id,
+      signal_type: signal.type,
+      source_type: signal.sourceType,
+      source_id: signal.sourceId,
+      recommended_action_id: dailyAction?.id,
+      route: dailyAction?.route || signal.route,
+      is_sample: signal.isSample,
+    });
+    recordActivationEvent.mutate?.({
+      eventName: "daily_quality_item_reviewed",
+      primaryPath: renderedState.primaryPath,
+      stage: renderedState.stage,
+      source: "daily_quality_home",
+      artifactType: signal.sourceType,
+      artifactId: signal.sourceId,
+      projectId: signal.projectId,
+      isSample: signal.isSample,
+      metadata: {
+        signal_id: signal.id,
+        signal_type: signal.type,
+        source_type: signal.sourceType,
+        source_id: signal.sourceId,
+        recommended_action_id: dailyAction?.id,
+        route: dailyAction?.route || signal.route,
+        daily_quality_mode: renderedState.dailyQuality?.mode,
+      },
     });
   };
 
@@ -335,10 +463,21 @@ export default function OnboardingHomeView() {
           />
         ) : null}
         {["activated", "daily_review"].includes(renderedState.stage) ? (
-          <FirstLoopCompletePanel
-            {...observePanelProps}
-            lastMeaningfulEvent={renderedState.lastMeaningfulEvent}
-          />
+          renderedState.homeMode === "daily_quality" &&
+          renderedState.dailyQuality ? (
+            <DailyQualityHome
+              dailyQuality={renderedState.dailyQuality}
+              recommendedAction={renderedState.recommendedAction}
+              onActionClick={handleDailyActionClick}
+              onSignalReview={handleDailySignalReview}
+              canAct={!renderedState.permissions?.permissionLimited}
+            />
+          ) : (
+            <FirstLoopCompletePanel
+              {...observePanelProps}
+              lastMeaningfulEvent={renderedState.lastMeaningfulEvent}
+            />
+          )
         ) : null}
       </>
     ) : null;

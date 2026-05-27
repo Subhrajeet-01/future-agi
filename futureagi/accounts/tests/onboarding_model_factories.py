@@ -7,7 +7,9 @@ from tracer.models.project import Project
 from tracer.models.trace import Trace
 
 
-def create_observe_project(*, organization, workspace, user=None, name=None):
+def create_observe_project(
+    *, organization, workspace, user=None, name=None, metadata=None
+):
     return Project.no_workspace_objects.create(
         name=name or f"Observe {uuid.uuid4().hex[:8]}",
         organization=organization,
@@ -15,16 +17,19 @@ def create_observe_project(*, organization, workspace, user=None, name=None):
         user=user,
         model_type=AIModel.ModelTypes.GENERATIVE_LLM,
         trace_type="observe",
+        metadata=metadata,
     )
 
 
-def create_trace(*, project, name=None, with_payload=True):
+def create_trace(*, project, name=None, with_payload=True, metadata=None, error=None):
     payload = {"value": "private"} if with_payload else None
     return Trace.no_workspace_objects.create(
         project=project,
         name=name or f"Trace {uuid.uuid4().hex[:8]}",
+        metadata=metadata,
         input=payload,
         output=payload,
+        error=error,
     )
 
 

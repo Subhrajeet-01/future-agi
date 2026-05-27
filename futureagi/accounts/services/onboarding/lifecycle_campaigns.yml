@@ -143,10 +143,11 @@ campaigns:
     primary_path: observe
     entry_stages:
       - activated
+      - daily_review
     wait_window_minutes: 60
     priority: 50
     target_action_id: review_daily_quality
-    target_success_event: daily_quality_home_viewed
+    target_success_event: daily_quality_item_reviewed
     route_strategy: daily_quality
     dry_run_flag: onboarding_email_daily_digest_enabled
     send_flag: onboarding_lifecycle_send_enabled

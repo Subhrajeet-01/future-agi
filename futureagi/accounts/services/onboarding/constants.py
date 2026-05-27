@@ -94,6 +94,13 @@ LIFECYCLE_SUPPRESSION_REASONS = (
     "activation_state_error",
     "no_matching_campaign",
     "manual_pause",
+    "not_activated",
+    "sample_only",
+    "no_useful_signal",
+    "already_reviewed",
+    "frequency_capped",
+    "flag_disabled",
+    "preferences_blocked",
 )
 
 ROUTE_AVAILABILITY_STATES = (

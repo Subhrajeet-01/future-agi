@@ -350,6 +350,7 @@ export const ActivationEventResultApiEventName = {
   sample_to_real_setup_clicked: 'sample_to_real_setup_clicked',
   first_quality_loop_completed: 'first_quality_loop_completed',
   daily_quality_home_viewed: 'daily_quality_home_viewed',
+  daily_quality_top_signal_shown: 'daily_quality_top_signal_shown',
   daily_quality_top_change_reviewed: 'daily_quality_top_change_reviewed',
   daily_quality_item_reviewed: 'daily_quality_item_reviewed',
   daily_quality_action_created: 'daily_quality_action_created',
@@ -358,6 +359,9 @@ export const ActivationEventResultApiEventName = {
   daily_quality_action_completed: 'daily_quality_action_completed',
   daily_quality_action_dismissed: 'daily_quality_action_dismissed',
   daily_quality_no_signal_viewed: 'daily_quality_no_signal_viewed',
+  daily_quality_empty_state_viewed: 'daily_quality_empty_state_viewed',
+  daily_quality_digest_destination_opened: 'daily_quality_digest_destination_opened',
+  daily_quality_route_fallback_used: 'daily_quality_route_fallback_used',
   weekly_quality_review_opened: 'weekly_quality_review_opened',
   weekly_quality_action_assigned: 'weekly_quality_action_assigned',
   weekly_quality_action_completed: 'weekly_quality_action_completed',
@@ -817,6 +821,13 @@ export const LifecyclePreviewApiSuppressionReason = {
   activation_state_error: 'activation_state_error',
   no_matching_campaign: 'no_matching_campaign',
   manual_pause: 'manual_pause',
+  not_activated: 'not_activated',
+  sample_only: 'sample_only',
+  no_useful_signal: 'no_useful_signal',
+  already_reviewed: 'already_reviewed',
+  frequency_capped: 'frequency_capped',
+  flag_disabled: 'flag_disabled',
+  preferences_blocked: 'preferences_blocked',
 } as const;
 
 export interface LifecyclePreviewApi {
@@ -832,6 +843,149 @@ export interface LifecyclePreviewApi {
   target_action_id?: string;
   target_url?: string;
   dry_run_only?: boolean;
+}
+
+export type DailyQualityStateApiMode = typeof DailyQualityStateApiMode[keyof typeof DailyQualityStateApiMode];
+
+
+export const DailyQualityStateApiMode = {
+  new_signal: 'new_signal',
+  open_action: 'open_action',
+  no_new_signal: 'no_new_signal',
+  permission_limited: 'permission_limited',
+  unavailable: 'unavailable',
+} as const;
+
+export interface DailyQualityWindowApi {
+  start_at: string;
+  end_at: string;
+}
+
+export type DailyQualitySignalApiType = typeof DailyQualitySignalApiType[keyof typeof DailyQualitySignalApiType];
+
+
+export const DailyQualitySignalApiType = {
+  trace_failure: 'trace_failure',
+  span_latency: 'span_latency',
+  span_cost: 'span_cost',
+  eval_failure: 'eval_failure',
+  alert_triggered: 'alert_triggered',
+  feed_issue: 'feed_issue',
+  dashboard_missing: 'dashboard_missing',
+  alert_missing: 'alert_missing',
+  evaluator_missing: 'evaluator_missing',
+  saved_view_missing: 'saved_view_missing',
+} as const;
+
+export type DailyQualitySignalApiSeverity = typeof DailyQualitySignalApiSeverity[keyof typeof DailyQualitySignalApiSeverity];
+
+
+export const DailyQualitySignalApiSeverity = {
+  critical: 'critical',
+  warning: 'warning',
+  info: 'info',
+} as const;
+
+export interface DailyQualitySignalApi {
+  /** @minLength 1 */
+  id: string;
+  type: DailyQualitySignalApiType;
+  severity: DailyQualitySignalApiSeverity;
+  /** @minLength 1 */
+  title: string;
+  /** @minLength 1 */
+  body: string;
+  /** @minLength 1 */
+  source_type: string;
+  /** @minLength 1 */
+  source_id: string;
+  /** @minLength 1 */
+  project_id?: string;
+  /** @minLength 1 */
+  route: string;
+  is_sample?: boolean;
+  created_at: string;
+}
+
+export type DailyQualityActionApiActivationKind = typeof DailyQualityActionApiActivationKind[keyof typeof DailyQualityActionApiActivationKind];
+
+
+export const DailyQualityActionApiActivationKind = {
+  choose_goal: 'choose_goal',
+  setup: 'setup',
+  send_signal: 'send_signal',
+  review: 'review',
+  improve: 'improve',
+  sample_project: 'sample_project',
+  request_access: 'request_access',
+  fallback: 'fallback',
+  daily_quality: 'daily_quality',
+  adjacent_loop: 'adjacent_loop',
+} as const;
+
+export interface DailyQualityActionApi {
+  /** @minLength 1 */
+  id: string;
+  /** @minLength 1 */
+  label: string;
+  /** @minLength 1 */
+  body: string;
+  /** @minLength 1 */
+  route: string;
+  /** @minLength 1 */
+  fallback_route: string;
+  route_available?: boolean;
+  /** @minLength 1 */
+  source_type: string;
+  /** @minLength 1 */
+  source_id?: string;
+  success_event?: string;
+  is_primary?: boolean;
+  is_sample?: boolean;
+  requires_permission?: string;
+  activation_kind?: DailyQualityActionApiActivationKind;
+}
+
+export type DailyQualityProductCardApiPath = typeof DailyQualityProductCardApiPath[keyof typeof DailyQualityProductCardApiPath];
+
+
+export const DailyQualityProductCardApiPath = {
+  prompt: 'prompt',
+  agent: 'agent',
+  observe: 'observe',
+  gateway: 'gateway',
+  voice: 'voice',
+  evals: 'evals',
+  dashboards: 'dashboards',
+  sample: 'sample',
+} as const;
+
+export interface DailyQualityProductCardApi {
+  path: DailyQualityProductCardApiPath;
+  /** @minLength 1 */
+  status: string;
+  /** @minLength 1 */
+  label: string;
+  /** @minLength 1 */
+  summary: string;
+  /** @minLength 1 */
+  metric: string;
+  change?: string;
+  /** @minLength 1 */
+  route: string;
+}
+
+export interface DailyQualityStateApi {
+  mode: DailyQualityStateApiMode;
+  last_reviewed_at?: string;
+  window: DailyQualityWindowApi;
+  top_signal?: DailyQualitySignalApi;
+  primary_action?: DailyQualityActionApi;
+  action_cards?: DailyQualityActionApi[];
+  product_cards?: DailyQualityProductCardApi[];
+  digest_eligible: boolean;
+  digest_suppression_reason?: string;
+  diagnostics?: string[];
 }
 
 export type LifecycleEligibilityApiSuppressionReason = typeof LifecycleEligibilityApiSuppressionReason[keyof typeof LifecycleEligibilityApiSuppressionReason];
@@ -864,6 +1018,13 @@ export const LifecycleEligibilityApiSuppressionReason = {
   activation_state_error: 'activation_state_error',
   no_matching_campaign: 'no_matching_campaign',
   manual_pause: 'manual_pause',
+  not_activated: 'not_activated',
+  sample_only: 'sample_only',
+  no_useful_signal: 'no_useful_signal',
+  already_reviewed: 'already_reviewed',
+  frequency_capped: 'frequency_capped',
+  flag_disabled: 'flag_disabled',
+  preferences_blocked: 'preferences_blocked',
 } as const;
 
 export interface LifecycleEligibilityApi {
@@ -1042,6 +1203,7 @@ export interface ActivationStateResponseApi {
   available_paths: AvailablePathApi[];
   sample_project: SampleProjectStateApi;
   lifecycle?: LifecyclePreviewApi;
+  daily_quality?: DailyQualityStateApi;
   email_eligibility: LifecycleEligibilityApi;
   permissions: ActivationPermissionsApi;
   feature_flags: ActivationStateResponseApiFeatureFlags;

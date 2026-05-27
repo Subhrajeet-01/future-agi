@@ -52,6 +52,24 @@ describe("onboarding home events", () => {
     );
   });
 
+  it("exposes daily quality analytics events", () => {
+    expect(OnboardingHomeEvents.dailyQualityHomeViewed).toBe(
+      "daily_quality_home_viewed",
+    );
+    expect(OnboardingHomeEvents.dailyQualityTopSignalShown).toBe(
+      "daily_quality_top_signal_shown",
+    );
+    expect(OnboardingHomeEvents.dailyQualityActionOpened).toBe(
+      "daily_quality_action_opened",
+    );
+    expect(OnboardingHomeEvents.dailyQualityItemReviewed).toBe(
+      "daily_quality_item_reviewed",
+    );
+    expect(OnboardingHomeEvents.dailyQualityEmptyStateViewed).toBe(
+      "daily_quality_empty_state_viewed",
+    );
+  });
+
   it("normalizes unsafe or empty properties", () => {
     expect(
       normalizeOnboardingEventProperties({

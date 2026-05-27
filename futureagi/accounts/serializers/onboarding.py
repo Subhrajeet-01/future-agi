@@ -327,6 +327,142 @@ class LifecyclePreviewSerializer(serializers.Serializer):
         return attrs
 
 
+class DailyQualityWindowSerializer(serializers.Serializer):
+    start_at = serializers.DateTimeField()
+    end_at = serializers.DateTimeField()
+
+
+class DailyQualitySignalSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    type = serializers.ChoiceField(
+        choices=choices(
+            (
+                "trace_failure",
+                "span_latency",
+                "span_cost",
+                "eval_failure",
+                "alert_triggered",
+                "feed_issue",
+                "dashboard_missing",
+                "alert_missing",
+                "evaluator_missing",
+                "saved_view_missing",
+            )
+        )
+    )
+    severity = serializers.ChoiceField(choices=choices(("critical", "warning", "info")))
+    title = serializers.CharField()
+    body = serializers.CharField()
+    source_type = serializers.CharField()
+    source_id = serializers.CharField()
+    project_id = serializers.CharField(required=False, allow_null=True)
+    route = serializers.CharField()
+    is_sample = serializers.BooleanField(default=False)
+    created_at = serializers.DateTimeField()
+
+    def validate(self, attrs):
+        if attrs["is_sample"]:
+            raise serializers.ValidationError(
+                "Daily quality signals cannot come from sample data."
+            )
+        return attrs
+
+
+class DailyQualityActionSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    label = serializers.CharField()
+    body = serializers.CharField()
+    route = serializers.CharField()
+    fallback_route = serializers.CharField()
+    route_available = serializers.BooleanField(default=True)
+    source_type = serializers.CharField()
+    source_id = serializers.CharField(required=False, allow_null=True)
+    success_event = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    is_primary = serializers.BooleanField(default=False)
+    is_sample = serializers.BooleanField(default=False)
+    requires_permission = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    activation_kind = serializers.ChoiceField(
+        choices=choices(ACTION_KINDS),
+        required=False,
+        allow_null=True,
+    )
+
+    def validate(self, attrs):
+        if attrs["is_sample"]:
+            raise serializers.ValidationError(
+                "Daily quality actions cannot use sample data."
+            )
+        return attrs
+
+
+class DailyQualityProductCardSerializer(serializers.Serializer):
+    path = serializers.ChoiceField(choices=choices(PRODUCT_PATHS))
+    status = serializers.CharField()
+    label = serializers.CharField()
+    summary = serializers.CharField()
+    metric = serializers.CharField()
+    change = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    route = serializers.CharField()
+
+
+class DailyQualityStateSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(
+        choices=choices(
+            (
+                "new_signal",
+                "open_action",
+                "no_new_signal",
+                "permission_limited",
+                "unavailable",
+            )
+        )
+    )
+    last_reviewed_at = serializers.DateTimeField(required=False, allow_null=True)
+    window = DailyQualityWindowSerializer()
+    top_signal = DailyQualitySignalSerializer(required=False, allow_null=True)
+    primary_action = DailyQualityActionSerializer(required=False, allow_null=True)
+    action_cards = DailyQualityActionSerializer(many=True, required=False)
+    product_cards = DailyQualityProductCardSerializer(many=True, required=False)
+    digest_eligible = serializers.BooleanField()
+    digest_suppression_reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    diagnostics = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+    )
+
+    def validate(self, attrs):
+        mode = attrs["mode"]
+        top_signal = attrs.get("top_signal")
+        primary_action = attrs.get("primary_action")
+        if mode in {"new_signal", "open_action"} and not top_signal:
+            raise serializers.ValidationError("Signal modes must include a top_signal.")
+        if mode != "unavailable" and not primary_action:
+            raise serializers.ValidationError(
+                "Renderable daily quality states require a primary_action."
+            )
+        if not attrs["digest_eligible"] and not attrs.get("digest_suppression_reason"):
+            raise serializers.ValidationError(
+                "Suppressed daily digest decisions need a reason."
+            )
+        if attrs["digest_eligible"] and attrs.get("digest_suppression_reason"):
+            raise serializers.ValidationError(
+                "Eligible daily digest decisions cannot include a suppression reason."
+            )
+        return attrs
+
+
 class ActivationPermissionsSerializer(serializers.Serializer):
     role = serializers.CharField(allow_blank=True, allow_null=True)
     can_read = serializers.BooleanField()
@@ -448,6 +584,7 @@ class ActivationStateResponseSerializer(serializers.Serializer):
     available_paths = AvailablePathSerializer(many=True)
     sample_project = SampleProjectStateSerializer()
     lifecycle = LifecyclePreviewSerializer(required=False, allow_null=True)
+    daily_quality = DailyQualityStateSerializer(required=False, allow_null=True)
     email_eligibility = LifecycleEligibilitySerializer()
     permissions = ActivationPermissionsSerializer()
     feature_flags = serializers.DictField(child=serializers.BooleanField())

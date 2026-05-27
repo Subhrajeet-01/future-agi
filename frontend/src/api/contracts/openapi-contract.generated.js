@@ -75002,6 +75002,7 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "sample_to_real_setup_clicked",
             "first_quality_loop_completed",
             "daily_quality_home_viewed",
+            "daily_quality_top_signal_shown",
             "daily_quality_top_change_reviewed",
             "daily_quality_item_reviewed",
             "daily_quality_action_created",
@@ -75010,6 +75011,9 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "daily_quality_action_completed",
             "daily_quality_action_dismissed",
             "daily_quality_no_signal_viewed",
+            "daily_quality_empty_state_viewed",
+            "daily_quality_digest_destination_opened",
+            "daily_quality_route_fallback_used",
             "weekly_quality_review_opened",
             "weekly_quality_action_assigned",
             "weekly_quality_action_completed",
@@ -75258,6 +75262,9 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "lifecycle": {
           "$ref": "#/definitions/LifecyclePreview"
+        },
+        "daily_quality": {
+          "$ref": "#/definitions/DailyQualityState"
         },
         "email_eligibility": {
           "$ref": "#/definitions/LifecycleEligibility"
@@ -91672,6 +91679,71 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "DailyQualityState": {
+      "required": [
+        "mode",
+        "window",
+        "digest_eligible"
+      ],
+      "type": "object",
+      "properties": {
+        "mode": {
+          "title": "Mode",
+          "type": "string",
+          "enum": [
+            "new_signal",
+            "open_action",
+            "no_new_signal",
+            "permission_limited",
+            "unavailable"
+          ]
+        },
+        "last_reviewed_at": {
+          "title": "Last reviewed at",
+          "type": "string",
+          "format": "date-time",
+          "x-nullable": true
+        },
+        "window": {
+          "$ref": "#/definitions/DailyQualityWindow"
+        },
+        "top_signal": {
+          "$ref": "#/definitions/DailyQualitySignal"
+        },
+        "primary_action": {
+          "$ref": "#/definitions/DailyQualityAction"
+        },
+        "action_cards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DailyQualityAction"
+          }
+        },
+        "product_cards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DailyQualityProductCard"
+          }
+        },
+        "digest_eligible": {
+          "title": "Digest eligible",
+          "type": "boolean"
+        },
+        "digest_suppression_reason": {
+          "title": "Digest suppression reason",
+          "type": "string",
+          "x-nullable": true
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "x-nullable": true
+    },
     "LifecycleEligibility": {
       "required": [
         "eligible",
@@ -91718,7 +91790,14 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "workspace_inactive",
             "activation_state_error",
             "no_matching_campaign",
-            "manual_pause"
+            "manual_pause",
+            "not_activated",
+            "sample_only",
+            "no_useful_signal",
+            "already_reviewed",
+            "frequency_capped",
+            "flag_disabled",
+            "preferences_blocked"
           ],
           "x-nullable": true
         },
@@ -91831,7 +91910,14 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "workspace_inactive",
             "activation_state_error",
             "no_matching_campaign",
-            "manual_pause"
+            "manual_pause",
+            "not_activated",
+            "sample_only",
+            "no_useful_signal",
+            "already_reviewed",
+            "frequency_capped",
+            "flag_disabled",
+            "preferences_blocked"
           ],
           "x-nullable": true
         },
@@ -99090,6 +99176,262 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Reason",
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "DailyQualityAction": {
+      "required": [
+        "id",
+        "label",
+        "body",
+        "route",
+        "fallback_route",
+        "source_type"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "title": "Label",
+          "type": "string",
+          "minLength": 1
+        },
+        "body": {
+          "title": "Body",
+          "type": "string",
+          "minLength": 1
+        },
+        "route": {
+          "title": "Route",
+          "type": "string",
+          "minLength": 1
+        },
+        "fallback_route": {
+          "title": "Fallback route",
+          "type": "string",
+          "minLength": 1
+        },
+        "route_available": {
+          "title": "Route available",
+          "type": "boolean",
+          "default": true
+        },
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        },
+        "success_event": {
+          "title": "Success event",
+          "type": "string",
+          "x-nullable": true
+        },
+        "is_primary": {
+          "title": "Is primary",
+          "type": "boolean",
+          "default": false
+        },
+        "is_sample": {
+          "title": "Is sample",
+          "type": "boolean",
+          "default": false
+        },
+        "requires_permission": {
+          "title": "Requires permission",
+          "type": "string",
+          "x-nullable": true
+        },
+        "activation_kind": {
+          "title": "Activation kind",
+          "type": "string",
+          "enum": [
+            "choose_goal",
+            "setup",
+            "send_signal",
+            "review",
+            "improve",
+            "sample_project",
+            "request_access",
+            "fallback",
+            "daily_quality",
+            "adjacent_loop"
+          ],
+          "x-nullable": true
+        }
+      },
+      "x-nullable": true
+    },
+    "DailyQualityProductCard": {
+      "required": [
+        "path",
+        "status",
+        "label",
+        "summary",
+        "metric",
+        "route"
+      ],
+      "type": "object",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string",
+          "enum": [
+            "prompt",
+            "agent",
+            "observe",
+            "gateway",
+            "voice",
+            "evals",
+            "dashboards",
+            "sample"
+          ]
+        },
+        "status": {
+          "title": "Status",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "title": "Label",
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string",
+          "minLength": 1
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string",
+          "minLength": 1
+        },
+        "change": {
+          "title": "Change",
+          "type": "string",
+          "x-nullable": true
+        },
+        "route": {
+          "title": "Route",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "DailyQualitySignal": {
+      "required": [
+        "id",
+        "type",
+        "severity",
+        "title",
+        "body",
+        "source_type",
+        "source_id",
+        "route",
+        "created_at"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "trace_failure",
+            "span_latency",
+            "span_cost",
+            "eval_failure",
+            "alert_triggered",
+            "feed_issue",
+            "dashboard_missing",
+            "alert_missing",
+            "evaluator_missing",
+            "saved_view_missing"
+          ]
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string",
+          "enum": [
+            "critical",
+            "warning",
+            "info"
+          ]
+        },
+        "title": {
+          "title": "Title",
+          "type": "string",
+          "minLength": 1
+        },
+        "body": {
+          "title": "Body",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "title": "Source type",
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "title": "Source id",
+          "type": "string",
+          "minLength": 1
+        },
+        "project_id": {
+          "title": "Project id",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        },
+        "route": {
+          "title": "Route",
+          "type": "string",
+          "minLength": 1
+        },
+        "is_sample": {
+          "title": "Is sample",
+          "type": "boolean",
+          "default": false
+        },
+        "created_at": {
+          "title": "Created at",
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "x-nullable": true
+    },
+    "DailyQualityWindow": {
+      "required": [
+        "start_at",
+        "end_at"
+      ],
+      "type": "object",
+      "properties": {
+        "start_at": {
+          "title": "Start at",
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_at": {
+          "title": "End at",
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

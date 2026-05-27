@@ -8,6 +8,7 @@ import OnboardingHomeView from "../OnboardingHomeView";
 
 const mocks = vi.hoisted(() => ({
   useActivationState: vi.fn(),
+  useRecordActivationEvent: vi.fn(),
   useSaveOnboardingGoal: vi.fn(),
   useSampleProject: vi.fn(),
   useAuthContext: vi.fn(),
@@ -17,6 +18,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../hooks/useActivationState", () => ({
   useActivationState: (params) => mocks.useActivationState(params),
+}));
+
+vi.mock("../hooks/useRecordActivationEvent", () => ({
+  useRecordActivationEvent: () => mocks.useRecordActivationEvent(),
 }));
 
 vi.mock("../hooks/useSaveOnboardingGoal", () => ({
@@ -69,6 +74,11 @@ describe("OnboardingHomeView", () => {
     vi.clearAllMocks();
     mocks.useAuthContext.mockReturnValue({ user: defaultUser });
     mocks.useWorkspace.mockReturnValue(defaultWorkspace);
+    mocks.useRecordActivationEvent.mockReturnValue({
+      mutate: vi.fn(),
+      isLoading: false,
+      isPending: false,
+    });
     mocks.useSaveOnboardingGoal.mockReturnValue({
       data: null,
       error: null,
@@ -198,6 +208,104 @@ describe("OnboardingHomeView", () => {
         target_success_event: "observe_project_created",
         route_available: true,
       }),
+    );
+  });
+
+  it("renders daily quality home for activated observe workspaces", async () => {
+    const mutate = vi.fn();
+    mocks.useRecordActivationEvent.mockReturnValue({
+      mutate,
+      isLoading: false,
+      isPending: false,
+    });
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("dailyQualityObserveNewSignal"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView("/dashboard/home?mode=daily-quality&source=onboarding_email");
+
+    expect(screen.getByTestId("onboarding-daily-quality")).toBeVisible();
+    expect(screen.getByTestId("daily-quality-top-signal")).toBeVisible();
+    expect(screen.queryByTestId("first-loop-complete-panel")).toBeNull();
+    await waitFor(() =>
+      expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+        "daily_quality_home_viewed",
+        expect.objectContaining({
+          daily_quality_mode: "new_signal",
+          signal_id: "trace_failure:trace-2",
+        }),
+      ),
+    );
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "daily_quality_top_signal_shown",
+      expect.objectContaining({
+        signal_type: "trace_failure",
+      }),
+    );
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "daily_quality_digest_destination_opened",
+      expect.objectContaining({
+        digest_context_id: null,
+      }),
+    );
+
+    await userEvent.click(screen.getByTestId("daily-quality-primary-action"));
+
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "daily_quality_action_opened",
+      expect.objectContaining({
+        recommended_action_id: "review_failed_trace",
+        route: "/dashboard/observe/observe-1/trace/trace-2",
+      }),
+    );
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "daily_quality_item_reviewed",
+      expect.objectContaining({
+        signal_id: "trace_failure:trace-2",
+        source_type: "trace",
+      }),
+    );
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: "daily_quality_item_reviewed",
+        primaryPath: "observe",
+        stage: "daily_review",
+        artifactType: "trace",
+        artifactId: "trace-2",
+      }),
+    );
+  });
+
+  it("renders daily quality no-signal state with one useful action", async () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("dailyQualityObserveNoSignal"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    expect(screen.getByTestId("onboarding-daily-quality")).toBeVisible();
+    expect(screen.getByTestId("daily-quality-empty-state")).toBeVisible();
+    expect(
+      screen.getByTestId("daily-quality-primary-action"),
+    ).toHaveTextContent("Create alert");
+    expect(screen.queryByText("Connect one observe project")).toBeNull();
+    await waitFor(() =>
+      expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+        "daily_quality_empty_state_viewed",
+        expect.objectContaining({
+          daily_quality_mode: "no_new_signal",
+        }),
+      ),
     );
   });
 

@@ -72,6 +72,32 @@ describe("activation-state utilities", () => {
     );
   });
 
+  it("normalizes daily quality state and rejects sample signals", () => {
+    const normalized = normalizeActivationState(
+      getActivationStateFixture("dailyQualityObserveNewSignal"),
+    );
+
+    expect(normalized.dailyQuality.mode).toBe("new_signal");
+    expect(normalized.dailyQuality.topSignal.type).toBe("trace_failure");
+    expect(normalized.dailyQuality.primaryAction.id).toBe(
+      "review_failed_trace",
+    );
+
+    const fixture = getActivationStateFixture("dailyQualityObserveNewSignal");
+    expect(() =>
+      normalizeActivationState({
+        ...fixture,
+        daily_quality: {
+          ...fixture.daily_quality,
+          top_signal: {
+            ...fixture.daily_quality.top_signal,
+            is_sample: true,
+          },
+        },
+      }),
+    ).toThrow(/sample data/);
+  });
+
   it("derives sample project route helpers", () => {
     const normalized = normalizeActivationState({
       ...getActivationStateFixture("sampleTraceReady"),

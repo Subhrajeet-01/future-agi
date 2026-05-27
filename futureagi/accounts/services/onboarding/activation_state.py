@@ -5,6 +5,7 @@ from django.utils import timezone
 from accounts.serializers.onboarding import ActivationStateResponseSerializer
 from accounts.services.onboarding.constants import ACTIVATION_SCHEMA_VERSION
 from accounts.services.onboarding.context import resolve_onboarding_context
+from accounts.services.onboarding.daily_quality import resolve_daily_quality_state
 from accounts.services.onboarding.feature_flags import get_onboarding_flags
 from accounts.services.onboarding.flow_config import (
     configured_goal_options,
@@ -134,6 +135,26 @@ def _lifecycle_preview(context, flags, payload, now):
     return lifecycle_preview_from_decision(decision, flags=flags)
 
 
+def _apply_daily_quality_email_guardrail(email_eligibility, daily_quality):
+    if not daily_quality:
+        return email_eligibility
+    if daily_quality["digest_eligible"]:
+        return {
+            **email_eligibility,
+            "digest_eligible": True,
+        }
+    return {
+        **email_eligibility,
+        "eligible": False,
+        "suppressed": True,
+        "suppression_reason": daily_quality["digest_suppression_reason"],
+        "next_email_key": None,
+        "next_email_after": None,
+        "digest_eligible": False,
+        "frequency_cap_remaining": 0,
+    }
+
+
 def _last_event_payload(event):
     if not event:
         return None
@@ -216,9 +237,25 @@ def resolve_activation_state(*, context, flags, signals):
         "diagnostics": None,
         "warnings": context.warnings,
     }
+    if payload["home_mode"] == "daily_quality":
+        daily_quality = resolve_daily_quality_state(
+            context=context,
+            flags=flags,
+            signals=signals,
+            routes=payload["route_availability"],
+            stage=stage,
+            now=now,
+        )
+        payload["daily_quality"] = daily_quality.state
+        payload["route_availability"].update(daily_quality.route_availability)
+        if daily_quality.recommended_action:
+            payload["recommended_action"] = daily_quality.recommended_action
     lifecycle = _lifecycle_preview(context, flags, payload, now)
     payload["lifecycle"] = lifecycle
-    payload["email_eligibility"] = _email_eligibility(stage, flags, now, lifecycle)
+    payload["email_eligibility"] = _apply_daily_quality_email_guardrail(
+        _email_eligibility(stage, flags, now, lifecycle),
+        payload.get("daily_quality"),
+    )
     return _validate_payload(payload)
 
 
