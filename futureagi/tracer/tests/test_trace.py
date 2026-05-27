@@ -426,14 +426,16 @@ class TestTraceGetTraceIdByIndexObserveAPI:
         response = auth_client.get("/tracer/trace/get_trace_id_by_index_observe/")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attributes_raw/metadata_map (v1 columns) not yet migrated to v2 schema",
-        strict=False,
-    )
     def test_get_trace_by_index_observe_no_root_span(
         self, auth_client, observe_project
     ):
-        """Trace with no root span should not crash; start_time falls back to created_at."""
+        """Trace with no root span returns 400 on the CH-only path.
+
+        The CH-only path queries the ``spans`` table for a root span
+        (``parent_span_id IS NULL``). A trace with zero spans has no
+        root span in CH, so the endpoint correctly returns 400
+        "Trace not found" rather than crashing.
+        """
         trace_no_spans = Trace.objects.create(
             project=observe_project,
             name="Observe Trace Without Spans",
@@ -445,8 +447,8 @@ class TestTraceGetTraceIdByIndexObserveAPI:
                 "trace_id": str(trace_no_spans.id),
             },
         )
-        # Should return 200, NOT crash with "Cannot use None as a query value"
-        assert response.status_code == status.HTTP_200_OK
+        # CH-only path: a trace with no spans is genuinely not found.
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.integration
@@ -550,10 +552,6 @@ class TestUsersViewAPI:
         )
         assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attributes_raw/span_attr_str (v1 columns) not yet migrated to v2 schema",
-        strict=False,
-    )
     def test_get_users_without_project_id(self, auth_client):
         """Get users returns all workspace users when project_id is missing."""
         response = auth_client.get("/tracer/users/")
@@ -582,12 +580,14 @@ class TestTraceListTracesOfSessionAPI:
         )
         assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attributes_raw/span_attr_str (v1 columns) not yet migrated to v2 schema",
-        strict=False,
-    )
-    def test_list_session_traces_missing_session_id(self, auth_client):
-        """List session traces supports org-scoped listing without session ID."""
+    def test_list_session_traces_missing_session_id(self, auth_client, observe_project):
+        """List session traces supports org-scoped listing without session ID.
+
+        Depends on ``observe_project`` so the workspace has at least one
+        observe project, which makes the org-scoped CH path use PG-side
+        eval config lookup instead of passing project_id=None to
+        ``toUUID()``.
+        """
         response = auth_client.get("/tracer/trace/list_traces_of_session/")
         assert response.status_code == status.HTTP_200_OK
 

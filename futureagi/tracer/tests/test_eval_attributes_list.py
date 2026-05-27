@@ -30,10 +30,6 @@ import model_hub.tasks  # noqa: F401, E402
 class TestGetEvalAttributesListSpans:
     """Legacy span behaviour — returned shape unchanged."""
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attr_str (v1 column) not yet migrated to v2 schema",
-        strict=False,
-    )
     def test_spans_default_returns_flat_list(
         self, auth_client, populated_observe_project
     ):
@@ -52,10 +48,6 @@ class TestGetEvalAttributesListSpans:
         # No dotted paths — the spans surface is flat.
         assert not any("." in path for path in result)
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attr_str (v1 column) not yet migrated to v2 schema",
-        strict=False,
-    )
     def test_spans_explicit_row_type_returns_flat_list(
         self, auth_client, populated_observe_project
     ):
@@ -107,10 +99,6 @@ class TestGetEvalAttributesListTraces:
         ):
             assert field in result
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attr_str (v1 column) not yet migrated to v2 schema",
-        strict=False,
-    )
     def test_includes_indexed_span_paths_per_observed_key(
         self, auth_client, populated_observe_project
     ):
@@ -207,10 +195,6 @@ class TestGetEvalAttributesListSessions:
         # No phantom positions beyond the observed max
         assert "traces.2.input" not in result
 
-    @pytest.mark.xfail(
-        reason="Production CH query references span_attr_str (v1 column) not yet migrated to v2 schema",
-        strict=False,
-    )
     def test_includes_nested_traces_spans_paths(
         self, auth_client, populated_observe_project
     ):

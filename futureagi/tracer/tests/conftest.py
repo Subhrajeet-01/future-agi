@@ -527,13 +527,21 @@ def populated_observe_project(db, observe_project):
                     input={"messages": [{"role": "user", "content": f"hi s{s_idx}t{t_idx}_{sp_idx}"}]},
                     output={"choices": [{"message": {"content": f"reply s{s_idx}t{t_idx}_{sp_idx}"}}]},
                     span_attributes={
-                        "input": {"value": f"hi s{s_idx}t{t_idx}_{sp_idx}"},
-                        "output": {"value": f"reply s{s_idx}t{t_idx}_{sp_idx}"},
+                        "input": f"hi s{s_idx}t{t_idx}_{sp_idx}",
+                        "output": f"reply s{s_idx}t{t_idx}_{sp_idx}",
+                        "model_name": "gpt-4",
+                        "provider_name": "openai",
+                        "operation": "chat",
+                        "prompt_tokens": "10",
+                        "completion_tokens": "5",
                     },
                     model="gpt-4",
                     status="OK",
                 )
             spans.extend(list(trace.observation_spans.order_by("start_time")))
+
+    # Seed CH so endpoints that read from ClickHouse see the rows.
+    seed_ch_spans(spans)
 
     return {
         "project": observe_project,

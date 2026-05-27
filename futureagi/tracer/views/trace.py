@@ -4662,7 +4662,7 @@ class UsersView(APIView):
             end_user_ids = [
                 r.get("end_user_id") for r in output if r.get("end_user_id")
             ]
-            if used_clickhouse and end_user_ids:
+            if end_user_ids:
                 try:
                     analytics = AnalyticsQueryService()
                     _SKIP_ATTR_PREFIXES = (

@@ -173,10 +173,7 @@ class UserListQueryBuilder(BaseQueryBuilder):
                 cost,
                 total_tokens,
                 prompt_tokens,
-                completion_tokens,
-                span_attributes_raw,
-                span_attr_str,
-                span_attr_num
+                completion_tokens
             FROM spans
             WHERE is_deleted = 0
               AND end_user_id IN (SELECT id FROM filtered_end_users)
