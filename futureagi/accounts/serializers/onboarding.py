@@ -1250,7 +1250,7 @@ class DailyQualityStateSerializer(serializers.Serializer):
         mode = attrs["mode"]
         top_signal = attrs.get("top_signal")
         primary_action = attrs.get("primary_action")
-        if mode in {"new_signal", "open_action"} and not top_signal:
+        if mode == "new_signal" and not top_signal:
             raise serializers.ValidationError("Signal modes must include a top_signal.")
         if mode != "unavailable" and not primary_action:
             raise serializers.ValidationError(

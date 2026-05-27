@@ -41,6 +41,105 @@ def test_activation_state_response_serializer_accepts_observe_first_run_fixture(
     )
 
 
+def test_activation_state_response_serializer_accepts_open_daily_action():
+    payload = activation_state_payload(
+        stage="daily_review",
+        home_mode="daily_quality",
+        is_activated=True,
+        activated_at="2026-05-27T08:00:00Z",
+        recommended_action=activation_action(
+            id="continue_quality_action",
+            kind="daily_quality",
+            title="Continue quality action",
+            description="Return to the unresolved action from the last review.",
+            href="/dashboard/observe/observe-1",
+            cta_label="Continue action",
+            requires_permission=None,
+            completion_event="daily_quality_action_completed",
+        ),
+        last_meaningful_event={
+            "name": "first_quality_loop_completed",
+            "occurred_at": "2026-05-27T08:00:00Z",
+            "is_sample": False,
+            "path": "observe",
+            "metadata": {},
+        },
+    )
+    payload["route_availability"]["observe_project"] = {
+        "href": "/dashboard/observe/observe-1",
+        "is_available": True,
+        "reason": None,
+    }
+    payload["email_eligibility"].update(
+        {
+            "eligible": False,
+            "suppressed": True,
+            "suppression_reason": "open_action",
+            "next_email_key": None,
+            "next_email_after": None,
+            "digest_eligible": False,
+        }
+    )
+    payload["daily_quality"] = {
+        "mode": "open_action",
+        "last_reviewed_at": "2026-05-27T08:00:00Z",
+        "window": {
+            "start_at": "2026-05-27T08:00:00Z",
+            "end_at": "2026-05-27T10:00:00Z",
+        },
+        "top_signal": None,
+        "primary_action": {
+            "id": "continue_quality_action",
+            "label": "Continue action",
+            "body": "Return to the unresolved action from the last review.",
+            "route": "/dashboard/observe/observe-1",
+            "fallback_route": "/dashboard/get-started",
+            "route_available": True,
+            "source_type": "project",
+            "source_id": "observe-1",
+            "success_event": "daily_quality_action_completed",
+            "is_primary": True,
+            "is_sample": False,
+            "requires_permission": None,
+            "activation_kind": "daily_quality",
+        },
+        "action_cards": [],
+        "product_cards": [
+            {
+                "path": "observe",
+                "status": "needs_review",
+                "label": "Observe",
+                "summary": "1 unresolved action",
+                "metric": "1",
+                "change": "Open from last review",
+                "route": "/dashboard/observe/observe-1",
+            }
+        ],
+        "weekly_review": {
+            "due": True,
+            "status": "due",
+            "route": "/dashboard/home?mode=weekly-review",
+            "window": {
+                "start_at": "2026-05-20T10:00:00Z",
+                "end_at": "2026-05-27T10:00:00Z",
+            },
+            "summary": "Review unresolved quality work with your team.",
+            "unresolved_count": 1,
+            "completed_count": 0,
+            "last_completed_at": None,
+            "action_label": "Open weekly review",
+        },
+        "digest_eligible": False,
+        "digest_suppression_reason": "open_action",
+        "diagnostics": ["open_action"],
+    }
+
+    serializer = ActivationStateResponseSerializer(data=payload)
+
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["daily_quality"]["mode"] == "open_action"
+
+
 def test_activation_state_response_rejects_unknown_stage():
     payload = activation_state_payload(stage="unknown_stage")
     serializer = ActivationStateResponseSerializer(data=payload)

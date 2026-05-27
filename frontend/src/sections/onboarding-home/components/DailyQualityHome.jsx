@@ -179,6 +179,52 @@ export default function DailyQualityHome({
         </Box>
       ) : null}
 
+      {dailyQuality?.actionCards?.length ? (
+        <Box
+          sx={{
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
+            p: 2,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Stack spacing={1.25}>
+            <Typography variant="subtitle2">Open quality actions</Typography>
+            {dailyQuality.actionCards.map((action) => {
+              const actionRoute = actionHref(action);
+              return (
+                <Stack
+                  key={action.id}
+                  data-testid={`daily-quality-action-card-${action.id}`}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                >
+                  <Box>
+                    <Typography variant="body2">{action.label}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {action.body}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    component={actionRoute ? RouterLink : "button"}
+                    href={actionRoute || undefined}
+                    disabled={!actionRoute}
+                    onClick={() => onActionClick?.(recommendedAction, action)}
+                    endIcon={<Iconify icon="mdi:arrow-right" width={16} />}
+                  >
+                    Open
+                  </Button>
+                </Stack>
+              );
+            })}
+          </Stack>
+        </Box>
+      ) : null}
+
       {weeklyReview?.due ? (
         <Box
           data-testid="weekly-quality-review"

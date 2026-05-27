@@ -1459,6 +1459,25 @@ export const activationStateFixtures = {
         source_id: "observe-1",
         success_event: "daily_quality_action_completed",
       }),
+      action_cards: [
+        dailyQualityPrimaryAction({
+          id: "assign_trace_owner",
+          label: "Assign trace owner",
+          body: "Pick an owner for the recurring trace failure.",
+          route: "/dashboard/observe/observe-1?mode=quality-actions",
+          source_type: "project",
+          source_id: "observe-1",
+          success_event: "daily_quality_action_completed",
+          is_primary: false,
+        }),
+      ],
+      weekly_review: weeklyReviewState({
+        due: true,
+        status: "due",
+        summary: "Review unresolved quality work with your team.",
+        unresolved_count: 2,
+        action_label: "Open weekly review",
+      }),
     }),
   }),
 

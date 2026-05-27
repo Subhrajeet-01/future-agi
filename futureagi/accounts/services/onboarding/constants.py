@@ -97,6 +97,7 @@ LIFECYCLE_SUPPRESSION_REASONS = (
     "not_activated",
     "sample_only",
     "no_useful_signal",
+    "open_action",
     "already_reviewed",
     "frequency_capped",
     "flag_disabled",

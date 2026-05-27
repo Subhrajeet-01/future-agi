@@ -16,6 +16,16 @@ REVIEW_EVENTS = (
     "daily_quality_top_change_reviewed",
     "daily_quality_action_completed",
 )
+ACTION_OPEN_EVENTS = (
+    "daily_quality_action_created",
+    "daily_quality_action_opened",
+    "daily_quality_action_assigned",
+)
+ACTION_CLOSE_EVENTS = (
+    "daily_quality_action_completed",
+    "daily_quality_action_dismissed",
+)
+ACTION_EVENTS = (*ACTION_OPEN_EVENTS, *ACTION_CLOSE_EVENTS)
 WEEKLY_REVIEW_COMPLETED_EVENTS = ("weekly_quality_review_completed",)
 WEEKLY_REVIEW_ROUTE = "/dashboard/home?mode=weekly-review"
 
@@ -185,6 +195,111 @@ def _recent_event_count(context, *, event_names, window):
         for event in events
         if window["start_at"] < event.occurred_at <= window["end_at"]
     )
+
+
+def _safe_metadata_text(metadata, key, fallback):
+    value = (metadata or {}).get(key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()[:180]
+    return fallback
+
+
+def _action_identity(event):
+    metadata = event.metadata or {}
+    explicit_id = metadata.get("action_id") or metadata.get("quality_action_id")
+    if explicit_id:
+        return str(explicit_id)
+    source_type = metadata.get("source_type") or metadata.get("artifact_type")
+    source_id = metadata.get("source_id") or metadata.get("artifact_id")
+    if source_type and source_id:
+        return f"{source_type}:{source_id}"
+    return str(event.id)
+
+
+def _action_metadata(metadata):
+    return {
+        key: value
+        for key, value in (metadata or {}).items()
+        if value is not None and value != ""
+    }
+
+
+def _open_quality_actions(context, now):
+    if not context.organization or not context.workspace:
+        return []
+    events = events_for_workspace(
+        organization=context.organization,
+        workspace=context.workspace,
+        event_names=ACTION_EVENTS,
+        product_path=_path(context),
+        is_sample=False,
+        limit=500,
+    )
+    since = now - timedelta(days=30)
+    latest_by_action = {}
+    metadata_by_action = {}
+    for event in reversed(events):
+        if event.occurred_at < since:
+            continue
+        action_id = _action_identity(event)
+        metadata_by_action[action_id] = {
+            **metadata_by_action.get(action_id, {}),
+            **_action_metadata(event.metadata),
+        }
+        latest_by_action[action_id] = event
+
+    actions = []
+    for action_id, event in latest_by_action.items():
+        if event.event_name in ACTION_CLOSE_EVENTS:
+            continue
+        metadata = metadata_by_action.get(action_id) or event.metadata or {}
+        route = metadata.get("route") or metadata.get("href") or "/dashboard/home"
+        fallback_route = metadata.get("fallback_route") or "/dashboard/get-started"
+        if not _internal_route(route):
+            route = "/dashboard/home"
+        if not _internal_route(fallback_route):
+            fallback_route = "/dashboard/get-started"
+        source_type = metadata.get("source_type") or metadata.get("artifact_type")
+        source_id = metadata.get("source_id") or metadata.get("artifact_id")
+        actions.append(
+            (
+                event.occurred_at,
+                {
+                    "id": action_id,
+                    "label": _safe_metadata_text(
+                        metadata,
+                        "label",
+                        "Continue quality action",
+                    ),
+                    "body": _safe_metadata_text(
+                        metadata,
+                        "body",
+                        "Return to unresolved quality work from a previous review.",
+                    ),
+                    "route": route,
+                    "fallback_route": fallback_route,
+                    "route_available": True,
+                    "source_type": str(source_type or "workspace"),
+                    "source_id": str(source_id)
+                    if source_id
+                    else str(context.workspace.id),
+                    "success_event": "daily_quality_action_completed",
+                    "is_primary": False,
+                    "is_sample": False,
+                    "requires_permission": None,
+                    "activation_kind": "daily_quality",
+                },
+            )
+        )
+
+    return [
+        action
+        for _occurred_at, action in sorted(
+            actions,
+            key=lambda item: (item[0], item[1]["id"]),
+            reverse=True,
+        )[:5]
+    ]
 
 
 def _trace_queryset(context):
@@ -697,14 +812,14 @@ def _unavailable(reason, now):
     }
 
 
-def _weekly_review_state(context, flags, *, mode, top_signal, now):
+def _weekly_review_state(context, flags, *, top_signal, open_actions, now):
     window = _weekly_window(now)
     completed_count = _recent_event_count(
         context,
         event_names=REVIEW_EVENTS,
         window=window,
     )
-    unresolved_count = 1 if top_signal or mode == "open_action" else 0
+    unresolved_count = len(open_actions) + (1 if top_signal else 0)
     last_completed = latest_event(
         organization=context.organization,
         workspace=context.workspace,
@@ -763,6 +878,7 @@ def resolve_daily_quality_state(*, context, flags, signals, routes, stage, now):
         return DailyQualityResult(_unavailable("sample_only", now), None)
 
     review_window = _window(context, signals, now)
+    open_actions = _open_quality_actions(context, now)
     top_signal, route_availability = _top_signal(
         context,
         signals,
@@ -776,6 +892,16 @@ def resolve_daily_quality_state(*, context, flags, signals, routes, stage, now):
         primary_action = _signal_action(top_signal)
         digest_eligible = bool(flags.get("onboarding_email_daily_digest_enabled"))
         digest_suppression_reason = None if digest_eligible else "flag_disabled"
+    elif open_actions:
+        primary_action = {
+            **open_actions[0],
+            "is_primary": True,
+        }
+        open_actions = open_actions[1:]
+        mode = "open_action"
+        digest_eligible = False
+        digest_suppression_reason = "open_action"
+        diagnostics = ["open_action"]
     else:
         primary_action, diagnostics = _next_action(context, signals, routes)
         mode = (
@@ -798,7 +924,7 @@ def resolve_daily_quality_state(*, context, flags, signals, routes, stage, now):
         },
         "top_signal": top_signal,
         "primary_action": primary_action,
-        "action_cards": [],
+        "action_cards": open_actions,
         "product_cards": [
             _product_card(
                 path=path,
@@ -811,8 +937,12 @@ def resolve_daily_quality_state(*, context, flags, signals, routes, stage, now):
         "weekly_review": _weekly_review_state(
             context,
             flags,
-            mode=mode,
             top_signal=top_signal,
+            open_actions=(
+                [primary_action, *open_actions]
+                if mode == "open_action"
+                else open_actions
+            ),
             now=now,
         ),
         "digest_eligible": digest_eligible,

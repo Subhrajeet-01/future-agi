@@ -202,6 +202,88 @@ def test_daily_quality_no_signal_returns_constructive_action_without_digest(
 
 
 @pytest.mark.django_db
+def test_daily_quality_carries_forward_open_quality_action(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    project = _activated_observe_workspace(organization, workspace, user, now=now)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="daily_quality_action_created",
+        source="test",
+        product_path="observe",
+        metadata={
+            "action_id": "trace-action-1",
+            "label": "Assign trace owner",
+            "body": "Pick an owner for the recurring trace failure.",
+            "route": f"/dashboard/observe/{project.id}",
+            "source_type": "project",
+            "source_id": str(project.id),
+        },
+        occurred_at=now - timedelta(minutes=20),
+    )
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="daily_quality_action_opened",
+        source="test",
+        product_path="observe",
+        metadata={"action_id": "trace-action-1"},
+        occurred_at=now - timedelta(minutes=10),
+    )
+
+    payload = _activation_state(
+        user,
+        organization,
+        workspace,
+        flags=_flags(onboarding_weekly_team_review=True),
+    )
+
+    daily_quality = payload["daily_quality"]
+    assert daily_quality["mode"] == "open_action"
+    assert daily_quality["primary_action"]["id"] == "trace-action-1"
+    assert daily_quality["primary_action"]["label"] == "Assign trace owner"
+    assert daily_quality["digest_suppression_reason"] == "open_action"
+    assert payload["email_eligibility"]["suppression_reason"] == "open_action"
+    assert daily_quality["weekly_review"]["due"] is True
+    assert daily_quality["weekly_review"]["unresolved_count"] == 1
+
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="daily_quality_action_completed",
+        source="test",
+        product_path="observe",
+        metadata={
+            "action_id": "trace-action-1",
+            "source_type": "project",
+            "source_id": str(project.id),
+        },
+        occurred_at=now - timedelta(minutes=5),
+    )
+
+    payload = _activation_state(
+        user,
+        organization,
+        workspace,
+        flags=_flags(onboarding_weekly_team_review=True),
+    )
+
+    daily_quality = payload["daily_quality"]
+    assert daily_quality["mode"] == "no_new_signal"
+    assert daily_quality["primary_action"]["id"] != "trace-action-1"
+    assert daily_quality["action_cards"] == []
+    assert daily_quality["weekly_review"]["due"] is False
+    assert daily_quality["weekly_review"]["unresolved_count"] == 0
+
+
+@pytest.mark.django_db
 def test_daily_quality_uses_last_review_to_hide_already_reviewed_signal(
     organization,
     workspace,

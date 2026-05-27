@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "src/utils/test-utils";
+import { screen, waitFor, within } from "src/utils/test-utils";
 import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "src/utils/test-utils";
 import { getActivationStateFixture } from "../fixtures/activation-state.fixtures";
@@ -318,6 +318,42 @@ describe("OnboardingHomeView", () => {
           daily_quality_mode: "no_new_signal",
         }),
       ),
+    );
+  });
+
+  it("renders carried-forward daily quality actions", async () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("dailyQualityObserveOpenAction"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    expect(screen.getByTestId("onboarding-daily-quality")).toBeVisible();
+    expect(
+      screen.getByTestId("daily-quality-primary-action"),
+    ).toHaveTextContent("Continue action");
+    const actionCard = screen.getByTestId(
+      "daily-quality-action-card-assign_trace_owner",
+    );
+    expect(actionCard).toBeVisible();
+    expect(actionCard).toHaveTextContent("Assign trace owner");
+    expect(screen.getByTestId("weekly-quality-review")).toBeVisible();
+
+    await userEvent.click(
+      within(actionCard).getByRole("link", { name: /open/i }),
+    );
+
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "daily_quality_action_opened",
+      expect.objectContaining({
+        recommended_action_id: "assign_trace_owner",
+        route: "/dashboard/observe/observe-1?mode=quality-actions",
+      }),
     );
   });
 
