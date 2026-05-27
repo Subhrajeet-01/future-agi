@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { Drawer } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 
 import axios, { endpoints } from "src/utils/axios";
 import { enqueueSnackbar } from "src/components/snackbar";
@@ -19,12 +19,23 @@ import { useTestEvaluationStore } from "./states";
 import TestEvaluationPage from "./TestEvaluationPage";
 import { AGENT_TYPES } from "../agents/constants";
 import { SourceType } from "../scenarios/common";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildVoiceSuccessCriteriaAddedPayload,
+  getVoiceOnboardingParams,
+  VOICE_ONBOARDING_MODES,
+} from "./onboardingVoiceRouteEvents";
 
 const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
   const { openTestEvaluation, setOpenTestEvaluation } =
     useTestEvaluationStore();
   const { testId } = useParams();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const voiceParams = getVoiceOnboardingParams(location.search);
+  const isSuccessCriteriaMode =
+    voiceParams.mode === VOICE_ONBOARDING_MODES.SUCCESS_CRITERIA;
 
   const runTestDetail = queryClient.getQueryData(["test-runs-detail", testId]);
   const runTestData = runTestDetail?.data;
@@ -109,6 +120,18 @@ const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
           await addEvalsAsync({ evaluations_config: [payload] });
           enqueueSnackbar("Eval added successfully", { variant: "success" });
         }
+        if (isSuccessCriteriaMode) {
+          recordActivationEvent?.(
+            buildVoiceSuccessCriteriaAddedPayload({
+              testId,
+              callId: voiceParams.callId,
+              evalConfig: {
+                ...payload,
+                id: editing?.id,
+              },
+            }),
+          );
+        }
         handleRefresh();
         setEditingEvalItem(null);
       } catch (error) {
@@ -118,7 +141,16 @@ const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
         throw error;
       }
     },
-    [addEvalsAsync, updateEvalAsync, handleRefresh, testId, editingEvalItem],
+    [
+      addEvalsAsync,
+      updateEvalAsync,
+      handleRefresh,
+      testId,
+      editingEvalItem,
+      isSuccessCriteriaMode,
+      recordActivationEvent,
+      voiceParams.callId,
+    ],
   );
 
   const handleEditEvaluation = useCallback((evalItem) => {

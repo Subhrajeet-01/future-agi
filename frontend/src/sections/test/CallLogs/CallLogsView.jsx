@@ -1,5 +1,5 @@
 import { Box, Button } from "@mui/material";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import CallLogsHeader from "./CallLogsHeader";
 import CallLogsCard from "./CallLogsCard";
 import { AudioPlaybackProvider } from "src/components/custom-audio/context-provider/AudioPlaybackContext";
@@ -7,18 +7,52 @@ import { useScrollEnd } from "../../../hooks/use-scroll-end";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import axios from "../../../utils/axios";
 import { endpoints } from "../../../utils/axios";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { useDebounce } from "src/hooks/use-debounce";
 import { ShowComponent } from "src/components/show";
 import EmptyLayout from "src/components/EmptyLayout/EmptyLayout";
 import { PERMISSIONS, RolePermission } from "src/utils/rolePermissionMapping";
 import { useAuthContext } from "src/auth/hooks";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildVoiceMonitorOpenedPayload,
+  buildVoiceRouteFocusPayload,
+  getVoiceOnboardingParams,
+  VOICE_ONBOARDING_MODES,
+} from "../onboardingVoiceRouteEvents";
 
 const CallLogsView = () => {
   const { testId } = useParams();
   const [searchText, setSearchText] = useState("");
   const { role } = useAuthContext();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedFocusRef = useRef(false);
+  const voiceParams = useMemo(
+    () => getVoiceOnboardingParams(location.search),
+    [location.search],
+  );
+  const isMonitorCallsMode =
+    voiceParams.mode === VOICE_ONBOARDING_MODES.MONITOR_CALLS;
+
+  useEffect(() => {
+    if (!isMonitorCallsMode || !testId || recordedFocusRef.current) return;
+    recordedFocusRef.current = true;
+    recordActivationEvent?.(
+      buildVoiceRouteFocusPayload({
+        mode: voiceParams.mode,
+        source: "voice_call_logs",
+        testId,
+      }),
+    );
+    recordActivationEvent?.(
+      buildVoiceMonitorOpenedPayload({
+        testId,
+        source: "voice_call_logs",
+      }),
+    );
+  }, [isMonitorCallsMode, recordActivationEvent, testId, voiceParams.mode]);
 
   const debouncedSearchText = useDebounce(searchText, 500);
 

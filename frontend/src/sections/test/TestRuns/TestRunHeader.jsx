@@ -1,10 +1,17 @@
 import { Box, Button, InputAdornment, useTheme } from "@mui/material";
-import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import FormSearchField from "src/components/FormSearchField/FormSearchField";
 import Iconify from "src/components/iconify";
 import SvgColor from "src/components/svg-color";
 import { useMutation } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import CustomTooltip from "src/components/tooltip/CustomTooltip";
 import {
   useSelectedScenariosStore,
@@ -24,6 +31,12 @@ import { useTestRunSdkStoreShallow } from "./state";
 import { AGENT_TYPES } from "src/sections/agents/constants";
 import { SIMULATION_TYPE } from "src/components/run-tests/common";
 import { SCENARIO_STATUS } from "src/pages/dashboard/scenarios/common";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildVoiceRouteFocusPayload,
+  getVoiceOnboardingParams,
+  VOICE_ONBOARDING_MODES,
+} from "../onboardingVoiceRouteEvents";
 
 const ScenarioPopover = lazy(() => import("./ScenarioPopover"));
 const TestRunsSelection = lazy(() => import("./TestRunsSelection"));
@@ -34,6 +47,9 @@ const NewVoiceSimulationDrawer = lazy(
 const TestRunHeader = () => {
   const theme = useTheme();
   const { role } = useAuthContext();
+  const location = useLocation();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedFocusRef = useRef(false);
   const { search, setSearch } = useTestRunsSearchStore();
   const [scenarioPopoverOpen, setScenarioPopoverOpen] = useState(false);
   const scenarioPopoverRef = useRef(null);
@@ -101,6 +117,37 @@ const TestRunHeader = () => {
     : testData?.agent_definition_detail?.agent_type ??
       testData?.agent_version?.configuration_snapshot?.agent_type ??
       testData?.agentVersion?.configurationSnapshot?.agentType;
+  const voiceParams = useMemo(
+    () => getVoiceOnboardingParams(location.search),
+    [location.search],
+  );
+  const isRunTestCallMode =
+    voiceParams.mode === VOICE_ONBOARDING_MODES.RUN_TEST_CALL;
+
+  useEffect(() => {
+    if (!isRunTestCallMode || agentType !== AGENT_TYPES.VOICE || !testId) {
+      return;
+    }
+    setSdkCodeOpen(true);
+    if (recordedFocusRef.current) return;
+    recordedFocusRef.current = true;
+    recordActivationEvent?.(
+      buildVoiceRouteFocusPayload({
+        mode: voiceParams.mode,
+        source: "voice_simulation_runs",
+        testId,
+        agentDefinitionId: voiceParams.agentDefinitionId,
+      }),
+    );
+  }, [
+    agentType,
+    isRunTestCallMode,
+    recordActivationEvent,
+    setSdkCodeOpen,
+    testId,
+    voiceParams.agentDefinitionId,
+    voiceParams.mode,
+  ]);
 
   return (
     <Box

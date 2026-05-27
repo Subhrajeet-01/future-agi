@@ -142,7 +142,12 @@ const StyledStepConnector = styled(StepConnector)(({ theme }) => ({
   },
 }));
 
-const CreateRunTestPage = ({ open, onClose }) => {
+const CreateRunTestPage = ({
+  open,
+  onClose,
+  initialAgentDefinitionId,
+  initialAgentType,
+}) => {
   const { enqueueSnackbar } = useSnackbar();
   const theme = useTheme();
   const router = useRouter();
@@ -204,16 +209,17 @@ const CreateRunTestPage = ({ open, onClose }) => {
         schedule: "immediate",
         notifications: false,
         failOnError: true,
-        agentDefinitionId: "",
+        agentDefinitionId: initialAgentDefinitionId || "",
         agentDefinitionVersionId: "",
         enableToolEvaluation: false,
+        agentType: initialAgentType || null,
       });
       setEvaluationsConfig([]);
       setOpenEvaluationDialog(false);
       setEditingEvalId(null);
       setCompleted({});
     }
-  }, [open]);
+  }, [initialAgentDefinitionId, initialAgentType, open]);
 
   // Scenarios state
   const [scenarioSearch, setScenarioSearch] = useState("");
@@ -2349,6 +2355,13 @@ const CreateRunTestPage = ({ open, onClose }) => {
 CreateRunTestPage.propTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
+  initialAgentDefinitionId: PropTypes.string,
+  initialAgentType: PropTypes.string,
+};
+
+CreateRunTestPage.defaultProps = {
+  initialAgentDefinitionId: "",
+  initialAgentType: null,
 };
 
 export default CreateRunTestPage;

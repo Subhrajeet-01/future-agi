@@ -17,7 +17,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import FormSearchField from "src/components/FormSearchField/FormSearchField";
 import Iconify from "src/components/iconify";
 import SvgColor from "src/components/svg-color";
@@ -36,6 +36,12 @@ import { PERMISSIONS, RolePermission } from "src/utils/rolePermissionMapping";
 import { useAuthContext } from "src/auth/hooks";
 import { useTestDetailContext } from "./context/TestDetailContext";
 import { SIMULATION_TYPE } from "src/components/run-tests/common";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildVoiceRouteFocusPayload,
+  getVoiceOnboardingParams,
+  VOICE_ONBOARDING_MODES,
+} from "./onboardingVoiceRouteEvents";
 
 const AgentDefinitionPopover = lazy(
   () => import("./TestRuns/AgentDefinitionPopover"),
@@ -76,6 +82,9 @@ const SavingStatus = {
 const TestDetailHeader = () => {
   const theme = useTheme();
   const { role } = useAuthContext();
+  const location = useLocation();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedFocusRef = useRef(false);
   const [testSelectDropDownOpen, setTestSelectDropDownOpen] = useState(false);
   const testSelectDropDownRef = useRef(null);
   // const [simulatorPopoverOpen, setSimulatorPopoverOpen] = useState(false);
@@ -119,6 +128,32 @@ const TestDetailHeader = () => {
   const agentType = configSnapshot?.agent_type ?? configSnapshot?.agentType;
   const sourceType = testData?.source_type ?? testData?.sourceType;
   const isPromptSimulation = sourceType === SIMULATION_TYPE.PROMPT;
+  const voiceParams = getVoiceOnboardingParams(location.search);
+  const isSuccessCriteriaMode =
+    voiceParams.mode === VOICE_ONBOARDING_MODES.SUCCESS_CRITERIA;
+
+  useEffect(() => {
+    if (!isSuccessCriteriaMode || !testId) return;
+    setOpenTestEvaluation(true);
+    if (recordedFocusRef.current) return;
+    recordedFocusRef.current = true;
+    recordActivationEvent?.(
+      buildVoiceRouteFocusPayload({
+        mode: voiceParams.mode,
+        source: "voice_success_criteria_route",
+        testId,
+        callId: voiceParams.callId,
+      }),
+    );
+  }, [
+    isSuccessCriteriaMode,
+    recordActivationEvent,
+    setOpenTestEvaluation,
+    testId,
+    voiceParams.callId,
+    voiceParams.mode,
+  ]);
+
   useEffect(() => {
     if (!selectedSimulatorAgent) {
       setSelectedSimulatorAgent(

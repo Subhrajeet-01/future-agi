@@ -3,16 +3,36 @@ import { Helmet } from "react-helmet-async";
 import { useLocation, useParams } from "react-router-dom";
 import CallDetails from "src/sections/test-detail/CallDetails";
 import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildVoiceCallReviewedPayload,
+  getVoiceOnboardingParams,
+  VOICE_ONBOARDING_MODES,
+} from "src/sections/test/onboardingVoiceRouteEvents";
 
 const TestExecutionCallDetail = () => {
   const { testId, executionId } = useParams();
   const location = useLocation();
   const { mutate: recordActivationEvent } = useRecordActivationEvent();
-  const isOnboardingReview =
-    new URLSearchParams(location.search).get("from") === "onboarding";
+  const voiceParams = getVoiceOnboardingParams(location.search);
+  const isVoiceReview = voiceParams.mode === VOICE_ONBOARDING_MODES.REVIEW_CALL;
+  const isAgentOnboardingReview =
+    voiceParams.from === "onboarding" && !isVoiceReview;
 
   useEffect(() => {
-    if (!isOnboardingReview || !testId || !executionId) return;
+    if (!testId || !executionId) return;
+
+    if (isVoiceReview) {
+      recordActivationEvent?.(
+        buildVoiceCallReviewedPayload({
+          testId,
+          executionId,
+          callId: voiceParams.callId,
+        }),
+      );
+      return;
+    }
+
+    if (!isAgentOnboardingReview) return;
     recordActivationEvent?.({
       eventName: "agent_trace_reviewed",
       primaryPath: "agent",
@@ -27,7 +47,14 @@ const TestExecutionCallDetail = () => {
       idempotencyKey: `agent_trace_reviewed:${testId}:${executionId}:call-details`,
       isSample: false,
     });
-  }, [executionId, isOnboardingReview, recordActivationEvent, testId]);
+  }, [
+    executionId,
+    isAgentOnboardingReview,
+    isVoiceReview,
+    recordActivationEvent,
+    testId,
+    voiceParams.callId,
+  ]);
 
   return (
     <>

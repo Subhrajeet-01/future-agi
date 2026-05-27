@@ -172,7 +172,8 @@ def test_voice_path_without_agent_returns_create_agent(organization, workspace, 
     assert payload["stage"] == "create_voice_agent"
     assert payload["recommended_action"]["id"] == "create_voice_agent"
     assert payload["recommended_action"]["href"].startswith(
-        "/dashboard/simulate/agent-definitions/create-new-agent-definition"
+        "/dashboard/simulate/agent-definitions/create-new-agent-definition?"
+        "source=onboarding&onboarding=create-voice-agent"
     )
     assert payload["voice"]["has_agent"] is False
 
@@ -190,6 +191,10 @@ def test_voice_agent_without_call_returns_run_test_call(organization, workspace,
     assert payload["stage"] == "run_voice_test_call"
     assert payload["recommended_action"]["id"] == "run_voice_test_call"
     assert payload["voice"]["agent_id"] == str(agent.id)
+    assert (
+        "/dashboard/simulate/test?onboarding=create-test-call"
+        in (payload["recommended_action"]["href"])
+    )
     assert "agent_definition_id" in payload["recommended_action"]["href"]
 
 
@@ -207,9 +212,10 @@ def test_completed_voice_call_requires_review(organization, workspace, user):
     assert payload["recommended_action"]["id"] == "review_voice_call"
     assert payload["voice"]["call_execution_id"] == str(call.id)
     assert payload["voice"]["has_completed_call"] is True
+    expected_query = f"from=onboarding&onboarding=review-voice-call&call_id={call.id}"
     assert payload["recommended_action"]["href"] == (
         f"/dashboard/simulate/test/{run_test.id}/{execution.id}/"
-        f"call-details?from=onboarding&call_id={call.id}"
+        f"call-details?{expected_query}"
     )
 
 
@@ -219,7 +225,7 @@ def test_reviewed_voice_call_requires_success_criteria(
     workspace,
     user,
 ):
-    _, _, _, call = _voice_call_setup(
+    _, run_test, _, call = _voice_call_setup(
         organization=organization,
         workspace=workspace,
     )
@@ -234,6 +240,10 @@ def test_reviewed_voice_call_requires_success_criteria(
 
     assert payload["stage"] == "add_voice_success_criteria"
     assert payload["recommended_action"]["id"] == "add_voice_success_criteria"
+    assert payload["recommended_action"]["href"] == (
+        f"/dashboard/simulate/test/{run_test.id}/runs?"
+        f"onboarding=success-criteria&call_id={call.id}"
+    )
     assert payload["voice"]["has_review"] is True
     assert payload["voice"]["has_success_criteria"] is False
 
@@ -265,6 +275,9 @@ def test_reviewed_call_with_success_criteria_activates(
     assert payload["stage"] == "activated"
     assert payload["is_activated"] is True
     assert payload["recommended_action"]["id"] == "voice_monitor_calls"
+    assert payload["recommended_action"]["href"] == (
+        f"/dashboard/simulate/test/{run_test.id}/call-logs?onboarding=monitor-calls"
+    )
     assert payload["voice"]["has_success_criteria"] is True
 
 
@@ -297,6 +310,9 @@ def test_failed_voice_call_review_with_criteria_routes_to_rerun(
     assert payload["is_activated"] is False
     assert payload["voice"]["call_failed"] is True
     assert payload["voice"]["has_completed_call"] is False
+    assert payload["recommended_action"]["href"].startswith(
+        f"/dashboard/simulate/test/{run_test.id}/runs?onboarding=run-test-call"
+    )
 
 
 @pytest.mark.django_db

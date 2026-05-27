@@ -6,7 +6,7 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   createAgentDefinitionSchema,
   defaultAgentDefinitionValues,
@@ -18,7 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Events, PropertyName, trackEvent } from "src/utils/Mixpanel";
 import axios, { endpoints } from "src/utils/axios";
 import logger from "src/utils/logger";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { paths } from "src/routes/paths";
 import { useSnackbar } from "notistack";
 import SvgColor from "src/components/svg-color";
@@ -35,9 +35,20 @@ import { LoadingButton } from "@mui/lab";
 import { AGENT_TYPES, isLiveKitProvider } from "./constants";
 import { useAuthContext } from "src/auth/hooks";
 import { PERMISSIONS, RolePermission } from "src/utils/rolePermissionMapping";
+import { useDeploymentMode } from "src/hooks/useDeploymentMode";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildVoiceRouteFocusPayload,
+  getVoiceOnboardingParams,
+  VOICE_ONBOARDING_MODES,
+} from "src/sections/test/onboardingVoiceRouteEvents";
 
 const CreateNewAgentDefinitionView = () => {
   const { role } = useAuthContext();
+  const { isOSS } = useDeploymentMode();
+  const location = useLocation();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedFocusRef = useRef(false);
   const { currentStep, reset, nextStep, prevStep, setStepValidated } =
     useCreateNewAgentStore();
   const theme = useTheme();
@@ -55,6 +66,7 @@ const CreateNewAgentDefinitionView = () => {
     formState: { errors, isSubmitting },
     trigger,
     watch,
+    setValue,
   } = methods;
 
   const navigate = useNavigate();
@@ -63,6 +75,32 @@ const CreateNewAgentDefinitionView = () => {
   const livekitValidated = watch("_livekitCredentialsValid");
 
   const watchedValues = watch();
+  const voiceParams = getVoiceOnboardingParams(location.search);
+  const isVoiceCreateMode =
+    voiceParams.mode === VOICE_ONBOARDING_MODES.CREATE_AGENT;
+
+  useEffect(() => {
+    if (!isVoiceCreateMode) return;
+    if (!isOSS && !getValues("agentType")) {
+      setValue("agentType", AGENT_TYPES.VOICE, { shouldDirty: false });
+    }
+    if (recordedFocusRef.current) return;
+    recordedFocusRef.current = true;
+    recordActivationEvent?.(
+      buildVoiceRouteFocusPayload({
+        mode: voiceParams.mode,
+        source: "voice_agent_definition_create",
+      }),
+    );
+  }, [
+    getValues,
+    isOSS,
+    isVoiceCreateMode,
+    recordActivationEvent,
+    setValue,
+    voiceParams.mode,
+  ]);
+
   const canProceed = useMemo(() => {
     const provider = watchedValues["provider"];
     const agentType = watchedValues["agentType"];

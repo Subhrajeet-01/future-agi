@@ -321,6 +321,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     voice_create_params = {}
     if voice_route_modes_enabled:
         voice_create_params["source"] = "onboarding"
+        voice_create_params["onboarding"] = "create-voice-agent"
     voice_create_href = _with_query(
         "/dashboard/simulate/agent-definitions/create-new-agent-definition",
         voice_create_params,
@@ -333,7 +334,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     if voice_agent_id:
         voice_run_params["agent_definition_id"] = voice_agent_id
     voice_run_base = (
-        f"/dashboard/simulate/test/{voice_run_test_id}"
+        f"/dashboard/simulate/test/{voice_run_test_id}/runs"
         if voice_run_test_id
         else "/dashboard/simulate/test"
     )
@@ -347,6 +348,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     voice_review_params = {}
     if voice_route_modes_enabled:
         voice_review_params["from"] = "onboarding"
+        voice_review_params["onboarding"] = "review-voice-call"
     if voice_call_execution_id:
         voice_review_params["call_id"] = voice_call_execution_id
     voice_review_href = _with_query(voice_review_base, voice_review_params)
@@ -356,7 +358,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     if voice_call_execution_id:
         voice_criteria_params["call_id"] = voice_call_execution_id
     voice_criteria_base = (
-        f"/dashboard/simulate/test/{voice_run_test_id}"
+        f"/dashboard/simulate/test/{voice_run_test_id}/runs"
         if voice_run_test_id
         else "/dashboard/simulate/test"
     )
@@ -365,7 +367,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     if voice_route_modes_enabled:
         voice_monitor_params["onboarding"] = "monitor-calls"
     voice_monitor_base = (
-        f"/dashboard/simulate/test/{voice_run_test_id}"
+        f"/dashboard/simulate/test/{voice_run_test_id}/call-logs"
         if voice_run_test_id
         else voice_list_href
     )
