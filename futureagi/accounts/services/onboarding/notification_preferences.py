@@ -70,38 +70,28 @@ def _scope_filter(*, organization, workspace, user, scope):
 
 
 def _candidate_preferences(*, organization, workspace, user, family, channel):
-    filters = {
-        "organization": organization,
-        "family": family,
-        "channel": channel,
-    }
-    preferences = list(
-        NotificationPreference.no_workspace_objects.filter(**filters).order_by(
-            "-updated_at"
+    queryset = NotificationPreference.no_workspace_objects.filter(
+        organization=organization,
+        family=family,
+        channel=channel,
+    ).order_by("-updated_at")
+    user_id = getattr(user, "id", None)
+    workspace_id = getattr(workspace, "id", None)
+    scoped_queries = []
+    if user_id and workspace_id:
+        scoped_queries.append(
+            queryset.filter(user_id=user_id, workspace_id=workspace_id)
         )
-    )
+    if user_id:
+        scoped_queries.append(queryset.filter(user_id=user_id, workspace__isnull=True))
+    if workspace_id:
+        scoped_queries.append(
+            queryset.filter(user__isnull=True, workspace_id=workspace_id)
+        )
+    scoped_queries.append(queryset.filter(user__isnull=True, workspace__isnull=True))
     ordered = []
-    for scope in ("user_workspace", "user", "workspace", "organization"):
-        for preference in preferences:
-            if scope == "user_workspace" and (
-                preference.user_id == getattr(user, "id", None)
-                and preference.workspace_id == getattr(workspace, "id", None)
-            ):
-                ordered.append(preference)
-            elif scope == "user" and (
-                preference.user_id == getattr(user, "id", None)
-                and preference.workspace_id is None
-            ):
-                ordered.append(preference)
-            elif scope == "workspace" and (
-                preference.user_id is None
-                and preference.workspace_id == getattr(workspace, "id", None)
-            ):
-                ordered.append(preference)
-            elif scope == "organization" and (
-                preference.user_id is None and preference.workspace_id is None
-            ):
-                ordered.append(preference)
+    for scoped_query in scoped_queries:
+        ordered.extend(scoped_query)
     return ordered
 
 
@@ -155,6 +145,30 @@ def _active_channel_exists(*, organization, workspace, channel):
     else:
         queryset = queryset.filter(workspace__isnull=True)
     return queryset.exists()
+
+
+def notification_channels_for_delivery(*, organization, workspace, channel):
+    if channel not in {
+        NotificationPreference.CHANNEL_SLACK,
+        NotificationPreference.CHANNEL_WEBHOOK,
+    }:
+        return []
+    channel_type = (
+        NotificationChannel.TYPE_SLACK_WEBHOOK
+        if channel == NotificationPreference.CHANNEL_SLACK
+        else NotificationChannel.TYPE_WEBHOOK
+    )
+    queryset = NotificationChannel.no_workspace_objects.filter(
+        organization=organization,
+        type=channel_type,
+        is_active=True,
+    )
+    if not workspace:
+        return list(queryset.filter(workspace__isnull=True)[:20])
+    workspace_channels = list(queryset.filter(workspace=workspace)[:20])
+    if workspace_channels:
+        return workspace_channels
+    return list(queryset.filter(workspace__isnull=True)[:20])
 
 
 def notification_preference_decision(
@@ -242,6 +256,23 @@ def notification_preference_decision(
                 source=source,
                 preference_id=str(preference.id),
             )
+        return NotificationPreferenceDecision(
+            allowed=True,
+            family=family,
+            channel=channel,
+            reason=None,
+            source=source,
+            preference_id=str(preference.id),
+        )
+
+    if channel not in family_config.default_channels:
+        return NotificationPreferenceDecision(
+            allowed=False,
+            family=family,
+            channel=channel,
+            reason="channel_not_enabled",
+            source="default",
+        )
 
     return NotificationPreferenceDecision(
         allowed=True,
@@ -352,6 +383,10 @@ def _decrypt_channel_config(channel):
         return decrypt_message(channel.encrypted_config)
     except Exception:
         return {}
+
+
+def notification_channel_delivery_config(channel):
+    return _decrypt_channel_config(channel)
 
 
 def _masked_config(channel):

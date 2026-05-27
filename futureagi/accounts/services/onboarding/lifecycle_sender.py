@@ -30,6 +30,9 @@ from accounts.services.onboarding.lifecycle_template_context import (
     subject_for_campaign,
     template_path,
 )
+from accounts.services.onboarding.notification_delivery import (
+    deliver_onboarding_lifecycle_external_channels,
+)
 from accounts.services.onboarding.notification_preferences import (
     notification_preference_decision,
     record_notification_delivery,
@@ -600,6 +603,7 @@ def send_onboarding_lifecycle_email(send_log, *, now=None):
         status=NotificationDeliveryLog.STATUS_SENT,
         now=now,
     )
+    deliver_onboarding_lifecycle_external_channels(send_log, now=now)
     return send_log
 
 

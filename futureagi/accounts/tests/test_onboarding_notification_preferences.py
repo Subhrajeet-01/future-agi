@@ -11,6 +11,7 @@ from accounts.models import (
 from accounts.services.onboarding.notification_preferences import (
     notification_preference_decision,
     record_notification_delivery,
+    upsert_notification_preference,
 )
 
 
@@ -136,6 +137,66 @@ def test_slack_channel_is_masked_and_testable(auth_client):
         source_id=str(channel.id),
         notification_key="notification_channel_test",
     ).exists()
+
+
+@pytest.mark.django_db
+def test_slack_channel_requires_enabled_family_preference(
+    auth_client,
+    organization,
+    workspace,
+    user,
+):
+    response = auth_client.patch(
+        "/accounts/notification-preferences/",
+        {
+            "channels": [
+                {
+                    "scope": "workspace",
+                    "type": "slack_webhook",
+                    "display_name": "Daily quality",
+                    "config": {
+                        "webhook_url": (
+                            "https://hooks.slack.com/services/T000/B000/secret"
+                        )
+                    },
+                    "is_active": True,
+                }
+            ]
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+
+    decision = notification_preference_decision(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        family=NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST,
+        channel=NotificationPreference.CHANNEL_SLACK,
+    )
+    assert decision.allowed is False
+    assert decision.reason == "channel_not_enabled"
+
+    upsert_notification_preference(
+        organization=organization,
+        workspace=workspace,
+        user=None,
+        actor=user,
+        scope="workspace",
+        family=NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST,
+        channel=NotificationPreference.CHANNEL_SLACK,
+        enabled=True,
+    )
+
+    decision = notification_preference_decision(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        family=NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST,
+        channel=NotificationPreference.CHANNEL_SLACK,
+    )
+    assert decision.allowed is True
+    assert decision.source == "workspace"
 
 
 @pytest.mark.django_db

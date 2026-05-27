@@ -6,6 +6,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from accounts.models import (
+    NotificationChannel,
     NotificationDeliveryLog,
     NotificationPreference,
     OnboardingGoal,
@@ -24,6 +25,8 @@ from accounts.services.onboarding.lifecycle_sender import (
 )
 from accounts.services.onboarding.notification_preferences import (
     notification_preference_decision,
+    upsert_notification_channel,
+    upsert_notification_preference,
 )
 from accounts.tests.onboarding_model_factories import (
     create_custom_eval,
@@ -135,6 +138,75 @@ def _eligible_log(user, organization, workspace, *, now=None):
             "recommended_action_id": "choose_onboarding_goal",
         },
         metadata={"source": "test", "send_enabled": False},
+    )
+
+
+def _queued_daily_quality_send_log(user, organization, workspace, *, now):
+    campaign = lifecycle_campaign_by_key("daily_quality_open_actions")
+    preview = {
+        "kind": "daily_quality_open_actions",
+        "campaign_key": "daily_quality_open_actions",
+        "template_key": "daily_quality_open_actions_v1",
+        "generated_at": now.isoformat(),
+        "workspace_id": str(workspace.id),
+        "action_count": 1,
+        "omitted_count": 0,
+        "actions": [
+            {
+                "action_id": "trace-action-1",
+                "label": "Review trace regression",
+                "route": "/dashboard/home?mode=daily-quality",
+                "fallback_route": "/dashboard/home",
+                "source_type": "trace",
+                "source_id": "trace-123",
+                "primary_path": "observe",
+                "status": "open",
+                "age_minutes": 30,
+                "last_event_at": (now - timedelta(minutes=30)).isoformat(),
+                "is_overdue": False,
+                "body": "Sensitive debugging notes must not leak.",
+                "metadata": {"api_token": "secret-value"},
+            }
+        ],
+    }
+    evaluation_log = OnboardingLifecycleEvaluationLog.no_workspace_objects.create(
+        run_id="00000000-0000-0000-0000-000000000017",
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        campaign_key=campaign["campaign_key"],
+        campaign_group=campaign["campaign_group"],
+        template_key=campaign["template_key"],
+        template_version=campaign["template_version"],
+        activation_stage="daily_review",
+        primary_path="observe",
+        recommendation_id="review_daily_quality",
+        target_action_id=campaign["target_action_id"],
+        target_success_event=campaign["target_success_event"],
+        target_url="/dashboard/home?mode=daily-quality",
+        status=OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE,
+        eligible_at=now - timedelta(minutes=15),
+        evaluated_at=now - timedelta(minutes=1),
+        registry_snapshot=campaign,
+        metadata={"digest_preview": preview},
+    )
+    return OnboardingLifecycleSendLog.no_workspace_objects.create(
+        evaluation_log=evaluation_log,
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        campaign_key=campaign["campaign_key"],
+        campaign_group=campaign["campaign_group"],
+        template_key=campaign["template_key"],
+        template_version=campaign["template_version"],
+        primary_path="observe",
+        activation_stage="daily_review",
+        recommended_action_id="review_daily_quality",
+        target_success_event=campaign["target_success_event"],
+        target_route="/dashboard/home?mode=daily-quality",
+        status=OnboardingLifecycleSendLog.STATUS_QUEUED,
+        queued_at=now,
+        metadata={"digest_preview": preview},
     )
 
 
@@ -280,6 +352,147 @@ def test_daily_quality_digest_send_log_carries_safe_preview(
     assert template_context["digest_preview"]["actions"][0]["action_id"] == (
         "trace-action-1"
     )
+
+
+@pytest.mark.django_db
+def test_daily_quality_digest_delivers_slack_when_channel_enabled(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    send_log = _queued_daily_quality_send_log(user, organization, workspace, now=now)
+    upsert_notification_channel(
+        organization=organization,
+        workspace=workspace,
+        actor=user,
+        type=NotificationChannel.TYPE_SLACK_WEBHOOK,
+        display_name="Daily quality",
+        config={"webhook_url": "https://hooks.slack.com/services/T000/B000/secret"},
+        is_active=True,
+    )
+    upsert_notification_preference(
+        organization=organization,
+        workspace=workspace,
+        user=None,
+        actor=user,
+        scope="workspace",
+        family=NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST,
+        channel=NotificationPreference.CHANNEL_SLACK,
+        enabled=True,
+    )
+
+    with (
+        patch("accounts.services.onboarding.lifecycle_sender.email_helper"),
+        patch(
+            "accounts.services.onboarding.notification_delivery.requests.post"
+        ) as post,
+    ):
+        post.return_value.raise_for_status.return_value = None
+        sent_log = send_onboarding_lifecycle_email(send_log, now=now)
+
+    assert sent_log.status == OnboardingLifecycleSendLog.STATUS_SENT
+    post.assert_called_once()
+    payload_text = str(post.call_args.kwargs["json"])
+    assert "Review trace regression" in payload_text
+    assert "Sensitive debugging notes" not in payload_text
+    assert "secret-value" not in payload_text
+    assert NotificationDeliveryLog.no_workspace_objects.filter(
+        source_id=str(send_log.id),
+        channel=NotificationPreference.CHANNEL_SLACK,
+        status=NotificationDeliveryLog.STATUS_SENT,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_daily_quality_digest_delivers_webhook_when_channel_enabled(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    send_log = _queued_daily_quality_send_log(user, organization, workspace, now=now)
+    upsert_notification_channel(
+        organization=organization,
+        workspace=workspace,
+        actor=user,
+        type=NotificationChannel.TYPE_WEBHOOK,
+        display_name="Daily quality webhook",
+        config={"url": "https://example.com/digest", "secret": "delivery-token"},
+        is_active=True,
+    )
+    upsert_notification_preference(
+        organization=organization,
+        workspace=workspace,
+        user=None,
+        actor=user,
+        scope="workspace",
+        family=NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST,
+        channel=NotificationPreference.CHANNEL_WEBHOOK,
+        enabled=True,
+    )
+
+    with (
+        patch("accounts.services.onboarding.lifecycle_sender.email_helper"),
+        patch(
+            "accounts.services.onboarding.notification_delivery.requests.post"
+        ) as post,
+    ):
+        post.return_value.raise_for_status.return_value = None
+        sent_log = send_onboarding_lifecycle_email(send_log, now=now)
+
+    assert sent_log.status == OnboardingLifecycleSendLog.STATUS_SENT
+    post.assert_called_once()
+    assert post.call_args.args[0] == "https://example.com/digest"
+    assert post.call_args.kwargs["headers"] == {
+        "content-type": "application/json",
+        "x-futureagi-notification-token": "delivery-token",
+    }
+    payload_text = str(post.call_args.kwargs["json"])
+    assert "Review trace regression" in payload_text
+    assert "Sensitive debugging notes" not in payload_text
+    assert "secret-value" not in payload_text
+    assert NotificationDeliveryLog.no_workspace_objects.filter(
+        source_id=str(send_log.id),
+        channel=NotificationPreference.CHANNEL_WEBHOOK,
+        status=NotificationDeliveryLog.STATUS_SENT,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_daily_quality_digest_suppresses_slack_without_channel_preference(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    send_log = _queued_daily_quality_send_log(user, organization, workspace, now=now)
+    upsert_notification_channel(
+        organization=organization,
+        workspace=workspace,
+        actor=user,
+        type=NotificationChannel.TYPE_SLACK_WEBHOOK,
+        display_name="Daily quality",
+        config={"webhook_url": "https://hooks.slack.com/services/T000/B000/secret"},
+        is_active=True,
+    )
+
+    with (
+        patch("accounts.services.onboarding.lifecycle_sender.email_helper"),
+        patch(
+            "accounts.services.onboarding.notification_delivery.requests.post"
+        ) as post,
+    ):
+        sent_log = send_onboarding_lifecycle_email(send_log, now=now)
+
+    assert sent_log.status == OnboardingLifecycleSendLog.STATUS_SENT
+    post.assert_not_called()
+    assert NotificationDeliveryLog.no_workspace_objects.filter(
+        source_id=str(send_log.id),
+        channel=NotificationPreference.CHANNEL_SLACK,
+        status=NotificationDeliveryLog.STATUS_SUPPRESSED,
+        suppressed_reason="channel_not_enabled",
+    ).exists()
 
 
 @pytest.mark.django_db
