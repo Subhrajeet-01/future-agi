@@ -173,3 +173,46 @@ def test_delivery_log_idempotency_updates_existing_row(organization, workspace, 
     logs = NotificationDeliveryLog.no_workspace_objects.filter(idempotency_key=key)
     assert logs.count() == 1
     assert logs.get().status == NotificationDeliveryLog.STATUS_SENT
+
+
+@pytest.mark.django_db
+def test_frequency_cap_preference_suppresses_recent_sent_delivery(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    NotificationPreference.no_workspace_objects.create(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        family=NotificationPreference.FAMILY_PRODUCT_ONBOARDING,
+        channel=NotificationPreference.CHANNEL_EMAIL,
+        enabled=True,
+        frequency_cap_minutes=90,
+    )
+    record_notification_delivery(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        family=NotificationPreference.FAMILY_PRODUCT_ONBOARDING,
+        source_type="onboarding_lifecycle",
+        source_id="send-1",
+        channel=NotificationPreference.CHANNEL_EMAIL,
+        status=NotificationDeliveryLog.STATUS_SENT,
+        notification_key="welcome_choose_goal",
+        idempotency_key="onboarding:send-1:email:sent",
+        now=now - timedelta(minutes=15),
+    )
+
+    decision = notification_preference_decision(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+        family=NotificationPreference.FAMILY_PRODUCT_ONBOARDING,
+        channel=NotificationPreference.CHANNEL_EMAIL,
+        now=now,
+    )
+
+    assert decision.allowed is False
+    assert decision.reason == "frequency_capped"

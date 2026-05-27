@@ -6,6 +6,8 @@ from django.test import override_settings
 from django.utils import timezone
 
 from accounts.models import (
+    NotificationDeliveryLog,
+    NotificationPreference,
     OnboardingGoal,
     OnboardingLifecycleEvaluationLog,
     OnboardingLifecyclePreference,
@@ -19,6 +21,9 @@ from accounts.services.onboarding.lifecycle_registry import lifecycle_campaign_b
 from accounts.services.onboarding.lifecycle_sender import (
     queue_onboarding_lifecycle_email,
     send_onboarding_lifecycle_email,
+)
+from accounts.services.onboarding.notification_preferences import (
+    notification_preference_decision,
 )
 from accounts.tests.onboarding_model_factories import (
     create_custom_eval,
@@ -275,6 +280,148 @@ def test_daily_quality_digest_send_log_carries_safe_preview(
     assert template_context["digest_preview"]["actions"][0]["action_id"] == (
         "trace-action-1"
     )
+
+
+@pytest.mark.django_db
+@override_settings(
+    ONBOARDING_FEATURE_FLAGS=_flags(
+        onboarding_daily_quality_home=True,
+        onboarding_email_daily_digest_enabled=True,
+    )
+)
+def test_daily_quality_digest_send_requires_safe_preview(
+    organization,
+    workspace,
+    user,
+):
+    _allow_user(user)
+    now = timezone.now()
+    campaign = lifecycle_campaign_by_key("daily_quality_open_actions")
+    _activated_observe_workspace(organization, workspace, user, now=now)
+    OnboardingQualityAction.no_workspace_objects.create(
+        organization=organization,
+        workspace=workspace,
+        created_by=user,
+        product_path="observe",
+        action_key="trace-action-1",
+        status=OnboardingQualityAction.STATUS_OPEN,
+        label="Assign trace owner",
+        route="/dashboard/home?mode=daily-quality",
+        fallback_route="/dashboard/get-started",
+        source_type="trace",
+        source_id="trace-123",
+        is_sample=False,
+        last_event_at=now - timedelta(minutes=30),
+    )
+    log = OnboardingLifecycleEvaluationLog.no_workspace_objects.create(
+        run_id="00000000-0000-0000-0000-000000000016",
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        campaign_key=campaign["campaign_key"],
+        campaign_group=campaign["campaign_group"],
+        template_key=campaign["template_key"],
+        template_version=campaign["template_version"],
+        activation_stage="daily_review",
+        primary_path="observe",
+        recommendation_id="review_daily_quality",
+        target_action_id=campaign["target_action_id"],
+        target_success_event=campaign["target_success_event"],
+        target_url="/dashboard/home?mode=daily-quality",
+        status=OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE,
+        eligible_at=now - timedelta(minutes=15),
+        evaluated_at=now - timedelta(minutes=1),
+        registry_snapshot=campaign,
+        activation_state_snapshot={
+            "stage": "daily_review",
+            "primary_path": "observe",
+            "recommended_action_id": "review_daily_quality",
+        },
+        metadata={"source": "test", "send_enabled": False},
+    )
+
+    with (
+        patch(
+            "accounts.services.onboarding.lifecycle_eligibility.build_lifecycle_digest_preview",
+            return_value=None,
+        ),
+        patch("accounts.services.onboarding.lifecycle_sender.email_helper") as helper,
+    ):
+        send_log = queue_onboarding_lifecycle_email(log, now=now)
+
+    assert send_log.status == OnboardingLifecycleSendLog.STATUS_SUPPRESSED
+    assert send_log.suppression_reason == "missing_digest_preview"
+    helper.assert_not_called()
+    assert NotificationDeliveryLog.no_workspace_objects.filter(
+        source_id=str(send_log.id),
+        status=NotificationDeliveryLog.STATUS_SUPPRESSED,
+        suppressed_reason="missing_digest_preview",
+    ).exists()
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_notification_frequency_cap_suppresses_lifecycle_send(
+    organization,
+    workspace,
+    user,
+):
+    _allow_user(user)
+    now = timezone.now()
+    for family in (
+        NotificationPreference.FAMILY_PRODUCT_ONBOARDING,
+        NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST,
+    ):
+        NotificationPreference.no_workspace_objects.create(
+            organization=organization,
+            workspace=workspace,
+            user=user,
+            family=family,
+            channel=NotificationPreference.CHANNEL_EMAIL,
+            enabled=True,
+            frequency_cap_minutes=120,
+        )
+        NotificationDeliveryLog.no_workspace_objects.create(
+            organization=organization,
+            workspace=workspace,
+            user=user,
+            family=family,
+            source_type="onboarding_lifecycle",
+            source_id=f"prior-send-{family}",
+            channel=NotificationPreference.CHANNEL_EMAIL,
+            recipient_type="user",
+            recipient_identifier_masked="u***@example.com",
+            notification_key="welcome_choose_goal",
+            status=NotificationDeliveryLog.STATUS_SENT,
+            sent_at=now - timedelta(minutes=30),
+        )
+    log = _eligible_log(user, organization, workspace, now=now)
+
+    assert (
+        notification_preference_decision(
+            organization=organization,
+            workspace=workspace,
+            user=user,
+            family=NotificationPreference.FAMILY_PRODUCT_ONBOARDING,
+            channel=NotificationPreference.CHANNEL_EMAIL,
+            now=now,
+        ).reason
+        == "frequency_capped"
+    )
+
+    with (
+        patch(
+            "accounts.services.onboarding.lifecycle_sender.notification_preference_decision",
+            wraps=notification_preference_decision,
+        ) as preference_decision,
+        patch("accounts.services.onboarding.lifecycle_sender.email_helper") as helper,
+    ):
+        send_log = queue_onboarding_lifecycle_email(log, now=now)
+
+    assert preference_decision.call_args_list
+    assert send_log.status == OnboardingLifecycleSendLog.STATUS_SUPPRESSED
+    assert send_log.suppression_reason == "frequency_capped"
+    helper.assert_not_called()
 
 
 @pytest.mark.django_db

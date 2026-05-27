@@ -1439,6 +1439,7 @@ export const LifecyclePreviewApiSuppressionReason = {
   frequency_capped: 'frequency_capped',
   flag_disabled: 'flag_disabled',
   preferences_blocked: 'preferences_blocked',
+  missing_digest_preview: 'missing_digest_preview',
 } as const;
 
 export interface LifecyclePreviewApi {
@@ -1674,6 +1675,7 @@ export const LifecycleEligibilityApiSuppressionReason = {
   frequency_capped: 'frequency_capped',
   flag_disabled: 'flag_disabled',
   preferences_blocked: 'preferences_blocked',
+  missing_digest_preview: 'missing_digest_preview',
 } as const;
 
 export interface LifecycleEligibilityApi {

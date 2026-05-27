@@ -102,6 +102,7 @@ LIFECYCLE_SUPPRESSION_REASONS = (
     "frequency_capped",
     "flag_disabled",
     "preferences_blocked",
+    "missing_digest_preview",
 )
 
 ROUTE_AVAILABILITY_STATES = (

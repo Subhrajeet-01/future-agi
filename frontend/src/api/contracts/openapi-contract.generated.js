@@ -93756,7 +93756,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "already_reviewed",
             "frequency_capped",
             "flag_disabled",
-            "preferences_blocked"
+            "preferences_blocked",
+            "missing_digest_preview"
           ],
           "x-nullable": true
         },
@@ -93877,7 +93878,8 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "already_reviewed",
             "frequency_capped",
             "flag_disabled",
-            "preferences_blocked"
+            "preferences_blocked",
+            "missing_digest_preview"
           ],
           "x-nullable": true
         },

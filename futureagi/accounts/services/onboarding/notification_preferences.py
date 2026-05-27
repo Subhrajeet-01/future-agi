@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -104,6 +105,35 @@ def _candidate_preferences(*, organization, workspace, user, family, channel):
     return ordered
 
 
+def _frequency_cap_suppression(
+    *,
+    organization,
+    workspace,
+    user,
+    family,
+    channel,
+    preference,
+    now,
+):
+    if not preference.frequency_cap_minutes:
+        return None
+    window_start = now - timedelta(minutes=preference.frequency_cap_minutes)
+    sent_logs = NotificationDeliveryLog.no_workspace_objects.filter(
+        organization=organization,
+        family=family,
+        channel=channel,
+        status=NotificationDeliveryLog.STATUS_SENT,
+        sent_at__gte=window_start,
+    )
+    if preference.workspace_id:
+        sent_logs = sent_logs.filter(workspace=workspace)
+    if preference.user_id:
+        sent_logs = sent_logs.filter(user=user)
+    if sent_logs.exists():
+        return "frequency_capped"
+    return None
+
+
 def _active_channel_exists(*, organization, workspace, channel):
     if channel not in {
         NotificationPreference.CHANNEL_SLACK,
@@ -169,6 +199,24 @@ def notification_preference_decision(
                 family=family,
                 channel=channel,
                 reason="muted",
+                source=source,
+                preference_id=str(preference.id),
+            )
+        frequency_reason = _frequency_cap_suppression(
+            organization=organization,
+            workspace=workspace,
+            user=user,
+            family=family,
+            channel=channel,
+            preference=preference,
+            now=now,
+        )
+        if frequency_reason:
+            return NotificationPreferenceDecision(
+                allowed=False,
+                family=family,
+                channel=channel,
+                reason=frequency_reason,
                 source=source,
                 preference_id=str(preference.id),
             )

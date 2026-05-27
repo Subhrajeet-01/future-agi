@@ -137,6 +137,11 @@ def _validate_campaign(campaign: dict, path: str) -> None:
                 raise _config_error(
                     f"{path}.daily_quality_modes contains unknown mode."
                 )
+    if "requires_digest_preview" in campaign and not isinstance(
+        campaign["requires_digest_preview"],
+        bool,
+    ):
+        raise _config_error(f"{path}.requires_digest_preview must be a boolean.")
 
 
 def _validate_config(config: dict) -> None:

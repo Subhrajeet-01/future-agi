@@ -290,25 +290,24 @@ def _preference_suppression(evaluation_log, now, campaign):
         organization=evaluation_log.organization,
         workspace=evaluation_log.workspace,
     )
-    if not preference:
-        return None
-    if not preference.onboarding_enabled or preference.unsubscribed_at:
-        return "unsubscribed"
-    if preference.snoozed_until and preference.snoozed_until > now:
-        return "snoozed"
-    group_field = {
-        "welcome": "first_action_recovery_enabled",
-        "recovery": "first_action_recovery_enabled",
-        "sample": "sample_bridge_enabled",
-        "first_signal": "first_action_recovery_enabled",
-        "prompt": "first_action_recovery_enabled",
-        "agent": "first_action_recovery_enabled",
-        "gateway": "first_action_recovery_enabled",
-        "next_loop": "next_loop_enabled",
-        "activation_success": "daily_digest_enabled",
-    }.get(campaign.get("campaign_group") if campaign else None)
-    if group_field and not getattr(preference, group_field):
-        return "unsubscribed"
+    if preference:
+        if not preference.onboarding_enabled or preference.unsubscribed_at:
+            return "unsubscribed"
+        if preference.snoozed_until and preference.snoozed_until > now:
+            return "snoozed"
+        group_field = {
+            "welcome": "first_action_recovery_enabled",
+            "recovery": "first_action_recovery_enabled",
+            "sample": "sample_bridge_enabled",
+            "first_signal": "first_action_recovery_enabled",
+            "prompt": "first_action_recovery_enabled",
+            "agent": "first_action_recovery_enabled",
+            "gateway": "first_action_recovery_enabled",
+            "next_loop": "next_loop_enabled",
+            "activation_success": "daily_digest_enabled",
+        }.get(campaign.get("campaign_group") if campaign else None)
+        if group_field and not getattr(preference, group_field):
+            return "unsubscribed"
     family = _notification_family_for_campaign(
         campaign.get("campaign_group") if campaign else None
     )
@@ -353,6 +352,18 @@ def _send_log_frequency_suppression(evaluation_log, now, campaign):
     return None
 
 
+def _digest_preview_for(decision, evaluation_log):
+    return (decision.metadata or {}).get("digest_preview") or (
+        evaluation_log.metadata or {}
+    ).get("digest_preview")
+
+
+def _missing_required_digest_preview(evaluation_log, campaign, decision):
+    if not campaign or not campaign.get("requires_digest_preview"):
+        return False
+    return not bool(_digest_preview_for(decision, evaluation_log))
+
+
 def _suppression_reason(evaluation_log, flags, decision, now):
     campaign = decision.campaign
     if not flags.get("onboarding_lifecycle_email_dry_run"):
@@ -377,6 +388,8 @@ def _suppression_reason(evaluation_log, flags, decision, now):
         if decision.suppression_reason == "user_snoozed":
             return "snoozed"
         return "activation_state_changed"
+    if _missing_required_digest_preview(evaluation_log, campaign, decision):
+        return "missing_digest_preview"
     if _denylisted(evaluation_log):
         return "denylisted"
     if not _allowlisted(evaluation_log, campaign):

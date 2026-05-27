@@ -516,6 +516,7 @@ campaigns:
     dry_run_flag: onboarding_email_daily_digest_enabled
     send_flag: onboarding_lifecycle_send_enabled
     frequency_cap_key: daily_digest
+    requires_digest_preview: true
     sample_policy: real_only
     owner: product
     qa_fixture: daily_quality_open_actions
