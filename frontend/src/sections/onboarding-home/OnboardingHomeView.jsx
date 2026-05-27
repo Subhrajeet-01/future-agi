@@ -1,239 +1,30 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useLocation } from "react-router-dom";
 import { useAuthContext } from "src/auth/hooks";
-import Iconify from "src/components/iconify";
 import { useWorkspace } from "src/contexts/WorkspaceContext";
-import { RouterLink } from "src/routes/components";
 import { useActivationState } from "./hooks/useActivationState";
+import { useSaveOnboardingGoal } from "./hooks/useSaveOnboardingGoal";
+import {
+  getGoalOptionsForState,
+  getStageCopy,
+  readableToken,
+} from "./onboarding-home.constants";
+import {
+  OnboardingHomeEvents,
+  trackOnboardingHomeEvent,
+} from "./analytics/onboarding-events";
+import GoalPicker from "./components/GoalPicker";
 import OnboardingHomeError from "./components/OnboardingHomeError";
 import OnboardingHomeSkeleton from "./components/OnboardingHomeSkeleton";
-
-const STAGE_COPY = {
-  feature_disabled: {
-    eyebrow: "Setup",
-    title: "Start with the setup checklist",
-    description: "The existing checklist is available for this workspace.",
-  },
-  workspace_missing: {
-    eyebrow: "Workspace",
-    title: "Choose a workspace",
-    description: "Select a workspace before starting a product loop.",
-  },
-  permission_limited: {
-    eyebrow: "Access",
-    title: "Request access for setup",
-    description: "This workspace needs write access before setup can continue.",
-  },
-  choose_goal: {
-    eyebrow: "First goal",
-    title: "Choose what to set up first",
-    description: "Pick the first product job before moving into setup.",
-  },
-  selected_path_unavailable: {
-    eyebrow: "Path unavailable",
-    title: "Start with an available path",
-    description: "This selected path is not available in the product yet.",
-  },
-  connect_observability: {
-    eyebrow: "Observe",
-    title: "Connect observability",
-    description: "Create an observe project and send one trace.",
-  },
-  waiting_for_first_trace: {
-    eyebrow: "Waiting",
-    title: "Waiting for the first trace",
-    description: "Once a trace lands, the next review action will unlock.",
-  },
-  waiting_for_first_trace_sample_available: {
-    eyebrow: "Waiting",
-    title: "Waiting for real data",
-    description: "Use a sample signal while the first real trace is pending.",
-  },
-  review_first_trace: {
-    eyebrow: "First signal",
-    title: "Review the first trace",
-    description:
-      "Inspect the first trace and capture the first quality signal.",
-  },
-  create_trace_evaluator: {
-    eyebrow: "Quality loop",
-    title: "Create an evaluator",
-    description: "Turn the reviewed trace into a repeatable quality check.",
-  },
-  activated: {
-    eyebrow: "Activated",
-    title: "First quality loop is ready",
-    description: "The workspace has completed a first meaningful loop.",
-  },
-  daily_review: {
-    eyebrow: "Daily quality",
-    title: "Review today's quality signal",
-    description: "Open the latest quality signal and keep the loop fresh.",
-  },
-  review_sample_signal: {
-    eyebrow: "Sample data",
-    title: "Review a sample signal",
-    description:
-      "Inspect the sample signal while real workspace data is pending.",
-  },
-};
-
-const getStageCopy = (state) =>
-  STAGE_COPY[state?.stage] || {
-    eyebrow: "Setup",
-    title: "Open Get Started",
-    description: "The existing setup checklist is available.",
-  };
-
-const readableToken = (value) =>
-  value ? String(value).replaceAll("_", " ") : "not set";
-
-const actionHref = (action) => {
-  if (!action || action.blocked || !action.routeAvailable || !action.href) {
-    return null;
-  }
-  return action.href;
-};
-
-function ActionSlot({ action, label, variant = "primary" }) {
-  const href = actionHref(action);
-  if (!action) {
-    return (
-      <Box
-        sx={{
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1,
-          p: 2,
-          minHeight: 136,
-        }}
-      >
-        <Typography variant="subtitle2">{label}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-          No action is available.
-        </Typography>
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      data-testid={`onboarding-${variant}-action`}
-      sx={{
-        border: "1px solid",
-        borderColor: variant === "primary" ? "primary.main" : "divider",
-        borderRadius: 1,
-        p: 2,
-        minHeight: 172,
-        bgcolor: "background.paper",
-      }}
-    >
-      <Stack spacing={1.25}>
-        <Stack direction="row" justifyContent="space-between" gap={1}>
-          <Typography variant="subtitle2">{label}</Typography>
-          <Chip
-            size="small"
-            label={readableToken(action.kind)}
-            sx={{ textTransform: "capitalize" }}
-          />
-        </Stack>
-        <Stack spacing={0.5}>
-          <Typography variant="h6">{action.title}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {action.description}
-          </Typography>
-        </Stack>
-        {action.blocked ? (
-          <Alert severity="info" sx={{ borderRadius: 1 }}>
-            {readableToken(action.blockedReason)}
-          </Alert>
-        ) : null}
-        <Button
-          variant={variant === "primary" ? "contained" : "outlined"}
-          component={href ? RouterLink : "button"}
-          href={href || undefined}
-          disabled={!href}
-          startIcon={<Iconify icon="mdi:arrow-right" width={18} />}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          {action.ctaLabel || "Open"}
-        </Button>
-      </Stack>
-    </Box>
-  );
-}
-
-ActionSlot.propTypes = {
-  action: PropTypes.object,
-  label: PropTypes.string.isRequired,
-  variant: PropTypes.oneOf(["primary", "fallback"]),
-};
-
-function PathRows({ paths: availablePaths = [] }) {
-  if (!availablePaths.length) return null;
-
-  return (
-    <Box
-      sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 1,
-        p: 2,
-      }}
-    >
-      <Stack spacing={1.25}>
-        <Typography variant="subtitle2">Available paths</Typography>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
-            gap: 1,
-          }}
-        >
-          {availablePaths.map((path) => (
-            <Box
-              key={path.id}
-              sx={{
-                minHeight: 86,
-                border: "1px solid",
-                borderColor: path.isAvailable ? "divider" : "action.disabled",
-                borderRadius: 1,
-                p: 1.5,
-                bgcolor:
-                  path.status === "selected" ? "action.hover" : "inherit",
-              }}
-            >
-              <Stack spacing={0.5}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography variant="subtitle2">{path.label}</Typography>
-                  <Chip
-                    size="small"
-                    label={readableToken(path.status)}
-                    sx={{ textTransform: "capitalize" }}
-                  />
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {path.description}
-                </Typography>
-              </Stack>
-            </Box>
-          ))}
-        </Box>
-      </Stack>
-    </Box>
-  );
-}
-
-PathRows.propTypes = {
-  paths: PropTypes.array,
-};
+import PathCardGrid from "./components/PathCardGrid";
+import ProductLoopStepper from "./components/ProductLoopStepper";
+import RecommendedActionCard from "./components/RecommendedActionCard";
 
 function Diagnostics({ state }) {
   if (!state?.featureFlags?.onboarding_debug || !state?.diagnostics) {
@@ -262,6 +53,9 @@ Diagnostics.propTypes = {
   state: PropTypes.object,
 };
 
+const mutationPending = (mutation) =>
+  Boolean(mutation?.isPending || mutation?.isLoading);
+
 export default function OnboardingHomeView() {
   const { user } = useAuthContext();
   const {
@@ -270,6 +64,8 @@ export default function OnboardingHomeView() {
     isReady: workspaceReady,
   } = useWorkspace();
   const location = useLocation();
+  const saveGoal = useSaveOnboardingGoal();
+  const [selectedGoal, setSelectedGoal] = useState(null);
 
   const searchContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -299,7 +95,17 @@ export default function OnboardingHomeView() {
     requireWorkspaceContext: false,
   });
 
-  if (isLoading || waitingForWorkspace || (!state && !isError)) {
+  const renderedState = saveGoal.data || state;
+  const goalOptions = useMemo(
+    () => getGoalOptionsForState(renderedState),
+    [renderedState],
+  );
+
+  useEffect(() => {
+    setSelectedGoal(renderedState?.goal || null);
+  }, [renderedState?.goal]);
+
+  if (isLoading || waitingForWorkspace || (!renderedState && !isError)) {
     return <OnboardingHomeSkeleton />;
   }
 
@@ -307,8 +113,80 @@ export default function OnboardingHomeView() {
     return <OnboardingHomeError error={error} onRetry={refetch} />;
   }
 
-  const copy = getStageCopy(state);
-  const fallbackAction = state.fallbackAction;
+  const copy = getStageCopy(renderedState);
+  const showGoalPicker =
+    renderedState.stage === "choose_goal" &&
+    renderedState.featureFlags?.onboarding_goal_picker !== false;
+  const isSavingGoal = mutationPending(saveGoal);
+
+  const trackContext = {
+    request_id: renderedState.requestId,
+    stage: renderedState.stage,
+    goal: renderedState.goal,
+    primary_path: renderedState.primaryPath,
+    workspace_id: renderedState.workspaceId || workspaceId,
+    organization_id: renderedState.organizationId || organizationId,
+    source: searchContext.source,
+  };
+
+  const handleSelectGoal = (option) => {
+    setSelectedGoal(option.goal);
+    trackOnboardingHomeEvent(OnboardingHomeEvents.homeGoalSelected, {
+      ...trackContext,
+      selected_goal: option.goal,
+      selected_path: option.primaryPath,
+    });
+  };
+
+  const handleSaveGoal = async (option) => {
+    if (!option) return;
+
+    try {
+      const nextState = await saveGoal.mutateAsync({
+        goal: option.goal,
+        primaryPath: option.primaryPath,
+        source: "goal_picker",
+        reason: renderedState.goal ? "path_change" : "first_selection",
+        expectedStage: renderedState.stage,
+      });
+      trackOnboardingHomeEvent(OnboardingHomeEvents.homeGoalSaved, {
+        ...trackContext,
+        selected_goal: option.goal,
+        selected_path: option.primaryPath,
+        next_stage: nextState.stage,
+      });
+      refetch?.();
+    } catch (mutationError) {
+      trackOnboardingHomeEvent(OnboardingHomeEvents.homeGoalSaveFailed, {
+        ...trackContext,
+        selected_goal: option.goal,
+        selected_path: option.primaryPath,
+        reason:
+          mutationError?.result?.reason ||
+          mutationError?.message ||
+          "unknown_error",
+      });
+    }
+  };
+
+  const handleActionClick = (action) => {
+    trackOnboardingHomeEvent(OnboardingHomeEvents.homeActionClicked, {
+      ...trackContext,
+      action_id: action.id,
+      action_kind: action.kind,
+      action_path: action.analytics?.targetPath,
+      is_sample: action.isSample,
+      completion_event: action.completionEvent,
+    });
+  };
+
+  const handlePathClick = (path) => {
+    trackOnboardingHomeEvent(OnboardingHomeEvents.homePathClicked, {
+      ...trackContext,
+      path_id: path.id,
+      path_status: path.status,
+    });
+  };
 
   return (
     <Box
@@ -329,7 +207,7 @@ export default function OnboardingHomeView() {
             flexWrap="wrap"
           >
             <Chip size="small" label={copy.eyebrow} />
-            {state.isActivated ? (
+            {renderedState.isActivated ? (
               <Chip size="small" color="success" label="Activated" />
             ) : null}
           </Stack>
@@ -344,30 +222,59 @@ export default function OnboardingHomeView() {
           ) : null}
         </Stack>
 
-        {state.stage === "feature_disabled" ? (
+        {renderedState.stage === "feature_disabled" ? (
           <Alert severity="info" sx={{ borderRadius: 1 }}>
             The existing setup checklist is available for this workspace.
           </Alert>
         ) : null}
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) 1fr" },
-            gap: 2,
-            alignItems: "stretch",
-          }}
-        >
-          <ActionSlot
-            action={state.recommendedAction}
-            label="Recommended action"
-          />
-          <ActionSlot
-            action={fallbackAction}
-            label="Fallback"
-            variant="fallback"
-          />
-        </Box>
+        {showGoalPicker ? (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) 1fr" },
+              gap: 2,
+              alignItems: "stretch",
+            }}
+          >
+            <GoalPicker
+              goals={goalOptions}
+              selectedGoal={selectedGoal}
+              onSelectGoal={handleSelectGoal}
+              onSaveGoal={handleSaveGoal}
+              skipHref={renderedState.fallbackAction?.href}
+              isSaving={isSavingGoal}
+              error={saveGoal.error}
+            />
+            <RecommendedActionCard
+              action={renderedState.fallbackAction}
+              label="Fallback"
+              variant="fallback"
+              onActionClick={handleActionClick}
+            />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) 1fr" },
+              gap: 2,
+              alignItems: "stretch",
+            }}
+          >
+            <RecommendedActionCard
+              action={renderedState.recommendedAction}
+              label="Recommended action"
+              onActionClick={handleActionClick}
+            />
+            <RecommendedActionCard
+              action={renderedState.fallbackAction}
+              label="Fallback"
+              variant="fallback"
+              onActionClick={handleActionClick}
+            />
+          </Box>
+        )}
 
         <Box
           sx={{
@@ -385,7 +292,7 @@ export default function OnboardingHomeView() {
                 color="text.secondary"
                 sx={{ mt: 0.5, textTransform: "capitalize" }}
               >
-                {readableToken(state.stage)}
+                {readableToken(renderedState.stage)}
               </Typography>
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -395,7 +302,7 @@ export default function OnboardingHomeView() {
                 color="text.secondary"
                 sx={{ mt: 0.5, textTransform: "capitalize" }}
               >
-                {readableToken(state.primaryPath)}
+                {readableToken(renderedState.primaryPath)}
               </Typography>
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -405,14 +312,18 @@ export default function OnboardingHomeView() {
                 color="text.secondary"
                 sx={{ mt: 0.5, textTransform: "capitalize" }}
               >
-                {readableToken(state.goal)}
+                {readableToken(renderedState.goal)}
               </Typography>
             </Box>
           </Stack>
         </Box>
 
-        <PathRows paths={state.availablePaths} />
-        <Diagnostics state={state} />
+        <ProductLoopStepper progress={renderedState.progress} />
+        <PathCardGrid
+          paths={renderedState.availablePaths}
+          onPathClick={handlePathClick}
+        />
+        <Diagnostics state={renderedState} />
       </Stack>
     </Box>
   );

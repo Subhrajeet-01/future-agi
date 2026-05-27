@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "src/utils/test-utils";
+import { screen, waitFor } from "src/utils/test-utils";
 import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "src/utils/test-utils";
 import { getActivationStateFixture } from "../fixtures/activation-state.fixtures";
@@ -8,13 +8,28 @@ import OnboardingHomeView from "../OnboardingHomeView";
 
 const mocks = vi.hoisted(() => ({
   useActivationState: vi.fn(),
+  useSaveOnboardingGoal: vi.fn(),
   useAuthContext: vi.fn(),
   useWorkspace: vi.fn(),
+  trackOnboardingHomeEvent: vi.fn(),
 }));
 
 vi.mock("../hooks/useActivationState", () => ({
   useActivationState: (params) => mocks.useActivationState(params),
 }));
+
+vi.mock("../hooks/useSaveOnboardingGoal", () => ({
+  useSaveOnboardingGoal: () => mocks.useSaveOnboardingGoal(),
+}));
+
+vi.mock("../analytics/onboarding-events", async () => {
+  const actual = await vi.importActual("../analytics/onboarding-events");
+  return {
+    ...actual,
+    trackOnboardingHomeEvent: (...args) =>
+      mocks.trackOnboardingHomeEvent(...args),
+  };
+});
 
 vi.mock("src/auth/hooks", () => ({
   useAuthContext: () => mocks.useAuthContext(),
@@ -49,6 +64,13 @@ describe("OnboardingHomeView", () => {
     vi.clearAllMocks();
     mocks.useAuthContext.mockReturnValue({ user: defaultUser });
     mocks.useWorkspace.mockReturnValue(defaultWorkspace);
+    mocks.useSaveOnboardingGoal.mockReturnValue({
+      data: null,
+      error: null,
+      isLoading: false,
+      isPending: false,
+      mutateAsync: vi.fn(),
+    });
   });
 
   it("renders the route skeleton while activation state is loading", () => {
@@ -97,7 +119,8 @@ describe("OnboardingHomeView", () => {
     renderView("/dashboard/home?source=email&campaign_key=welcome");
 
     expect(screen.getByText("Choose what to set up first")).toBeVisible();
-    expect(screen.getByText("Choose your first goal")).toBeVisible();
+    expect(screen.getByTestId("onboarding-goal-picker")).toBeVisible();
+    expect(screen.getAllByText("Monitor a production AI app").length).toBe(2);
     expect(screen.getByText("Workspace: Quality Workspace")).toBeVisible();
     expect(mocks.useActivationState).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -107,6 +130,42 @@ describe("OnboardingHomeView", () => {
         campaignKey: "welcome",
       }),
     );
+  });
+
+  it("saves a selected goal through the goal mutation", async () => {
+    const mutateAsync = vi
+      .fn()
+      .mockResolvedValue(normalizedFixture("observeNoSetup"));
+    mocks.useSaveOnboardingGoal.mockReturnValue({
+      data: null,
+      error: null,
+      isLoading: false,
+      isPending: false,
+      mutateAsync,
+    });
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("newWorkspaceNoGoal"),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    await userEvent.click(screen.getByLabelText("Monitor a production AI app"));
+    await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith({
+        goal: "monitor_production_ai_app",
+        primaryPath: "observe",
+        source: "goal_picker",
+        reason: "first_selection",
+        expectedStage: "choose_goal",
+      }),
+    );
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalled();
   });
 
   it("renders a hard-error fallback and retries on demand", async () => {
