@@ -156,6 +156,7 @@ export const ONBOARDING_STAGE_COPY = {
 };
 
 export const getStageCopy = (state) =>
+  state?.stageCopy ||
   ONBOARDING_STAGE_COPY[state?.stage] || {
     eyebrow: "Setup",
     title: "Open Get Started",

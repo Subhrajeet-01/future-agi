@@ -132,6 +132,41 @@ describe("OnboardingHomeView", () => {
     );
   });
 
+  it("renders the observe setup panel for the observe MVP path", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeNoSetup"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    expect(screen.getByTestId("observe-setup-panel")).toBeVisible();
+    expect(screen.getByText("Connect one observe project")).toBeVisible();
+  });
+
+  it("checks again from the waiting-for-signal panel", async () => {
+    const refetch = vi.fn();
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeWaitingForTrace"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch,
+    });
+
+    renderView();
+
+    expect(screen.getByTestId("waiting-for-signal-panel")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: /check again/i }));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("saves a selected goal through the goal mutation", async () => {
     const mutateAsync = vi
       .fn()

@@ -1,0 +1,436 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import yaml
+from django.core.exceptions import ImproperlyConfigured
+
+CONFIG_PATH = Path(__file__).with_name("activation_flow.yml")
+
+HOME_MODES = {"first_run", "daily_quality", "fallback"}
+PROGRESS_STATES = {
+    "not_started",
+    "available",
+    "selected",
+    "in_progress",
+    "blocked",
+    "complete",
+    "sample_only",
+}
+
+
+def _config_error(message: str) -> ImproperlyConfigured:
+    return ImproperlyConfigured(f"Invalid onboarding activation flow config: {message}")
+
+
+def _mapping(value: Any, path: str) -> dict:
+    if not isinstance(value, dict):
+        raise _config_error(f"{path} must be a mapping.")
+    return value
+
+
+def _sequence(value: Any, path: str) -> list:
+    if not isinstance(value, list):
+        raise _config_error(f"{path} must be a list.")
+    return value
+
+
+def _required_text(mapping: dict, key: str, path: str) -> str:
+    value = mapping.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise _config_error(f"{path}.{key} must be a non-empty string.")
+    return value
+
+
+def _optional_text(mapping: dict, key: str, path: str) -> str | None:
+    value = mapping.get(key)
+    if value in {None, ""}:
+        return None
+    if not isinstance(value, str):
+        raise _config_error(f"{path}.{key} must be a string.")
+    return value
+
+
+def _load_config_file() -> dict:
+    try:
+        raw = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise _config_error(f"{CONFIG_PATH.name} could not be read.") from exc
+    except yaml.YAMLError as exc:
+        raise _config_error(f"{CONFIG_PATH.name} is not valid YAML.") from exc
+
+    return _mapping(raw, CONFIG_PATH.name)
+
+
+def _merge_stage_defaults(config: dict) -> None:
+    defaults = deepcopy(_mapping(config.get("stage_defaults"), "stage_defaults"))
+    stages = _mapping(config.get("stages"), "stages")
+
+    merged = {}
+    for stage_id, stage_config in stages.items():
+        merged_stage = deepcopy(defaults)
+        merged_stage.update(_mapping(stage_config, f"stages.{stage_id}"))
+        if "copy" in defaults or "copy" in stage_config:
+            copy = deepcopy(defaults.get("copy", {}))
+            copy.update(stage_config.get("copy") or {})
+            merged_stage["copy"] = copy
+        if "progress" in defaults or "progress" in stage_config:
+            progress = deepcopy(defaults.get("progress", {}))
+            progress.update(stage_config.get("progress") or {})
+            merged_stage["progress"] = progress
+        merged[stage_id] = merged_stage
+
+    config["stages"] = merged
+
+
+def _validate_goals(config: dict) -> None:
+    goals = _mapping(config.get("goals"), "goals")
+    paths = _mapping(config.get("paths"), "paths")
+
+    for goal_id, goal_config in goals.items():
+        path = f"goals.{goal_id}"
+        goal_config = _mapping(goal_config, path)
+        primary_path = _required_text(goal_config, "primary_path", path)
+        if primary_path not in paths:
+            raise _config_error(f"{path}.primary_path references unknown path.")
+        _required_text(goal_config, "label", path)
+        _required_text(goal_config, "description", path)
+        minutes = goal_config.get("estimated_minutes")
+        if minutes is not None and (not isinstance(minutes, int) or minutes < 1):
+            raise _config_error(f"{path}.estimated_minutes must be a positive integer.")
+
+    aliases = _mapping(config.get("goal_aliases", {}), "goal_aliases")
+    for alias, canonical in aliases.items():
+        if canonical not in goals:
+            raise _config_error(f"goal_aliases.{alias} references unknown goal.")
+
+
+def _validate_paths(config: dict) -> None:
+    paths = _mapping(config.get("paths"), "paths")
+    actions = _mapping(config.get("actions"), "actions")
+
+    for path_id, path_config in paths.items():
+        path = f"paths.{path_id}"
+        path_config = _mapping(path_config, path)
+        _required_text(path_config, "label", path)
+        _required_text(path_config, "description", path)
+        first_action_id = _optional_text(path_config, "first_action_id", path)
+        if first_action_id and first_action_id not in actions:
+            raise _config_error(f"{path}.first_action_id references unknown action.")
+
+    aliases = _mapping(config.get("path_aliases", {}), "path_aliases")
+    for alias, canonical in aliases.items():
+        if canonical not in paths:
+            raise _config_error(f"path_aliases.{alias} references unknown path.")
+
+
+def _validate_actions(config: dict) -> None:
+    action_kinds = set(_sequence(config.get("action_kinds"), "action_kinds"))
+    actions = _mapping(config.get("actions"), "actions")
+    paths = _mapping(config.get("paths"), "paths")
+
+    for action_id, action_config in actions.items():
+        path = f"actions.{action_id}"
+        action_config = _mapping(action_config, path)
+        kind = _required_text(action_config, "kind", path)
+        if kind not in action_kinds:
+            raise _config_error(f"{path}.kind references unknown action kind.")
+        _required_text(action_config, "title", path)
+        _required_text(action_config, "description", path)
+        _required_text(action_config, "route_key", path)
+        _required_text(action_config, "cta_label", path)
+        _required_text(action_config, "fallback_route_key", path)
+        priority = action_config.get("priority")
+        if not isinstance(priority, int):
+            raise _config_error(f"{path}.priority must be an integer.")
+        minutes = action_config.get("estimated_minutes")
+        if minutes is not None and (not isinstance(minutes, int) or minutes < 1):
+            raise _config_error(f"{path}.estimated_minutes must be a positive integer.")
+        target_path = _optional_text(action_config, "target_path", path)
+        if target_path and target_path not in paths:
+            raise _config_error(f"{path}.target_path references unknown path.")
+
+
+def _validate_stage(config: dict, stage_id: str, stage_config: dict) -> None:
+    path = f"stages.{stage_id}"
+    actions = _mapping(config.get("actions"), "actions")
+    stages = _mapping(config.get("stages"), "stages")
+    loop_steps = _mapping(config.get("product_loop_steps"), "product_loop_steps")
+
+    home_mode = _required_text(stage_config, "home_mode", path)
+    if home_mode not in HOME_MODES:
+        raise _config_error(f"{path}.home_mode references unknown home mode.")
+
+    copy = _mapping(stage_config.get("copy"), f"{path}.copy")
+    _required_text(copy, "eyebrow", f"{path}.copy")
+    _required_text(copy, "title", f"{path}.copy")
+    _required_text(copy, "description", f"{path}.copy")
+
+    progress = _mapping(stage_config.get("progress"), f"{path}.progress")
+    if set(progress) != set(loop_steps):
+        raise _config_error(f"{path}.progress must include every product loop step.")
+    invalid_states = set(progress.values()) - PROGRESS_STATES
+    if invalid_states:
+        raise _config_error(f"{path}.progress uses unknown progress states.")
+
+    for key in ("recommended_action", "fallback_action"):
+        action_id = _required_text(stage_config, key, path)
+        if action_id not in actions:
+            raise _config_error(f"{path}.{key} references unknown action.")
+
+    flagged = _mapping(
+        stage_config.get("flagged_fallback_actions", {}),
+        f"{path}.flagged_fallback_actions",
+    )
+    for flag, action_id in flagged.items():
+        if not isinstance(flag, str) or not flag:
+            raise _config_error(f"{path}.flagged_fallback_actions has invalid flag.")
+        if action_id not in actions:
+            raise _config_error(
+                f"{path}.flagged_fallback_actions references unknown action."
+            )
+
+    for next_stage in _sequence(stage_config.get("next", []), f"{path}.next"):
+        if next_stage not in stages:
+            raise _config_error(f"{path}.next references unknown stage.")
+
+
+def _validate_stages(config: dict) -> None:
+    stages = _mapping(config.get("stages"), "stages")
+    if not stages:
+        raise _config_error("stages cannot be empty.")
+    for stage_id, stage_config in stages.items():
+        _validate_stage(config, stage_id, _mapping(stage_config, f"stages.{stage_id}"))
+
+
+def _validate_stage_rules(config: dict) -> None:
+    stages = _mapping(config.get("stages"), "stages")
+    rules = _sequence(config.get("stage_rules"), "stage_rules")
+    for index, rule in enumerate(rules):
+        path = f"stage_rules.{index}"
+        rule = _mapping(rule, path)
+        stage = _required_text(rule, "stage", path)
+        if stage not in stages:
+            raise _config_error(f"{path}.stage references unknown stage.")
+        _mapping(rule.get("when"), f"{path}.when")
+
+
+def _validate_activation_events(config: dict) -> None:
+    events = _mapping(config.get("activation_events"), "activation_events")
+    names = _sequence(events.get("names"), "activation_events.names")
+    if not names or not all(isinstance(name, str) and name for name in names):
+        raise _config_error("activation_events.names must contain event names.")
+    aliases = _mapping(events.get("aliases", {}), "activation_events.aliases")
+    for alias, canonical in aliases.items():
+        if canonical not in names:
+            raise _config_error(
+                f"activation_events.aliases.{alias} references unknown event."
+            )
+
+
+def _validate_config(config: dict) -> None:
+    _mapping(config.get("product_loop_steps"), "product_loop_steps")
+    _validate_actions(config)
+    _validate_paths(config)
+    _validate_goals(config)
+    _validate_stages(config)
+    _validate_stage_rules(config)
+    _validate_activation_events(config)
+
+
+@lru_cache(maxsize=1)
+def get_activation_flow_config() -> dict:
+    config = _load_config_file()
+    _merge_stage_defaults(config)
+    _validate_config(config)
+    return config
+
+
+def configured_goal_ids() -> tuple[str, ...]:
+    return tuple(get_activation_flow_config()["goals"].keys())
+
+
+def configured_goal_aliases() -> dict[str, str]:
+    return dict(get_activation_flow_config().get("goal_aliases", {}))
+
+
+def configured_goal_primary_paths() -> dict[str, str]:
+    return {
+        goal_id: goal_config["primary_path"]
+        for goal_id, goal_config in get_activation_flow_config()["goals"].items()
+    }
+
+
+def configured_goal_options() -> list[dict]:
+    options = []
+    for goal_id, goal_config in get_activation_flow_config()["goals"].items():
+        options.append(
+            {
+                "id": goal_id,
+                "goal": goal_id,
+                "primary_path": goal_config["primary_path"],
+                "label": goal_config["label"],
+                "description": goal_config["description"],
+                "estimated_minutes": goal_config.get("estimated_minutes"),
+                "disabled": False,
+                "disabled_reason": None,
+            }
+        )
+    return options
+
+
+def configured_product_paths() -> tuple[str, ...]:
+    return tuple(get_activation_flow_config()["paths"].keys())
+
+
+def configured_path_aliases() -> dict[str, str]:
+    return dict(get_activation_flow_config().get("path_aliases", {}))
+
+
+def configured_path(path_id: str) -> dict:
+    return deepcopy(get_activation_flow_config()["paths"][path_id])
+
+
+def configured_stage_ids() -> tuple[str, ...]:
+    return tuple(get_activation_flow_config()["stages"].keys())
+
+
+def configured_stage(stage_id: str) -> dict:
+    return deepcopy(get_activation_flow_config()["stages"][stage_id])
+
+
+def configured_stage_copy(stage_id: str) -> dict:
+    return deepcopy(get_activation_flow_config()["stages"][stage_id]["copy"])
+
+
+def configured_stage_home_mode(stage_id: str) -> str:
+    return get_activation_flow_config()["stages"][stage_id]["home_mode"]
+
+
+def configured_stage_progress(stage_id: str) -> dict:
+    return deepcopy(get_activation_flow_config()["stages"][stage_id]["progress"])
+
+
+def configured_write_stages() -> set[str]:
+    return {
+        stage_id
+        for stage_id, stage in get_activation_flow_config()["stages"].items()
+        if stage.get("requires_write") is True
+    }
+
+
+def configured_action_kinds() -> tuple[str, ...]:
+    return tuple(get_activation_flow_config()["action_kinds"])
+
+
+def configured_action(action_id: str) -> dict:
+    return deepcopy(get_activation_flow_config()["actions"][action_id])
+
+
+def configured_activation_events() -> tuple[str, ...]:
+    return tuple(get_activation_flow_config()["activation_events"]["names"])
+
+
+def configured_activation_event_aliases() -> dict[str, str]:
+    return dict(get_activation_flow_config()["activation_events"].get("aliases", {}))
+
+
+def _context_value(context, field: str):
+    return getattr(context, field)
+
+
+def _is_missing(value) -> bool:
+    return value is None or value == "" or value == []
+
+
+def _condition_matches(condition: dict, *, context, flags: dict, signals) -> bool:
+    results = []
+    if "always" in condition:
+        results.append(bool(condition["always"]))
+    if "all" in condition:
+        results.append(
+            all(
+                _condition_matches(
+                    _mapping(item, "stage rule condition"),
+                    context=context,
+                    flags=flags,
+                    signals=signals,
+                )
+                for item in _sequence(condition["all"], "stage rule all")
+            )
+        )
+    if "any" in condition:
+        results.append(
+            any(
+                _condition_matches(
+                    _mapping(item, "stage rule condition"),
+                    context=context,
+                    flags=flags,
+                    signals=signals,
+                )
+                for item in _sequence(condition["any"], "stage rule any")
+            )
+        )
+    if "not" in condition:
+        results.append(
+            not _condition_matches(
+                _mapping(condition["not"], "stage rule not"),
+                context=context,
+                flags=flags,
+                signals=signals,
+            )
+        )
+    if "flag_enabled" in condition:
+        results.append(bool(flags.get(condition["flag_enabled"])))
+    if "flag_disabled" in condition:
+        results.append(not bool(flags.get(condition["flag_disabled"])))
+    if "signal" in condition:
+        results.append(bool(getattr(signals, condition["signal"])))
+    if "signal_not" in condition:
+        results.append(not bool(getattr(signals, condition["signal_not"])))
+    if "missing" in condition:
+        results.append(_is_missing(_context_value(context, condition["missing"])))
+    if "missing_any" in condition:
+        results.append(
+            any(
+                _is_missing(_context_value(context, field))
+                for field in _sequence(
+                    condition["missing_any"], "stage rule missing_any"
+                )
+            )
+        )
+    if "context_equals" in condition:
+        expected = _mapping(condition["context_equals"], "stage rule context_equals")
+        results.append(
+            all(
+                _context_value(context, field) == value
+                for field, value in expected.items()
+            )
+        )
+    if "context_not_equals" in condition:
+        expected = _mapping(
+            condition["context_not_equals"],
+            "stage rule context_not_equals",
+        )
+        results.append(
+            any(
+                _context_value(context, field) != value
+                for field, value in expected.items()
+            )
+        )
+
+    if not results:
+        raise _config_error("stage rule condition is empty or unsupported.")
+    return all(results)
+
+
+def resolve_stage_from_config(*, context, flags: dict, signals) -> str:
+    for rule in get_activation_flow_config()["stage_rules"]:
+        if _condition_matches(
+            rule["when"], context=context, flags=flags, signals=signals
+        ):
+            return rule["stage"]
+    raise _config_error("stage_rules did not resolve a stage.")

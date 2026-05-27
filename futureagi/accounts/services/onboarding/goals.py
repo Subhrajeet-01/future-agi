@@ -19,17 +19,10 @@ from accounts.services.onboarding.constants import (
     canonical_goal,
     canonical_path,
 )
+from accounts.services.onboarding.flow_config import configured_goal_primary_paths
 from tfc.constants.roles import RolePermissions
 
-GOAL_PRIMARY_PATHS = {
-    "improve_prompts": "prompt",
-    "build_ai_agent": "agent",
-    "monitor_production_ai_app": "observe",
-    "control_model_traffic": "gateway",
-    "evaluate_quality": "evals",
-    "connect_voice_ai_agent": "voice",
-    "explore_sample_data": "sample",
-}
+GOAL_PRIMARY_PATHS = configured_goal_primary_paths()
 
 
 @dataclass(frozen=True)

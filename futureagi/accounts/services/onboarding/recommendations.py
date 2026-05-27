@@ -1,10 +1,10 @@
-WRITE_STAGES = {
-    "choose_goal",
-    "connect_observability",
-    "waiting_for_first_trace",
-    "waiting_for_first_trace_sample_available",
-    "create_trace_evaluator",
-}
+from accounts.services.onboarding.flow_config import (
+    configured_action,
+    configured_stage,
+    configured_write_stages,
+)
+
+WRITE_STAGES = configured_write_stages()
 
 
 def _route(routes, key):
@@ -59,238 +59,39 @@ def _action(
     }
 
 
-def get_started_action(routes):
-    href = _route(routes, "get_started")["href"]
+def configured_activation_action(action_id, routes):
+    config = configured_action(action_id)
+    fallback_route_key = config.get("fallback_route_key") or "get_started"
     return _action(
-        action_id="open_get_started",
-        kind="fallback",
-        title="Open Get Started",
-        description="Use the existing setup checklist.",
-        route_key="get_started",
+        action_id=action_id,
+        kind=config["kind"],
+        title=config["title"],
+        description=config["description"],
+        route_key=config["route_key"],
         routes=routes,
-        cta_label="Open Get Started",
-        priority=10,
-        fallback_href=href,
-        source="fallback",
-    )
-
-
-def sample_action(routes):
-    fallback_href = _route(routes, "get_started")["href"]
-    return _action(
-        action_id="open_sample_trace",
-        kind="sample_project",
-        title="Open sample trace",
-        description="Review a sample trace while real data is pending.",
-        route_key="sample_trace",
-        routes=routes,
-        cta_label="Open sample trace",
-        priority=30,
-        fallback_href=fallback_href,
-        completion_event="sample_signal_viewed",
-        is_sample=True,
-        target_path="sample",
-    )
-
-
-def request_access_action(routes):
-    fallback_href = _route(routes, "get_started")["href"]
-    return _action(
-        action_id="request_workspace_access",
-        kind="request_access",
-        title="Request workspace access",
-        description="Ask an admin for access before making onboarding changes.",
-        route_key="workspace_list",
-        routes=routes,
-        cta_label="Request access",
-        priority=90,
-        fallback_href=fallback_href,
-        source="permission_limited",
+        cta_label=config["cta_label"],
+        priority=config["priority"],
+        fallback_href=_route(routes, fallback_route_key)["href"],
+        estimated_minutes=config.get("estimated_minutes"),
+        requires_permission=config.get("requires_permission"),
+        completion_event=config.get("completion_event"),
+        is_sample=bool(config.get("is_sample")),
+        target_path=config.get("target_path"),
+        source=config.get("source", "home"),
+        blocked_reason=config.get("blocked_reason"),
     )
 
 
 def _fallback_for_stage(stage, flags, routes):
-    if stage in {
-        "connect_observability",
-        "waiting_for_first_trace",
-        "waiting_for_first_trace_sample_available",
-    } and flags.get("onboarding_sample_project"):
-        return sample_action(routes)
-    if stage in {"daily_review", "activated"}:
-        return _action(
-            action_id="open_observe_dashboard_fallback",
-            kind="review",
-            title="Open observe dashboard",
-            description="Review current observability signals.",
-            route_key="observe_dashboard",
-            routes=routes,
-            cta_label="Open observe",
-            priority=20,
-            fallback_href=_route(routes, "get_started")["href"],
-            target_path="observe",
-        )
-    return get_started_action(routes)
+    stage_config = configured_stage(stage)
+    for flag, action_id in stage_config.get("flagged_fallback_actions", {}).items():
+        if flags.get(flag):
+            return configured_activation_action(action_id, routes)
+    return configured_activation_action(stage_config["fallback_action"], routes)
 
 
 def resolve_recommended_action(*, context, flags, signals, stage, routes):
     fallback = _fallback_for_stage(stage, flags, routes)
-
-    if stage == "feature_disabled":
-        action = get_started_action(routes)
-        return action, action
-    if stage == "workspace_missing":
-        return (
-            _action(
-                action_id="open_workspace_list",
-                kind="fallback",
-                title="Choose a workspace",
-                description="Open workspace settings to choose or create a workspace.",
-                route_key="workspace_list",
-                routes=routes,
-                cta_label="Open workspaces",
-                priority=100,
-                fallback_href=_route(routes, "get_started")["href"],
-                source="workspace_missing",
-            ),
-            get_started_action(routes),
-        )
-    if stage == "permission_limited":
-        return request_access_action(routes), fallback
-    if stage == "choose_goal":
-        return (
-            _action(
-                action_id="choose_onboarding_goal",
-                kind="choose_goal",
-                title="Choose your first goal",
-                description="Pick the job you want FutureAGI to help with first.",
-                route_key="choose_goal",
-                routes=routes,
-                cta_label="Choose goal",
-                priority=100,
-                fallback_href=fallback["fallback_href"],
-                target_path=context.primary_path,
-            ),
-            fallback,
-        )
-    if stage == "connect_observability":
-        return (
-            _action(
-                action_id="create_observe_project",
-                kind="setup",
-                title="Connect observability",
-                description="Create an observability project and send one request.",
-                route_key="observe_setup",
-                routes=routes,
-                cta_label="Connect observability",
-                priority=100,
-                fallback_href=fallback["fallback_href"],
-                estimated_minutes=5,
-                requires_permission="observe:write",
-                completion_event="observe_project_created",
-                target_path="observe",
-            ),
-            fallback,
-        )
-    if stage in {"waiting_for_first_trace", "waiting_for_first_trace_sample_available"}:
-        return (
-            _action(
-                action_id="send_first_trace",
-                kind="send_signal",
-                title="Send your first trace",
-                description="Send one production or test trace to unlock review.",
-                route_key="observe_project",
-                routes=routes,
-                cta_label="Send trace",
-                priority=100,
-                fallback_href=fallback["fallback_href"],
-                estimated_minutes=5,
-                requires_permission="observe:write",
-                completion_event="trace_ingested",
-                target_path="observe",
-            ),
-            fallback,
-        )
-    if stage == "review_first_trace":
-        return (
-            _action(
-                action_id="review_first_trace",
-                kind="review",
-                title="Review the first trace",
-                description="Inspect latency, cost, and quality signal context.",
-                route_key="observe_trace_detail",
-                routes=routes,
-                cta_label="Review trace",
-                priority=100,
-                fallback_href=fallback["fallback_href"],
-                completion_event="trace_reviewed",
-                target_path="observe",
-            ),
-            fallback,
-        )
-    if stage == "create_trace_evaluator":
-        return (
-            _action(
-                action_id="create_trace_evaluator",
-                kind="improve",
-                title="Create an evaluator",
-                description="Turn the reviewed trace into a repeatable quality check.",
-                route_key="observe_project",
-                routes=routes,
-                cta_label="Create evaluator",
-                priority=100,
-                fallback_href=fallback["fallback_href"],
-                estimated_minutes=5,
-                requires_permission="observe:write",
-                completion_event="first_quality_loop_completed",
-                target_path="observe",
-            ),
-            fallback,
-        )
-    if stage == "daily_review":
-        return (
-            _action(
-                action_id="review_daily_quality",
-                kind="daily_quality",
-                title="Review today’s quality signal",
-                description="Open the daily quality view and resolve the top item.",
-                route_key="daily_quality_home",
-                routes=routes,
-                cta_label="Review signal",
-                priority=100,
-                fallback_href=fallback["fallback_href"],
-                completion_event="daily_quality_item_reviewed",
-                target_path="observe",
-            ),
-            fallback,
-        )
-    if stage == "activated":
-        return (
-            _action(
-                action_id="open_observe_dashboard",
-                kind="review",
-                title="Open observe dashboard",
-                description="Review the current quality loop.",
-                route_key="observe_dashboard",
-                routes=routes,
-                cta_label="Open observe",
-                priority=80,
-                fallback_href=_route(routes, "get_started")["href"],
-                target_path="observe",
-            ),
-            fallback,
-        )
-    return (
-        _action(
-            action_id="choose_available_path",
-            kind="fallback",
-            title="Choose an available path",
-            description="Start with the observe path while this path is unavailable.",
-            route_key="observe_setup",
-            routes=routes,
-            cta_label="Start with observe",
-            priority=80,
-            fallback_href=fallback["fallback_href"],
-            target_path="observe",
-        ),
-        fallback,
-    )
+    action_id = configured_stage(stage)["recommended_action"]
+    action = configured_activation_action(action_id, routes)
+    return action, fallback

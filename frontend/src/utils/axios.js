@@ -258,6 +258,7 @@ export const endpoints = {
     getTabs: apiPath("/accounts/first-checks/"),
   },
   onboarding: {
+    activationEvent: apiPath("/accounts/activation-events/"),
     activationState: apiPath("/accounts/activation-state/"),
     goal: apiPath("/accounts/onboarding/goal/"),
   },

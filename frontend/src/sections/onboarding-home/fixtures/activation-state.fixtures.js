@@ -118,6 +118,29 @@ const fallbackAction = (overrides = {}) =>
     ...overrides,
   });
 
+const availableGoals = [
+  {
+    id: "monitor_production_ai_app",
+    goal: "monitor_production_ai_app",
+    primary_path: "observe",
+    label: "Monitor a production AI app",
+    description: "Connect traces and review the first quality signal.",
+    estimated_minutes: 5,
+    disabled: false,
+    disabled_reason: null,
+  },
+  {
+    id: "improve_prompts",
+    goal: "improve_prompts",
+    primary_path: "prompt",
+    label: "Test and improve prompts",
+    description: "Create a prompt test loop and compare output changes.",
+    estimated_minutes: 6,
+    disabled: false,
+    disabled_reason: null,
+  },
+];
+
 const sampleAction = (overrides = {}) =>
   action({
     id: "open_sample_trace",
@@ -206,6 +229,7 @@ const baseState = (overrides = {}) => ({
     first_trace_id: null,
     first_observe_id: null,
   },
+  available_goals: availableGoals,
   available_paths: [
     {
       id: "observe",

@@ -7,10 +7,16 @@ from rest_framework.views import APIView
 
 from accounts.serializers.contracts import ACCOUNTS_ERROR_RESPONSES
 from accounts.serializers.onboarding import (
+    ActivationEventRequestSerializer,
+    ActivationEventResponseSerializer,
     ActivationGoalConflictResponseSerializer,
     ActivationGoalRequestSerializer,
     ActivationStateApiResponseSerializer,
     ActivationStateQuerySerializer,
+)
+from accounts.services.onboarding.activation_events import (
+    build_idempotency_key,
+    record_event,
 )
 from accounts.services.onboarding.activation_state import (
     resolve_activation_state_for_request,
@@ -24,6 +30,50 @@ from tfc.utils.api_contracts import validated_request
 from tfc.utils.general_methods import GeneralMethods
 
 logger = structlog.get_logger(__name__)
+
+
+def _bad_request(gm, detail):
+    if isinstance(detail, ValidationError):
+        detail = (
+            detail.message_dict if hasattr(detail, "message_dict") else detail.messages
+        )
+    return gm.bad_request(detail)
+
+
+def _get_observe_trace(*, organization, workspace, project_id, trace_id):
+    from tracer.models.project import Project
+    from tracer.models.trace import Trace
+
+    try:
+        project = (
+            Project.no_workspace_objects.filter(
+                id=project_id,
+                organization=organization,
+                workspace=workspace,
+                trace_type="observe",
+            )
+            .only("id")
+            .first()
+        )
+    except (TypeError, ValueError, ValidationError):
+        project = None
+    if project is None:
+        raise ValidationError({"project_id": "Observe project not found."})
+
+    try:
+        trace = (
+            Trace.no_workspace_objects.filter(
+                id=trace_id,
+                project=project,
+            )
+            .only("id")
+            .first()
+        )
+    except (TypeError, ValueError, ValidationError):
+        trace = None
+    if trace is None:
+        raise ValidationError({"artifact_id": "Trace not found."})
+    return trace
 
 
 class ActivationStateView(APIView):
@@ -122,4 +172,93 @@ class OnboardingGoalView(APIView):
             )
             return self._gm.internal_server_error_response(
                 "Failed to save onboarding goal"
+            )
+
+
+class ActivationEventView(APIView):
+    permission_classes = [IsAuthenticated]
+    _gm = GeneralMethods()
+
+    @validated_request(
+        request_serializer=ActivationEventRequestSerializer,
+        responses={
+            200: ActivationEventResponseSerializer,
+            **ACCOUNTS_ERROR_RESPONSES,
+        },
+        strict_request_validation=False,
+    )
+    def post(self, request):
+        serializer = ActivationEventRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return self._gm.bad_request(serializer.errors)
+
+        try:
+            context = resolve_onboarding_context(request)
+            data = serializer.validated_data
+            metadata = dict(data.get("metadata") or {})
+            artifact_type = data.get("artifact_type")
+            artifact_id = data.get("artifact_id")
+            project_id = data.get("project_id")
+
+            if data["event_name"] == "trace_reviewed":
+                _get_observe_trace(
+                    organization=context.organization,
+                    workspace=context.workspace,
+                    project_id=project_id,
+                    trace_id=artifact_id,
+                )
+                metadata.update(
+                    {
+                        "artifact_type": "trace",
+                        "artifact_id": str(artifact_id),
+                        "project_id": str(project_id),
+                    }
+                )
+            elif artifact_type:
+                metadata.update(
+                    {
+                        "artifact_type": artifact_type,
+                        "artifact_id": str(artifact_id) if artifact_id else None,
+                        "project_id": str(project_id) if project_id else None,
+                    }
+                )
+
+            idempotency_key = data.get("idempotency_key") or build_idempotency_key(
+                [
+                    data["event_name"],
+                    getattr(context.workspace, "id", None),
+                    getattr(request.user, "id", None),
+                    artifact_id or project_id,
+                ]
+            )
+            event = record_event(
+                user=request.user,
+                organization=context.organization,
+                workspace=context.workspace,
+                event_name=data["event_name"],
+                source=data.get("source") or "onboarding_home",
+                product_path=data.get("primary_path"),
+                activation_stage=data.get("stage"),
+                metadata=metadata,
+                is_sample=data.get("is_sample", False),
+                idempotency_key=idempotency_key,
+            )
+            payload = resolve_activation_state_for_request(request)
+            return self._gm.success_response(
+                {
+                    "event_id": str(event.id),
+                    "event_name": event.event_name,
+                    "activation_state": payload,
+                }
+            )
+        except ValidationError as exc:
+            return _bad_request(self._gm, exc)
+        except Exception as exc:
+            logger.exception(
+                "Onboarding activation event record failed",
+                error=str(exc),
+                user_id=str(getattr(request.user, "id", "")),
+            )
+            return self._gm.internal_server_error_response(
+                "Failed to record onboarding activation event"
             )

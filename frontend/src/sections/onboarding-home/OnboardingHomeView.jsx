@@ -19,12 +19,17 @@ import {
   OnboardingHomeEvents,
   trackOnboardingHomeEvent,
 } from "./analytics/onboarding-events";
+import FirstLoopCompletePanel from "./components/FirstLoopCompletePanel";
+import FirstSignalPanel from "./components/FirstSignalPanel";
 import GoalPicker from "./components/GoalPicker";
+import ObserveDiagnosticsPanel from "./components/ObserveDiagnosticsPanel";
+import ObserveSetupPanel from "./components/ObserveSetupPanel";
 import OnboardingHomeError from "./components/OnboardingHomeError";
 import OnboardingHomeSkeleton from "./components/OnboardingHomeSkeleton";
 import PathCardGrid from "./components/PathCardGrid";
 import ProductLoopStepper from "./components/ProductLoopStepper";
 import RecommendedActionCard from "./components/RecommendedActionCard";
+import WaitingForSignalPanel from "./components/WaitingForSignalPanel";
 
 function Diagnostics({ state }) {
   if (!state?.featureFlags?.onboarding_debug || !state?.diagnostics) {
@@ -55,6 +60,16 @@ Diagnostics.propTypes = {
 
 const mutationPending = (mutation) =>
   Boolean(mutation?.isPending || mutation?.isLoading);
+
+const OBSERVE_PANEL_STAGES = new Set([
+  "connect_observability",
+  "waiting_for_first_trace",
+  "waiting_for_first_trace_sample_available",
+  "review_first_trace",
+  "create_trace_evaluator",
+  "activated",
+  "daily_review",
+]);
 
 export default function OnboardingHomeView() {
   const { user } = useAuthContext();
@@ -87,13 +102,14 @@ export default function OnboardingHomeView() {
   const waitingForWorkspace =
     Boolean(user?.default_workspace_id) && !workspaceId && !workspaceReady;
 
-  const { state, isLoading, isError, error, refetch } = useActivationState({
-    organizationId,
-    workspaceId,
-    ...searchContext,
-    enabled: Boolean(user) && !waitingForWorkspace,
-    requireWorkspaceContext: false,
-  });
+  const { state, isLoading, isRefetching, isError, error, refetch } =
+    useActivationState({
+      organizationId,
+      workspaceId,
+      ...searchContext,
+      enabled: Boolean(user) && !waitingForWorkspace,
+      requireWorkspaceContext: false,
+    });
 
   const renderedState = saveGoal.data || state;
   const goalOptions = useMemo(
@@ -188,6 +204,49 @@ export default function OnboardingHomeView() {
     });
   };
 
+  const observePanelProps = {
+    action: renderedState.recommendedAction,
+    fallbackAction: renderedState.fallbackAction,
+    onPrimaryClick: handleActionClick,
+    onFallbackClick: handleActionClick,
+    onCheckAgain: refetch,
+    isChecking: Boolean(isRefetching),
+  };
+
+  const observePanel =
+    renderedState.primaryPath === "observe" &&
+    OBSERVE_PANEL_STAGES.has(renderedState.stage) ? (
+      <>
+        {renderedState.stage === "connect_observability" ? (
+          <ObserveSetupPanel {...observePanelProps} />
+        ) : null}
+        {[
+          "waiting_for_first_trace",
+          "waiting_for_first_trace_sample_available",
+        ].includes(renderedState.stage) ? (
+          <WaitingForSignalPanel
+            {...observePanelProps}
+            signals={renderedState.signals}
+          />
+        ) : null}
+        {["review_first_trace", "create_trace_evaluator"].includes(
+          renderedState.stage,
+        ) ? (
+          <FirstSignalPanel
+            {...observePanelProps}
+            signals={renderedState.signals}
+            stage={renderedState.stage}
+          />
+        ) : null}
+        {["activated", "daily_review"].includes(renderedState.stage) ? (
+          <FirstLoopCompletePanel
+            {...observePanelProps}
+            lastMeaningfulEvent={renderedState.lastMeaningfulEvent}
+          />
+        ) : null}
+      </>
+    ) : null;
+
   return (
     <Box
       data-testid="onboarding-home-view"
@@ -253,6 +312,8 @@ export default function OnboardingHomeView() {
               onActionClick={handleActionClick}
             />
           </Box>
+        ) : observePanel ? (
+          observePanel
         ) : (
           <Box
             sx={{
@@ -319,6 +380,9 @@ export default function OnboardingHomeView() {
         </Box>
 
         <ProductLoopStepper progress={renderedState.progress} />
+        {observePanel ? (
+          <ObserveDiagnosticsPanel signals={renderedState.signals} />
+        ) : null}
         <PathCardGrid
           paths={renderedState.availablePaths}
           onPathClick={handlePathClick}

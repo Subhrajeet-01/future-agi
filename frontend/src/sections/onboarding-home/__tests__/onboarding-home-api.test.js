@@ -11,6 +11,7 @@ vi.mock("src/utils/axios", () => ({
   endpoints: {
     onboarding: {
       activationState: "/accounts/activation-state/",
+      activationEvent: "/accounts/activation-events/",
       goal: "/accounts/onboarding/goal/",
     },
   },
@@ -25,6 +26,7 @@ import {
   onboardingHomeQueryKeys,
   OnboardingEndpointUnavailableError,
   openSampleProject,
+  recordActivationEvent,
   saveOnboardingGoal,
 } from "../api/onboarding-home-api";
 
@@ -140,6 +142,41 @@ describe("onboarding home API", () => {
     await expect(saveOnboardingGoal({ goal: "improve_prompts" })).rejects.toBe(
       conflict,
     );
+  });
+
+  it("records an activation event and returns the nested activation state", async () => {
+    axios.post.mockResolvedValueOnce({
+      data: {
+        result: {
+          event_id: "event-1",
+          event_name: "trace_reviewed",
+          activation_state: getActivationStateFixture("observeNeedsEvaluator"),
+        },
+      },
+    });
+
+    const state = await recordActivationEvent({
+      eventName: "trace_detail_opened",
+      primaryPath: "observability",
+      stage: "review_first_trace",
+      source: "trace_full_page",
+      artifactType: "trace",
+      artifactId: "trace-1",
+      projectId: "observe-1",
+      metadata: { entry: "trace_full_page" },
+    });
+
+    expect(axios.post).toHaveBeenCalledWith("/accounts/activation-events/", {
+      event_name: "trace_detail_opened",
+      primary_path: "observe",
+      stage: "review_first_trace",
+      source: "trace_full_page",
+      artifact_type: "trace",
+      artifact_id: "trace-1",
+      project_id: "observe-1",
+      metadata: { entry: "trace_full_page" },
+    });
+    expect(state.stage).toBe("create_trace_evaluator");
   });
 
   it("returns a renderable feature-disabled state", async () => {

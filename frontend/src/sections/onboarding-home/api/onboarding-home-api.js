@@ -91,6 +91,30 @@ export const saveOnboardingGoal = async (payload = {}) => {
   return normalizeActivationStatePayload(unwrapPayload(response));
 };
 
+const activationEventPayload = (payload = {}) =>
+  compactObject({
+    event_name: payload.eventName ?? payload.event_name,
+    primary_path:
+      normalizeProductPath(payload.primaryPath ?? payload.primary_path) ||
+      undefined,
+    stage: payload.stage,
+    source: payload.source,
+    artifact_type: payload.artifactType ?? payload.artifact_type,
+    artifact_id: payload.artifactId ?? payload.artifact_id,
+    project_id: payload.projectId ?? payload.project_id,
+    metadata: payload.metadata,
+    idempotency_key: payload.idempotencyKey ?? payload.idempotency_key,
+    is_sample: payload.isSample ?? payload.is_sample,
+  });
+
+export const recordActivationEvent = async (payload = {}) => {
+  const response = await axios.post(
+    endpoints.onboarding.activationEvent,
+    activationEventPayload(payload),
+  );
+  return normalizeActivationStatePayload(unwrapPayload(response));
+};
+
 export class OnboardingEndpointUnavailableError extends Error {
   constructor(endpointName) {
     super(`${endpointName} endpoint is not available yet`);

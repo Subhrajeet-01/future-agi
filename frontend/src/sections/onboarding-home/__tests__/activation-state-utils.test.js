@@ -74,6 +74,25 @@ describe("activation-state utilities", () => {
     expect(normalizeProductPath("sample_project")).toBe("sample");
   });
 
+  it("preserves configured stage copy and goal options", () => {
+    const normalized = normalizeActivationState({
+      ...getActivationStateFixture("newWorkspaceNoGoal"),
+      stage_copy: {
+        eyebrow: "Configured",
+        title: "Configured title",
+        description: "Configured description",
+      },
+    });
+
+    expect(normalized.stageCopy.title).toBe("Configured title");
+    expect(normalized.availableGoals[0]).toEqual(
+      expect.objectContaining({
+        goal: "monitor_production_ai_app",
+        primaryPath: "observe",
+      }),
+    );
+  });
+
   it("creates a renderable local fallback for hard API failures", () => {
     const fallback = makeActivationStateErrorFallback({
       message: "Network error",

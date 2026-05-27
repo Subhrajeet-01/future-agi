@@ -8,11 +8,13 @@ from accounts.services.onboarding.constants import (
     EMAIL_CONTEXT_STATUSES,
     HOME_MODES,
     LIFECYCLE_SUPPRESSION_REASONS,
+    ONBOARDING_ACTIVATION_EVENTS,
     ONBOARDING_GOALS,
     PRODUCT_PATHS,
     PROGRESS_STATES,
     ROUTE_UNAVAILABLE_REASONS,
     SAMPLE_PROJECT_STATUSES,
+    canonical_activation_event,
     canonical_goal,
     canonical_path,
     choices,
@@ -92,6 +94,12 @@ class ActivationProgressSerializer(serializers.Serializer):
     improve = serializers.ChoiceField(choices=choices(PROGRESS_STATES))
 
 
+class ActivationStageCopySerializer(serializers.Serializer):
+    eyebrow = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+
+
 class ActivationSignalsSerializer(serializers.Serializer):
     provider_keys = serializers.IntegerField(min_value=0, default=0)
     datasets = serializers.IntegerField(min_value=0, default=0)
@@ -145,6 +153,25 @@ class AvailablePathSerializer(serializers.Serializer):
         allow_null=True,
     )
     first_action_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+
+
+class AvailableGoalSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    goal = serializers.ChoiceField(choices=choices(ONBOARDING_GOALS))
+    primary_path = serializers.ChoiceField(choices=choices(PRODUCT_PATHS))
+    label = serializers.CharField()
+    description = serializers.CharField()
+    estimated_minutes = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        allow_null=True,
+    )
+    disabled = serializers.BooleanField(default=False)
+    disabled_reason = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
@@ -323,6 +350,7 @@ class ActivationStateResponseSerializer(serializers.Serializer):
         allow_null=True,
     )
     stage = serializers.ChoiceField(choices=choices(ACTIVATION_STAGES))
+    stage_copy = ActivationStageCopySerializer(required=False)
     home_mode = serializers.ChoiceField(choices=choices(HOME_MODES))
     is_activated = serializers.BooleanField()
     activated_at = serializers.DateTimeField(allow_null=True)
@@ -330,6 +358,7 @@ class ActivationStateResponseSerializer(serializers.Serializer):
     fallback_action = ActivationActionSerializer()
     progress = ActivationProgressSerializer()
     signals = ActivationSignalsSerializer()
+    available_goals = AvailableGoalSerializer(many=True, required=False)
     available_paths = AvailablePathSerializer(many=True)
     sample_project = SampleProjectStateSerializer()
     email_eligibility = LifecycleEligibilitySerializer()
@@ -508,6 +537,93 @@ class ActivationGoalConflictResultSerializer(serializers.Serializer):
 class ActivationGoalConflictResponseSerializer(serializers.Serializer):
     status = serializers.BooleanField(default=False)
     result = ActivationGoalConflictResultSerializer()
+
+
+class ActivationEventRequestSerializer(serializers.Serializer):
+    event_name = serializers.CharField()
+    primary_path = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    stage = serializers.ChoiceField(
+        choices=choices(ACTIVATION_STAGES),
+        required=False,
+        allow_null=True,
+    )
+    source = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    artifact_type = serializers.ChoiceField(
+        choices=choices(("trace", "project")),
+        required=False,
+        allow_null=True,
+    )
+    artifact_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    project_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    metadata = serializers.DictField(required=False)
+    idempotency_key = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=160,
+    )
+    is_sample = serializers.BooleanField(default=False)
+
+    def validate_event_name(self, value):
+        canonical = canonical_activation_event(value)
+        if canonical not in ONBOARDING_ACTIVATION_EVENTS:
+            raise serializers.ValidationError("Unsupported activation event.")
+        return canonical
+
+    def validate_primary_path(self, value):
+        if value in {None, ""}:
+            return None
+        canonical = canonical_path(value)
+        if canonical not in PRODUCT_PATHS:
+            raise serializers.ValidationError("Unsupported primary path value.")
+        return canonical
+
+    def validate(self, attrs):
+        event_name = attrs["event_name"]
+        primary_path = attrs.get("primary_path")
+        artifact_type = attrs.get("artifact_type")
+
+        if event_name == "trace_reviewed":
+            if primary_path != "observe":
+                raise serializers.ValidationError(
+                    {"primary_path": "Trace review events must use observe."}
+                )
+            if artifact_type != "trace":
+                raise serializers.ValidationError(
+                    {"artifact_type": "Trace review events require trace artifacts."}
+                )
+            if not attrs.get("artifact_id"):
+                raise serializers.ValidationError(
+                    {"artifact_id": "Trace review events require artifact_id."}
+                )
+            if not attrs.get("project_id"):
+                raise serializers.ValidationError(
+                    {"project_id": "Trace review events require project_id."}
+                )
+        return attrs
+
+
+class ActivationEventResultSerializer(serializers.Serializer):
+    event_id = serializers.CharField()
+    event_name = serializers.ChoiceField(choices=choices(ONBOARDING_ACTIVATION_EVENTS))
+    activation_state = ActivationStateResponseSerializer()
+
+
+class ActivationEventResponseSerializer(serializers.Serializer):
+    status = serializers.BooleanField(default=True)
+    result = ActivationEventResultSerializer()
 
 
 class SampleProjectRequestSerializer(serializers.Serializer):

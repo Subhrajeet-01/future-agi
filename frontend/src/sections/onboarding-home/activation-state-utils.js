@@ -142,6 +142,16 @@ const normalizeProgress = (raw = {}) => ({
   ...raw,
 });
 
+const normalizeStageCopy = (raw) => {
+  if (!raw) return null;
+  return {
+    eyebrow: raw.eyebrow || "Setup",
+    title: raw.title || "Open Get Started",
+    description:
+      raw.description || "The existing setup checklist is available.",
+  };
+};
+
 const normalizeSignals = (raw = {}) => ({
   providerKeys: raw.provider_keys ?? raw.providerKeys ?? 0,
   datasets: raw.datasets ?? 0,
@@ -187,6 +197,17 @@ const normalizeAvailablePath = (raw) => {
     firstActionId: raw.first_action_id ?? raw.firstActionId ?? null,
   };
 };
+
+const normalizeAvailableGoal = (raw) => ({
+  id: raw.id || raw.goal,
+  goal: raw.goal,
+  primaryPath: normalizeProductPath(raw.primary_path ?? raw.primaryPath),
+  label: raw.label,
+  description: raw.description,
+  estimatedMinutes: raw.estimated_minutes ?? raw.estimatedMinutes ?? null,
+  disabled: Boolean(raw.disabled),
+  disabledReason: raw.disabled_reason ?? raw.disabledReason ?? null,
+});
 
 const normalizeSampleProject = (raw = {}) => {
   const href = raw.href ?? null;
@@ -351,6 +372,7 @@ export const normalizeActivationState = (raw) => {
     persona: raw.persona ?? null,
     primaryPath,
     stage: raw.stage,
+    stageCopy: normalizeStageCopy(raw.stage_copy ?? raw.stageCopy),
     homeMode: raw.home_mode,
     isActivated: Boolean(raw.is_activated),
     activatedAt: raw.activated_at ?? null,
@@ -358,6 +380,9 @@ export const normalizeActivationState = (raw) => {
     fallbackAction,
     progress: normalizeProgress(raw.progress),
     signals: normalizeSignals(raw.signals),
+    availableGoals: (raw.available_goals || raw.availableGoals || []).map(
+      normalizeAvailableGoal,
+    ),
     availablePaths: (raw.available_paths || []).map(normalizeAvailablePath),
     sampleProject: normalizeSampleProject(raw.sample_project),
     emailEligibility: normalizeEmailEligibility(raw.email_eligibility),

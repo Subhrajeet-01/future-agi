@@ -3,6 +3,10 @@ import pytest
 from accounts.services.onboarding.activation_events import record_event
 from accounts.services.onboarding.activation_state import resolve_activation_state
 from accounts.services.onboarding.context import OnboardingContext
+from accounts.services.onboarding.flow_config import (
+    configured_goal_primary_paths,
+    configured_stage,
+)
 from accounts.services.onboarding.signal_resolver import (
     OnboardingSignals,
     collect_onboarding_signals,
@@ -112,7 +116,16 @@ def test_observe_path_no_setup_returns_connect_observability(
     )
 
     assert payload["stage"] == "connect_observability"
+    assert payload["stage_copy"]["title"] == "Connect observability"
+    assert payload["available_goals"][0]["goal"] == "monitor_production_ai_app"
     assert payload["recommended_action"]["id"] == "create_observe_project"
+
+
+def test_activation_flow_config_drives_goal_and_stage_wiring():
+    assert configured_goal_primary_paths()["monitor_production_ai_app"] == "observe"
+    assert configured_stage("connect_observability")["recommended_action"] == (
+        "create_observe_project"
+    )
 
 
 @pytest.mark.django_db

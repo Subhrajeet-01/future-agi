@@ -1,0 +1,792 @@
+schema_version: activation-flow-2026-05-27.v1
+
+product_loop_steps:
+  build:
+    label: Build
+    description: Create or connect the AI surface.
+  test:
+    label: Test
+    description: Run a focused check before shipping.
+  observe:
+    label: Observe
+    description: Inspect real quality signals.
+  ship:
+    label: Ship
+    description: Move the workflow toward production.
+  improve:
+    label: Improve
+    description: Turn signal into a repeatable guardrail.
+
+goals:
+  monitor_production_ai_app:
+    primary_path: observe
+    label: Monitor a production AI app
+    description: Connect traces and review the first quality signal.
+    estimated_minutes: 5
+  improve_prompts:
+    primary_path: prompt
+    label: Test and improve prompts
+    description: Create a prompt test loop and compare output changes.
+    estimated_minutes: 6
+  build_ai_agent:
+    primary_path: agent
+    label: Build or prototype an AI agent
+    description: Run a first scenario and inspect the agent trace.
+    estimated_minutes: 8
+  control_model_traffic:
+    primary_path: gateway
+    label: Route LLM traffic safely
+    description: Send a gateway request and review the first log.
+    estimated_minutes: 7
+  evaluate_quality:
+    primary_path: evals
+    label: Evaluate quality on data or traces
+    description: Create a small eval and review the first failure.
+    estimated_minutes: 7
+  connect_voice_ai_agent:
+    primary_path: voice
+    label: Connect a voice AI agent
+    description: Run or review a call with clear success criteria.
+    estimated_minutes: 8
+  explore_sample_data:
+    primary_path: sample
+    label: Explore with sample data
+    description: Review sample signals while real data is pending.
+    estimated_minutes: 2
+
+goal_aliases:
+  test_and_improve_prompts: improve_prompts
+  build_or_prototype_agent: build_ai_agent
+  route_llm_traffic_safely: control_model_traffic
+  evaluate_quality_on_data_or_traces: evaluate_quality
+
+paths:
+  prompt:
+    label: Improve prompts
+    description: Test and compare prompt versions.
+    first_action_id:
+    requires_permission: prompt:write
+  agent:
+    label: Build an AI agent
+    description: Create an agent and review its first scenario.
+    first_action_id:
+    requires_permission: agent:write
+  observe:
+    label: Monitor a production AI app
+    description: Connect traces and inspect quality signals.
+    first_action_id: create_observe_project
+    requires_permission: observe:write
+  gateway:
+    label: Control model traffic
+    description: Configure model routing and production policies.
+    first_action_id:
+    requires_permission: gateway:write
+  voice:
+    label: Connect a voice AI agent
+    description: Review calls and success criteria.
+    first_action_id:
+    requires_permission: voice:write
+  evals:
+    label: Evaluate quality
+    description: Create datasets, scorers, and failure review loops.
+    first_action_id:
+    requires_permission: evals:write
+  dashboards:
+    label: Build quality dashboards
+    description: Track quality, cost, latency, and failures.
+    first_action_id:
+    requires_permission: dashboards:write
+  sample:
+    label: Explore with sample data
+    description: Use a sample workspace while real data is pending.
+    first_action_id: open_sample_trace
+    requires_permission:
+
+path_aliases:
+  prompts: prompt
+  workbench: prompt
+  agents: agent
+  simulate_agent: agent
+  observability: observe
+  traces: observe
+  model_gateway: gateway
+  voice_ai: voice
+  eval: evals
+  evaluations: evals
+  dashboard: dashboards
+  sample_project: sample
+
+action_kinds:
+  - choose_goal
+  - setup
+  - send_signal
+  - review
+  - improve
+  - sample_project
+  - request_access
+  - fallback
+  - daily_quality
+  - adjacent_loop
+
+actions:
+  open_get_started:
+    kind: fallback
+    title: Open Get Started
+    description: Use the existing setup checklist.
+    route_key: get_started
+    cta_label: Open Get Started
+    priority: 10
+    fallback_route_key: get_started
+    source: fallback
+  open_workspace_list:
+    kind: fallback
+    title: Choose a workspace
+    description: Open workspace settings to choose or create a workspace.
+    route_key: workspace_list
+    cta_label: Open workspaces
+    priority: 100
+    fallback_route_key: get_started
+    source: workspace_missing
+  request_workspace_access:
+    kind: request_access
+    title: Request workspace access
+    description: Ask an admin for access before making onboarding changes.
+    route_key: workspace_list
+    cta_label: Request access
+    priority: 90
+    fallback_route_key: get_started
+    source: permission_limited
+  choose_onboarding_goal:
+    kind: choose_goal
+    title: Choose your first goal
+    description: Pick the job you want FutureAGI to help with first.
+    route_key: choose_goal
+    cta_label: Choose goal
+    priority: 100
+    fallback_route_key: get_started
+    target_path:
+  create_observe_project:
+    kind: setup
+    title: Connect observability
+    description: Create an observability project and send one request.
+    route_key: observe_setup
+    cta_label: Connect observability
+    priority: 100
+    estimated_minutes: 5
+    requires_permission: observe:write
+    completion_event: observe_project_created
+    target_path: observe
+    fallback_route_key: get_started
+  send_first_trace:
+    kind: send_signal
+    title: Send your first trace
+    description: Send one production or test trace to unlock review.
+    route_key: observe_project
+    cta_label: Send trace
+    priority: 100
+    estimated_minutes: 5
+    requires_permission: observe:write
+    completion_event: trace_ingested
+    target_path: observe
+    fallback_route_key: get_started
+  review_first_trace:
+    kind: review
+    title: Review the first trace
+    description: Inspect latency, cost, and quality signal context.
+    route_key: observe_trace_detail
+    cta_label: Review trace
+    priority: 100
+    estimated_minutes: 3
+    completion_event: trace_reviewed
+    target_path: observe
+    fallback_route_key: get_started
+  create_trace_evaluator:
+    kind: improve
+    title: Create an evaluator
+    description: Turn the reviewed trace into a repeatable quality check.
+    route_key: observe_project
+    cta_label: Create evaluator
+    priority: 100
+    estimated_minutes: 5
+    requires_permission: observe:write
+    completion_event: first_quality_loop_completed
+    target_path: observe
+    fallback_route_key: get_started
+  open_observe_dashboard:
+    kind: review
+    title: Open observe dashboard
+    description: Review the current quality loop.
+    route_key: observe_dashboard
+    cta_label: Open observe
+    priority: 80
+    target_path: observe
+    fallback_route_key: get_started
+  open_observe_dashboard_fallback:
+    kind: review
+    title: Open observe dashboard
+    description: Review current observability signals.
+    route_key: observe_dashboard
+    cta_label: Open observe
+    priority: 20
+    target_path: observe
+    fallback_route_key: get_started
+  review_daily_quality:
+    kind: daily_quality
+    title: Review today's quality signal
+    description: Open the daily quality view and resolve the top item.
+    route_key: daily_quality_home
+    cta_label: Review signal
+    priority: 100
+    estimated_minutes: 4
+    completion_event: daily_quality_item_reviewed
+    target_path: observe
+    fallback_route_key: get_started
+  open_sample_trace:
+    kind: sample_project
+    title: Open sample trace
+    description: Review a sample trace while real data is pending.
+    route_key: sample_trace
+    cta_label: Open sample trace
+    priority: 30
+    estimated_minutes: 2
+    completion_event: sample_signal_viewed
+    is_sample: true
+    target_path: sample
+    fallback_route_key: get_started
+  choose_available_path:
+    kind: fallback
+    title: Choose an available path
+    description: Start with the observe path while this path is unavailable.
+    route_key: observe_setup
+    cta_label: Start with observe
+    priority: 80
+    requires_permission: observe:write
+    target_path: observe
+    fallback_route_key: get_started
+
+stage_defaults:
+  home_mode: first_run
+  copy:
+    eyebrow: Setup
+    title: Open Get Started
+    description: The existing setup checklist is available.
+  progress:
+    build: selected
+    test: available
+    observe: available
+    ship: available
+    improve: available
+  recommended_action: choose_available_path
+  fallback_action: open_get_started
+  next: []
+
+stages:
+  feature_disabled:
+    home_mode: fallback
+    copy:
+      eyebrow: Setup
+      title: Start with the setup checklist
+      description: The existing checklist is available for this workspace.
+    progress:
+      build: not_started
+      test: available
+      observe: not_started
+      ship: available
+      improve: available
+    recommended_action: open_get_started
+    fallback_action: open_get_started
+    next: []
+  workspace_missing:
+    home_mode: fallback
+    copy:
+      eyebrow: Workspace
+      title: Choose a workspace
+      description: Select a workspace before starting a product loop.
+    progress:
+      build: not_started
+      test: available
+      observe: not_started
+      ship: available
+      improve: available
+    recommended_action: open_workspace_list
+    fallback_action: open_get_started
+    next:
+      - choose_goal
+  permission_limited:
+    home_mode: fallback
+    copy:
+      eyebrow: Access
+      title: Request access for setup
+      description: This workspace needs write access before setup can continue.
+    recommended_action: request_workspace_access
+    fallback_action: open_get_started
+    requires_write: false
+    next:
+      - connect_observability
+  choose_goal:
+    home_mode: first_run
+    copy:
+      eyebrow: First goal
+      title: Choose what to set up first
+      description: Pick the first product job before moving into setup.
+    progress:
+      build: not_started
+      test: available
+      observe: not_started
+      ship: available
+      improve: available
+    recommended_action: choose_onboarding_goal
+    fallback_action: open_get_started
+    requires_write: true
+    next:
+      - connect_observability
+      - selected_path_unavailable
+  selected_path_unavailable:
+    home_mode: fallback
+    copy:
+      eyebrow: Path unavailable
+      title: Start with an available path
+      description: This selected path is not available in the product yet.
+    recommended_action: choose_available_path
+    fallback_action: open_get_started
+    next:
+      - connect_observability
+  activated:
+    home_mode: first_run
+    copy:
+      eyebrow: Activated
+      title: First quality loop is ready
+      description: The workspace has completed a first meaningful loop.
+    progress:
+      build: complete
+      test: available
+      observe: complete
+      ship: available
+      improve: complete
+    recommended_action: open_observe_dashboard
+    fallback_action: open_observe_dashboard_fallback
+    next:
+      - daily_review
+  daily_review:
+    home_mode: daily_quality
+    copy:
+      eyebrow: Daily quality
+      title: Review today's quality signal
+      description: Open the latest quality signal and keep the loop fresh.
+    progress:
+      build: complete
+      test: available
+      observe: complete
+      ship: available
+      improve: complete
+    recommended_action: review_daily_quality
+    fallback_action: open_observe_dashboard_fallback
+    next: []
+  connect_observability:
+    home_mode: first_run
+    copy:
+      eyebrow: Observe
+      title: Connect observability
+      description: Create an observe project and send one trace.
+    progress:
+      build: selected
+      test: available
+      observe: not_started
+      ship: available
+      improve: available
+    recommended_action: create_observe_project
+    fallback_action: open_get_started
+    flagged_fallback_actions:
+      onboarding_sample_project: open_sample_trace
+    requires_write: true
+    next:
+      - waiting_for_first_trace
+      - waiting_for_first_trace_sample_available
+  waiting_for_first_trace:
+    home_mode: first_run
+    copy:
+      eyebrow: Waiting
+      title: Waiting for the first trace
+      description: Once a trace lands, the next review action will unlock.
+    progress:
+      build: selected
+      test: available
+      observe: in_progress
+      ship: available
+      improve: available
+    recommended_action: send_first_trace
+    fallback_action: open_get_started
+    flagged_fallback_actions:
+      onboarding_sample_project: open_sample_trace
+    requires_write: true
+    next:
+      - review_first_trace
+  waiting_for_first_trace_sample_available:
+    home_mode: first_run
+    copy:
+      eyebrow: Waiting
+      title: Waiting for real data
+      description: Use a sample signal while the first real trace is pending.
+    progress:
+      build: selected
+      test: available
+      observe: in_progress
+      ship: available
+      improve: available
+    recommended_action: send_first_trace
+    fallback_action: open_sample_trace
+    requires_write: true
+    next:
+      - review_first_trace
+  review_first_trace:
+    home_mode: first_run
+    copy:
+      eyebrow: First signal
+      title: Review the first trace
+      description: Inspect the first trace and capture the first quality signal.
+    progress:
+      build: selected
+      test: available
+      observe: in_progress
+      ship: available
+      improve: available
+    recommended_action: review_first_trace
+    fallback_action: open_get_started
+    next:
+      - create_trace_evaluator
+  create_trace_evaluator:
+    home_mode: first_run
+    copy:
+      eyebrow: Quality loop
+      title: Create an evaluator
+      description: Turn the reviewed trace into a repeatable quality check.
+    progress:
+      build: selected
+      test: available
+      observe: complete
+      ship: available
+      improve: in_progress
+    recommended_action: create_trace_evaluator
+    fallback_action: open_get_started
+    requires_write: true
+    next:
+      - activated
+  review_sample_signal:
+    home_mode: first_run
+    copy:
+      eyebrow: Sample data
+      title: Review a sample signal
+      description: Inspect the sample signal while real workspace data is pending.
+    recommended_action: open_sample_trace
+    fallback_action: open_get_started
+    next:
+      - connect_real_data
+  start_prompt:
+    copy:
+      eyebrow: Prompt
+      title: Start a prompt loop
+      description: Create or open a prompt before running a focused test.
+    next:
+      - run_prompt_test
+  run_prompt_test:
+    copy:
+      eyebrow: Prompt test
+      title: Run a prompt test
+      description: Run a test case before saving a prompt version.
+    next:
+      - save_prompt_version
+  save_prompt_version:
+    copy:
+      eyebrow: Prompt version
+      title: Save the prompt version
+      description: Save the working version so it can be compared later.
+    next:
+      - compare_prompt_versions
+  compare_prompt_versions:
+    copy:
+      eyebrow: Prompt compare
+      title: Compare prompt versions
+      description: Compare output changes and pick the safer version.
+    next:
+      - prompt_next_loop
+  prompt_next_loop:
+    copy:
+      eyebrow: Prompt loop
+      title: Continue the prompt loop
+      description: Turn the latest comparison into the next improvement.
+    next: []
+  create_agent:
+    copy:
+      eyebrow: Agent
+      title: Create an agent
+      description: Create the first agent before running a scenario.
+    next:
+      - run_agent_scenario
+  run_agent_scenario:
+    copy:
+      eyebrow: Agent scenario
+      title: Run a scenario
+      description: Run one scenario and inspect what the agent did.
+    next:
+      - review_agent_trace
+  review_agent_trace:
+    copy:
+      eyebrow: Agent trace
+      title: Review the agent trace
+      description: Inspect the trace and identify the first improvement.
+    next:
+      - save_agent_eval
+  save_agent_eval:
+    copy:
+      eyebrow: Agent eval
+      title: Save an agent eval
+      description: Convert the observed behavior into a repeatable eval.
+    next:
+      - agent_create_eval
+  agent_create_eval:
+    copy:
+      eyebrow: Agent quality
+      title: Create the first agent quality check
+      description: Create the check that keeps the agent behavior measurable.
+    next: []
+  create_trace_dashboard:
+    copy:
+      eyebrow: Observe dashboard
+      title: Create a trace dashboard
+      description: Group important trace signals into a dashboard.
+    next:
+      - activated
+  create_trace_alert:
+    copy:
+      eyebrow: Observe alert
+      title: Create a trace alert
+      description: Add an alert for the quality signal that matters most.
+    next:
+      - activated
+  configure_gateway_provider:
+    copy:
+      eyebrow: Gateway
+      title: Configure a model provider
+      description: Add a provider before routing model traffic.
+    next:
+      - create_gateway_key
+  create_gateway_key:
+    copy:
+      eyebrow: Gateway key
+      title: Create a gateway key
+      description: Create a key for the first routed request.
+    next:
+      - run_gateway_request
+  run_gateway_request:
+    copy:
+      eyebrow: Gateway request
+      title: Run a gateway request
+      description: Send one request and inspect the first log.
+    next:
+      - review_gateway_log
+  review_gateway_log:
+    copy:
+      eyebrow: Gateway log
+      title: Review the gateway log
+      description: Inspect the first log for cost, latency, and failures.
+    next:
+      - fix_gateway_failure
+  fix_gateway_failure:
+    copy:
+      eyebrow: Gateway quality
+      title: Fix the first gateway failure
+      description: Turn the first failure into a routing or provider change.
+    next:
+      - add_gateway_policy
+  add_gateway_policy:
+    copy:
+      eyebrow: Gateway policy
+      title: Add a gateway policy
+      description: Add a policy that keeps the request path controlled.
+    next: []
+  create_voice_agent:
+    copy:
+      eyebrow: Voice
+      title: Create a voice agent
+      description: Create the agent before running a first call.
+    next:
+      - run_voice_test_call
+  run_voice_test_call:
+    copy:
+      eyebrow: Voice test
+      title: Run a test call
+      description: Run one call and listen for the first quality signal.
+    next:
+      - review_voice_call
+  review_voice_call:
+    copy:
+      eyebrow: Voice review
+      title: Review the voice call
+      description: Review transcript, latency, and task completion.
+    next:
+      - add_voice_success_criteria
+  add_voice_success_criteria:
+    copy:
+      eyebrow: Voice criteria
+      title: Add success criteria
+      description: Define what a good voice interaction must satisfy.
+    next:
+      - voice_monitor_calls
+  voice_monitor_calls:
+    copy:
+      eyebrow: Voice monitor
+      title: Monitor voice calls
+      description: Keep reviewing calls against the success criteria.
+    next: []
+  create_eval_dataset:
+    copy:
+      eyebrow: Eval dataset
+      title: Create a dataset
+      description: Add the examples that define expected behavior.
+    next:
+      - add_eval_scorer
+  add_eval_scorer:
+    copy:
+      eyebrow: Eval scorer
+      title: Add a scorer
+      description: Add the metric that decides whether an output is good.
+    next:
+      - run_eval
+  run_eval:
+    copy:
+      eyebrow: Eval run
+      title: Run an eval
+      description: Run the eval and collect the first result.
+    next:
+      - review_eval_failures
+  review_eval_failures:
+    copy:
+      eyebrow: Eval failures
+      title: Review failures
+      description: Inspect failures and choose the next fix.
+    next:
+      - eval_next_loop
+  eval_next_loop:
+    copy:
+      eyebrow: Eval loop
+      title: Continue the eval loop
+      description: Use the failures to drive the next improvement.
+    next: []
+  open_sample_project:
+    copy:
+      eyebrow: Sample data
+      title: Open a sample project
+      description: Use a sample project while real data is pending.
+    recommended_action: open_sample_trace
+    next:
+      - review_sample_signal
+  connect_real_data:
+    copy:
+      eyebrow: Real data
+      title: Connect real data
+      description: Move from sample data to one real production signal.
+    recommended_action: create_observe_project
+    next:
+      - waiting_for_first_trace
+
+stage_rules:
+  - stage: feature_disabled
+    when:
+      flag_disabled: onboarding_activation_state_api
+  - stage: workspace_missing
+    when:
+      missing_any:
+        - organization
+        - workspace
+  - stage: choose_goal
+    when:
+      missing: selected_goal
+  - stage: selected_path_unavailable
+    when:
+      context_not_equals:
+        primary_path: observe
+  - stage: daily_review
+    when:
+      all:
+        - signal: first_loop_completed
+        - flag_enabled: onboarding_daily_quality_home
+        - signal: useful_daily_signal
+  - stage: activated
+    when:
+      signal: first_loop_completed
+  - stage: connect_observability
+    when:
+      signal_not: observe_project_exists
+  - stage: waiting_for_first_trace_sample_available
+    when:
+      all:
+        - signal: observe_project_exists
+        - signal_not: trace_exists
+        - flag_enabled: onboarding_sample_project
+  - stage: waiting_for_first_trace
+    when:
+      all:
+        - signal: observe_project_exists
+        - signal_not: trace_exists
+  - stage: review_first_trace
+    when:
+      all:
+        - signal: trace_exists
+        - signal_not: trace_reviewed
+  - stage: create_trace_evaluator
+    when:
+      all:
+        - signal: trace_reviewed
+        - not:
+            any:
+              - signal: evaluator_exists
+              - signal: dashboard_exists
+              - signal: alert_exists
+              - signal: saved_view_exists
+  - stage: activated
+    when:
+      always: true
+
+activation_events:
+  names:
+    - onboarding_transition_viewed
+    - onboarding_home_viewed
+    - onboarding_goal_selected
+    - onboarding_goal_changed
+    - onboarding_recommended_action_viewed
+    - onboarding_recommended_action_clicked
+    - onboarding_path_card_clicked
+    - onboarding_blocked_state_viewed
+    - onboarding_diagnostics_opened
+    - onboarding_sample_project_opened
+    - onboarding_fallback_action_clicked
+    - sample_signal_viewed
+    - sample_to_real_setup_clicked
+    - first_quality_loop_completed
+    - daily_quality_home_viewed
+    - daily_quality_top_change_reviewed
+    - daily_quality_item_reviewed
+    - daily_quality_action_created
+    - daily_quality_action_opened
+    - daily_quality_action_assigned
+    - daily_quality_action_completed
+    - daily_quality_action_dismissed
+    - daily_quality_no_signal_viewed
+    - weekly_quality_review_opened
+    - weekly_quality_action_assigned
+    - weekly_quality_action_completed
+    - weekly_quality_review_completed
+    - reactivation_reason_clicked
+    - observe_project_created
+    - trace_ingested
+    - trace_reviewed
+    - trace_detail_opened
+    - team_member_invited
+    - trace_failure_detected
+  aliases:
+    goal_selected: onboarding_goal_selected
+    goal_changed: onboarding_goal_changed
+    sample_project_opened: onboarding_sample_project_opened
+    sample_trace_detail_opened: sample_signal_viewed
+    quality_dashboard_viewed: weekly_quality_review_opened
+    trace_detail_opened: trace_reviewed

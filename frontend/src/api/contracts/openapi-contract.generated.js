@@ -5,7 +5,7 @@
 export const OPENAPI_CONTRACT = Object.freeze({
   "generatedFrom": "api_contracts/openapi/swagger.json",
   "swaggerVersion": "2.0",
-  "endpointCount": 982,
+  "endpointCount": 983,
   "endpoints": {
     "/accounts/2fa/recovery-codes/": {
       "get": {
@@ -407,6 +407,40 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "/accounts/activation-events/": {
+      "post": {
+        "operationId": "accounts_activation-events_create",
+        "runtimeRequestValidation": true,
+        "runtimeResponseValidation": true,
+        "requestBody": {
+          "$ref": "#/definitions/ActivationEventRequest"
+        },
+        "queryParameters": {},
+        "responses": {
+          "200": {
+            "$ref": "#/definitions/ActivationEventResponse"
+          },
+          "400": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "401": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "403": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "404": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "500": {
+            "$ref": "#/definitions/AccountsErrorResponse"
+          },
+          "default": {
+            "$ref": "#/definitions/ManagementAPIErrorResponse"
+          }
+        }
+      }
+    },
     "/accounts/activation-state/": {
       "get": {
         "operationId": "accounts_activation-state_list",
@@ -444,6 +478,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
                 "selected_path_unavailable",
                 "activated",
                 "daily_review",
+                "connect_observability",
+                "waiting_for_first_trace",
+                "waiting_for_first_trace_sample_available",
+                "review_first_trace",
+                "create_trace_evaluator",
+                "review_sample_signal",
                 "start_prompt",
                 "run_prompt_test",
                 "save_prompt_version",
@@ -454,11 +494,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
                 "review_agent_trace",
                 "save_agent_eval",
                 "agent_create_eval",
-                "connect_observability",
-                "waiting_for_first_trace",
-                "waiting_for_first_trace_sample_available",
-                "review_first_trace",
-                "create_trace_evaluator",
                 "create_trace_dashboard",
                 "create_trace_alert",
                 "configure_gateway_provider",
@@ -478,7 +513,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
                 "review_eval_failures",
                 "eval_next_loop",
                 "open_sample_project",
-                "review_sample_signal",
                 "connect_real_data"
               ]
             }
@@ -42163,6 +42197,133 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ActivationEventRequest": {
+      "required": [
+        "event_name"
+      ],
+      "type": "object",
+      "properties": {
+        "event_name": {
+          "title": "Event name",
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_path": {
+          "title": "Primary path",
+          "type": "string",
+          "x-nullable": true
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string",
+          "enum": [
+            "feature_disabled",
+            "workspace_missing",
+            "permission_limited",
+            "choose_goal",
+            "selected_path_unavailable",
+            "activated",
+            "daily_review",
+            "connect_observability",
+            "waiting_for_first_trace",
+            "waiting_for_first_trace_sample_available",
+            "review_first_trace",
+            "create_trace_evaluator",
+            "review_sample_signal",
+            "start_prompt",
+            "run_prompt_test",
+            "save_prompt_version",
+            "compare_prompt_versions",
+            "prompt_next_loop",
+            "create_agent",
+            "run_agent_scenario",
+            "review_agent_trace",
+            "save_agent_eval",
+            "agent_create_eval",
+            "create_trace_dashboard",
+            "create_trace_alert",
+            "configure_gateway_provider",
+            "create_gateway_key",
+            "run_gateway_request",
+            "review_gateway_log",
+            "fix_gateway_failure",
+            "add_gateway_policy",
+            "create_voice_agent",
+            "run_voice_test_call",
+            "review_voice_call",
+            "add_voice_success_criteria",
+            "voice_monitor_calls",
+            "create_eval_dataset",
+            "add_eval_scorer",
+            "run_eval",
+            "review_eval_failures",
+            "eval_next_loop",
+            "open_sample_project",
+            "connect_real_data"
+          ],
+          "x-nullable": true
+        },
+        "source": {
+          "title": "Source",
+          "type": "string",
+          "x-nullable": true
+        },
+        "artifact_type": {
+          "title": "Artifact type",
+          "type": "string",
+          "enum": [
+            "trace",
+            "project"
+          ],
+          "x-nullable": true
+        },
+        "artifact_id": {
+          "title": "Artifact id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "project_id": {
+          "title": "Project id",
+          "type": "string",
+          "x-nullable": true
+        },
+        "metadata": {
+          "title": "Metadata",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "x-nullable": true
+          }
+        },
+        "idempotency_key": {
+          "title": "Idempotency key",
+          "type": "string",
+          "maxLength": 160,
+          "x-nullable": true
+        },
+        "is_sample": {
+          "title": "Is sample",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "ActivationEventResponse": {
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "boolean",
+          "default": true
+        },
+        "result": {
+          "$ref": "#/definitions/ActivationEventResult"
+        }
+      }
+    },
     "ActivationGoalConflictResponse": {
       "required": [
         "result"
@@ -42232,6 +42393,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "selected_path_unavailable",
             "activated",
             "daily_review",
+            "connect_observability",
+            "waiting_for_first_trace",
+            "waiting_for_first_trace_sample_available",
+            "review_first_trace",
+            "create_trace_evaluator",
+            "review_sample_signal",
             "start_prompt",
             "run_prompt_test",
             "save_prompt_version",
@@ -42242,11 +42409,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "review_agent_trace",
             "save_agent_eval",
             "agent_create_eval",
-            "connect_observability",
-            "waiting_for_first_trace",
-            "waiting_for_first_trace_sample_available",
-            "review_first_trace",
-            "create_trace_evaluator",
             "create_trace_dashboard",
             "create_trace_alert",
             "configure_gateway_provider",
@@ -42266,7 +42428,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "review_eval_failures",
             "eval_next_loop",
             "open_sample_project",
-            "review_sample_signal",
             "connect_real_data"
           ],
           "x-nullable": true
@@ -74675,6 +74836,64 @@ export const OPENAPI_CONTRACT = Object.freeze({
         }
       }
     },
+    "ActivationEventResult": {
+      "required": [
+        "event_id",
+        "event_name",
+        "activation_state"
+      ],
+      "type": "object",
+      "properties": {
+        "event_id": {
+          "title": "Event id",
+          "type": "string",
+          "minLength": 1
+        },
+        "event_name": {
+          "title": "Event name",
+          "type": "string",
+          "enum": [
+            "onboarding_transition_viewed",
+            "onboarding_home_viewed",
+            "onboarding_goal_selected",
+            "onboarding_goal_changed",
+            "onboarding_recommended_action_viewed",
+            "onboarding_recommended_action_clicked",
+            "onboarding_path_card_clicked",
+            "onboarding_blocked_state_viewed",
+            "onboarding_diagnostics_opened",
+            "onboarding_sample_project_opened",
+            "onboarding_fallback_action_clicked",
+            "sample_signal_viewed",
+            "sample_to_real_setup_clicked",
+            "first_quality_loop_completed",
+            "daily_quality_home_viewed",
+            "daily_quality_top_change_reviewed",
+            "daily_quality_item_reviewed",
+            "daily_quality_action_created",
+            "daily_quality_action_opened",
+            "daily_quality_action_assigned",
+            "daily_quality_action_completed",
+            "daily_quality_action_dismissed",
+            "daily_quality_no_signal_viewed",
+            "weekly_quality_review_opened",
+            "weekly_quality_action_assigned",
+            "weekly_quality_action_completed",
+            "weekly_quality_review_completed",
+            "reactivation_reason_clicked",
+            "observe_project_created",
+            "trace_ingested",
+            "trace_reviewed",
+            "trace_detail_opened",
+            "team_member_invited",
+            "trace_failure_detected"
+          ]
+        },
+        "activation_state": {
+          "$ref": "#/definitions/ActivationStateResponse"
+        }
+      }
+    },
     "ActivationGoalConflictResult": {
       "required": [
         "error_code",
@@ -74775,9 +74994,9 @@ export const OPENAPI_CONTRACT = Object.freeze({
           "title": "Goal",
           "type": "string",
           "enum": [
+            "monitor_production_ai_app",
             "improve_prompts",
             "build_ai_agent",
-            "monitor_production_ai_app",
             "control_model_traffic",
             "evaluate_quality",
             "connect_voice_ai_agent",
@@ -74816,6 +75035,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "selected_path_unavailable",
             "activated",
             "daily_review",
+            "connect_observability",
+            "waiting_for_first_trace",
+            "waiting_for_first_trace_sample_available",
+            "review_first_trace",
+            "create_trace_evaluator",
+            "review_sample_signal",
             "start_prompt",
             "run_prompt_test",
             "save_prompt_version",
@@ -74826,11 +75051,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "review_agent_trace",
             "save_agent_eval",
             "agent_create_eval",
-            "connect_observability",
-            "waiting_for_first_trace",
-            "waiting_for_first_trace_sample_available",
-            "review_first_trace",
-            "create_trace_evaluator",
             "create_trace_dashboard",
             "create_trace_alert",
             "configure_gateway_provider",
@@ -74850,9 +75070,11 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "review_eval_failures",
             "eval_next_loop",
             "open_sample_project",
-            "review_sample_signal",
             "connect_real_data"
           ]
+        },
+        "stage_copy": {
+          "$ref": "#/definitions/ActivationStageCopy"
         },
         "home_mode": {
           "title": "Home mode",
@@ -74884,6 +75106,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "signals": {
           "$ref": "#/definitions/ActivationSignals"
+        },
+        "available_goals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AvailableGoal"
+          }
         },
         "available_paths": {
           "type": "array",
@@ -90732,6 +90960,12 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "selected_path_unavailable",
             "activated",
             "daily_review",
+            "connect_observability",
+            "waiting_for_first_trace",
+            "waiting_for_first_trace_sample_available",
+            "review_first_trace",
+            "create_trace_evaluator",
+            "review_sample_signal",
             "start_prompt",
             "run_prompt_test",
             "save_prompt_version",
@@ -90742,11 +90976,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "review_agent_trace",
             "save_agent_eval",
             "agent_create_eval",
-            "connect_observability",
-            "waiting_for_first_trace",
-            "waiting_for_first_trace_sample_available",
-            "review_first_trace",
-            "create_trace_evaluator",
             "create_trace_dashboard",
             "create_trace_alert",
             "configure_gateway_provider",
@@ -90766,7 +90995,6 @@ export const OPENAPI_CONTRACT = Object.freeze({
             "review_eval_failures",
             "eval_next_loop",
             "open_sample_project",
-            "review_sample_signal",
             "connect_real_data"
           ]
         },
@@ -91118,6 +91346,101 @@ export const OPENAPI_CONTRACT = Object.freeze({
         },
         "first_observe_id": {
           "title": "First observe id",
+          "type": "string",
+          "x-nullable": true
+        }
+      }
+    },
+    "ActivationStageCopy": {
+      "required": [
+        "eyebrow",
+        "title",
+        "description"
+      ],
+      "type": "object",
+      "properties": {
+        "eyebrow": {
+          "title": "Eyebrow",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "title": "Title",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "title": "Description",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "AvailableGoal": {
+      "required": [
+        "id",
+        "goal",
+        "primary_path",
+        "label",
+        "description"
+      ],
+      "type": "object",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string",
+          "minLength": 1
+        },
+        "goal": {
+          "title": "Goal",
+          "type": "string",
+          "enum": [
+            "monitor_production_ai_app",
+            "improve_prompts",
+            "build_ai_agent",
+            "control_model_traffic",
+            "evaluate_quality",
+            "connect_voice_ai_agent",
+            "explore_sample_data"
+          ]
+        },
+        "primary_path": {
+          "title": "Primary path",
+          "type": "string",
+          "enum": [
+            "prompt",
+            "agent",
+            "observe",
+            "gateway",
+            "voice",
+            "evals",
+            "dashboards",
+            "sample"
+          ]
+        },
+        "label": {
+          "title": "Label",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "title": "Description",
+          "type": "string",
+          "minLength": 1
+        },
+        "estimated_minutes": {
+          "title": "Estimated minutes",
+          "type": "integer",
+          "minimum": 1,
+          "x-nullable": true
+        },
+        "disabled": {
+          "title": "Disabled",
+          "type": "boolean",
+          "default": false
+        },
+        "disabled_reason": {
+          "title": "Disabled reason",
           "type": "string",
           "x-nullable": true
         }

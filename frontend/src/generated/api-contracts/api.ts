@@ -37,6 +37,8 @@ import type {
   AccountsUserProfileResponseApi,
   AccountsWorkspaceListListParams,
   AccountsWorkspaceMembersListParams,
+  ActivationEventRequestApi,
+  ActivationEventResponseApi,
   ActivationGoalConflictResponseApi,
   ActivationGoalRequestApi,
   ActivationStateApiResponseApi,
@@ -2200,6 +2202,72 @@ export const accountsAcceptInvitationCreate = async (uidb64: string,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
       acceptInvitationRequestApi,)
+  }
+);}
+
+
+
+export type accountsActivationEventsCreateResponse200 = {
+  data: ActivationEventResponseApi
+  status: 200
+}
+
+export type accountsActivationEventsCreateResponse400 = {
+  data: AccountsErrorResponseApi
+  status: 400
+}
+
+export type accountsActivationEventsCreateResponse401 = {
+  data: AccountsErrorResponseApi
+  status: 401
+}
+
+export type accountsActivationEventsCreateResponse403 = {
+  data: AccountsErrorResponseApi
+  status: 403
+}
+
+export type accountsActivationEventsCreateResponse404 = {
+  data: AccountsErrorResponseApi
+  status: 404
+}
+
+export type accountsActivationEventsCreateResponse500 = {
+  data: AccountsErrorResponseApi
+  status: 500
+}
+
+export type accountsActivationEventsCreateResponseDefault = {
+  data: ManagementAPIErrorResponseApi
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 404 | 500>
+}
+
+export type accountsActivationEventsCreateResponseSuccess = (accountsActivationEventsCreateResponse200) & {
+  headers: Headers;
+};
+export type accountsActivationEventsCreateResponseError = (accountsActivationEventsCreateResponse400 | accountsActivationEventsCreateResponse401 | accountsActivationEventsCreateResponse403 | accountsActivationEventsCreateResponse404 | accountsActivationEventsCreateResponse500 | accountsActivationEventsCreateResponseDefault) & {
+  headers: Headers;
+};
+
+export type accountsActivationEventsCreateResponse = (accountsActivationEventsCreateResponseSuccess | accountsActivationEventsCreateResponseError)
+
+export const getAccountsActivationEventsCreateUrl = () => {
+
+
+
+
+  return `/accounts/activation-events/`
+}
+
+export const accountsActivationEventsCreate = async (activationEventRequestApi: ActivationEventRequestApi, options?: RequestInit): Promise<accountsActivationEventsCreateResponse> => {
+
+  return apiMutator<accountsActivationEventsCreateResponse>(getAccountsActivationEventsCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      activationEventRequestApi,)
   }
 );}
 
