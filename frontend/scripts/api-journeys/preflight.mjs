@@ -46,6 +46,12 @@ try {
     })),
   );
   checks.push(
+    ...(await checkPostgresVolumeIntegrity({
+      envName: "API_JOURNEY_DB_CONTAINER",
+      fallbackNames: DEFAULT_DB_CONTAINERS,
+    })),
+  );
+  checks.push(
     ...(await checkContainerDiskAvailability({
       envName: "API_JOURNEY_DB_CONTAINER",
       fallbackNames: DEFAULT_DB_CONTAINERS,
@@ -296,6 +302,98 @@ async function checkRedisWriteHealth({ envName, fallbackNames }) {
   return results;
 }
 
+async function checkPostgresVolumeIntegrity({ envName, fallbackNames }) {
+  const explicit = splitEnvList(process.env[envName]);
+  const names = [
+    ...new Set((explicit.length ? explicit : fallbackNames).filter(Boolean)),
+  ];
+  const results = [];
+
+  for (const name of names) {
+    const container = await loadDockerContainerInspect(name);
+    if (!container?.exists) continue;
+
+    results.push(await checkPostgresContainerVolumeIntegrity(name, container));
+  }
+
+  return results;
+}
+
+async function checkPostgresContainerVolumeIntegrity(name, container) {
+  const pgdata =
+    container.env
+      .find((value) => value.startsWith("PGDATA="))
+      ?.slice("PGDATA=".length) || "/var/lib/postgresql/data";
+  const mountInfo = findMountForPath(container.mounts, pgdata);
+
+  if (!mountInfo) {
+    return {
+      name: `postgres_volume_integrity:${name}`,
+      status: "warning",
+      pgdata,
+      detail:
+        "Could not find the Docker mount for PGDATA, so PostgreSQL data-directory integrity was not checked.",
+    };
+  }
+
+  const mountSource =
+    mountInfo.mount.Type === "volume"
+      ? mountInfo.mount.Name
+      : mountInfo.mount.Source;
+  const mountedPath = `/mnt${mountInfo.relativePath}`;
+
+  try {
+    const { stdout } = await execFileAsync("docker", [
+      "run",
+      "--rm",
+      "--entrypoint",
+      "sh",
+      "-v",
+      `${mountSource}:/mnt:ro`,
+      container.image,
+      "-lc",
+      buildPostgresDataProbeScript(mountedPath),
+    ]);
+    const probe = parsePostgresVolumeProbe(stdout);
+    const classification = classifyPostgresVolumeProbe(probe);
+
+    return {
+      name: `postgres_volume_integrity:${name}`,
+      status: classification.status,
+      container_status: container.status,
+      image: container.image,
+      pgdata,
+      mount: {
+        type: mountInfo.mount.Type,
+        name: mountInfo.mount.Name || null,
+        destination: mountInfo.mount.Destination,
+      },
+      files: probe.files,
+      directories: probe.directories,
+      entry_count: probe.entryCount,
+      flags: classification.flags,
+      detail: classification.detail,
+      recommended_action: classification.recommendedAction,
+    };
+  } catch (error) {
+    return {
+      name: `postgres_volume_integrity:${name}`,
+      status: "warning",
+      container_status: container.status,
+      image: container.image,
+      pgdata,
+      mount: {
+        type: mountInfo.mount.Type,
+        name: mountInfo.mount.Name || null,
+        destination: mountInfo.mount.Destination,
+      },
+      error: error.message,
+      detail:
+        "Could not inspect the PostgreSQL data volume read-only. Check Docker image and volume access before trusting DB-backed journey results.",
+    };
+  }
+}
+
 async function checkContainerDiskAvailability({
   envName,
   fallbackNames,
@@ -361,17 +459,26 @@ async function checkContainerDisk(name, service, paths) {
 }
 
 async function loadDockerContainerState(name) {
+  const container = await loadDockerContainerInspect(name);
+  return {
+    exists: Boolean(container?.exists),
+    status: container?.status || "",
+  };
+}
+
+async function loadDockerContainerInspect(name) {
   try {
-    const { stdout } = await execFileAsync("docker", [
-      "inspect",
-      name,
-      "--format",
-      "{{json .State}}",
-    ]);
-    const state = JSON.parse(stdout.trim());
-    return { exists: true, status: state.Status };
+    const { stdout } = await execFileAsync("docker", ["inspect", name]);
+    const [container] = JSON.parse(stdout);
+    return {
+      exists: true,
+      status: container?.State?.Status || "",
+      image: container?.Config?.Image || "",
+      env: container?.Config?.Env || [],
+      mounts: container?.Mounts || [],
+    };
   } catch {
-    return { exists: false, status: "" };
+    return { exists: false };
   }
 }
 
@@ -400,6 +507,143 @@ function parseDfRows(output) {
 
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function findMountForPath(mounts, targetPath) {
+  const normalizedTarget = stripTrailingSlash(targetPath);
+  const candidates = (mounts || [])
+    .filter((mount) => mount.Type === "volume" || mount.Type === "bind")
+    .map((mount) => ({
+      mount,
+      destination: stripTrailingSlash(mount.Destination),
+    }))
+    .sort((a, b) => b.destination.length - a.destination.length);
+
+  for (const candidate of candidates) {
+    if (
+      normalizedTarget === candidate.destination ||
+      normalizedTarget.startsWith(`${candidate.destination}/`)
+    ) {
+      return {
+        mount: candidate.mount,
+        relativePath: normalizedTarget.slice(candidate.destination.length),
+      };
+    }
+  }
+  return null;
+}
+
+function stripTrailingSlash(value) {
+  const normalized = String(value || "").replace(/\/+$/, "");
+  return normalized || "/";
+}
+
+function buildPostgresDataProbeScript(mountedPath) {
+  const base = shellQuote(mountedPath);
+  return `
+set -eu
+base=${base}
+for file in PG_VERSION postgresql.conf pg_hba.conf pg_ident.conf postgresql.auto.conf; do
+  path="$base/$file"
+  if [ -e "$path" ]; then
+    bytes=$(wc -c < "$path" | tr -d ' ')
+    if [ "$bytes" = "0" ]; then
+      printf 'file\\t%s\\tzero\\t%s\\n' "$file" "$bytes"
+    else
+      printf 'file\\t%s\\tok\\t%s\\n' "$file" "$bytes"
+    fi
+  else
+    printf 'file\\t%s\\tmissing\\t0\\n' "$file"
+  fi
+done
+for dir in base global pg_wal pg_xact; do
+  if [ -d "$base/$dir" ]; then
+    printf 'dir\\t%s\\tpresent\\t0\\n' "$dir"
+  else
+    printf 'dir\\t%s\\tmissing\\t0\\n' "$dir"
+  fi
+done
+entries=$(find "$base" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')
+printf 'entries\\t.\\t%s\\t0\\n' "$entries"
+`;
+}
+
+function parsePostgresVolumeProbe(output) {
+  const files = [];
+  const directories = [];
+  let entryCount = 0;
+
+  for (const line of String(output || "").split(/\r?\n/)) {
+    const [kind, name, status, size] = line.split("\t");
+    if (!kind || !name) continue;
+
+    if (kind === "file") {
+      files.push({ name, status, size_bytes: Number(size) || 0 });
+    } else if (kind === "dir") {
+      directories.push({ name, status });
+    } else if (kind === "entries") {
+      entryCount = Number(status) || 0;
+    }
+  }
+
+  return { files, directories, entryCount };
+}
+
+function classifyPostgresVolumeProbe(probe) {
+  const criticalFileNames = new Set([
+    "PG_VERSION",
+    "postgresql.conf",
+    "pg_hba.conf",
+  ]);
+  const criticalFiles = probe.files.filter((file) =>
+    criticalFileNames.has(file.name),
+  );
+  const zeroCritical = criticalFiles.filter((file) => file.status === "zero");
+  const missingCritical = criticalFiles.filter(
+    (file) => file.status === "missing",
+  );
+  const presentDataDirectories = probe.directories
+    .filter((directory) => directory.status === "present")
+    .map((directory) => directory.name);
+  const hasExistingData =
+    probe.entryCount > 0 || presentDataDirectories.length > 0;
+  const flags = [];
+
+  if (zeroCritical.length) flags.push("postgres_zero_byte_critical_files");
+  if (missingCritical.length && hasExistingData)
+    flags.push("postgres_missing_critical_files");
+  if (presentDataDirectories.length) flags.push("postgres_data_dirs_present");
+
+  if (zeroCritical.length || (missingCritical.length && hasExistingData)) {
+    const fileNames = [...zeroCritical, ...missingCritical]
+      .map((file) => `${file.name}:${file.status}`)
+      .join(", ");
+    return {
+      status: "failed",
+      flags,
+      detail: `PostgreSQL data directory appears truncated or only partially initialized; critical files are invalid (${fileNames}).`,
+      recommendedAction:
+        "Back up, repair, or intentionally recreate the local Postgres volume before running DB-backed API journeys. Do not delete active volumes without explicit approval.",
+    };
+  }
+
+  if (!hasExistingData) {
+    return {
+      status: "warning",
+      flags: ["postgres_data_dir_empty"],
+      detail:
+        "PostgreSQL data directory is empty; the container may need a clean initialization before DB-backed API journeys run.",
+      recommendedAction:
+        "Start the Postgres service and rerun preflight after initialization completes.",
+    };
+  }
+
+  return {
+    status: "passed",
+    flags,
+    detail:
+      "PostgreSQL data directory contains non-empty critical files expected for an initialized cluster.",
+  };
 }
 
 async function checkRedisContainerWriteHealth(name) {
@@ -452,6 +696,9 @@ async function summarizeDockerLogs(name) {
     const flags = [];
     if (/No space left on device/i.test(text)) flags.push("no_space_left");
     if (/MISCONF/i.test(text)) flags.push("redis_misconf");
+    if (/initdb: error: directory .* exists but is not empty/i.test(text)) {
+      flags.push("postgres_initdb_non_empty_data_dir");
+    }
     if (/FATAL/i.test(text)) flags.push("fatal");
     if (/Name or service not known/i.test(text))
       flags.push("dns_or_service_lookup");
