@@ -4648,14 +4648,12 @@ class EvalUsageStatsView(APIView):
                                     )
                                     else "[url]"
                                 )
-                            else:
-                                val_str = val_str[:100]
                             input_vars[k] = val_str
 
                 # Build input summary: "key1: val1, key2: val2"
                 if input_vars:
                     input_str = ", ".join(
-                        f"{k}: {v[:60]}" for k, v in list(input_vars.items())[:3]
+                        f"{k}: {v}" for k, v in list(input_vars.items())[:3]
                     )
                 else:
                     # Fallback to config.input
@@ -4666,10 +4664,10 @@ class EvalUsageStatsView(APIView):
                         parts = []
                         for k, v in input_data.items():
                             if v and k not in _skip_keys:
-                                parts.append(f"{k}: {str(v)[:60]}")
+                                parts.append(f"{k}: {str(v)}")
                         input_str = ", ".join(parts[:3])
                     elif isinstance(input_data, str):
-                        input_str = input_data[:200]
+                        input_str = input_data
                     else:
                         input_str = ""
 
@@ -4712,10 +4710,10 @@ class EvalUsageStatsView(APIView):
 
                 log_item = {
                     "id": str(log.log_id),
-                    "input": input_str[:200],
+                    "input": input_str,
                     "result": result_label,
                     "score": score,
-                    "reason": ((reason[:150] + "...") if len(reason) > 150 else reason),
+                    "reason": reason,
                     "status": log.status,
                     "source": source,
                     "created_at": (
