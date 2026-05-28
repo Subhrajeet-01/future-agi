@@ -2708,7 +2708,7 @@ export interface GatewayBudgetSetRequestApi {
   config: GatewayBudgetSetRequestApiConfig;
 }
 
-export type GatewayBatchSubmitRequestApiRequestsItem = {[key: string]: string};
+export type GatewayBatchSubmitRequestApiRequestsItem = {[key: string]: unknown};
 
 export interface GatewayBatchSubmitRequestApi {
   requests: GatewayBatchSubmitRequestApiRequestsItem[];

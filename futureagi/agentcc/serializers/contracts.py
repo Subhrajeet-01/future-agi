@@ -347,7 +347,9 @@ class GatewayBudgetRemoveRequestSerializer(serializers.Serializer):
 
 
 class GatewayBatchSubmitRequestSerializer(serializers.Serializer):
-    requests = serializers.ListField(child=serializers.DictField())
+    requests = serializers.ListField(
+        child=serializers.DictField(child=serializers.JSONField())
+    )
     max_concurrency = serializers.IntegerField(required=False, min_value=1, default=5)
 
 

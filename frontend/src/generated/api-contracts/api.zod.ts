@@ -5662,7 +5662,7 @@ export const agentccGatewaysSubmitBatchBodyMaxConcurrencyDefault = 5;
 
 
 export const AgentccGatewaysSubmitBatchBody = zod.object({
-  "requests": zod.array(zod.record(zod.string(), zod.string())),
+  "requests": zod.array(zod.record(zod.string(), zod.unknown())),
   "max_concurrency": zod.number().min(1).default(agentccGatewaysSubmitBatchBodyMaxConcurrencyDefault)
 })
 
