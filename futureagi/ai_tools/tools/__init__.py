@@ -24,24 +24,20 @@ from ai_tools.tools.annotation_queues import (
 )
 
 # list/get/create/update/delete_annotation_queue -> DRF bridge (see _annotation_queues.py)
-# Annotation tools (13)
-from ai_tools.tools.annotations import (
-    create_annotation_label,  # noqa: F401
-    delete_label,  # noqa: F401
-    get_annotation,  # noqa: F401
-    list_annotation_labels,  # noqa: F401
-    list_annotations,  # noqa: F401
-    update_label,  # noqa: F401
-)
-
+# Annotation tools — all migrated to DRF bridge (see _annotations.py)
+# list_annotation_labels, get_annotation_label, create/update/delete_annotation_label,
+# list_annotations, get_annotation
 # DRF bridges programmatically applied for legacy lint-debt files:
 from ai_tools.tools.bridge import (
     _agents,  # noqa: F401  list/get/create/update/delete_agent
     _annotation_queues,  # noqa: F401  list/get/create/update/delete_annotation_queue
+    _annotations,  # noqa: F401  list/get/create/update/delete_annotation_label + list/get_annotation
     _datasets,  # noqa: F401  list/get/create/update/delete_dataset
     _eval_groups,  # noqa: F401  list/get/create/update/delete_eval_group
     _knowledge_bases,  # noqa: F401  list/get/create/update/delete_knowledge_base
     _personas,  # noqa: F401  list/get/create/update/delete_persona
+    _prompt_folders,  # noqa: F401  list/get/create/update/delete_prompt_folder
+    _prompt_labels,  # noqa: F401  list/get/create/update/delete_prompt_label
     _prompt_templates,  # noqa: F401  list/get/create/update/delete_prompt_template
 )
 
@@ -137,8 +133,8 @@ from ai_tools.tools.prompts import (
     get_prompt_eval_configs,  # noqa: F401
     get_prompt_execution_results,  # noqa: F401
     get_prompt_version,  # noqa: F401
-    list_prompt_folders,  # noqa: F401
-    list_prompt_labels,  # noqa: F401
+    # list_prompt_folders -> DRF bridge (see _prompt_folders.py)
+    # list_prompt_labels -> DRF bridge (see _prompt_labels.py)
     list_prompt_scenarios,  # noqa: F401
     list_prompt_versions,  # noqa: F401
     run_prompt,  # noqa: F401
