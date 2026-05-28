@@ -266,6 +266,7 @@ const useOrganizationInitialData = (isOwner, user) => {
 const SetupOrganization = ({ getStarted = false }) => {
   const queryClient = useQueryClient();
   const quickStartRequestedRef = useRef(false);
+  const [showRoleQuestions, setShowRoleQuestions] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeStep = parseInt(searchParams.get("step") || "0", 10);
   const finishSetup = useCallback(() => {
@@ -801,7 +802,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                What&apos;s your role
+                Start with your first quality loop
               </Typography>
               <Typography
                 fontWeight={"fontWeightSemiBold"}
@@ -812,55 +813,67 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Select the job title you most identify with
+                Connect observability before personalizing setup
               </Typography>
             </Box>
 
             {renderObserveQuickStartButton()}
 
-            <RadioField
-              custom
-              control={userForm.control}
-              fieldName="role"
-              optionColor="text.primary"
-              labelColor="text.primary"
-              label={undefined}
-              groupSx={{ padding: 0, marginLeft: -1 }}
-              options={AVAILABLE_ROLES}
-            />
-
-            <Typography variant="M3" fontWeight={"fontWeightMedium"}>
-              Don&apos;t see your role?
-            </Typography>
-
-            <Controller
-              name="customRole"
-              control={userForm.control}
-              render={({ field, fieldState: { error } }) => (
-                <TextField
-                  {...field}
-                  fullWidth
-                  size="small"
-                  placeholder="Tell us about your role"
-                  variant="outlined"
-                  error={!!error}
-                  helperText={error?.message}
-                  sx={{
-                    backgroundColor: "background.neutral",
-                    borderRadius: 0.5,
-                  }}
+            {!showRoleQuestions ? (
+              <Button
+                variant="outlined"
+                onClick={() => setShowRoleQuestions(true)}
+                color="primary"
+              >
+                Personalize setup first
+              </Button>
+            ) : (
+              <>
+                <RadioField
+                  custom
+                  control={userForm.control}
+                  fieldName="role"
+                  optionColor="text.primary"
+                  labelColor="text.primary"
+                  label={undefined}
+                  groupSx={{ padding: 0, marginLeft: -1 }}
+                  options={AVAILABLE_ROLES}
                 />
-              )}
-            />
 
-            <Button
-              variant="outlined"
-              disabled={!roleValue && !customRoleValue}
-              onClick={() => setActiveStep(1)}
-              color="primary"
-            >
-              Continue with role
-            </Button>
+                <Typography variant="M3" fontWeight={"fontWeightMedium"}>
+                  Don&apos;t see your role?
+                </Typography>
+
+                <Controller
+                  name="customRole"
+                  control={userForm.control}
+                  render={({ field, fieldState: { error } }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      size="small"
+                      placeholder="Tell us about your role"
+                      variant="outlined"
+                      error={!!error}
+                      helperText={error?.message}
+                      sx={{
+                        backgroundColor: "background.neutral",
+                        borderRadius: 0.5,
+                      }}
+                    />
+                  )}
+                />
+
+                <Button
+                  variant="outlined"
+                  disabled={!roleValue && !customRoleValue}
+                  onClick={() => setActiveStep(1)}
+                  color="primary"
+                >
+                  Continue with role
+                </Button>
+              </>
+            )}
           </Stack>
         );
 

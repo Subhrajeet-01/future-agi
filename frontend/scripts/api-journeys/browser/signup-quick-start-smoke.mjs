@@ -244,7 +244,9 @@ async function main() {
     );
     await clickVisibleButtonText(page, "Create account and continue");
 
-    await expectVisibleText(page, "What's your role", { timeout: 90000 });
+    await expectVisibleText(page, "Start with your first quality loop", {
+      timeout: 90000,
+    });
     await waitForBrowserFrame();
     await clickVisibleButtonText(page, "Connect observability first");
     await expectVisibleText(page, "Invite your team later");
