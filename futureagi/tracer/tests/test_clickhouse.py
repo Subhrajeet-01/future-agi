@@ -1952,6 +1952,206 @@ class TestTimeSeriesQueryBuilder:
         assert "GROUP BY" in query
         assert "ORDER BY" in query
 
+    # ------------------------------------------------------------------
+    # CH25 close-out: v2 spans_hourly_rollup specifics
+    # ------------------------------------------------------------------
+    # The rollup table partitions/orders by `hour` (DateTime, schema 010)
+    # rather than `start_time`. If the WHERE clause uses the wrong column
+    # the query still runs but skips no partitions — silent perf regression.
+
+    def test_agg_query_filters_on_hour_not_start_time(self):
+        """Rollup queries must filter on `hour`, the partition/order key."""
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        query, _ = builder.build()
+        # The rollup table has no `start_time` column — that lives on raw spans.
+        assert "hour >= %(start_date)s" in query
+        assert "hour < %(end_date)s" in query
+        assert "start_time" not in query
+
+    def test_agg_query_extracts_median_quantile(self):
+        """avg_latency should be the median (index [1]) of the tDigest tuple.
+
+        `quantilesTDigestMerge(0.5, 0.95, 0.99)` returns a 3-tuple; CH is
+        1-indexed so [1] = p50. We assert the index, not the literal, so
+        the test doesn't depend on whitespace.
+        """
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        query, _ = builder.build()
+        assert "quantilesTDigestMerge(0.5, 0.95, 0.99)(latency_q)" in query
+        # Median selector is appended to the merge call.
+        assert ")[1]" in query
+
+    def test_agg_query_avg_cost_divides_sum_by_count(self):
+        """avg_cost must be `sumMerge(cost_sum) / countMerge(n)`.
+
+        The rollup stores only the summed cost, not the average — the
+        builder must reconstruct the mean. `greatest(..., 1)` guards
+        against /0 on empty hours.
+        """
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        query, _ = builder.build()
+        assert "sumMerge(cost_sum) / greatest(countMerge(n), 1)" in query
+
+    def test_agg_query_error_rate_is_percentage(self):
+        """error_rate must be a percentage (× 100.0), not a raw ratio."""
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        query, _ = builder.build()
+        assert "countMerge(error_count) * 100.0 / greatest(countMerge(n), 1)" in query
+
+    def test_agg_query_does_not_reference_legacy_table(self):
+        """No path back to the legacy CDC-fed aggregate or its source."""
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        query, _ = builder.build()
+        assert "span_metrics_hourly" not in query
+        assert "tracer_observation_span" not in query
+
+    def test_format_result_emits_all_metric_keys(self):
+        """The response dict must include every metric the dashboard reads.
+
+        The dashboard renderers index into specific keys — if any one is
+        missing the chart silently disappears. Pin the contract.
+        """
+
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        builder.build()  # populates start_date / end_date
+        # Single bucket within the parsed window.
+        assert builder.start_date is not None and builder.end_date is not None
+        rows = [
+            {
+                "time_bucket": builder.start_date,
+                "avg_latency": 123.45,
+                "total_tokens": 1000,
+                "avg_cost": 0.0042,
+                "traffic_count": 7,
+                "prompt_tokens": 600,
+                "completion_tokens": 400,
+                "error_rate": 12.5,
+            }
+        ]
+        result = builder.format_result(rows, columns=[])
+
+        expected_keys = {
+            "latency",
+            "tokens",
+            "cost",
+            "traffic",
+            "prompt_tokens",
+            "completion_tokens",
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "error_rate",
+        }
+        assert expected_keys.issubset(result.keys())
+        # input_tokens / output_tokens are aliases of prompt / completion —
+        # this is a stable contract the frontend depends on.
+        assert result["input_tokens"] == result["prompt_tokens"]
+        assert result["output_tokens"] == result["completion_tokens"]
+        assert result["total_tokens"] == result["tokens"]
+
+    def test_format_result_preserves_values_from_dict_rows(self):
+        """Dict-row path (returned by execute_ch_query) must round-trip values.
+
+        Regression guard for the dual dict-or-tuple row handling in
+        ``format_result``: it reshapes each dict into a 2-tuple
+        ``(time_bucket, metric_value)`` for the zero-fill helper, so the
+        canonical key on each output point is ``"value"`` (the synonymous
+        ``latency`` / ``tokens`` / ``cost`` keys are zero-filled aliases —
+        see test below).
+        """
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id", filters=[], interval="hour"
+        )
+        builder.build()
+        assert builder.start_date is not None
+        rows = [
+            {
+                "time_bucket": builder.start_date,
+                "avg_latency": 99.5,
+                "total_tokens": 1234,
+                "avg_cost": 0.000123456789,
+                "traffic_count": 42,
+                "prompt_tokens": 1000,
+                "completion_tokens": 234,
+                "error_rate": 5.0,
+            }
+        ]
+        result = builder.format_result(rows, columns=[])
+
+        # The hour bucket containing start_date — zero-fill creates other
+        # buckets around it. Match by hour prefix to ignore minute/second
+        # normalization done by `format_time_series._normalize_timestamp`.
+        hour_prefix = builder.start_date.isoformat()[:13]
+
+        def _bucket_at_start(series_key: str) -> dict:
+            for p in result[series_key]:
+                if p["timestamp"].startswith(hour_prefix):
+                    return p
+            raise AssertionError(
+                f"No bucket matched hour {hour_prefix!r} in {series_key}"
+            )
+
+        assert _bucket_at_start("latency")["value"] == 99.5
+        assert _bucket_at_start("tokens")["value"] == 1234
+        # avg_cost is rounded to 9 decimal places by format_result.
+        assert _bucket_at_start("cost")["value"] == round(0.000123456789, 9)
+        assert _bucket_at_start("traffic")["traffic"] == 42
+
+    def test_raw_query_path_keeps_start_time_column(self):
+        """Filtered queries hit raw `spans`, which uses `start_time` (not `hour`).
+
+        Belt-and-braces with `test_build_with_filters_uses_spans_table`:
+        confirms the *column* swap happens too, not just the table swap.
+        """
+        from tracer.services.clickhouse.query_builders import TimeSeriesQueryBuilder
+
+        builder = TimeSeriesQueryBuilder(
+            project_id="test-project-id",
+            filters=[
+                {
+                    "column_id": "model",
+                    "filter_config": {
+                        "filter_type": "text",
+                        "filter_op": "equals",
+                        "filter_value": "gpt-4",
+                        "col_type": "SYSTEM_METRIC",
+                    },
+                }
+            ],
+            interval="hour",
+        )
+        query, _ = builder.build()
+        # Raw-spans path filters on start_time, NOT hour.
+        assert "start_time >= %(start_date)s" in query
+        assert "start_time < %(end_date)s" in query
+        assert "spans_hourly_rollup" not in query
+
 
 @pytest.mark.unit
 class TestTraceListQueryBuilder:
