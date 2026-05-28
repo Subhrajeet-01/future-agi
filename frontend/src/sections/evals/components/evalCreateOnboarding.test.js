@@ -14,6 +14,7 @@ import {
   buildEvalScorerSourceHref,
   buildEvalSourceFixCtaClickedPayload,
   buildEvalSourceFixHref,
+  buildEvalSourceFixRouteFocusPayload,
   buildEvalSourceSelectedPayload,
   buildEvalSourceSetupHref,
   EVAL_CREATE_ONBOARDING_STEPS,
@@ -30,6 +31,8 @@ import {
   getEvalReviewOnboardingCopy,
   getEvalReviewOnboardingParams,
   getEvalRunResultId,
+  getEvalSourceFixOnboardingCopy,
+  getEvalSourceFixOnboardingParams,
 } from "./evalCreateOnboarding";
 
 describe("evalCreateOnboarding", () => {
@@ -373,6 +376,36 @@ describe("evalCreateOnboarding", () => {
     ).toBeNull();
   });
 
+  it("parses and describes eval source-fix destination params", () => {
+    expect(
+      getEvalSourceFixOnboardingParams(
+        "?source=onboarding&step=fix-eval-failure&run_id=run-1&source_type=dataset&source_id=data-1",
+      ),
+    ).toEqual({
+      isOnboarding: true,
+      runId: "run-1",
+      sourceId: "data-1",
+      sourceType: "dataset",
+      step: "fix-eval-failure",
+    });
+
+    expect(getEvalSourceFixOnboardingParams("?source=onboarding")).toEqual({
+      isOnboarding: false,
+      runId: null,
+      sourceId: null,
+      sourceType: null,
+      step: null,
+    });
+
+    expect(
+      getEvalSourceFixOnboardingCopy({ sourceType: "dataset" }),
+    ).toMatchObject({
+      title: "Fix eval source",
+      description:
+        "Update this dataset, then rerun the eval to confirm the failure is fixed.",
+    });
+  });
+
   it("extracts the safest available run id from eval run results", () => {
     expect(getEvalRunResultId({ log_id: "log-1" })).toBe("log-1");
     expect(
@@ -580,6 +613,35 @@ describe("evalCreateOnboarding", () => {
       },
       idempotencyKey: "onboarding_eval_source_fix_cta_clicked:data-1:eval-1",
     });
+    expect(payload.metadata).not.toHaveProperty("output");
+    expect(payload.metadata).not.toHaveProperty("reason");
+  });
+
+  it("builds a source-fix route focus payload without source content", () => {
+    const payload = buildEvalSourceFixRouteFocusPayload({
+      route: "develop_dataset",
+      runId: "run-1",
+      sourceId: "data-1",
+      sourceType: "dataset",
+    });
+
+    expect(payload).toMatchObject({
+      eventName: "onboarding_eval_source_fix_route_viewed",
+      primaryPath: "evals",
+      stage: "fix_eval_source",
+      source: "eval_review_onboarding",
+      artifactType: "eval_source_fix_route",
+      artifactId: "data-1",
+      metadata: {
+        route: "develop_dataset",
+        run_id: "run-1",
+        source_id: "data-1",
+        source_type: "dataset",
+        step: "fix-eval-failure",
+      },
+      idempotencyKey: "onboarding_eval_source_fix_route_viewed:dataset:data-1",
+    });
+    expect(payload.metadata).not.toHaveProperty("rows");
     expect(payload.metadata).not.toHaveProperty("output");
     expect(payload.metadata).not.toHaveProperty("reason");
   });

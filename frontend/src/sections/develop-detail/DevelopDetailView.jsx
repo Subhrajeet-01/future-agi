@@ -1,6 +1,12 @@
-import { Box, Skeleton, useTheme } from "@mui/material";
+import { Alert, Box, Skeleton, useTheme } from "@mui/material";
 import { Outlet, useLocation, useParams } from "react-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "src/routes/hooks";
 import DatasetsSelectRow from "./DatasetsSelectRow";
 import DevelopBar from "./DevelopBar/DevelopBar";
@@ -41,6 +47,12 @@ import DevelopEvaluationDrawer from "./DataTab/DevelopEvaluationDrawer";
 import { useUrlState } from "src/routes/hooks/use-url-state";
 import ConditionalNodeV2 from "./AddColumn/ConditionalNode/ConditionalNodeV2";
 import ExperimentTabHeader from "./ExperimentTab/ExperimentTabHeader";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildEvalSourceFixRouteFocusPayload,
+  getEvalSourceFixOnboardingCopy,
+  getEvalSourceFixOnboardingParams,
+} from "src/sections/evals/components/evalCreateOnboarding";
 
 const TabOptions = [
   { label: "Data", value: "data" },
@@ -84,6 +96,8 @@ const DevelopDetailView = () => {
     location?.state?.isCommonColumn,
   );
   const theme = useTheme();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedSourceFixFocusRef = useRef(false);
   const [experimentSearch, setExperimentSearch] = useState("");
   const [selectedRowsCount, setSelectedRowsCount] = useState(0);
   const [selectedRowIds, setSelectedRowIds] = useState([]);
@@ -119,6 +133,21 @@ const DevelopDetailView = () => {
     "tab",
     params.tab || TabOptions[0]?.value,
   );
+  const sourceFixOnboardingParams = useMemo(
+    () => getEvalSourceFixOnboardingParams(location.search),
+    [location.search],
+  );
+  const sourceFixOnboardingCopy = useMemo(
+    () =>
+      getEvalSourceFixOnboardingCopy({
+        sourceType: sourceFixOnboardingParams.sourceType,
+      }),
+    [sourceFixOnboardingParams.sourceType],
+  );
+  const showEvalSourceFixBanner =
+    sourceFixOnboardingParams.isOnboarding &&
+    sourceFixOnboardingParams.sourceType === "dataset" &&
+    sourceFixOnboardingParams.sourceId === dataset;
 
   const SkeletonHeader = () => {
     return <Skeleton width="60%" />;
@@ -283,6 +312,24 @@ const DevelopDetailView = () => {
     });
   }, [dataset]);
 
+  useEffect(() => {
+    if (!showEvalSourceFixBanner || recordedSourceFixFocusRef.current) return;
+
+    recordedSourceFixFocusRef.current = true;
+    recordActivationEvent?.(
+      buildEvalSourceFixRouteFocusPayload({
+        route: "develop_dataset",
+        runId: sourceFixOnboardingParams.runId,
+        sourceId: sourceFixOnboardingParams.sourceId,
+        sourceType: sourceFixOnboardingParams.sourceType,
+      }),
+    );
+  }, [
+    recordActivationEvent,
+    showEvalSourceFixBanner,
+    sourceFixOnboardingParams,
+  ]);
+
   const getRightSection = () => {
     if (isCompareDataset && currentTab === "data") {
       return (
@@ -378,6 +425,12 @@ const DevelopDetailView = () => {
           shouldHideDevelopBar={shouldHideDevelopBar}
           hideScenarioFeatures={hideScenarioFeatures}
         />
+
+        {showEvalSourceFixBanner && (
+          <Alert severity="info" sx={{ mx: 2, mt: 1, flexShrink: 0 }}>
+            {sourceFixOnboardingCopy.description}
+          </Alert>
+        )}
 
         {!shouldHideDevelopBar && (
           <DevelopBar

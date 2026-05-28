@@ -30,6 +30,12 @@ import {
 } from "./SessionsView/ReplaySessions/store";
 import { resetTraceGridStore } from "./LLMTracing/states";
 import { resetTabStore } from "./LLMTracing/tabStore";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildEvalSourceFixRouteFocusPayload,
+  getEvalSourceFixOnboardingCopy,
+  getEvalSourceFixOnboardingParams,
+} from "src/sections/evals/components/evalCreateOnboarding";
 
 // Loading component for tab content
 const TabContentLoader = () => (
@@ -76,6 +82,8 @@ const ObservePage = React.memo(() => {
   const { data: projectDetail } = useGetProjectDetails(observeId);
   const { data: savedViewsData } = useGetSavedViews(observeId);
   const queryClient = useQueryClient();
+  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedSourceFixFocusRef = useRef(false);
 
   // Tab store state for modals and context menu
   const {
@@ -96,6 +104,21 @@ const ObservePage = React.memo(() => {
 
   // Active tab for the new tab system
   const [activeTab, setActiveTab] = useUrlState("tab", "traces");
+  const sourceFixOnboardingParams = useMemo(
+    () => getEvalSourceFixOnboardingParams(location.search),
+    [location.search],
+  );
+  const sourceFixOnboardingCopy = useMemo(
+    () =>
+      getEvalSourceFixOnboardingCopy({
+        sourceType: sourceFixOnboardingParams.sourceType,
+      }),
+    [sourceFixOnboardingParams.sourceType],
+  );
+  const showEvalSourceFixBanner =
+    sourceFixOnboardingParams.isOnboarding &&
+    ["trace", "trace_project"].includes(sourceFixOnboardingParams.sourceType) &&
+    sourceFixOnboardingParams.sourceId === observeId;
 
   // Determine if current route uses the new tab system
   const currentRouteSegment = useMemo(() => {
@@ -368,6 +391,24 @@ const ObservePage = React.memo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [observeId]);
 
+  useEffect(() => {
+    if (!showEvalSourceFixBanner || recordedSourceFixFocusRef.current) return;
+
+    recordedSourceFixFocusRef.current = true;
+    recordActivationEvent?.(
+      buildEvalSourceFixRouteFocusPayload({
+        route: "observe_project",
+        runId: sourceFixOnboardingParams.runId,
+        sourceId: sourceFixOnboardingParams.sourceId,
+        sourceType: sourceFixOnboardingParams.sourceType,
+      }),
+    );
+  }, [
+    recordActivationEvent,
+    showEvalSourceFixBanner,
+    sourceFixOnboardingParams,
+  ]);
+
   if (!observeId) {
     return (
       <Box sx={{ p: 3, backgroundColor: "background.paper" }}>
@@ -417,6 +458,12 @@ const ObservePage = React.memo(() => {
         id="observe-filter-chips-slot"
         sx={{ px: 2, flexShrink: 0, bgcolor: "background.paper" }}
       />
+
+      {showEvalSourceFixBanner && (
+        <Alert severity="info" sx={{ mx: 2, mt: 1, mb: 0.5, flexShrink: 0 }}>
+          {sourceFixOnboardingCopy.description}
+        </Alert>
+      )}
 
       {/* Content Section */}
       <Box sx={contentStyles}>

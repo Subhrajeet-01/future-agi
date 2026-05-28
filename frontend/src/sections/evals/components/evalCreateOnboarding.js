@@ -1,6 +1,7 @@
 const DEFAULT_ARTIFACT_ID = "eval-onboarding";
 const EVAL_REVIEW_ARTIFACT_ID = "eval-review";
 const EVAL_FIX_ARTIFACT_ID = "eval-failure-action";
+const EVAL_SOURCE_FIX_ARTIFACT_ID = "eval-source-fix-route";
 const EVAL_FIX_STEP = "fix-eval-failure";
 const EVAL_REVIEW_STEP = "review";
 const EVAL_REVIEW_STAGE = "review_eval_failures";
@@ -81,6 +82,24 @@ const EVAL_REVIEW_COPY = {
     { label: "Run", complete: true },
     { label: "Review", complete: false },
   ],
+};
+
+const EVAL_SOURCE_FIX_COPY = {
+  dataset: {
+    description:
+      "Update this dataset, then rerun the eval to confirm the failure is fixed.",
+    title: "Fix eval source",
+  },
+  trace: {
+    description:
+      "Review the trace evidence and adjust the source workflow, then rerun the eval.",
+    title: "Fix eval source",
+  },
+  trace_project: {
+    description:
+      "Review the traces or project setup that produced this eval result, then rerun the eval.",
+    title: "Fix eval source",
+  },
 };
 
 const validSteps = new Set(Object.values(EVAL_CREATE_ONBOARDING_STEPS));
@@ -284,6 +303,27 @@ export const getEvalFailureActionOnboardingParams = (search = "") => {
 };
 
 export const getEvalReviewOnboardingCopy = () => EVAL_REVIEW_COPY;
+
+export const getEvalSourceFixOnboardingParams = (search = "") => {
+  const params = toSearchParams(search);
+  const step = params.get("step");
+
+  return {
+    isOnboarding:
+      params.get("source") === "onboarding" && step === EVAL_FIX_STEP,
+    runId: params.get("run_id"),
+    sourceId: params.get("source_id"),
+    sourceType: params.get("source_type"),
+    step,
+  };
+};
+
+export const getEvalSourceFixOnboardingCopy = ({ sourceType } = {}) =>
+  EVAL_SOURCE_FIX_COPY[sourceType] || {
+    description:
+      "Update the source that produced this eval result, then rerun the eval.",
+    title: "Fix eval source",
+  };
 
 export const buildEvalReviewStepHref = ({
   evalId,
@@ -550,6 +590,40 @@ export const buildEvalReviewRouteFocusPayload = ({
     idempotencyKey: [
       "onboarding_eval_route_focus_viewed",
       EVAL_REVIEW_STEP,
+      artifactId,
+    ].join(":"),
+    isSample: false,
+  };
+};
+
+export const buildEvalSourceFixRouteFocusPayload = ({
+  route,
+  runId,
+  sourceId,
+  sourceType,
+} = {}) => {
+  const artifactId = safeKeyPart(
+    sourceId || runId,
+    EVAL_SOURCE_FIX_ARTIFACT_ID,
+  );
+
+  return {
+    eventName: "onboarding_eval_source_fix_route_viewed",
+    primaryPath: "evals",
+    stage: "fix_eval_source",
+    source: "eval_review_onboarding",
+    artifactType: "eval_source_fix_route",
+    artifactId,
+    metadata: compactMetadata({
+      route,
+      run_id: runId,
+      source_id: sourceId,
+      source_type: sourceType,
+      step: EVAL_FIX_STEP,
+    }),
+    idempotencyKey: [
+      "onboarding_eval_source_fix_route_viewed",
+      safeKeyPart(sourceType, "source"),
       artifactId,
     ].join(":"),
     isSample: false,
