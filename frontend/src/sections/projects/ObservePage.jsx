@@ -46,6 +46,14 @@ import {
   getEvalSourceFixOnboardingCopy,
   getEvalSourceFixOnboardingParams,
 } from "src/sections/evals/components/evalCreateOnboarding";
+import ObserveOnboardingFocusPanel from "./ObserveOnboardingFocusPanel";
+import {
+  buildObserveEvaluatorCreateHref,
+  buildObserveRouteFocusPayload,
+  getObserveOnboardingCopy,
+  getObserveOnboardingParams,
+  OBSERVE_ONBOARDING_MODES,
+} from "./observeOnboardingRoute";
 
 // Loading component for tab content
 const TabContentLoader = () => (
@@ -93,6 +101,7 @@ const ObservePage = React.memo(() => {
   const { data: savedViewsData } = useGetSavedViews(observeId);
   const queryClient = useQueryClient();
   const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const recordedObserveFocusRef = useRef(null);
   const recordedSourceFixFocusRef = useRef(false);
 
   // Tab store state for modals and context menu
@@ -114,6 +123,16 @@ const ObservePage = React.memo(() => {
 
   // Active tab for the new tab system
   const [activeTab, setActiveTab] = useUrlState("tab", "traces");
+  const observeOnboardingParams = useMemo(
+    () => getObserveOnboardingParams(location.search),
+    [location.search],
+  );
+  const observeOnboardingCopy = useMemo(
+    () => getObserveOnboardingCopy(observeOnboardingParams.mode),
+    [observeOnboardingParams.mode],
+  );
+  const showObserveOnboardingFocus =
+    observeOnboardingParams.isOnboarding && Boolean(observeOnboardingCopy);
   const sourceFixOnboardingParams = useMemo(
     () => getEvalSourceFixOnboardingParams(location.search),
     [location.search],
@@ -402,6 +421,7 @@ const ObservePage = React.memo(() => {
     }),
     [],
   );
+  const refreshObserveData = headerConfig.refreshData;
 
   useEffect(() => {
     return () => {
@@ -413,6 +433,32 @@ const ObservePage = React.memo(() => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [observeId]);
+
+  useEffect(() => {
+    if (
+      !showObserveOnboardingFocus ||
+      !observeId ||
+      !observeOnboardingParams.mode
+    ) {
+      return;
+    }
+
+    const recordKey = `${observeId}:${observeOnboardingParams.mode}`;
+    if (recordedObserveFocusRef.current === recordKey) return;
+    recordedObserveFocusRef.current = recordKey;
+
+    recordActivationEvent?.(
+      buildObserveRouteFocusPayload({
+        observeId,
+        mode: observeOnboardingParams.mode,
+      }),
+    );
+  }, [
+    observeId,
+    observeOnboardingParams.mode,
+    recordActivationEvent,
+    showObserveOnboardingFocus,
+  ]);
 
   useEffect(() => {
     if (!showEvalSourceFixBanner || recordedSourceFixFocusRef.current) return;
@@ -452,6 +498,62 @@ const ObservePage = React.memo(() => {
     recordActivationEvent,
     sourceFixOnboardingParams,
     sourceFixRerunHref,
+  ]);
+
+  const handleObservePrimaryAction = useCallback(() => {
+    if (
+      observeOnboardingParams.mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR
+    ) {
+      navigate(buildObserveEvaluatorCreateHref({ observeId }));
+      return;
+    }
+
+    refreshObserveData?.();
+  }, [navigate, observeId, observeOnboardingParams.mode, refreshObserveData]);
+
+  const handleObserveSecondaryAction = useCallback(() => {
+    if (
+      observeOnboardingParams.mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR
+    ) {
+      refreshObserveData?.();
+      return;
+    }
+
+    navigate("/dashboard/observe?setup=true&source=onboarding");
+  }, [navigate, observeOnboardingParams.mode, refreshObserveData]);
+
+  const observePrimaryAction = useMemo(() => {
+    if (!observeOnboardingCopy) return null;
+    const isCreateEvaluator =
+      observeOnboardingParams.mode ===
+      OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR;
+    return {
+      label: observeOnboardingCopy.primaryLabel,
+      onClick: handleObservePrimaryAction,
+      disabled: !isCreateEvaluator && !refreshObserveData,
+    };
+  }, [
+    handleObservePrimaryAction,
+    observeOnboardingCopy,
+    observeOnboardingParams.mode,
+    refreshObserveData,
+  ]);
+
+  const observeSecondaryAction = useMemo(() => {
+    if (!observeOnboardingCopy) return null;
+    const isCreateEvaluator =
+      observeOnboardingParams.mode ===
+      OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR;
+    return {
+      label: observeOnboardingCopy.secondaryLabel,
+      onClick: handleObserveSecondaryAction,
+      disabled: isCreateEvaluator && !refreshObserveData,
+    };
+  }, [
+    handleObserveSecondaryAction,
+    observeOnboardingCopy,
+    observeOnboardingParams.mode,
+    refreshObserveData,
   ]);
 
   if (!observeId) {
@@ -503,6 +605,18 @@ const ObservePage = React.memo(() => {
         id="observe-filter-chips-slot"
         sx={{ px: 2, flexShrink: 0, bgcolor: "background.paper" }}
       />
+
+      {showObserveOnboardingFocus && observeOnboardingCopy && (
+        <ObserveOnboardingFocusPanel
+          currentStep={observeOnboardingCopy.currentStep}
+          description={observeOnboardingCopy.description}
+          primaryAction={observePrimaryAction}
+          secondaryAction={observeSecondaryAction}
+          steps={observeOnboardingCopy.steps}
+          sx={{ mx: 2, mt: 1, mb: 0.5 }}
+          title={observeOnboardingCopy.title}
+        />
+      )}
 
       {showEvalSourceFixBanner && (
         <Alert

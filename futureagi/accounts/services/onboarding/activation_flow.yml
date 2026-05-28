@@ -566,7 +566,7 @@ actions:
     kind: send_signal
     title: Send your first trace
     description: Send one production or test trace to unlock review.
-    route_key: observe_project
+    route_key: observe_send_first_trace
     cta_label: Send trace
     priority: 100
     estimated_minutes: 5
@@ -589,7 +589,7 @@ actions:
     kind: improve
     title: Create an evaluator
     description: Turn the reviewed trace into a repeatable quality check.
-    route_key: observe_project
+    route_key: observe_create_trace_evaluator
     cta_label: Create evaluator
     priority: 100
     estimated_minutes: 5
@@ -1679,6 +1679,7 @@ activation_events:
     - weekly_quality_review_completed
     - reactivation_reason_clicked
     - observe_project_created
+    - onboarding_observe_route_focus_viewed
     - trace_received
     - trace_reviewed
     - trace_detail_opened

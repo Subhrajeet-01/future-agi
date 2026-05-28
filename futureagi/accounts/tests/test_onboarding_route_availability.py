@@ -69,6 +69,44 @@ def test_trace_detail_route_uses_signal_ids():
     }
 
 
+def test_observe_focus_routes_use_signal_ids():
+    observe_id = uuid4()
+    routes = resolve_route_availability(
+        context=_context(),
+        flags={
+            "onboarding_observe_route_modes": True,
+            "onboarding_sample_project": False,
+            "onboarding_daily_quality_home": False,
+        },
+        signals=OnboardingSignals(
+            first_checks={},
+            first_observe_id=str(observe_id),
+        ),
+    )
+
+    assert routes["observe_project"] == {
+        "href": f"/dashboard/observe/{observe_id}/llm-tracing",
+        "is_available": True,
+        "reason": None,
+    }
+    assert routes["observe_send_first_trace"] == {
+        "href": (
+            f"/dashboard/observe/{observe_id}/llm-tracing?"
+            "source=onboarding&onboarding=send-first-trace"
+        ),
+        "is_available": True,
+        "reason": None,
+    }
+    assert routes["observe_create_trace_evaluator"] == {
+        "href": (
+            f"/dashboard/observe/{observe_id}/llm-tracing?"
+            "source=onboarding&onboarding=create-evaluator"
+        ),
+        "is_available": True,
+        "reason": None,
+    }
+
+
 def test_write_route_is_unavailable_for_read_only_user():
     routes = resolve_route_availability(
         context=_context(can_write=False),

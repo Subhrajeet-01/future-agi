@@ -52,6 +52,7 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     can_write = context.permissions["can_write"]
     first_observe_id = signals.first_observe_id
     first_trace_id = signals.first_trace_id
+    observe_route_modes_enabled = bool(flags.get("onboarding_observe_route_modes"))
     prompt_id = signals.latest_prompt_id or signals.first_prompt_id
     prompt_route_modes_enabled = bool(flags.get("onboarding_prompt_route_modes"))
     prompt_path_enabled = bool(flags.get("onboarding_prompt_path"))
@@ -373,6 +374,29 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
     )
     voice_monitor_href = _with_query(voice_monitor_base, voice_monitor_params)
 
+    observe_project_base = (
+        f"/dashboard/observe/{first_observe_id}/llm-tracing"
+        if first_observe_id
+        else "/dashboard/observe"
+    )
+    observe_project_available = bool(first_observe_id)
+    observe_send_trace_href = _with_query(
+        observe_project_base,
+        (
+            {"source": "onboarding", "onboarding": "send-first-trace"}
+            if observe_route_modes_enabled
+            else {}
+        ),
+    )
+    observe_create_evaluator_href = _with_query(
+        observe_project_base,
+        (
+            {"source": "onboarding", "onboarding": "create-evaluator"}
+            if observe_route_modes_enabled
+            else {}
+        ),
+    )
+
     routes = {
         "home": route_entry("/dashboard/home"),
         "get_started": route_entry("/dashboard/get-started"),
@@ -387,10 +411,18 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
             reason="missing_permission",
         ),
         "observe_project": route_entry(
-            f"/dashboard/observe/{first_observe_id}"
-            if first_observe_id
-            else "/dashboard/observe",
-            is_available=bool(first_observe_id),
+            observe_project_base,
+            is_available=observe_project_available,
+            reason="missing_id",
+        ),
+        "observe_send_first_trace": route_entry(
+            observe_send_trace_href,
+            is_available=observe_project_available,
+            reason="missing_id",
+        ),
+        "observe_create_trace_evaluator": route_entry(
+            observe_create_evaluator_href,
+            is_available=observe_project_available,
             reason="missing_id",
         ),
         "observe_trace_detail": route_entry(

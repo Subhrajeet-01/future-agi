@@ -8,6 +8,7 @@ ONBOARDING_FLAG_NAMES = (
     "onboarding_path_cards",
     "onboarding_sample_project",
     "onboarding_daily_quality_home",
+    "onboarding_observe_route_modes",
     "onboarding_prompt_path",
     "onboarding_prompt_route_modes",
     "onboarding_agent_path",

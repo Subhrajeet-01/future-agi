@@ -137,7 +137,11 @@ def test_activation_flow_config_drives_goal_and_stage_wiring():
 
 @pytest.mark.django_db
 def test_observe_project_without_trace_waits_for_trace(organization, workspace, user):
-    create_observe_project(organization=organization, workspace=workspace, user=user)
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
     signals = collect_onboarding_signals(
         user=user,
         organization=organization,
@@ -151,6 +155,41 @@ def test_observe_project_without_trace_waits_for_trace(organization, workspace, 
     )
 
     assert payload["stage"] == "waiting_for_first_trace"
+    assert payload["recommended_action"]["id"] == "send_first_trace"
+    assert payload["recommended_action"]["href"] == (
+        f"/dashboard/observe/{project.id}/llm-tracing"
+    )
+
+
+@pytest.mark.django_db
+def test_observe_project_waiting_trace_uses_route_focus_when_enabled(
+    organization,
+    workspace,
+    user,
+):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(onboarding_observe_route_modes=True),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "waiting_for_first_trace"
+    assert payload["recommended_action"]["id"] == "send_first_trace"
+    assert payload["recommended_action"]["href"] == (
+        f"/dashboard/observe/{project.id}/llm-tracing?"
+        "source=onboarding&onboarding=send-first-trace"
+    )
 
 
 @pytest.mark.django_db
@@ -231,6 +270,50 @@ def test_trace_review_without_improvement_returns_create_evaluator(
     )
 
     assert payload["stage"] == "create_trace_evaluator"
+    assert payload["recommended_action"]["id"] == "create_trace_evaluator"
+    assert payload["recommended_action"]["href"] == (
+        f"/dashboard/observe/{project.id}/llm-tracing"
+    )
+
+
+@pytest.mark.django_db
+def test_create_evaluator_uses_route_focus_when_enabled(
+    organization,
+    workspace,
+    user,
+):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    create_trace(project=project)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="trace_reviewed",
+        source="trace_detail",
+        product_path="observe",
+    )
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(onboarding_observe_route_modes=True),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "create_trace_evaluator"
+    assert payload["recommended_action"]["id"] == "create_trace_evaluator"
+    assert payload["recommended_action"]["href"] == (
+        f"/dashboard/observe/{project.id}/llm-tracing?"
+        "source=onboarding&onboarding=create-evaluator"
+    )
 
 
 @pytest.mark.django_db
