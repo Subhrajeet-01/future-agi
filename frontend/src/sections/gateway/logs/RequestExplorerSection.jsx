@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Stack,
@@ -23,6 +24,12 @@ import RequestTable from "./RequestTable";
 import RequestDetailDrawer from "./RequestDetailDrawer";
 import FilterPanel from "./FilterPanel";
 import SessionExplorer from "./SessionExplorer";
+import GatewayOnboardingFocusPanel from "../components/GatewayOnboardingFocusPanel";
+import {
+  GATEWAY_LOG_ONBOARDING_MODES,
+  getGatewayLogOnboardingCopy,
+  isGatewayLogOnboardingMode,
+} from "./gatewayLogOnboarding";
 
 // ---------------------------------------------------------------------------
 // Quick filter definitions
@@ -57,6 +64,7 @@ function activeQuickFilter(filters) {
 // ---------------------------------------------------------------------------
 
 const RequestExplorerSection = () => {
+  const navigate = useNavigate();
   // --- URL-synced filters ---------------------------------------------------
   const { filters, setFilter, setFilters, clearFilters, activeFilterCount } =
     useFilters();
@@ -90,19 +98,51 @@ const RequestExplorerSection = () => {
   const currentView = filters.view || "requests";
   const onboardingMode = filters.onboarding || null;
   const onboardingRequestId = filters.requestId || null;
+  const isLogOnboardingMode = isGatewayLogOnboardingMode(onboardingMode);
+  const onboardingCopy = getGatewayLogOnboardingCopy(onboardingMode);
+  const onboardingTargetRow = useMemo(
+    () =>
+      requestRows.find(
+        (item) =>
+          String(item.request_id || "") === String(onboardingRequestId) ||
+          String(item.id || "") === String(onboardingRequestId),
+      ),
+    [onboardingRequestId, requestRows],
+  );
+  const hasMatchingRequest = Boolean(onboardingTargetRow?.id || selectedLogId);
 
   useEffect(() => {
-    if (!["review-request", "fix-failure"].includes(onboardingMode)) return;
+    if (!isLogOnboardingMode) return;
     if (!onboardingRequestId || selectedLogId) return;
-    const row = requestRows.find(
-      (item) =>
-        String(item.request_id || "") === String(onboardingRequestId) ||
-        String(item.id || "") === String(onboardingRequestId),
-    );
-    if (row?.id) {
-      setSelectedLogId(row.id);
+    if (onboardingTargetRow?.id) {
+      setSelectedLogId(onboardingTargetRow.id);
     }
-  }, [onboardingMode, onboardingRequestId, requestRows, selectedLogId]);
+  }, [
+    isLogOnboardingMode,
+    onboardingRequestId,
+    onboardingTargetRow,
+    selectedLogId,
+  ]);
+
+  const handleOpenOnboardingRequest = useCallback(() => {
+    if (onboardingTargetRow?.id) {
+      setSelectedLogId(onboardingTargetRow.id);
+    }
+  }, [onboardingTargetRow]);
+
+  const handleOpenFallbacks = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set("source", "onboarding");
+    if (onboardingRequestId) {
+      params.set("request_id", onboardingRequestId);
+    }
+    navigate(`/dashboard/gateway/fallbacks?${params.toString()}`);
+  }, [navigate, onboardingRequestId]);
+
+  const handleShowAllLogs = useCallback(() => {
+    clearFilters();
+    setSelectedLogId(null);
+  }, [clearFilters]);
 
   const handleViewChange = useCallback(
     (_event, newValue) => {
@@ -247,6 +287,39 @@ const RequestExplorerSection = () => {
           </MenuItem>
         </Menu>
       </SectionHeader>
+
+      <GatewayOnboardingFocusPanel
+        currentStep={onboardingCopy.currentStep}
+        description={onboardingCopy.description}
+        hidden={!isLogOnboardingMode}
+        blocker={!onboardingRequestId ? "Missing request ID" : null}
+        primaryAction={{
+          label: onboardingCopy.primaryLabel,
+          onClick: handleOpenOnboardingRequest,
+          disabled: !onboardingTargetRow?.id,
+        }}
+        secondaryAction={{
+          label: onboardingCopy.secondaryLabel,
+          onClick:
+            onboardingMode === GATEWAY_LOG_ONBOARDING_MODES.FIX_FAILURE
+              ? handleOpenFallbacks
+              : handleShowAllLogs,
+        }}
+        steps={[
+          { label: "Request", complete: Boolean(onboardingRequestId) },
+          { label: "Log", complete: hasMatchingRequest },
+          {
+            label:
+              onboardingMode === GATEWAY_LOG_ONBOARDING_MODES.FIX_FAILURE
+                ? "Fix"
+                : "Review",
+            complete:
+              onboardingMode === GATEWAY_LOG_ONBOARDING_MODES.REVIEW_REQUEST &&
+              hasMatchingRequest,
+          },
+        ]}
+        title={onboardingCopy.title}
+      />
 
       {/* ---- Search + Filters button ---- */}
       <Stack direction="row" spacing={2} alignItems="center" mb={2}>

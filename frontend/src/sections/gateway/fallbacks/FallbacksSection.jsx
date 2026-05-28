@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -29,6 +29,7 @@ import { GATEWAY_ICONS } from "../constants/gatewayIcons";
 import { useFallbackConfig } from "./hooks/useFallbackConfig";
 import { useProviderHealth } from "../providers/hooks/useGatewayConfig";
 import { useGatewayContext } from "../context/useGatewayContext";
+import GatewayOnboardingFocusPanel from "../components/GatewayOnboardingFocusPanel";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -396,6 +397,7 @@ const ModelTimeoutsEditor = ({ timeouts, onChange, models }) => {
 
 const FallbacksSection = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { routing, isLoading, error, refetch, saveRouting, isSaving } =
     useFallbackConfig();
   const { gatewayId } = useGatewayContext();
@@ -414,6 +416,8 @@ const FallbacksSection = () => {
   }, [providerHealth]);
 
   const noModelsConfigured = availableModels.length === 0;
+  const onboardingRequestId = searchParams.get("request_id");
+  const showOnboardingFocus = searchParams.get("source") === "onboarding";
 
   // Local draft state — initialized from server data
   const [draft, setDraft] = useState(null);
@@ -494,6 +498,15 @@ const FallbacksSection = () => {
     setHasChanges(false);
   };
 
+  const openOnboardingRequestLog = () => {
+    const params = new URLSearchParams();
+    if (onboardingRequestId) {
+      params.set("request_id", onboardingRequestId);
+    }
+    params.set("onboarding", "review-request");
+    navigate(`/dashboard/gateway/logs?${params.toString()}`);
+  };
+
   // Convenience getters
   const failover = draft?.failover || {};
   const retry = draft?.retry || {};
@@ -546,6 +559,31 @@ const FallbacksSection = () => {
           title="Fallbacks & Reliability"
           subtitle="Configure model fallback chains and provider reliability settings"
           actions={[]}
+        />
+        <GatewayOnboardingFocusPanel
+          currentStep="Fix"
+          description="Add providers before configuring fallback recovery for this failed request."
+          hidden={!showOnboardingFocus}
+          blocker="Needs provider models"
+          primaryAction={{
+            label: "Configure providers",
+            onClick: () =>
+              navigate("/dashboard/gateway/providers?source=onboarding"),
+          }}
+          secondaryAction={
+            onboardingRequestId
+              ? {
+                  label: "Open request log",
+                  onClick: openOnboardingRequestLog,
+                }
+              : null
+          }
+          steps={[
+            { label: "Request", complete: Boolean(onboardingRequestId) },
+            { label: "Provider", complete: false },
+            { label: "Fallback", complete: false },
+          ]}
+          title="Configure gateway recovery"
         />
         <Card sx={{ mt: 3 }}>
           <CardContent>
@@ -605,6 +643,31 @@ const FallbacksSection = () => {
               ]
             : []),
         ]}
+      />
+
+      <GatewayOnboardingFocusPanel
+        currentStep="Fix"
+        description="Add or update a fallback chain so similar gateway failures can recover automatically."
+        hidden={!showOnboardingFocus}
+        primaryAction={{
+          label: "Add Fallback Chain",
+          onClick: handleAddChain,
+          disabled: availableModels.length === fallbackChains.length,
+        }}
+        secondaryAction={
+          onboardingRequestId
+            ? {
+                label: "Open request log",
+                onClick: openOnboardingRequestLog,
+              }
+            : null
+        }
+        steps={[
+          { label: "Request", complete: Boolean(onboardingRequestId) },
+          { label: "Provider", complete: availableModels.length > 0 },
+          { label: "Fallback", complete: fallbackChains.length > 0 },
+        ]}
+        title="Configure gateway recovery"
       />
 
       {hasChanges && (
