@@ -331,7 +331,7 @@ const EvalCreatePage = () => {
       eval_type: evalType,
       instructions:
         evalType === "code"
-          ? ""
+          ? undefined
           : evalType === "llm"
             ? instructions ||
               messages.find((m) => m.role === "system")?.content ||

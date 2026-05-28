@@ -27,7 +27,6 @@ const CODE_EVAL_CODE = [
   "def evaluate(output=None, expected=None, **kwargs):",
   "    return True",
 ].join("\n");
-const CODE_EVAL_INSTRUCTIONS = "Code eval list browser smoke fixture.";
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const READ_POST_PATHS = new Set([
   "/model-hub/eval-templates/list/",
@@ -63,7 +62,6 @@ async function main() {
   let page = null;
   let createdTemplateIds = [];
   let uiDeletedTemplateIds = [];
-  let publishFallbackUsed = false;
 
   await hardDeleteEvalFixturesByPrefix(EVAL_PREFIX, cleanupEvidence);
 
@@ -168,43 +166,20 @@ async function main() {
     await clickChipByLabel(page, TAG_LABEL);
     await dismissSnackbars(page);
 
-    try {
-      const [, publishResponse] = await waitForResponsesDuring(
-        page,
-        "publish browser-created eval",
-        [
-          (response) =>
-            isPublishUpdateResponse(response, {
-              templateId: draftId,
-              name: browserEval.name,
-            }),
-        ],
-        () => clickEnabledButtonByText(page, "Save Evaluation"),
-        { timeout: 5000 },
-      );
-      await responseJson(publishResponse);
-      await waitForPath(page, `/dashboard/evaluations/${draftId}`);
-    } catch {
-      publishFallbackUsed = true;
-      await publishEvalFromBrowserFetch(page, auth, {
-        id: draftId,
-        name: browserEval.name,
-        tags: browserEval.tags,
-      });
-      await waitForResponsesDuring(
-        page,
-        "load browser-published eval detail",
-        [
-          (response) =>
-            isEvalDetailResponse(response, draftId) && response.status() < 400,
-        ],
-        () =>
-          page.goto(`${APP_BASE}/dashboard/evaluations/${draftId}`, {
-            waitUntil: "domcontentloaded",
+    const [, publishResponse] = await waitForResponsesDuring(
+      page,
+      "publish browser-created eval",
+      [
+        (response) =>
+          isPublishUpdateResponse(response, {
+            templateId: draftId,
+            name: browserEval.name,
           }),
-      );
-      await waitForPath(page, `/dashboard/evaluations/${draftId}`);
-    }
+      ],
+      () => clickEnabledButtonByText(page, "Save Evaluation"),
+    );
+    await responseJson(publishResponse);
+    await waitForPath(page, `/dashboard/evaluations/${draftId}`);
 
     const created = [directEval, browserEval];
     await assertApiListReadback(auth.client, created, searchText);
@@ -364,7 +339,7 @@ async function main() {
             tags,
           })),
           deleted_template_ids: uiDeletedTemplateIds,
-          publish_fallback_used: publishFallbackUsed,
+          publish_fallback_used: false,
           db_audit: dbAudit,
           browser_mutations: browserMutations.map(sanitizeMutation),
           eval_api_request_count: evalApiRequests.length,
@@ -453,64 +428,6 @@ async function createCodeEval(client, { name, tags }) {
   );
   assert(isUuid(created?.id), "Code eval create did not return a UUID id.");
   return created;
-}
-
-async function publishEvalFromBrowserFetch(page, auth, { id, name, tags }) {
-  const result = await page.evaluate(
-    async ({
-      apiBase,
-      templateId,
-      tokens,
-      organizationId,
-      workspaceId,
-      payload,
-    }) => {
-      const response = await fetch(
-        `${apiBase.replace(/\/$/, "")}/model-hub/eval-templates/${templateId}/update/`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${tokens.access}`,
-            ...(organizationId ? { "X-Organization-Id": organizationId } : {}),
-            ...(workspaceId ? { "X-Workspace-Id": workspaceId } : {}),
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-      const body = await response.json().catch(() => null);
-      return { ok: response.ok, status: response.status, body };
-    },
-    {
-      apiBase: auth.apiBase,
-      templateId: id,
-      tokens: auth.tokens,
-      organizationId: auth.organizationId,
-      workspaceId: auth.workspaceId,
-      payload: {
-        name,
-        eval_type: "code",
-        instructions: CODE_EVAL_INSTRUCTIONS,
-        code: CODE_EVAL_CODE,
-        code_language: "python",
-        model: "turing_large",
-        output_type: "pass_fail",
-        pass_threshold: 0.5,
-        choice_scores: null,
-        multi_choice: false,
-        check_internet: false,
-        error_localizer_enabled: false,
-        template_format: "mustache",
-        description: null,
-        tags,
-        publish: true,
-      },
-    },
-  );
-  assert(
-    result.ok && result.body?.status !== false,
-    `Browser publish fallback failed: ${JSON.stringify(result)}`,
-  );
 }
 
 async function assertApiListReadback(client, created, searchText) {
@@ -958,9 +875,20 @@ async function clickVisibleText(
 }
 
 async function clickEnabledButtonByText(page, text, timeout = 30000) {
-  await waitForVisibleText(page, text, { exact: true, timeout });
+  await page.waitForFunction(
+    (expectedText) =>
+      window
+        .visibleElements("button")
+        .some(
+          (candidate) =>
+            window.normalizeText(candidate.textContent) === expectedText &&
+            !candidate.disabled,
+        ),
+    { timeout },
+    text,
+  );
   await dismissSnackbars(page);
-  const clicked = await page.evaluate(async (expectedText) => {
+  const clickBox = await page.evaluate((expectedText) => {
     const button = window
       .visibleElements("button")
       .find(
@@ -968,37 +896,17 @@ async function clickEnabledButtonByText(page, text, timeout = 30000) {
           window.normalizeText(candidate.textContent) === expectedText &&
           !candidate.disabled,
       );
-    if (!button) return false;
+    if (!button) return null;
     button.scrollIntoView({ block: "center", inline: "center" });
     button.focus();
-    let node = button;
-    let onClick = null;
-    while (node && node !== document.body && !onClick) {
-      for (const key of Object.keys(node)) {
-        if (!key.startsWith("__react")) continue;
-        const candidate = node[key]?.onClick;
-        if (typeof candidate === "function") {
-          onClick = candidate;
-          break;
-        }
-      }
-      node = node.parentElement;
-    }
-    if (typeof onClick === "function") {
-      await Promise.resolve(
-        onClick({
-          currentTarget: button,
-          target: button,
-          preventDefault() {},
-          stopPropagation() {},
-        }),
-      );
-      return true;
-    }
-    button.click();
-    return true;
+    const rect = button.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
   }, text);
-  assert(clicked, `Could not click enabled button: ${text}`);
+  assert(clickBox, `Could not click enabled button: ${text}`);
+  await page.mouse.click(clickBox.x, clickBox.y);
 }
 
 async function dismissSnackbars(page) {
@@ -1339,14 +1247,6 @@ function isCreateEvalResponse(response) {
   return (
     isEvalTemplatesApiUrl(response.url()) &&
     url.pathname === "/model-hub/eval-templates/create-v2/"
-  );
-}
-
-function isEvalDetailResponse(response, templateId) {
-  const url = new URL(response.url());
-  return (
-    isEvalTemplatesApiUrl(response.url()) &&
-    url.pathname === `/model-hub/eval-templates/${templateId}/detail/`
   );
 }
 
