@@ -17,6 +17,7 @@ import {
   EVAL_CREATE_ONBOARDING_STEPS,
   EVAL_CREATE_SOURCE_TABS,
   evalCreateOnboardingStage,
+  evalUsageLogMatchesRun,
   getEvalCreateInitialSourceTab,
   getEvalCreateOnboardingCopy,
   getEvalCreateOnboardingParams,
@@ -340,6 +341,30 @@ describe("evalCreateOnboarding", () => {
       }),
     ).toBe("task-1");
     expect(getEvalRunResultId({})).toBeNull();
+  });
+
+  it("matches review logs to run ids without reading result content", () => {
+    expect(
+      evalUsageLogMatchesRun(
+        {
+          id: "log-1",
+          output: "Do not inspect this field",
+          reason: "Do not inspect this field",
+        },
+        "log-1",
+      ),
+    ).toBe(true);
+    expect(
+      evalUsageLogMatchesRun(
+        {
+          detail: {
+            eval_task_id: "task-1",
+          },
+        },
+        "task-1",
+      ),
+    ).toBe(true);
+    expect(evalUsageLogMatchesRun({ id: "log-2" }, "log-1")).toBe(false);
   });
 
   it("builds a review route focus payload", () => {

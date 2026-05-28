@@ -195,6 +195,29 @@ export const getEvalRunResultId = (result = {}) =>
   result?.log_id ||
   null;
 
+export const evalUsageLogMatchesRun = (log = {}, runId) => {
+  if (!runId) return false;
+
+  const detail = log?.detail || {};
+  const candidates = [
+    log?.id,
+    log?.run_id,
+    log?.log_id,
+    log?.eval_log_id,
+    log?.eval_task_id,
+    log?.evaluation_id,
+    detail?.id,
+    detail?.run_id,
+    detail?.log_id,
+    detail?.eval_log_id,
+    detail?.eval_task_id,
+    detail?.evaluation_id,
+  ];
+  const target = String(runId);
+
+  return candidates.some((candidate) => String(candidate || "") === target);
+};
+
 export const getEvalReviewOnboardingParams = (search = "") => {
   const params = toSearchParams(search);
   const step = params.get("step");

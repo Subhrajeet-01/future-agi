@@ -12,7 +12,13 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import PropTypes from "prop-types";
-import React, { useCallback, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Editor from "@monaco-editor/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
@@ -34,6 +40,7 @@ import UsageChart from "./UsageChart";
 import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
 import {
   buildEvalFailureActionCreatedPayload,
+  evalUsageLogMatchesRun,
   getEvalFailureActionOnboardingParams,
 } from "./evalCreateOnboarding";
 
@@ -401,6 +408,7 @@ const EvalUsageTab = ({
   const [pageSize, setPageSize] = useState(25);
   const [searchQuery, setSearchQuery] = useState("");
   const [detailIndex, setDetailIndex] = useState(null); // index in filteredLogs
+  const autoOpenedReviewRunRef = useRef(null);
   const debouncedSearch = useDebounce(searchQuery.trim(), 400);
 
   const period = DATE_OPTION_TO_PERIOD[dateOption] || "30d";
@@ -447,6 +455,29 @@ const EvalUsageTab = ({
   );
 
   const detailRow = detailIndex !== null ? filteredLogs[detailIndex] : null;
+
+  useEffect(() => {
+    const runId = failureActionOnboardingParams.runId;
+    if (
+      !failureActionOnboardingParams.isOnboarding ||
+      !runId ||
+      autoOpenedReviewRunRef.current === runId
+    ) {
+      return;
+    }
+
+    const reviewLogIndex = filteredLogs.findIndex((log) =>
+      evalUsageLogMatchesRun(log, runId),
+    );
+    if (reviewLogIndex < 0) return;
+
+    autoOpenedReviewRunRef.current = runId;
+    setDetailIndex(reviewLogIndex);
+  }, [
+    failureActionOnboardingParams.isOnboarding,
+    failureActionOnboardingParams.runId,
+    filteredLogs,
+  ]);
 
   const handleFeedbackSubmitted = useCallback(() => {
     queryClient.invalidateQueries({
