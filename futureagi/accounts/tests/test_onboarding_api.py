@@ -67,6 +67,41 @@ def test_activation_state_flag_on_returns_full_shape(auth_client, user):
 
 
 @pytest.mark.django_db
+@override_settings(
+    ONBOARDING_FEATURE_FLAGS={
+        "onboarding_activation_state_api": True,
+        "onboarding_goal_picker": True,
+        "onboarding_path_cards": True,
+    }
+)
+def test_activation_state_defaults_no_goal_users_to_observe_aha(
+    auth_client,
+    workspace,
+    user,
+):
+    user.goals = []
+    user.config = {}
+    user.role = "developer"
+    user.save(update_fields=["goals", "config", "role"])
+
+    response = auth_client.get("/accounts/activation-state/?source=setup_org")
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()["result"]
+    assert payload["goal"] == "monitor_production_ai_app"
+    assert payload["primary_path"] == "observe"
+    assert payload["stage"] == "connect_observability"
+    assert payload["recommended_action"]["id"] == "create_observe_project"
+    assert payload["recommended_action"]["href"] == (
+        "/dashboard/observe?setup=true&source=onboarding"
+    )
+    assert not OnboardingGoal.no_workspace_objects.filter(
+        workspace=workspace,
+        is_active=True,
+    ).exists()
+
+
+@pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
 def test_activation_state_unknown_query_param_does_not_crash(auth_client, user):
     user.goals = ["monitor_production_ai_app"]

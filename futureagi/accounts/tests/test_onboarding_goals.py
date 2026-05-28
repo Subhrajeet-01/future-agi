@@ -226,6 +226,45 @@ def test_legacy_setup_goals_can_skip_second_goal_picker(
 
 
 @pytest.mark.django_db
+def test_no_explicit_goal_uses_configured_default_first_run_goal(
+    organization,
+    workspace,
+    user,
+):
+    user.goals = []
+    user.config = {}
+    user.save(update_fields=["goals", "config"])
+
+    goal_context = resolve_goal_for_context(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    assert goal_context["goal"] == "monitor_production_ai_app"
+    assert goal_context["primary_path"] == "observe"
+    assert goal_context["goal_id"] is None
+    assert goal_context["source"] == "default_first_run_goal"
+
+
+@pytest.mark.django_db
+def test_default_first_run_goal_waits_for_workspace_context(organization, user):
+    user.goals = []
+    user.config = {}
+    user.save(update_fields=["goals", "config"])
+
+    goal_context = resolve_goal_for_context(
+        user=user,
+        organization=organization,
+        workspace=None,
+    )
+
+    assert goal_context["goal"] is None
+    assert goal_context["primary_path"] is None
+    assert goal_context["source"] == "none"
+
+
+@pytest.mark.django_db
 def test_stale_known_goal_rejected(organization, workspace, user):
     save_onboarding_goal(
         user=user,

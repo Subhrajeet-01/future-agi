@@ -89,6 +89,9 @@ def _merge_stage_defaults(config: dict) -> None:
 def _validate_goals(config: dict) -> None:
     goals = _mapping(config.get("goals"), "goals")
     paths = _mapping(config.get("paths"), "paths")
+    default_goal_id = _optional_text(config, "default_goal_id", "activation_flow")
+    if default_goal_id and default_goal_id not in goals:
+        raise _config_error("default_goal_id references unknown goal.")
 
     for goal_id, goal_config in goals.items():
         path = f"goals.{goal_id}"
@@ -255,6 +258,10 @@ def configured_goal_ids() -> tuple[str, ...]:
 
 def configured_goal_aliases() -> dict[str, str]:
     return dict(get_activation_flow_config().get("goal_aliases", {}))
+
+
+def configured_default_goal_id() -> str | None:
+    return get_activation_flow_config().get("default_goal_id")
 
 
 def configured_goal_primary_paths() -> dict[str, str]:

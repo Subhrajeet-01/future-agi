@@ -5,6 +5,7 @@ from accounts.services.onboarding.activation_events import record_event
 from accounts.services.onboarding.activation_state import resolve_activation_state
 from accounts.services.onboarding.context import OnboardingContext
 from accounts.services.onboarding.flow_config import (
+    configured_default_goal_id,
     configured_goal_primary_paths,
     configured_stage,
 )
@@ -137,6 +138,7 @@ def test_observe_path_no_setup_returns_connect_observability(
 
 
 def test_activation_flow_config_drives_goal_and_stage_wiring():
+    assert configured_default_goal_id() == "monitor_production_ai_app"
     assert configured_goal_primary_paths()["monitor_production_ai_app"] == "observe"
     assert configured_stage("connect_observability")["recommended_action"] == (
         "create_observe_project"

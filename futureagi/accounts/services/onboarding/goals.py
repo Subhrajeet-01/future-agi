@@ -19,10 +19,14 @@ from accounts.services.onboarding.constants import (
     canonical_goal,
     canonical_path,
 )
-from accounts.services.onboarding.flow_config import configured_goal_primary_paths
+from accounts.services.onboarding.flow_config import (
+    configured_default_goal_id,
+    configured_goal_primary_paths,
+)
 from tfc.constants.roles import RolePermissions
 
 GOAL_PRIMARY_PATHS = configured_goal_primary_paths()
+DEFAULT_GOAL_ID = configured_default_goal_id()
 
 
 @dataclass(frozen=True)
@@ -84,7 +88,7 @@ def get_active_goal(*, organization, workspace):
     )
 
 
-def _legacy_goal_for_user(user):
+def _legacy_goal_for_user(user, *, use_default=True):
     config = getattr(user, "config", None) or {}
     onboarding_config = config.get("onboarding", {}) or {}
     candidates = []
@@ -112,6 +116,13 @@ def _legacy_goal_for_user(user):
             "goal_id": None,
             "source": "legacy_user_goals",
         }
+    if use_default and DEFAULT_GOAL_ID:
+        return {
+            "goal": DEFAULT_GOAL_ID,
+            "primary_path": GOAL_PRIMARY_PATHS[DEFAULT_GOAL_ID],
+            "goal_id": None,
+            "source": "default_first_run_goal",
+        }
     return {
         "goal": None,
         "primary_path": None,
@@ -129,7 +140,7 @@ def resolve_goal_for_context(*, user, organization, workspace):
             "goal_id": str(active_goal.id),
             "source": "active_workspace_goal",
         }
-    return _legacy_goal_for_user(user)
+    return _legacy_goal_for_user(user, use_default=bool(organization and workspace))
 
 
 def _validate_workspace_scope(*, organization, workspace):

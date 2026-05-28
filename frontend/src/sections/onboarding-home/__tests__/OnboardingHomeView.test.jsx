@@ -134,7 +134,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
   });
 
-  it("renders the recommended first action from activation state", () => {
+  it("renders the default Observe first action for first-run users", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("newWorkspaceNoGoal"),
       isLoading: false,
@@ -145,9 +145,11 @@ describe("OnboardingHomeView", () => {
 
     renderView("/dashboard/home?source=email&campaign_key=welcome");
 
-    expect(screen.getByText("Choose what to set up first")).toBeVisible();
-    expect(screen.getByTestId("onboarding-goal-picker")).toBeVisible();
-    expect(screen.getAllByText("Monitor a production AI app").length).toBe(2);
+    expect(screen.getByTestId("observe-setup-panel")).toBeVisible();
+    expect(
+      screen.queryByTestId("onboarding-goal-picker"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Connect one observe project")).toBeVisible();
     expect(screen.getByText("Workspace: Quality Workspace")).toBeVisible();
     expect(mocks.useActivationState).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -603,7 +605,7 @@ describe("OnboardingHomeView", () => {
       mutateAsync,
     });
     mocks.useActivationState.mockReturnValue({
-      state: normalizedFixture("newWorkspaceNoGoal"),
+      state: normalizedFixture("goalPickerFallback"),
       isLoading: false,
       isError: false,
       error: null,

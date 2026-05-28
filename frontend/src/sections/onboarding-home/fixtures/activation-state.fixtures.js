@@ -1066,7 +1066,9 @@ const gatewayFixture = (overrides = {}) =>
   });
 
 export const activationStateFixtures = {
-  newWorkspaceNoGoal: baseState({
+  newWorkspaceNoGoal: baseState(),
+
+  goalPickerFallback: baseState({
     goal: null,
     primary_path: null,
     stage: "choose_goal",

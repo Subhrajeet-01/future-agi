@@ -234,7 +234,7 @@ describe("activation-state utilities", () => {
 
   it("preserves configured stage copy and goal options", () => {
     const normalized = normalizeActivationState({
-      ...getActivationStateFixture("newWorkspaceNoGoal"),
+      ...getActivationStateFixture("goalPickerFallback"),
       stage_copy: {
         eyebrow: "Configured",
         title: "Configured title",
