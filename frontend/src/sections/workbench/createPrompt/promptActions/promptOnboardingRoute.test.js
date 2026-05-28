@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildPromptComparisonCompletedPayload,
   buildPromptCreatedHref,
   buildPromptEditorHref,
   getPromptOnboardingRouteParams,
   PROMPT_ONBOARDING_MODES,
+  shouldAdvancePromptCompareOnboarding,
   shouldAdvancePromptRunOnboarding,
   shouldAdvancePromptSaveOnboarding,
 } from "./promptOnboardingRoute";
@@ -119,5 +121,44 @@ describe("promptOnboardingRoute", () => {
         source: "workspace",
       }),
     ).toBe(false);
+  });
+
+  it("advances compare onboarding only after multiple versions are selected", () => {
+    expect(
+      shouldAdvancePromptCompareOnboarding({
+        mode: PROMPT_ONBOARDING_MODES.COMPARE,
+        selectedVersionCount: 2,
+        source: "onboarding",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldAdvancePromptCompareOnboarding({
+        mode: PROMPT_ONBOARDING_MODES.COMPARE,
+        selectedVersionCount: 1,
+        source: "onboarding",
+      }),
+    ).toBe(false);
+  });
+
+  it("builds a safe prompt comparison completion payload", () => {
+    expect(
+      buildPromptComparisonCompletedPayload({
+        promptId: "prompt-1",
+        versions: ["v1", "v2"],
+      }),
+    ).toEqual({
+      eventName: "prompt_comparison_completed",
+      primaryPath: "prompt",
+      stage: "compare_prompt_versions",
+      source: "prompt_template",
+      metadata: {
+        step: PROMPT_ONBOARDING_MODES.COMPARE,
+        template_id: "prompt-1",
+        version_count: 2,
+      },
+      idempotencyKey:
+        "prompt_onboarding:prompt_comparison_completed:prompt-1:v1-v2",
+    });
   });
 });

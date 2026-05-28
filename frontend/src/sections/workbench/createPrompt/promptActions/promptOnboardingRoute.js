@@ -16,6 +16,11 @@ const toSearchParams = (search = "") =>
     ? new URLSearchParams(search)
     : new URLSearchParams(search);
 
+const safeKeyPart = (value, fallback) =>
+  String(value || fallback)
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .slice(0, 56);
+
 export const getPromptOnboardingRouteParams = (search = "") => {
   const params = toSearchParams(search);
   const mode = params.get("onboarding");
@@ -72,3 +77,42 @@ export const shouldAdvancePromptRunOnboarding = ({
 
 export const shouldAdvancePromptSaveOnboarding = ({ mode, source } = {}) =>
   source === "onboarding" && mode === PROMPT_ONBOARDING_MODES.SAVE_VERSION;
+
+export const shouldAdvancePromptCompareOnboarding = ({
+  mode,
+  selectedVersionCount,
+  source,
+} = {}) =>
+  source === "onboarding" &&
+  mode === PROMPT_ONBOARDING_MODES.COMPARE &&
+  selectedVersionCount > 1;
+
+export const buildPromptComparisonCompletedPayload = ({
+  promptId,
+  versions = [],
+} = {}) => {
+  const safePromptId = safeKeyPart(promptId, "prompt");
+  const safeVersions = versions.map((version, index) =>
+    safeKeyPart(version, `version-${index + 1}`),
+  );
+
+  return {
+    eventName: "prompt_comparison_completed",
+    primaryPath: "prompt",
+    stage: "compare_prompt_versions",
+    source: "prompt_template",
+    metadata: {
+      step: PROMPT_ONBOARDING_MODES.COMPARE,
+      template_id: promptId,
+      version_count: versions.length,
+    },
+    idempotencyKey: [
+      "prompt_onboarding",
+      "prompt_comparison_completed",
+      safePromptId,
+      safeVersions.join("-"),
+    ]
+      .filter(Boolean)
+      .join(":"),
+  };
+};
