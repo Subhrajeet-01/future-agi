@@ -33,15 +33,41 @@
 
 -- (A) trace_name MATERIALIZED column on spans
 --
--- The attribute key is the OTel-GenAI convention for trace naming;
--- fi-collector populates it from `resource.fi.trace.name` (when present)
--- or from the root span's `name` field via the trace-naming enrichment
--- processor (planned, falls back to '' until then). Customers using
--- pure OTel without our enrichment will see empty trace_name — same
--- semantic as the legacy path when trace_dict had no entry.
+-- Source of truth: a trace's name is its root span's `name` (the legacy
+-- ingest promotes exactly this — see langfuse_upsert.py
+-- `trace.name = promoted_root_name`). We therefore derive trace_name from
+-- the span's own `name`, while still honoring an explicit producer-set
+-- `fi.trace.name` attribute if one is ever present (none is today, but
+-- the OTel-GenAI convention reserves the key).
+--
+-- IMPORTANT — why `if(... != '', ..., name)` and NOT `coalesce(...)`:
+-- a ClickHouse `Map(K, String)` subscript on a MISSING key returns the
+-- value type's default (empty string), NOT NULL. `coalesce` only skips
+-- NULLs, so `coalesce(attrs_string['fi.trace.name'], name)` would return
+-- '' verbatim and never fall through to `name`. The previous definition
+-- (`coalesce(attrs_string['fi.trace.name'], '')`) was dead for the same
+-- reason — it always yielded '' because the key is never set. An explicit
+-- emptiness guard is required.
+--
+-- MATERIALIZED (not ALIAS): both `attrs_string` and `name` are present on
+-- the row at INSERT, so the value is computed once at write time and the
+-- bloom index below can prune on it. All active readers query trace_name
+-- on root spans (parent_span_id = ''), where `name` IS the trace name.
 ALTER TABLE spans
     ADD COLUMN IF NOT EXISTS trace_name String
-        MATERIALIZED coalesce(attrs_string['fi.trace.name'], '');
+        MATERIALIZED if(attrs_string['fi.trace.name'] != '', attrs_string['fi.trace.name'], name);
+
+-- MODIFY after ADD so environments that already applied the old (dead,
+-- coalesce-based) definition converge to the corrected expression —
+-- `ADD COLUMN IF NOT EXISTS` is a no-op on an existing column and would
+-- otherwise leave the broken definition in place. MODIFY of a
+-- MATERIALIZED expression is metadata-only (no data rewrite); it applies
+-- to future inserts. Pre-launch there are no rows to backfill; if this
+-- ever ships with data present, follow with
+-- `ALTER TABLE spans MATERIALIZE COLUMN trace_name` out-of-band.
+ALTER TABLE spans
+    MODIFY COLUMN trace_name String
+        MATERIALIZED if(attrs_string['fi.trace.name'] != '', attrs_string['fi.trace.name'], name);
 
 -- Skip-index on trace_name so the search-by-trace-name path can prune.
 ALTER TABLE spans

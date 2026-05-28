@@ -148,6 +148,32 @@ CREATE TABLE IF NOT EXISTS spans
     INDEX idx_attrs_str_keys      mapKeys(attrs_string)    TYPE bloom_filter(0.01)  GRANULARITY 1,
     INDEX idx_attrs_num_keys      mapKeys(attrs_number)    TYPE bloom_filter(0.01)  GRANULARITY 1,
     INDEX idx_attrs_bool_keys     mapKeys(attrs_bool)      TYPE bloom_filter(0.01)  GRANULARITY 1,
+    -- Min/max skip indexes on numeric columns for range-filter pruning
+    -- (dashboard filters by latency / cost / token counts; soft-delete +
+    -- version predicates prune on is_deleted / _version).
+    --
+    -- These are declared EXPLICITLY rather than via the table setting
+    -- `add_minmax_index_for_numeric_columns = 1`. That setting auto-creates
+    -- a minmax index for EVERY numeric column — including the
+    -- `_peerdb_is_deleted UInt8 ALIAS` added in 014. A minmax index on a
+    -- non-stored ALIAS column is invalid: CH bakes it into the table's
+    -- persisted metadata, then on the next table load (ATTACH, e.g. every
+    -- CH restart) the setting tries to recreate it and ATTACH fails with
+    -- `Code: 49 ... auto_minmax_index__peerdb_is_deleted already exists`,
+    -- wedging the whole table (every read → Code 722, even DROP fails).
+    -- Listing the real numeric columns by hand makes that impossible: no
+    -- setting, so no auto-index is ever derived for the alias (or any
+    -- future ALIAS column). Keep this list in sync if numeric columns are
+    -- added.
+    INDEX auto_minmax_index_latency_ms        latency_ms        TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_prompt_tokens     prompt_tokens     TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_completion_tokens completion_tokens TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_total_tokens      total_tokens      TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_cost              cost              TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_input_length      input_length      TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_output_length     output_length     TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index_is_deleted        is_deleted        TYPE minmax() GRANULARITY 1,
+    INDEX auto_minmax_index__version          _version          TYPE minmax() GRANULARITY 1,
 
     -- ─── Dashboard projection (replaces span_metrics_hourly_mv) ────────────
     -- The CH query optimizer routes any GROUP BY-on-these-dims aggregation
@@ -205,7 +231,10 @@ SETTINGS
     index_granularity_bytes                  = 67108864,    -- 64 MiB
     merge_max_block_size_bytes               = 67108864,    -- 64 MiB
     ttl_only_drop_parts                      = 1,
-    add_minmax_index_for_numeric_columns     = 1,
+    -- NOTE: `add_minmax_index_for_numeric_columns` is deliberately NOT set.
+    -- It auto-indexes every numeric column including the `_peerdb_is_deleted`
+    -- ALIAS (014), which wedges the table on load. The numeric minmax
+    -- indexes are declared explicitly in the INDEX block above instead.
     deduplicate_merge_projection_mode        = 'rebuild',   -- safer with projections + dedup
     allow_nullable_key                       = 1            -- nullable ORDER BY tiebreaker bits if needed later;
 ;
