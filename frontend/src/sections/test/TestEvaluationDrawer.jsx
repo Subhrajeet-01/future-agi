@@ -25,6 +25,7 @@ import {
   getVoiceOnboardingParams,
   VOICE_ONBOARDING_MODES,
 } from "./onboardingVoiceRouteEvents";
+import { isEvalOnboardingMode } from "./testOnboardingModes";
 
 const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
   const { openTestEvaluation, setOpenTestEvaluation } =
@@ -34,8 +35,10 @@ const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
   const queryClient = useQueryClient();
   const { mutate: recordActivationEvent } = useRecordActivationEvent();
   const voiceParams = getVoiceOnboardingParams(location.search);
+  const routeMode = new URLSearchParams(location.search).get("onboarding");
   const isSuccessCriteriaMode =
     voiceParams.mode === VOICE_ONBOARDING_MODES.SUCCESS_CRITERIA;
+  const evalOnboardingMode = isEvalOnboardingMode(routeMode) ? routeMode : null;
 
   const runTestDetail = queryClient.getQueryData(["test-runs-detail", testId]);
   const runTestData = runTestDetail?.data;
@@ -191,6 +194,7 @@ const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
         <TestEvaluationPage
           onClose={onCloseHandler}
           executionIds={executionIds}
+          onboardingMode={evalOnboardingMode}
           onSuccessOfAdditionOfEvals={onSuccessOfAdditionOfEvals}
           onAddEvaluation={() => {
             setEditingEvalItem(null);

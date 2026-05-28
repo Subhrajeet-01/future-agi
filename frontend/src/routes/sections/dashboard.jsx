@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from "react";
+import PropTypes from "prop-types";
 import { Suspense } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 
@@ -505,6 +506,15 @@ const DashboardRoutes = () => {
       </DashboardLayout>
     </AuthGuard>
   );
+};
+
+const NavigatePreserveSearch = ({ to }) => {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search || ""}`} replace />;
+};
+
+NavigatePreserveSearch.propTypes = {
+  to: PropTypes.string.isRequired,
 };
 
 export const dashboardRoutes = (
@@ -1399,7 +1409,7 @@ export const dashboardRoutes = (
           children: [
             {
               index: true,
-              element: <Navigate to="runs" replace />,
+              element: <NavigatePreserveSearch to="runs" />,
             },
             {
               path: "runs",

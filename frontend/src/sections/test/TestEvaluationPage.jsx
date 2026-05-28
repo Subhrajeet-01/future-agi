@@ -24,10 +24,7 @@ import { useAuthContext } from "src/auth/hooks";
 import ConfirmRunEvaluations from "../common/EvaluationDrawer/ConfirmRunEvaluations";
 import logger from "src/utils/logger";
 import { useTestDetailContext } from "./context/TestDetailContext";
-import {
-  useTestEvaluationStoreShallow,
-  useTestRunsGridStoreShallow,
-} from "./states";
+import { useTestRunsGridStoreShallow } from "./states";
 import CustomTooltip from "src/components/tooltip";
 import { useTestRunsSelectedCount } from "./common";
 import UpdateKeysDialog from "../agents/AgentConfiguration/UpdateKeysDialog";
@@ -36,10 +33,13 @@ import { useSelectedAgentDefinitionStore } from "./TestRuns/states";
 import { ComponentApiMapping } from "./TestRuns/common";
 import { AGENT_TYPES } from "../agents/constants";
 import useTestRunDetails from "src/hooks/useTestRunDetails";
+import TestOnboardingFocusPanel from "./TestOnboardingFocusPanel";
+import { TEST_ONBOARDING_MODES } from "./testOnboardingModes";
 
 const TestEvaluationPage = ({
   onClose,
   executionIds = null,
+  onboardingMode = null,
   onSuccessOfAdditionOfEvals = null,
   onAddEvaluation = null,
   onEditEvaluation = null,
@@ -51,9 +51,6 @@ const TestEvaluationPage = ({
   const { setSelectedAgentDefinitionVersion } =
     useSelectedAgentDefinitionStore();
 
-  const setOpenTestEvaluation = useTestEvaluationStoreShallow(
-    (s) => s.setOpenTestEvaluation,
-  );
   const { toggledNodes, selectAll, setToggledNodes, setSelectAll } =
     useTestRunsGridStoreShallow((s) => ({
       toggledNodes: s.toggledNodes,
@@ -75,6 +72,8 @@ const TestEvaluationPage = ({
     testData?.agentDefinitionDetail?.agentType ??
     AGENT_TYPES.CHAT;
   const queryClient = useQueryClient();
+  const canEditEvals =
+    RolePermission.EVALS[PERMISSIONS.EDIT_CREATE_DELETE_EVALS][role];
 
   const { mutate: updateTestRuns } = useUpdateTestRuns(testId, {
     onMutate: async (data) => {
@@ -175,6 +174,25 @@ const TestEvaluationPage = ({
   };
 
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const isEvalRouteMode =
+    onboardingMode === TEST_ONBOARDING_MODES.CREATE_EVAL ||
+    onboardingMode === TEST_ONBOARDING_MODES.SAVE_EVAL;
+  const hasEvals = (evals?.length ?? 0) > 0;
+  const hasSelectedRuns = executionIds
+    ? executionIds?.length > 0
+    : selectedCount > 0;
+  const evalRouteCopy =
+    onboardingMode === TEST_ONBOARDING_MODES.CREATE_EVAL
+      ? {
+          title: "Create eval coverage",
+          description:
+            "Choose or create one evaluation and map it to this test so future runs produce a quality signal.",
+        }
+      : {
+          title: "Save the first evaluation",
+          description:
+            "Add one evaluation to this test, then run it against selected rows to confirm the signal works.",
+        };
 
   const handleAddEvaluationClick = () => {
     if (testId) {
@@ -248,6 +266,33 @@ const TestEvaluationPage = ({
       </ShowComponent>
       <Box sx={{ mb: 2 }} />
 
+      <TestOnboardingFocusPanel
+        currentStep="Evaluation"
+        description={evalRouteCopy.description}
+        hidden={!isEvalRouteMode}
+        blocker={hasEvals && !hasSelectedRuns ? "Select a run first" : null}
+        primaryAction={{
+          label: hasEvals ? "Add another evaluation" : "Add Evaluation",
+          onClick: handleAddEvaluationClick,
+          disabled: !canEditEvals,
+        }}
+        secondaryAction={
+          hasEvals
+            ? {
+                label: "Run Evaluation",
+                onClick: () => setOpenConfirmRunEvaluations(true),
+                disabled: !canEditEvals || !hasSelectedRuns,
+              }
+            : null
+        }
+        steps={[
+          { label: "Test", complete: Boolean(testId) },
+          { label: "Evaluation", complete: hasEvals },
+          { label: "Run", complete: hasEvals && hasSelectedRuns },
+        ]}
+        title={evalRouteCopy.title}
+      />
+
       {/* ── List ── */}
       <Box
         sx={{
@@ -285,11 +330,7 @@ const TestEvaluationPage = ({
               variant="contained"
               startIcon={<Iconify icon="mdi:plus" width={16} />}
               onClick={handleAddEvaluationClick}
-              disabled={
-                !RolePermission.EVALS[PERMISSIONS.EDIT_CREATE_DELETE_EVALS][
-                  role
-                ]
-              }
+              disabled={!canEditEvals}
               sx={{
                 textTransform: "none",
                 fontSize: "12px",
@@ -386,10 +427,7 @@ const TestEvaluationPage = ({
                 disabled={
                   (executionIds
                     ? executionIds?.length === 0
-                    : selectedCount === 0) ||
-                  !RolePermission.EVALS[PERMISSIONS.EDIT_CREATE_DELETE_EVALS][
-                    role
-                  ]
+                    : selectedCount === 0) || !canEditEvals
                 }
                 startIcon={
                   <Iconify icon="mdi:play-circle-outline" width={16} />
@@ -475,6 +513,7 @@ const TestEvaluationPage = ({
 TestEvaluationPage.propTypes = {
   onClose: PropTypes.func.isRequired,
   executionIds: PropTypes.arrayOf(PropTypes.string),
+  onboardingMode: PropTypes.string,
   onSuccessOfAdditionOfEvals: PropTypes.func,
   onAddEvaluation: PropTypes.func,
   onEditEvaluation: PropTypes.func,
@@ -482,6 +521,7 @@ TestEvaluationPage.propTypes = {
 
 TestEvaluationPage.defaultProps = {
   executionIds: null,
+  onboardingMode: null,
   onSuccessOfAdditionOfEvals: null,
   onAddEvaluation: null,
   onEditEvaluation: null,
