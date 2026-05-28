@@ -5,7 +5,9 @@ import { METRIC_TAB_IDS } from "./constants";
 
 const PromptMetricsOnboardingFocusPanel = ({
   activeTab,
+  isCompletingLoop,
   isOnboarding,
+  onCompleteLoop,
   onOpenFilters,
   onOpenLinkedTraces,
 }) => {
@@ -56,11 +58,18 @@ const PromptMetricsOnboardingFocusPanel = ({
             Filter weak versions
           </Button>
           <Button
-            variant="contained"
+            variant="outlined"
             disabled={activeTab === METRIC_TAB_IDS.LINKED_TRACES}
             onClick={onOpenLinkedTraces}
           >
             Linked Traces
+          </Button>
+          <Button
+            variant="contained"
+            disabled={isCompletingLoop}
+            onClick={onCompleteLoop}
+          >
+            {isCompletingLoop ? "Finishing..." : "Finish loop"}
           </Button>
         </Stack>
       </Stack>
@@ -70,7 +79,9 @@ const PromptMetricsOnboardingFocusPanel = ({
 
 PromptMetricsOnboardingFocusPanel.propTypes = {
   activeTab: PropTypes.string,
+  isCompletingLoop: PropTypes.bool,
   isOnboarding: PropTypes.bool,
+  onCompleteLoop: PropTypes.func,
   onOpenFilters: PropTypes.func,
   onOpenLinkedTraces: PropTypes.func,
 };

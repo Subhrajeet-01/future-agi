@@ -119,3 +119,27 @@ export const buildPromptComparisonCompletedPayload = ({
       .join(":"),
   };
 };
+
+export const buildPromptFirstQualityLoopCompletedPayload = ({
+  promptId,
+} = {}) => {
+  const safePromptId = safeKeyPart(promptId, "prompt");
+
+  return {
+    eventName: "first_quality_loop_completed",
+    primaryPath: "prompt",
+    stage: "activated",
+    source: "prompt_metrics",
+    metadata: {
+      step: PROMPT_ONBOARDING_MODES.METRICS,
+      template_id: promptId,
+    },
+    idempotencyKey: [
+      "prompt_onboarding",
+      "first_quality_loop_completed",
+      safePromptId,
+    ]
+      .filter(Boolean)
+      .join(":"),
+  };
+};

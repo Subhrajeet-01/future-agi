@@ -3,6 +3,7 @@ import {
   buildPromptComparisonCompletedPayload,
   buildPromptCreatedHref,
   buildPromptEditorHref,
+  buildPromptFirstQualityLoopCompletedPayload,
   getPromptOnboardingRouteParams,
   isPromptFailureCaptureOnboarding,
   PROMPT_ONBOARDING_MODES,
@@ -160,6 +161,24 @@ describe("promptOnboardingRoute", () => {
       },
       idempotencyKey:
         "prompt_onboarding:prompt_comparison_completed:prompt-1:v1-v2",
+    });
+  });
+
+  it("builds a safe prompt first quality loop completion payload", () => {
+    expect(
+      buildPromptFirstQualityLoopCompletedPayload({
+        promptId: "prompt-1",
+      }),
+    ).toEqual({
+      eventName: "first_quality_loop_completed",
+      primaryPath: "prompt",
+      stage: "activated",
+      source: "prompt_metrics",
+      metadata: {
+        step: PROMPT_ONBOARDING_MODES.METRICS,
+        template_id: "prompt-1",
+      },
+      idempotencyKey: "prompt_onboarding:first_quality_loop_completed:prompt-1",
     });
   });
 

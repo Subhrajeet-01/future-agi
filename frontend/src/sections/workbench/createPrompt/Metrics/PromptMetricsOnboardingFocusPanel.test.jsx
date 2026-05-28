@@ -17,7 +17,8 @@ describe("PromptMetricsOnboardingFocusPanel", () => {
     expect(screen.queryByTestId("prompt-metrics-onboarding-focus")).toBeNull();
   });
 
-  it("opens filters and linked traces from guided metrics onboarding", async () => {
+  it("opens filters, linked traces, and completion from guided metrics onboarding", async () => {
+    const onCompleteLoop = vi.fn();
     const onOpenFilters = vi.fn();
     const onOpenLinkedTraces = vi.fn();
 
@@ -25,6 +26,7 @@ describe("PromptMetricsOnboardingFocusPanel", () => {
       <PromptMetricsOnboardingFocusPanel
         activeTab={METRIC_TAB_IDS.METRICS}
         isOnboarding
+        onCompleteLoop={onCompleteLoop}
         onOpenFilters={onOpenFilters}
         onOpenLinkedTraces={onOpenLinkedTraces}
       />,
@@ -38,7 +40,9 @@ describe("PromptMetricsOnboardingFocusPanel", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /linked traces/i }),
     );
+    await userEvent.click(screen.getByRole("button", { name: /finish loop/i }));
 
+    expect(onCompleteLoop).toHaveBeenCalledTimes(1);
     expect(onOpenFilters).toHaveBeenCalledTimes(1);
     expect(onOpenLinkedTraces).toHaveBeenCalledTimes(1);
   });
@@ -54,5 +58,17 @@ describe("PromptMetricsOnboardingFocusPanel", () => {
     expect(
       screen.getByRole("button", { name: /linked traces/i }),
     ).toBeDisabled();
+  });
+
+  it("disables the completion action while completion is pending", () => {
+    render(
+      <PromptMetricsOnboardingFocusPanel
+        activeTab={METRIC_TAB_IDS.METRICS}
+        isCompletingLoop
+        isOnboarding
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /finishing/i })).toBeDisabled();
   });
 });

@@ -1,6 +1,6 @@
 import { Box, Tab, Tabs, useTheme } from "@mui/material";
 import React, { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import WorkbenchMetricsProvider from "./context/WorkbenchMetricsProvider";
 import { useWorkbenchMetrics } from "./context/WorkbenchMetricsContext";
 import MetricsContent from "./MetricsContent/MetricsContent";
@@ -9,7 +9,13 @@ import MetricFilterDrawer from "./MetricFilterDrawer/MetricFilterDrawer";
 import { getMetricsTabSx } from "./common";
 import { METRIC_TAB_IDS } from "./constants";
 import SvgColor from "src/components/svg-color";
-import { PROMPT_ONBOARDING_MODES } from "../promptActions/promptOnboardingRoute";
+import { paths } from "src/routes/paths";
+import { enqueueSnackbar } from "src/components/snackbar";
+import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
+import {
+  buildPromptFirstQualityLoopCompletedPayload,
+  PROMPT_ONBOARDING_MODES,
+} from "../promptActions/promptOnboardingRoute";
 import PromptMetricsOnboardingFocusPanel from "./PromptMetricsOnboardingFocusPanel";
 
 const icon = (name) => (
@@ -21,7 +27,10 @@ const icon = (name) => (
 
 const MetricsTabs = () => {
   const theme = useTheme();
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const completePromptLoop = useRecordActivationEvent();
   const { activeTab, setActiveTab, setIsFilterDrawerOpen } =
     useWorkbenchMetrics();
   const isMetricsOnboarding =
@@ -41,6 +50,24 @@ const MetricsTabs = () => {
 
   const handleTabChange = (_, newValue) => {
     setActiveTab(newValue);
+  };
+
+  const handleCompletePromptLoop = async () => {
+    try {
+      await completePromptLoop.mutateAsync(
+        buildPromptFirstQualityLoopCompletedPayload({
+          promptId: id,
+        }),
+      );
+      navigate(
+        `${paths.dashboard.home}?mode=daily-quality&source=onboarding&target_event=first_quality_loop_completed`,
+        { replace: true },
+      );
+    } catch {
+      enqueueSnackbar("Unable to finish prompt loop. Please try again.", {
+        variant: "error",
+      });
+    }
   };
 
   return (
@@ -74,7 +101,9 @@ const MetricsTabs = () => {
 
       <PromptMetricsOnboardingFocusPanel
         activeTab={activeTab}
+        isCompletingLoop={completePromptLoop.isPending}
         isOnboarding={isMetricsOnboarding}
+        onCompleteLoop={handleCompletePromptLoop}
         onOpenFilters={() => setIsFilterDrawerOpen(true)}
         onOpenLinkedTraces={() => setActiveTab(METRIC_TAB_IDS.LINKED_TRACES)}
       />
