@@ -406,6 +406,7 @@ const EvalUsageTab = ({
   outputType = "pass_fail",
   evalType = "llm",
   onReviewActionPreferenceChange,
+  onPostRepairContinue,
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -474,6 +475,11 @@ const EvalUsageTab = ({
     failureActionOnboardingParams.step,
     templateId,
   ]);
+  const isRepairReviewOnboarding = Boolean(
+    failureActionOnboardingParams.isOnboarding &&
+      failureActionOnboardingParams.step === "review" &&
+      failureActionOnboardingParams.rerunFrom,
+  );
 
   // Split queries
   const { data: chartData, isLoading: chartLoading } = useEvalUsageChart(
@@ -1060,8 +1066,14 @@ const EvalUsageTab = ({
               isDark={isDark}
               templateId={templateId}
               evalType={evalType}
+              isRepairReview={isRepairReviewOnboarding}
               onFeedbackSubmitted={handleFeedbackSubmitted}
               onFailureActionSubmitted={handleFailureActionSubmitted}
+              onPostRepairContinueClick={
+                onPostRepairContinue
+                  ? () => onPostRepairContinue({ row: detailRow })
+                  : undefined
+              }
               onSourceFixClick={() =>
                 handleSourceFixClicked({ row: detailRow })
               }
@@ -1084,8 +1096,10 @@ const DetailPanelContent = ({
   isDark,
   templateId,
   evalType = "llm",
+  isRepairReview = false,
   onFailureActionSubmitted,
   onFeedbackSubmitted,
+  onPostRepairContinueClick,
   onScorerEditClick,
   onSourceFixClick,
   scorerEditHref,
@@ -1103,8 +1117,19 @@ const DetailPanelContent = ({
     scorerEditHref,
     sourceFixHref,
   });
-  const nextAction =
-    nextActionKind === "source_fix"
+  const shouldContinueToQualityHome =
+    isRepairReview &&
+    reviewOutcome === "result_summary_reviewed" &&
+    Boolean(onPostRepairContinueClick);
+  const nextAction = shouldContinueToQualityHome
+    ? {
+        buttonLabel: "Continue to quality home",
+        description:
+          "Open the onboarding home and keep reviewing product signals.",
+        icon: "mingcute:chart-line-line",
+        onClick: onPostRepairContinueClick,
+      }
+    : nextActionKind === "source_fix"
       ? {
           buttonLabel: "Open source fix",
           description:
@@ -1796,6 +1821,7 @@ const DetailRow = ({ label, value, color, chip, chipColor, mono }) => (
 EvalUsageTab.propTypes = {
   evalType: PropTypes.string,
   onReviewActionPreferenceChange: PropTypes.func,
+  onPostRepairContinue: PropTypes.func,
   outputType: PropTypes.string,
   templateId: PropTypes.string.isRequired,
 };

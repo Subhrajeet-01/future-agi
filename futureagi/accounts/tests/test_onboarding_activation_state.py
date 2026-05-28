@@ -366,6 +366,55 @@ def test_evaluator_after_trace_review_activates(organization, workspace, user):
 
 
 @pytest.mark.django_db
+def test_eval_loop_on_observe_project_after_trace_review_activates(
+    organization,
+    workspace,
+    user,
+):
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    create_trace(project=project)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="trace_reviewed",
+        source="trace_detail",
+        product_path="observe",
+    )
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="first_quality_loop_completed",
+        source="eval_review_onboarding",
+        product_path="evals",
+        metadata={
+            "source_id": str(project.id),
+            "source_type": "trace_project",
+            "run_id": "run-1",
+        },
+    )
+    signals = collect_onboarding_signals(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(),
+        signals=signals,
+    )
+
+    assert payload["stage"] == "activated"
+    assert payload["is_activated"] is True
+
+
+@pytest.mark.django_db
 def test_daily_flag_moves_activated_workspace_to_daily_review(
     organization,
     workspace,

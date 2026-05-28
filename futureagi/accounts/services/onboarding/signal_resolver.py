@@ -401,6 +401,23 @@ def _custom_eval_exists(project_ids):
     ).exists()
 
 
+def _observe_eval_loop_completed(organization, workspace, project_ids):
+    if not project_ids:
+        return False
+    from accounts.models import OnboardingActivationEvent
+
+    project_ids = [str(project_id) for project_id in project_ids]
+    return OnboardingActivationEvent.no_workspace_objects.filter(
+        organization=organization,
+        workspace=workspace,
+        event_name="first_quality_loop_completed",
+        product_path="evals",
+        is_sample=False,
+        metadata__source_type="trace_project",
+        metadata__source_id__in=project_ids,
+    ).exists()
+
+
 def _dashboard_exists(workspace):
     from tracer.models.dashboard import Dashboard
 
@@ -471,6 +488,12 @@ def collect_onboarding_signals(*, user, organization, workspace):
     improvement_exists = (
         evaluator_exists or dashboard_exists or alert_exists or saved_view_exists
     )
+    observe_eval_loop_completed = _observe_eval_loop_completed(
+        organization,
+        workspace,
+        observe_project_ids,
+    )
+    improvement_exists = improvement_exists or observe_eval_loop_completed
     real_loop_completed = first_quality_loop_completed(
         organization=organization,
         workspace=workspace,

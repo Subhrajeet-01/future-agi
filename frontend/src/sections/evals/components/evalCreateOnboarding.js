@@ -5,6 +5,7 @@ const EVAL_SOURCE_FIX_ARTIFACT_ID = "eval-source-fix-route";
 const EVAL_FIX_STEP = "fix-eval-failure";
 const EVAL_REVIEW_STEP = "review";
 const EVAL_REVIEW_STAGE = "review_eval_failures";
+const FIRST_QUALITY_LOOP_EVENT = "first_quality_loop_completed";
 
 export const EVAL_FIX_RERUN_ORIGINS = {
   SCORER_EDIT: "scorer_edit",
@@ -141,7 +142,7 @@ const EVAL_REVIEW_COPY = {
 const EVAL_REPAIR_REVIEW_COPY = {
   currentStep: "Review rerun",
   description:
-    "This run follows a repair action. Check the result before deciding whether to fix more or continue.",
+    "This run follows a repair action. If the rerun is healthy, continue to the quality home. If it still looks weak, fix the source again.",
   sourceSummary: {
     description: "The previous run is linked for repair-loop measurement.",
     label: "Repair rerun complete",
@@ -566,6 +567,25 @@ export const buildEvalSourceFixHref = ({
   if (runId) params.set("run_id", runId);
 
   return `${basePath}?${params.toString()}`;
+};
+
+export const buildEvalPostRepairHomeHref = ({
+  previousRunId,
+  rerunFrom,
+  runId,
+  sourceId,
+  sourceType,
+} = {}) => {
+  const params = new URLSearchParams();
+  params.set("source", "onboarding");
+  params.set("target_event", FIRST_QUALITY_LOOP_EVENT);
+  params.set("target_route", "activation_home");
+  if (runId) params.set("run_id", runId);
+  if (sourceType) params.set("source_type", sourceType);
+  if (sourceId) params.set("source_id", sourceId);
+  appendEvalFixRerunParams(params, { previousRunId, rerunFrom });
+
+  return `/dashboard/home?${params.toString()}`;
 };
 
 export const evalCreateOnboardingStage = (step) =>
@@ -1120,6 +1140,48 @@ export const buildEvalScorerEditCtaClickedPayload = ({
       "onboarding_eval_scorer_edit_cta_clicked",
       safeKeyPart(evalId, "no-eval"),
       safeKeyPart(evalLogId || runId, "no-run"),
+    ].join(":"),
+    isSample: false,
+  };
+};
+
+export const buildEvalFirstQualityLoopCompletedPayload = ({
+  evalId,
+  evalLogId,
+  previousRunId,
+  rerunFrom,
+  reviewOutcome,
+  runId,
+  sourceId,
+  sourceType,
+} = {}) => {
+  const normalizedRerunFrom = normalizeFixRerunOrigin(rerunFrom);
+  const artifactId = safeKeyPart(runId || evalLogId || evalId, "eval-run");
+
+  return {
+    eventName: FIRST_QUALITY_LOOP_EVENT,
+    primaryPath: "evals",
+    stage: "activated",
+    source: "eval_review_onboarding",
+    artifactType: "eval_run",
+    artifactId,
+    metadata: compactMetadata({
+      eval_id: evalId,
+      eval_log_id: evalLogId,
+      previous_run_id: previousRunId,
+      rerun_from: normalizedRerunFrom,
+      review_outcome: reviewOutcome,
+      run_id: runId,
+      source_id: sourceId,
+      source_type: sourceType,
+      step: EVAL_REVIEW_STEP,
+      tab: "usage",
+    }),
+    idempotencyKey: [
+      "eval_onboarding",
+      FIRST_QUALITY_LOOP_EVENT,
+      safeKeyPart(previousRunId, "no-previous-run"),
+      artifactId,
     ].join(":"),
     isSample: false,
   };

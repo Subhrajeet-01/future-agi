@@ -1040,6 +1040,47 @@ async function main() {
       60000,
     );
     const evalRepairReviewUrl = page.url();
+    await expectVisibleText(page, "Continue to quality home", {
+      timeout: 45000,
+    });
+    await clickVisibleButtonText(page, "Continue to quality home", 45000);
+    await page.waitForFunction(
+      () => {
+        const params = new URLSearchParams(window.location.search);
+        return (
+          window.location.pathname === "/dashboard/home" &&
+          params.get("source") === "onboarding" &&
+          params.get("target_event") === "first_quality_loop_completed" &&
+          params.get("target_route") === "activation_home"
+        );
+      },
+      { timeout: 60000 },
+    );
+    await waitForCondition(
+      () =>
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "first_quality_loop_completed" &&
+            payload?.primary_path === "evals" &&
+            payload?.stage === "activated" &&
+            payload?.source === "eval_review_onboarding" &&
+            payload?.artifact_type === "eval_run" &&
+            payload?.artifact_id === repairEvalRunId &&
+            payload?.metadata?.run_id === repairEvalRunId &&
+            payload?.metadata?.previous_run_id === firstEvalRunId &&
+            payload?.metadata?.rerun_from === "source_fix" &&
+            payload?.metadata?.review_outcome === "result_summary_reviewed",
+        ),
+      "Expected eval first quality loop completion activation event.",
+      45000,
+    );
+    await expectVisibleTestId(page, "onboarding-home-view", {
+      timeout: 45000,
+    });
+    await expectVisibleText(page, "First quality loop is ready", {
+      timeout: 60000,
+    });
+    const evalPostRepairHomeUrl = page.url();
 
     assert(evidence.signupPosts.length === 1, "Expected one signup POST.");
     assert(evidence.tokenPosts.length === 1, "Expected one token POST.");
@@ -1228,6 +1269,13 @@ async function main() {
             ),
             eval_repair_review_url: evalRepairReviewUrl,
             eval_repair_run_id: repairEvalRunId,
+            eval_post_repair_home_url: evalPostRepairHomeUrl,
+            eval_first_quality_loop_completed_event:
+              evidence.activationEventPosts.find(
+                (payload) =>
+                  payload?.event_name === "first_quality_loop_completed" &&
+                  payload?.metadata?.run_id === repairEvalRunId,
+              ),
             eval_source_fix_cta_event: evidence.activationEventPosts.find(
               (payload) =>
                 payload?.event_name ===

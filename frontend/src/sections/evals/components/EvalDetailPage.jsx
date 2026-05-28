@@ -60,6 +60,8 @@ import { buildDataInjection } from "src/sections/common/EvalPicker/evalPickerCon
 import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/useRecordActivationEvent";
 import EvalOnboardingFocusPanel from "./EvalOnboardingFocusPanel";
 import {
+  buildEvalFirstQualityLoopCompletedPayload,
+  buildEvalPostRepairHomeHref,
   buildEvalScorerEditCtaClickedPayload,
   buildEvalScorerEditHref,
   buildEvalReviewRouteFocusPayload,
@@ -272,6 +274,37 @@ const EvalDetailPage = () => {
     reviewActionPreference?.reviewOutcome === "result_summary_reviewed"
       ? "Tune scorer"
       : "Edit scorer";
+  const reviewOutcomeForRun =
+    reviewActionPreference?.runId === reviewOnboardingParams.runId
+      ? reviewActionPreference.reviewOutcome
+      : null;
+  const isCompletedRepairReview =
+    reviewOnboardingParams.isOnboarding &&
+    Boolean(reviewOnboardingParams.rerunFrom) &&
+    reviewOutcomeForRun === "result_summary_reviewed";
+  const postRepairHomeHref = useMemo(() => {
+    if (
+      !reviewOnboardingParams.isOnboarding ||
+      !reviewOnboardingParams.rerunFrom
+    ) {
+      return null;
+    }
+
+    return buildEvalPostRepairHomeHref({
+      previousRunId: reviewOnboardingParams.previousRunId,
+      rerunFrom: reviewOnboardingParams.rerunFrom,
+      runId: reviewOnboardingParams.runId,
+      sourceId: reviewOnboardingParams.sourceId,
+      sourceType: reviewOnboardingParams.sourceType,
+    });
+  }, [
+    reviewOnboardingParams.isOnboarding,
+    reviewOnboardingParams.previousRunId,
+    reviewOnboardingParams.rerunFrom,
+    reviewOnboardingParams.runId,
+    reviewOnboardingParams.sourceId,
+    reviewOnboardingParams.sourceType,
+  ]);
 
   useEffect(() => {
     if (!reviewOnboardingParams.isOnboarding) return;
@@ -307,7 +340,47 @@ const EvalDetailPage = () => {
     },
     [setSearchParams],
   );
+  const handlePostRepairContinue = useCallback(() => {
+    if (!postRepairHomeHref) return;
+
+    const navigateToQualityHome = () => navigate(postRepairHomeHref);
+    if (recordActivationEvent) {
+      recordActivationEvent(
+        buildEvalFirstQualityLoopCompletedPayload({
+          evalId,
+          evalLogId: reviewActionPreference?.evalLogId,
+          previousRunId: reviewOnboardingParams.previousRunId,
+          rerunFrom: reviewOnboardingParams.rerunFrom,
+          reviewOutcome: reviewOutcomeForRun,
+          runId: reviewOnboardingParams.runId,
+          sourceId: reviewOnboardingParams.sourceId,
+          sourceType: reviewOnboardingParams.sourceType,
+        }),
+        { onSettled: navigateToQualityHome },
+      );
+    } else {
+      navigateToQualityHome();
+    }
+  }, [
+    evalId,
+    navigate,
+    postRepairHomeHref,
+    recordActivationEvent,
+    reviewActionPreference?.evalLogId,
+    reviewOnboardingParams.previousRunId,
+    reviewOnboardingParams.rerunFrom,
+    reviewOnboardingParams.runId,
+    reviewOnboardingParams.sourceId,
+    reviewOnboardingParams.sourceType,
+    reviewOutcomeForRun,
+  ]);
+
   const handleReviewPrimaryAction = useCallback(() => {
+    if (isCompletedRepairReview && postRepairHomeHref) {
+      handlePostRepairContinue();
+      return;
+    }
+
     if (useReviewSourceFix && reviewSourceFixHref) {
       const navigateToFix = () => navigate(reviewSourceFixHref);
       if (recordActivationEvent) {
@@ -346,7 +419,10 @@ const EvalDetailPage = () => {
     }
   }, [
     evalId,
+    handlePostRepairContinue,
+    isCompletedRepairReview,
     navigate,
+    postRepairHomeHref,
     recordActivationEvent,
     reviewOnboardingParams.runId,
     reviewOnboardingParams.sourceId,
@@ -358,6 +434,12 @@ const EvalDetailPage = () => {
   const reviewPrimaryAction = useMemo(() => {
     if (!reviewOnboardingParams.isOnboarding) return null;
     if (!hasResolvedReviewAction) return null;
+    if (isCompletedRepairReview && postRepairHomeHref) {
+      return {
+        label: "Continue to quality home",
+        onClick: handleReviewPrimaryAction,
+      };
+    }
     if (useReviewSourceFix && reviewSourceFixHref) {
       return {
         label: "Open source fix",
@@ -374,6 +456,8 @@ const EvalDetailPage = () => {
   }, [
     handleReviewPrimaryAction,
     hasResolvedReviewAction,
+    isCompletedRepairReview,
+    postRepairHomeHref,
     reviewOnboardingParams.isOnboarding,
     reviewScorerActionLabel,
     reviewScorerEditHref,
@@ -2119,6 +2203,7 @@ const EvalDetailPage = () => {
             outputType={outputType}
             evalType={evalType}
             onReviewActionPreferenceChange={handleReviewActionPreferenceChange}
+            onPostRepairContinue={handlePostRepairContinue}
           />
         </Box>
       )}

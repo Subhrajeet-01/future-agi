@@ -4,8 +4,10 @@ import {
   buildEvalDatasetCreatedPayload,
   buildEvalFixRerunCompletedPayload,
   buildEvalFixRerunReviewedPayload,
+  buildEvalFirstQualityLoopCompletedPayload,
   buildEvalFailureActionCreatedPayload,
   buildEvalFailuresReviewedPayload,
+  buildEvalPostRepairHomeHref,
   buildEvalReviewDetailHref,
   buildEvalReviewRouteFocusPayload,
   buildEvalReviewStepHref,
@@ -558,6 +560,29 @@ describe("evalCreateOnboarding", () => {
     );
   });
 
+  it("builds a post-repair quality home href", () => {
+    const href = buildEvalPostRepairHomeHref({
+      previousRunId: "run-1",
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+      runId: "run-2",
+      sourceId: "project-1",
+      sourceType: "trace_project",
+    });
+    const url = new URL(href, "http://localhost");
+
+    expect(url.pathname).toBe("/dashboard/home");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      source: "onboarding",
+      target_event: "first_quality_loop_completed",
+      target_route: "activation_home",
+      run_id: "run-2",
+      source_type: "trace_project",
+      source_id: "project-1",
+      rerun_from: "source_fix",
+      previous_run_id: "run-1",
+    });
+  });
+
   it("builds source-fix routes only when source context is actionable", () => {
     expect(
       buildEvalSourceFixHref({
@@ -1010,5 +1035,44 @@ describe("evalCreateOnboarding", () => {
     expect(payload.metadata).not.toHaveProperty("output");
     expect(payload.metadata).not.toHaveProperty("reason");
     expect(payload.metadata).not.toHaveProperty("value");
+  });
+
+  it("builds an eval first quality loop completion payload after repair", () => {
+    const payload = buildEvalFirstQualityLoopCompletedPayload({
+      evalId: "eval-1",
+      evalLogId: "log-2",
+      previousRunId: "run-1",
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+      reviewOutcome: "result_summary_reviewed",
+      runId: "run-2",
+      sourceId: "project-1",
+      sourceType: "trace_project",
+    });
+
+    expect(payload).toMatchObject({
+      eventName: "first_quality_loop_completed",
+      primaryPath: "evals",
+      stage: "activated",
+      source: "eval_review_onboarding",
+      artifactType: "eval_run",
+      artifactId: "run-2",
+      metadata: {
+        eval_id: "eval-1",
+        eval_log_id: "log-2",
+        previous_run_id: "run-1",
+        rerun_from: "source_fix",
+        review_outcome: "result_summary_reviewed",
+        run_id: "run-2",
+        source_id: "project-1",
+        source_type: "trace_project",
+        step: "review",
+        tab: "usage",
+      },
+      idempotencyKey:
+        "eval_onboarding:first_quality_loop_completed:run-1:run-2",
+      isSample: false,
+    });
+    expect(payload.metadata).not.toHaveProperty("output");
+    expect(payload.metadata).not.toHaveProperty("reason");
   });
 });
