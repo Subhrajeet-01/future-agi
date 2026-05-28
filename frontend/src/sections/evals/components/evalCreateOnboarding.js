@@ -53,19 +53,19 @@ const SOURCE_TYPE_ARTIFACT_TYPES = {
 
 const EVAL_STARTER_SCORER_CODE = `from typing import Any
 
-def _text(value: Any) -> str:
+def to_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
 
-def evaluate(input: Any, output: Any, expected: Any, context: dict, **kwargs):
+def evaluate(output: Any = None, context: dict = None, **kwargs):
     context = context or {}
-    span = context.get("span") or {}
-    trace = context.get("trace") or {}
+    span = context.get("span") or kwargs.get("span_context") or {}
+    trace = context.get("trace") or kwargs.get("trace_context") or {}
     candidate_output = (
-        _text(output)
-        or _text(span.get("output"))
-        or _text(trace.get("output"))
+        to_text(output)
+        or to_text(span.get("output"))
+        or to_text(trace.get("output"))
     )
 
     if not candidate_output:
@@ -335,10 +335,10 @@ export const buildEvalRunStepHref = ({
 
 export const getEvalRunResultId = (result = {}) =>
   result?.run_id ||
+  result?.log_id ||
   result?.eval_run_id ||
   result?.eval_task_id ||
   result?.evaluation_id ||
-  result?.log_id ||
   null;
 
 export const getEvalUsageLogId = (log = {}) => {

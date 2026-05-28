@@ -641,6 +641,7 @@ const TestPlayground = React.forwardRef(
       isSystemEval = false,
       initialSourceTab = "Custom",
       initialTraceProjectId = null,
+      initialTraceRowType = null,
       onReadyChange,
     },
     ref,
@@ -805,6 +806,17 @@ const TestPlayground = React.forwardRef(
     useEffect(() => {
       inputValuesRef.current = inputValues;
     }, [inputValues]);
+
+    useEffect(() => {
+      const nextTab = normalizeSourceTab(initialSourceTab);
+      setActiveTab((currentTab) => {
+        if (currentTab === nextTab) return currentTab;
+        setError(null);
+        setResult(null);
+        setInputValues({});
+        return nextTab;
+      });
+    }, [initialSourceTab]);
 
     const handleInputChange = useCallback((variable, value) => {
       setInputValues((prev) => ({ ...prev, [variable]: value }));
@@ -1413,6 +1425,7 @@ const TestPlayground = React.forwardRef(
                   errorLocalizerEnabled={errorLocalizerEnabled}
                   onReadyChange={handleTracingReady}
                   initialProjectId={initialTraceProjectId}
+                  initialRowType={initialTraceRowType}
                   isComposite={isComposite}
                   compositeAdhocConfig={compositeAdhocConfig}
                   hostsFilter
@@ -1900,6 +1913,7 @@ TestPlayground.propTypes = {
   codeLanguage: PropTypes.string,
   initialSourceTab: PropTypes.string,
   initialTraceProjectId: PropTypes.string,
+  initialTraceRowType: PropTypes.string,
   onReadyChange: PropTypes.func,
   isSystemEval: PropTypes.bool,
 };

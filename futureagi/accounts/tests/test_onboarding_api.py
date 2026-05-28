@@ -4,6 +4,7 @@ from rest_framework import status
 
 from accounts.models import OnboardingActivationEvent, OnboardingGoal
 from accounts.services.onboarding.activation_events import record_event
+from accounts.services.onboarding.feature_flags import get_onboarding_flags
 from accounts.services.onboarding.goals import save_onboarding_goal
 
 
@@ -18,7 +19,7 @@ def test_activation_state_requires_auth(api_client):
 
 
 @pytest.mark.django_db
-@override_settings(ONBOARDING_FEATURE_FLAGS={})
+@override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": False})
 def test_activation_state_flag_off_returns_renderable_payload(auth_client):
     response = auth_client.get("/accounts/activation-state/")
 
@@ -26,6 +27,27 @@ def test_activation_state_flag_off_returns_renderable_payload(auth_client):
     payload = response.json()["result"]
     assert payload["stage"] == "feature_disabled"
     assert payload["recommended_action"]["id"] == "open_get_started"
+
+
+@pytest.mark.django_db
+@override_settings(CLOUD_DEPLOYMENT="")
+def test_self_host_defaults_enable_core_onboarding_flags(
+    organization,
+    workspace,
+    user,
+):
+    flags = get_onboarding_flags(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+    )
+
+    assert flags["onboarding_activation_state_api"] is True
+    assert flags["onboarding_goal_picker"] is True
+    assert flags["onboarding_path_cards"] is True
+    assert flags["onboarding_sample_project"] is True
+    assert flags["onboarding_eval_path"] is True
+    assert flags["onboarding_lifecycle_send_enabled"] is False
 
 
 @pytest.mark.django_db
@@ -313,7 +335,7 @@ def test_onboarding_goal_stale_expected_stage_returns_conflict(
 
 
 @pytest.mark.django_db
-@override_settings(ONBOARDING_FEATURE_FLAGS={})
+@override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": False})
 def test_onboarding_goal_save_succeeds_when_activation_api_flag_off(auth_client):
     response = auth_client.post(
         "/accounts/onboarding/goal/",

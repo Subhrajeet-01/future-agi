@@ -32,8 +32,11 @@ async function main() {
     activationEventPosts: [],
     activationStateRequests: [],
     apiFailures: [],
+    evalPlaygroundRequests: [],
+    evalPlaygroundResponses: [],
     evalTemplateRequests: [],
     evalTemplateResponses: [],
+    evalUsageResponses: [],
     onboardingPosts: [],
     sampleProjectPosts: [],
     sampleProjectResponses: [],
@@ -115,6 +118,11 @@ async function main() {
         ),
       });
     }
+    if (path === "/model-hub/eval-playground/" && request.method() === "POST") {
+      evidence.evalPlaygroundRequests.push(
+        summarizeEvalPlaygroundPayload(parseJsonPostData(request.postData())),
+      );
+    }
     if (/^\/tracer\/trace\/[^/]+\/$/.test(path) && request.method() === "GET") {
       evidence.traceDetailRequests.push(path);
     }
@@ -160,6 +168,40 @@ async function main() {
         item.body = { parse_error: true };
       }
       evidence.evalTemplateResponses.push(item);
+    }
+    if (
+      url &&
+      url.origin === new URL(API_BASE).origin &&
+      path === "/model-hub/eval-playground/" &&
+      response.request().method() === "POST"
+    ) {
+      const item = {
+        status: response.status(),
+      };
+      try {
+        item.body = summarizeEvalPlaygroundResponse(await response.json());
+      } catch {
+        item.body = { parse_error: true };
+      }
+      evidence.evalPlaygroundResponses.push(item);
+    }
+    if (
+      url &&
+      url.origin === new URL(API_BASE).origin &&
+      /^\/model-hub\/eval-templates\/[^/]+\/usage\/$/.test(path) &&
+      response.request().method() === "GET" &&
+      response.status() < 400
+    ) {
+      const item = {
+        path,
+        status: response.status(),
+      };
+      try {
+        item.body = summarizeEvalUsageResponse(await response.json());
+      } catch {
+        item.body = { parse_error: true };
+      }
+      evidence.evalUsageResponses.push(item);
     }
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -607,7 +649,7 @@ async function main() {
             payload?.artifact_id === realProject.projectId &&
             payload?.metadata?.source_id === realProject.projectId &&
             payload?.metadata?.source_type === "trace_project" &&
-            payload?.metadata?.row_type === "Span" &&
+            payload?.metadata?.row_type === "Trace" &&
             payload?.metadata?.surface === "tracing" &&
             payload?.metadata?.step === "data",
         ),
@@ -708,6 +750,114 @@ async function main() {
       45000,
     );
     const evalRunOnboardingUrl = page.url();
+    await expectVisibleText(page, "Run first eval", { timeout: 45000 });
+    await clickVisibleButtonText(page, "Run first eval", 45000);
+    await waitForCondition(
+      () =>
+        evidence.evalPlaygroundResponses.some(
+          (item) =>
+            item.status < 400 &&
+            item.body?.status === true &&
+            item.body?.result?.log_id,
+        ),
+      "Expected eval playground run response with a log id.",
+      60000,
+    );
+    const firstEvalRun = evidence.evalPlaygroundResponses.find(
+      (item) =>
+        item.status < 400 &&
+        item.body?.status === true &&
+        item.body?.result?.log_id,
+    );
+    const firstEvalRunId = firstEvalRun?.body?.result?.log_id;
+    await page.waitForFunction(
+      ({ runId }) => {
+        const params = new URLSearchParams(window.location.search);
+        return (
+          /^\/dashboard\/evaluations\/[^/]+$/.test(window.location.pathname) &&
+          params.get("tab") === "usage" &&
+          params.get("source") === "onboarding" &&
+          params.get("step") === "review" &&
+          params.get("run_id") === runId
+        );
+      },
+      { timeout: 60000 },
+      { runId: firstEvalRunId },
+    );
+    await expectVisibleTestId(page, "eval-onboarding-focus", {
+      timeout: 45000,
+    });
+    await expectVisibleText(page, "Review", { timeout: 45000 });
+    await expectVisibleText(page, "Review the eval result", {
+      timeout: 45000,
+    });
+    await expectVisibleText(
+      page,
+      "Inspect failures or summary before deciding what to fix next.",
+      { timeout: 45000 },
+    );
+    await waitForCondition(
+      () =>
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "eval_run_completed" &&
+            payload?.primary_path === "evals" &&
+            payload?.stage === "run_eval" &&
+            payload?.source === "eval_create_onboarding" &&
+            payload?.artifact_type === "eval_run" &&
+            payload?.metadata?.source_id === realProject.projectId &&
+            payload?.metadata?.source_type === "trace_project" &&
+            payload?.metadata?.eval_type === "code" &&
+            payload?.metadata?.run_id === firstEvalRunId &&
+            payload?.metadata?.step === "run",
+        ),
+      "Expected eval run completed activation event.",
+      45000,
+    );
+    await waitForCondition(
+      () =>
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "onboarding_eval_route_focus_viewed" &&
+            payload?.primary_path === "evals" &&
+            payload?.stage === "review_eval_failures" &&
+            payload?.source === "eval_review_onboarding" &&
+            payload?.artifact_type === "eval_run" &&
+            payload?.artifact_id === firstEvalRunId &&
+            payload?.metadata?.run_id === firstEvalRunId &&
+            payload?.metadata?.step === "review" &&
+            payload?.metadata?.tab === "usage",
+        ),
+      "Expected eval review focus activation event.",
+      45000,
+    );
+    await waitForCondition(
+      () =>
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "eval_failures_reviewed" &&
+            payload?.primary_path === "evals" &&
+            payload?.stage === "review_eval_failures" &&
+            payload?.source === "eval_review_onboarding" &&
+            payload?.artifact_type === "eval_run" &&
+            payload?.artifact_id === firstEvalRunId &&
+            payload?.metadata?.run_id === firstEvalRunId &&
+            payload?.metadata?.step === "review" &&
+            payload?.metadata?.tab === "usage",
+        ),
+      "Expected eval result reviewed activation event.",
+      60000,
+    );
+    await waitForCondition(
+      () =>
+        evidence.evalUsageResponses.some((item) =>
+          item.body?.logs?.items?.some((log) => log.id === firstEvalRunId),
+        ),
+      "Expected usage API response to include the first eval run.",
+      60000,
+    );
+    await expectVisibleText(page, "Next action", { timeout: 60000 });
+    const evalReviewOnboardingUrl = page.url();
 
     assert(evidence.signupPosts.length === 1, "Expected one signup POST.");
     assert(evidence.tokenPosts.length === 1, "Expected one token POST.");
@@ -841,6 +991,8 @@ async function main() {
             ),
             eval_template_requests: evidence.evalTemplateRequests,
             eval_template_responses: evidence.evalTemplateResponses,
+            eval_playground_requests: evidence.evalPlaygroundRequests,
+            eval_playground_responses: evidence.evalPlaygroundResponses,
             eval_run_focus_event: evidence.activationEventPosts.find(
               (payload) =>
                 payload?.event_name === "onboarding_eval_route_focus_viewed" &&
@@ -848,6 +1000,24 @@ async function main() {
                 payload?.artifact_id === realProject.projectId,
             ),
             eval_run_onboarding_url: evalRunOnboardingUrl,
+            eval_run_completed_event: evidence.activationEventPosts.find(
+              (payload) =>
+                payload?.event_name === "eval_run_completed" &&
+                payload?.metadata?.run_id === firstEvalRunId,
+            ),
+            eval_review_focus_event: evidence.activationEventPosts.find(
+              (payload) =>
+                payload?.event_name === "onboarding_eval_route_focus_viewed" &&
+                payload?.stage === "review_eval_failures" &&
+                payload?.artifact_id === firstEvalRunId,
+            ),
+            eval_result_reviewed_event: evidence.activationEventPosts.find(
+              (payload) =>
+                payload?.event_name === "eval_failures_reviewed" &&
+                payload?.artifact_id === firstEvalRunId,
+            ),
+            eval_review_onboarding_url: evalReviewOnboardingUrl,
+            eval_usage_responses: evidence.evalUsageResponses,
             post_review_home_url: postReviewHomeUrl,
             post_review_state: summarizeActivationState(postReviewState),
             real_observe_project: realProject,
@@ -1349,6 +1519,8 @@ function isTrackedApiPath(path) {
     path === "/accounts/activation-state/" ||
     path === "/accounts/user-info/" ||
     isEvalTemplatePath(path) ||
+    path === "/model-hub/eval-playground/" ||
+    /^\/model-hub\/eval-templates\/[^/]+\/usage\/$/.test(path) ||
     /^\/tracer\/trace\/[^/]+\/$/.test(path)
   );
 }
@@ -1372,6 +1544,48 @@ function summarizeEvalTemplatePayload(payload = {}) {
     name: payload.name,
     output_type: payload.output_type,
     publish: payload.publish,
+  };
+}
+
+function summarizeEvalPlaygroundPayload(payload = {}) {
+  const mapping = payload.config?.mapping || payload.mapping || {};
+  return {
+    has_output_mapping: Boolean(mapping.output),
+    model: payload.model,
+    span_id: payload.span_id,
+    template_id: payload.template_id,
+    trace_id: payload.trace_id,
+  };
+}
+
+function summarizeEvalPlaygroundResponse(payload = {}) {
+  const result = payload?.result || {};
+  return {
+    status: payload?.status,
+    result: {
+      log_id: result.log_id,
+      output: result.output,
+      output_type: result.output_type,
+      reason: result.reason,
+    },
+  };
+}
+
+function summarizeEvalUsageResponse(payload = {}) {
+  const result = payload?.result || {};
+  return {
+    logs: {
+      items: (result.logs?.items || []).slice(0, 5).map((log) => ({
+        id: log.id,
+        result: log.result,
+        score: log.score,
+        source: log.source,
+        status: log.status,
+      })),
+      total: result.logs?.total,
+    },
+    stats: result.stats,
+    template_id: result.template_id,
   };
 }
 

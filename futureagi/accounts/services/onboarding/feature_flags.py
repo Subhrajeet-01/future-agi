@@ -39,6 +39,16 @@ ONBOARDING_FLAG_NAMES = (
     "onboarding_lifecycle_send_enabled",
 )
 
+SELF_HOST_ONBOARDING_DEFAULTS = {
+    "onboarding_activation_state_api": True,
+    "onboarding_goal_picker": True,
+    "onboarding_path_cards": True,
+    "onboarding_sample_project": True,
+    "onboarding_observe_route_modes": True,
+    "onboarding_eval_path": True,
+    "onboarding_eval_route_modes": True,
+}
+
 CONTRACT_FLAG_ALIASES = {
     "onboarding_home_enabled": "onboarding_activation_state_api",
     "onboarding_observe_mvp_enabled": "onboarding_activation_state_api",
@@ -47,9 +57,18 @@ CONTRACT_FLAG_ALIASES = {
     "daily_quality_home_enabled": "onboarding_daily_quality_home",
 }
 
+CLOUD_DEPLOYMENT_VALUES = {"US", "EU", "DEV"}
+
 
 def _flag_overrides():
     return dict(getattr(settings, "ONBOARDING_FEATURE_FLAGS", {}) or {})
+
+
+def _uses_cloud_flag_service():
+    return (
+        str(getattr(settings, "CLOUD_DEPLOYMENT", "") or "").upper()
+        in CLOUD_DEPLOYMENT_VALUES
+    )
 
 
 def _groups(organization, workspace):
@@ -66,12 +85,18 @@ def get_onboarding_flags(*, user, organization, workspace):
     overrides = _flag_overrides()
     overrides_configured = hasattr(settings, "ONBOARDING_FEATURE_FLAGS")
     groups = _groups(organization, workspace)
+    use_cloud_flags = _uses_cloud_flag_service()
+
+    if not use_cloud_flags:
+        flags.update(SELF_HOST_ONBOARDING_DEFAULTS)
 
     for flag_name in ONBOARDING_FLAG_NAMES:
         if flag_name in overrides:
             flags[flag_name] = bool(overrides[flag_name])
             continue
         if overrides_configured:
+            continue
+        if not use_cloud_flags:
             continue
         try:
             user_id = getattr(user, "id", None)

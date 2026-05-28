@@ -207,6 +207,7 @@ const EvalCreatePage = () => {
     }
     return null;
   }, [onboardingParams]);
+  const onboardingTraceRowType = onboardingTraceProjectId ? "Trace" : null;
 
   // Mode: single or composite
   const [mode, setMode] = useState("single");
@@ -266,6 +267,7 @@ const EvalCreatePage = () => {
   const [draftId, setDraftId] = useState(urlDraftId || null);
   const [draftLoadComplete, setDraftLoadComplete] = useState(!urlDraftId);
   const [isTesting, setIsTesting] = useState(false);
+  const [isPlaygroundReady, setIsPlaygroundReady] = useState(false);
   const draftCreating = useRef(false);
   const autoSaveTimer = useRef(null);
   const autoSaveSkipFirst = useRef(!!urlDraftId);
@@ -509,7 +511,7 @@ const EvalCreatePage = () => {
     }
 
     handleOnboardingSourceSelected({
-      rowType: onboardingParams.sourceType === "trace_project" ? "Span" : null,
+      rowType: onboardingParams.sourceType === "trace_project" ? "Trace" : null,
       sourceId: onboardingParams.sourceId,
       sourceType: onboardingParams.sourceType,
       surface:
@@ -582,6 +584,10 @@ const EvalCreatePage = () => {
     if (!onboardingSourceSetupHref) return;
     navigate(onboardingSourceSetupHref);
   }, [navigate, onboardingSourceSetupHref]);
+
+  const handlePlaygroundReadyChange = useCallback((ready) => {
+    setIsPlaygroundReady(Boolean(ready));
+  }, []);
 
   // Auto-save config to draft (debounced, skip initial load)
   const buildUpdatePayload = useCallback(() => {
@@ -948,6 +954,14 @@ const EvalCreatePage = () => {
       };
     }
 
+    if (onboardingParams.step === EVAL_CREATE_ONBOARDING_STEPS.RUN) {
+      return {
+        disabled: !draftId || isTesting || !isPlaygroundReady,
+        label: isTesting ? "Running first eval" : "Run first eval",
+        onClick: handleTestEvaluation,
+      };
+    }
+
     if (onboardingParams.step !== EVAL_CREATE_ONBOARDING_STEPS.DATA) {
       return null;
     }
@@ -966,6 +980,9 @@ const EvalCreatePage = () => {
     handleConfirmOnboardingSource,
     handleSaveComposite,
     handleSaveSingle,
+    handleTestEvaluation,
+    isPlaygroundReady,
+    isTesting,
     isLoading,
     mode,
     onboardingParams,
@@ -1616,6 +1633,8 @@ const EvalCreatePage = () => {
                   onSourceSelected={handleOnboardingSourceSelected}
                   templateFormat={templateFormat}
                   initialTraceProjectId={onboardingTraceProjectId}
+                  initialTraceRowType={onboardingTraceRowType}
+                  onReadyChange={handlePlaygroundReadyChange}
                 />
               </Box>
 

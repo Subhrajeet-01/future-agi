@@ -226,8 +226,11 @@ describe("evalCreateOnboarding", () => {
       outputType: "percentage",
       passThreshold: 0.7,
     });
-    expect(starter.code).toContain("def evaluate(");
+    expect(starter.code).toContain(
+      "def evaluate(output: Any = None, context: dict = None, **kwargs):",
+    );
     expect(starter.code).toContain('context.get("span")');
+    expect(starter.code).toContain('kwargs.get("span_context")');
   });
 
   it("builds a safe route focus payload", () => {
@@ -598,7 +601,7 @@ describe("evalCreateOnboarding", () => {
         eval_task_id: "task-1",
         log_id: "log-1",
       }),
-    ).toBe("task-1");
+    ).toBe("log-1");
     expect(getEvalRunResultId({})).toBeNull();
   });
 
