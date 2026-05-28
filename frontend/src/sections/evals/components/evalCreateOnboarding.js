@@ -89,6 +89,23 @@ const EVAL_REVIEW_COPY = {
   ],
 };
 
+const EVAL_REPAIR_REVIEW_COPY = {
+  currentStep: "Review rerun",
+  description:
+    "This run follows a repair action. Check the result before deciding whether to fix more or continue.",
+  sourceSummary: {
+    description: "The previous run is linked for repair-loop measurement.",
+    label: "Repair rerun complete",
+  },
+  title: "Review the repair attempt",
+  steps: [
+    { label: "Review", complete: true },
+    { label: "Fix", complete: true },
+    { label: "Rerun", complete: true },
+    { label: "Inspect", complete: false },
+  ],
+};
+
 const EVAL_SOURCE_FIX_COPY = {
   dataset: {
     description:
@@ -325,6 +342,8 @@ export const getEvalReviewOnboardingParams = (search = "") => {
   return {
     isOnboarding:
       params.get("source") === "onboarding" && step === EVAL_REVIEW_STEP,
+    previousRunId: params.get("previous_run_id"),
+    rerunFrom: normalizeFixRerunOrigin(params.get("rerun_from")),
     runId: params.get("run_id"),
     sourceId: params.get("source_id"),
     sourceType: params.get("source_type"),
@@ -348,7 +367,8 @@ export const getEvalFailureActionOnboardingParams = (search = "") => {
   };
 };
 
-export const getEvalReviewOnboardingCopy = () => EVAL_REVIEW_COPY;
+export const getEvalReviewOnboardingCopy = ({ rerunFrom } = {}) =>
+  rerunFrom ? EVAL_REPAIR_REVIEW_COPY : EVAL_REVIEW_COPY;
 
 export const getEvalSourceFixOnboardingParams = (search = "") => {
   const params = toSearchParams(search);
@@ -374,6 +394,8 @@ export const getEvalSourceFixOnboardingCopy = ({ sourceType } = {}) =>
 
 export const buildEvalReviewStepHref = ({
   evalId,
+  previousRunId,
+  rerunFrom,
   runId,
   sourceId,
   sourceType,
@@ -388,6 +410,7 @@ export const buildEvalReviewStepHref = ({
   if (runId) params.set("run_id", runId);
   if (sourceType) params.set("source_type", sourceType);
   if (sourceId) params.set("source_id", sourceId);
+  appendEvalFixRerunParams(params, { previousRunId, rerunFrom });
 
   return `${basePath}?${params.toString()}`;
 };
@@ -401,6 +424,8 @@ export const buildEvalReviewDetailHref = (evalId, search = "") => {
   return buildEvalReviewStepHref({
     evalId,
     runId: reviewParams.runId,
+    previousRunId: reviewParams.previousRunId,
+    rerunFrom: reviewParams.rerunFrom,
     sourceId: reviewParams.sourceId,
     sourceType: reviewParams.sourceType,
   });
@@ -667,6 +692,8 @@ export const buildEvalFixRerunCompletedPayload = ({
 
 export const buildEvalReviewRouteFocusPayload = ({
   evalId,
+  previousRunId,
+  rerunFrom,
   route = "eval_detail",
   runId,
 } = {}) => {
@@ -681,6 +708,8 @@ export const buildEvalReviewRouteFocusPayload = ({
     artifactId,
     metadata: compactMetadata({
       eval_id: evalId,
+      previous_run_id: previousRunId,
+      rerun_from: normalizeFixRerunOrigin(rerunFrom),
       route,
       run_id: runId,
       step: EVAL_REVIEW_STEP,

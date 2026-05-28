@@ -387,9 +387,24 @@ describe("evalCreateOnboarding", () => {
       ),
     ).toEqual({
       isOnboarding: true,
+      previousRunId: null,
+      rerunFrom: null,
       runId: "run-1",
       sourceId: "data-1",
       sourceType: "dataset",
+      step: "review",
+      tab: "usage",
+    });
+
+    expect(
+      getEvalReviewOnboardingParams(
+        "?tab=usage&source=onboarding&step=review&run_id=run-2&rerun_from=source_fix&previous_run_id=run-1",
+      ),
+    ).toMatchObject({
+      isOnboarding: true,
+      previousRunId: "run-1",
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+      runId: "run-2",
       step: "review",
       tab: "usage",
     });
@@ -405,6 +420,18 @@ describe("evalCreateOnboarding", () => {
         { label: "Run", complete: true },
         { label: "Review", complete: false },
       ],
+    });
+
+    expect(
+      getEvalReviewOnboardingCopy({
+        rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+      }),
+    ).toMatchObject({
+      currentStep: "Review rerun",
+      sourceSummary: {
+        label: "Repair rerun complete",
+      },
+      title: "Review the repair attempt",
     });
   });
 
@@ -422,6 +449,18 @@ describe("evalCreateOnboarding", () => {
     expect(buildEvalReviewStepHref({ runId: "run-1" })).toBe(
       "/dashboard/evaluations/usage?tab=usage&source=onboarding&step=review&run_id=run-1",
     );
+    expect(
+      buildEvalReviewStepHref({
+        evalId: "eval-1",
+        previousRunId: "run-1",
+        rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+        runId: "run-2",
+        sourceId: "data-1",
+        sourceType: "dataset",
+      }),
+    ).toBe(
+      "/dashboard/evaluations/eval-1?tab=usage&source=onboarding&step=review&run_id=run-2&source_type=dataset&source_id=data-1&rerun_from=source_fix&previous_run_id=run-1",
+    );
 
     expect(
       buildEvalReviewDetailHref(
@@ -430,6 +469,15 @@ describe("evalCreateOnboarding", () => {
       ),
     ).toBe(
       "/dashboard/evaluations/eval-1?tab=usage&source=onboarding&step=review&run_id=run-1&source_type=dataset&source_id=data-1",
+    );
+
+    expect(
+      buildEvalReviewDetailHref(
+        "eval-1",
+        "?tab=usage&source=onboarding&step=review&run_id=run-2&source_type=dataset&source_id=data-1&rerun_from=source_fix&previous_run_id=run-1",
+      ),
+    ).toBe(
+      "/dashboard/evaluations/eval-1?tab=usage&source=onboarding&step=review&run_id=run-2&source_type=dataset&source_id=data-1&rerun_from=source_fix&previous_run_id=run-1",
     );
 
     expect(buildEvalReviewDetailHref("eval-1", "?tab=usage")).toBe(
@@ -562,6 +610,8 @@ describe("evalCreateOnboarding", () => {
     expect(
       buildEvalReviewRouteFocusPayload({
         evalId: "eval-1",
+        previousRunId: "run-0",
+        rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
         route: "eval_detail",
         runId: "run-1",
       }),
@@ -574,6 +624,8 @@ describe("evalCreateOnboarding", () => {
       artifactId: "run-1",
       metadata: {
         eval_id: "eval-1",
+        previous_run_id: "run-0",
+        rerun_from: "source_fix",
         route: "eval_detail",
         run_id: "run-1",
         step: "review",

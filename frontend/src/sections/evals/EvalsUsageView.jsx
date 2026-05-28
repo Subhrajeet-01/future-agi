@@ -141,7 +141,10 @@ const EvalsUsageView = () => {
     () => getEvalReviewOnboardingParams(location.search),
     [location.search],
   );
-  const reviewOnboardingCopy = useMemo(() => getEvalReviewOnboardingCopy(), []);
+  const reviewOnboardingCopy = useMemo(
+    () => getEvalReviewOnboardingCopy(reviewOnboardingParams),
+    [reviewOnboardingParams],
+  );
   preventHeaderSelection();
 
   useEffect(() => {
@@ -155,6 +158,8 @@ const EvalsUsageView = () => {
     recordedOnboardingFocusRef.current = true;
     recordActivationEvent?.(
       buildEvalReviewRouteFocusPayload({
+        previousRunId: reviewOnboardingParams.previousRunId,
+        rerunFrom: reviewOnboardingParams.rerunFrom,
         route: "eval_usage_list",
         runId: reviewOnboardingParams.runId,
       }),

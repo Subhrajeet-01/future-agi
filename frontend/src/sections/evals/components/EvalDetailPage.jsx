@@ -204,7 +204,10 @@ const EvalDetailPage = () => {
     () => getEvalReviewOnboardingParams(searchParams),
     [searchParams],
   );
-  const reviewOnboardingCopy = useMemo(() => getEvalReviewOnboardingCopy(), []);
+  const reviewOnboardingCopy = useMemo(
+    () => getEvalReviewOnboardingCopy(reviewOnboardingParams),
+    [reviewOnboardingParams],
+  );
 
   useEffect(() => {
     if (!reviewOnboardingParams.isOnboarding) return;
@@ -214,6 +217,8 @@ const EvalDetailPage = () => {
       recordActivationEvent?.(
         buildEvalReviewRouteFocusPayload({
           evalId,
+          previousRunId: reviewOnboardingParams.previousRunId,
+          rerunFrom: reviewOnboardingParams.rerunFrom,
           route: "eval_detail",
           runId: reviewOnboardingParams.runId,
         }),

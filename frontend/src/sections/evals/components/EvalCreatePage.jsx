@@ -320,6 +320,8 @@ const EvalCreatePage = () => {
         navigate(
           buildEvalReviewStepHref({
             evalId: draftId,
+            previousRunId: onboardingParams.previousRunId,
+            rerunFrom: onboardingParams.rerunFrom,
             runId: completedRunId,
             sourceId: onboardingParams.sourceId,
             sourceType: onboardingParams.sourceType,
