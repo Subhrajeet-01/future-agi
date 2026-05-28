@@ -5,6 +5,7 @@ import math
 import os
 import re
 import traceback
+from datetime import timedelta
 from urllib.parse import urlencode
 
 import structlog
@@ -29,8 +30,23 @@ from simulate.utils.test_execution import (
 from tracer.models.observation_span import ObservationSpan
 from tracer.models.replay_session import ReplaySession, ReplaySessionStep
 from tracer.models.trace import Trace
+from tracer.services.clickhouse.span_attribute_lookups import (
+    spans_by_eval_attribute_call_execution_ids,
+)
 
 logger = structlog.get_logger(__name__)
+
+
+def _empty_call_log_summary(reason: str) -> dict:
+    return {
+        "total_entries": 0,
+        "level_counts": {},
+        "category_counts": {},
+        "last_logged_at": None,
+        "skipped_reason": reason,
+    }
+
+
 from drf_yasg.utils import swagger_auto_schema
 
 from model_hub.models.api_key import ApiKey
@@ -133,6 +149,7 @@ from simulate.services.test_executor import (
     run_new_evals_on_call_executions_task,
 )
 from simulate.tasks.eval_summary_tasks import run_eval_summary_task
+from simulate.utils.baseline import resolve_baseline_id
 from simulate.utils.agent_optimiser import (
     create_optimiser_run_for_test_execution,
     get_latest_optimiser_result,
@@ -144,6 +161,7 @@ from simulate.utils.eval_summary import (
     _get_completed_call_executions,
     _get_eval_configs_with_template,
 )
+from simulate.utils.scenario_completeness import check_scenarios_incomplete
 from simulate.utils.sql_query import (
     get_combined_call_executions_and_snapshots_count_query,
     get_combined_call_executions_and_snapshots_query,
@@ -718,6 +736,10 @@ class RunTestExecutionView(APIView):
                     {"error": "At least one scenario is required to execute the test."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            gate_response = check_scenarios_incomplete(final_scenario_ids, run_test)
+            if gate_response is not None:
+                return gate_response
 
             # Check if Temporal test execution is enabled
             if getattr(app_settings, "TEMPORAL_TEST_EXECUTION_ENABLED", False):
@@ -1501,6 +1523,14 @@ class RunTestKPIsView(APIView):
                         # Numeric choice: already averaged
                         field_name = f"avg_{metric_name.lower().replace(' ', '_')}"
                         eval_averages[field_name] = float(avg_value)
+                    else:
+                        # Fully-errored choices metric: register it so the UI
+                        # renders a zeroed chart card instead of dropping the
+                        # whole eval bar.
+                        choice_metric_ids.add(metric_id)
+                        base_name = metric_name.lower().replace(" ", "_")
+                        if base_name not in choice_counts:
+                            choice_counts[base_name] = {"_metric_id": metric_id}
 
             # Fetch choices config for choice-type eval metrics
             if choice_metric_ids:
@@ -2369,13 +2399,7 @@ class TestExecutionDetailView(APIView):
                 for row_id, metadata in Row.all_objects.filter(
                     id__in=row_ids
                 ).values_list("id", "metadata"):
-                    if not isinstance(metadata, dict):
-                        continue
-                    # Chat replays use session_id, voice replays use trace_id.
-                    # For replay sessions, intent_id is the baseline trace ID.
-                    baseline_id = metadata.get("session_id") or metadata.get("trace_id")
-                    if not baseline_id and is_replay:
-                        baseline_id = metadata.get("intent_id")
+                    baseline_id = resolve_baseline_id(metadata, is_replay=is_replay)
                     if baseline_id:
                         row_session_id_map[str(row_id)] = baseline_id
 
@@ -3148,6 +3172,29 @@ class CallExecutionDetailView(APIView):
                 test_execution__run_test__deleted=False,
             )
 
+            # Mirror the list endpoint's lookup so the drawer's
+            # "Compare with baseline" button stays visible after the
+            # detail fetch.
+            row_session_id_map = {}
+            row_id = call_execution.row_id
+            if not row_id and isinstance(call_execution.call_metadata, dict):
+                row_id = call_execution.call_metadata.get("row_id")
+            if row_id:
+                metadata = (
+                    Row.all_objects.filter(id=row_id)
+                    .values_list("metadata", flat=True)
+                    .first()
+                )
+                scenario_ids = call_execution.test_execution.scenario_ids
+                is_replay = bool(scenario_ids) and Scenarios.objects.filter(
+                    id__in=scenario_ids,
+                    deleted=False,
+                    metadata__created_from="replay_session",
+                ).exists()
+                baseline_id = resolve_baseline_id(metadata, is_replay=is_replay)
+                if baseline_id:
+                    row_session_id_map[str(row_id)] = baseline_id
+
             # Serialize with the same serializer as the list view, but with full detail
             serializer = CallExecutionDetailSerializer(
                 call_execution,
@@ -3155,7 +3202,7 @@ class CallExecutionDetailView(APIView):
                     "request": request,
                     "eval_configs": {},
                     "scenarios": {},
-                    "row_session_id_map": {},
+                    "row_session_id_map": row_session_id_map,
                     "rows_map": {},
                     "columns_by_dataset": {},
                     "cells_by_row": {},
@@ -3389,9 +3436,14 @@ class CallExecutionLogsView(APIView):
             customer_call_id = request.query_params.get(
                 "customer_call_id"
             ) or request.query_params.get("vapi_call_id")
+            call_execution_filters = {
+                "test_execution__run_test__organization": user_organization,
+                "test_execution__run_test__deleted": False,
+            }
             if customer_call_id:
                 call_execution = CallExecution.objects.filter(
-                    customer_call_id=customer_call_id
+                    customer_call_id=customer_call_id,
+                    **call_execution_filters,
                 ).first()
                 if not call_execution:
                     return self.gm.bad_request("Call execution not found.")
@@ -3399,15 +3451,15 @@ class CallExecutionLogsView(APIView):
                 call_execution = get_object_or_404(
                     CallExecution,
                     id=call_execution_id,
-                    test_execution__run_test__organization=user_organization,
-                    test_execution__run_test__deleted=False,
+                    **call_execution_filters,
                 )
 
             source = CallLogEntry.LogSource.CUSTOMER
 
-            queryset = CallLogEntry.objects.filter(
+            base_queryset = CallLogEntry.objects.filter(
                 call_execution=call_execution, source=source
             )
+            queryset = base_queryset
 
             severity_text = request.query_params.get("severity_text")
             if severity_text is not None:
@@ -3429,28 +3481,90 @@ class CallExecutionLogsView(APIView):
             # Lazy backfill: observability-off simulate calls never had their
             # artifact log file downloaded at ingest time, but the URL is
             # sitting on `provider_call_data.vapi.artifact.logUrl`. First
-            # Logs-tab open triggers the existing ingest task; subsequent
-            # opens serve the persisted CallLogEntry rows. `customer_log_url`
-            # doubles as the dispatched-flag so we don't re-fire on every
-            # poll while the task runs.
-            if not queryset.exists() and not call_execution.customer_log_url:
-                pcd = call_execution.provider_call_data or {}
-                vapi = pcd.get("vapi") or {}
-                log_url = (vapi.get("artifact") or {}).get("logUrl")
-                if log_url:
-                    call_execution.customer_log_url = log_url
-                    call_execution.save(update_fields=["customer_log_url"])
-                    from simulate.tasks.call_log_tasks import (
-                        ingest_call_logs_task,
+            # Logs-tab open triggers the existing ingest task; the response
+            # marks ingestion as pending so the frontend can poll until rows
+            # exist or the task records an empty summary.
+            has_stored_logs = base_queryset.exists()
+            pcd = call_execution.provider_call_data or {}
+            vapi = pcd.get("vapi") or {}
+            provider_log_url = (vapi.get("artifact") or {}).get("logUrl")
+            log_url = call_execution.customer_log_url or provider_log_url
+            has_ingestion_summary = bool(call_execution.customer_logs_summary)
+            should_start_ingestion = (
+                not has_stored_logs
+                and bool(log_url)
+                and not has_ingestion_summary
+                and call_execution.logs_ingested_at is None
+            )
+
+            if should_start_ingestion:
+                dispatch_started_at = timezone.now()
+                update_kwargs = {"logs_ingested_at": dispatch_started_at}
+                if not call_execution.customer_log_url and provider_log_url:
+                    update_kwargs["customer_log_url"] = provider_log_url
+
+                claimed_ingestion = CallExecution.objects.filter(
+                    id=call_execution.id,
+                    logs_ingested_at__isnull=True,
+                ).update(**update_kwargs)
+
+                if claimed_ingestion:
+                    call_execution.logs_ingested_at = dispatch_started_at
+                    if "customer_log_url" in update_kwargs:
+                        call_execution.customer_log_url = provider_log_url
+
+                    try:
+                        from ee.voice.tasks.call_log_tasks import ingest_call_logs_task
+                    except ImportError:
+                        empty_summary = _empty_call_log_summary(
+                            "ee_voice_not_available"
+                        )
+                        CallExecution.objects.filter(
+                            id=call_execution.id,
+                            logs_ingested_at=dispatch_started_at,
+                        ).update(customer_logs_summary=empty_summary)
+                        call_execution.customer_logs_summary = empty_summary
+                        logger.info(
+                            "call_log_ingestion_task_unavailable",
+                            call_execution_id=str(call_execution.id),
+                        )
+                    else:
+                        try:
+                            ingest_call_logs_task.apply_async(
+                                args=(str(call_execution.id), log_url),
+                                kwargs={
+                                    "verify_ssl": False,
+                                    "source": CallLogEntry.LogSource.CUSTOMER,
+                                },
+                            )
+                        except Exception:
+                            CallExecution.objects.filter(
+                                id=call_execution.id,
+                                logs_ingested_at=dispatch_started_at,
+                            ).update(logs_ingested_at=None)
+                            call_execution.logs_ingested_at = None
+                            raise
+                else:
+                    call_execution.refresh_from_db(
+                        fields=[
+                            "customer_log_url",
+                            "customer_logs_summary",
+                            "logs_ingested_at",
+                        ]
                     )
 
-                    ingest_call_logs_task.apply_async(
-                        args=(str(call_execution.id), log_url),
-                        kwargs={
-                            "verify_ssl": False,
-                            "source": CallLogEntry.LogSource.CUSTOMER,
-                        },
-                    )
+            has_ingestion_summary = bool(call_execution.customer_logs_summary)
+            ingest_attempt_at = call_execution.logs_ingested_at
+            recently_started_ingest = (
+                ingest_attempt_at is None
+                or timezone.now() - ingest_attempt_at < timedelta(minutes=5)
+            )
+            ingestion_pending = (
+                not has_stored_logs
+                and bool(log_url)
+                and not has_ingestion_summary
+                and recently_started_ingest
+            )
 
             # Intentionally return a 200 with an empty page when no rows
             # match — the frontend Logs tab distinguishes "no logs yet /
@@ -3475,7 +3589,11 @@ class CallExecutionLogsView(APIView):
             ]
 
             logs_serializer = CallExecutionLogsResponseSerializer(
-                {"results": results, "source": source}
+                {
+                    "results": results,
+                    "source": source,
+                    "ingestion_pending": ingestion_pending,
+                }
             )
             return paginator.get_paginated_response(logs_serializer.data)
 
@@ -6871,46 +6989,36 @@ def add_trace_details_to_call_executions(call_executions):
     # ObservationSpan.eval_attributes is a *flat* JSON dict. The call execution id is stored under a dotted key:
     # "fi.simulator.call_execution_id" (snake_case; FE sees camelCase due to middleware).
     #
-    # We bulk-fetch spans for all call_execution_ids on the page to avoid N+1 queries.
-
-    # Build Q objects for filtering by multiple call execution IDs
-    q_objects = Q()
-    for call_exec_id in call_execution_ids:
-        q_objects |= Q(
-            eval_attributes__contains={"fi.simulator.call_execution_id": call_exec_id}
-        )
-
-    matching_spans = (
-        ObservationSpan.objects.filter(
-            deleted=False,
-        )
-        .filter(q_objects)
-        .select_related("trace")
-        .only("id", "trace_id", "eval_attributes")
+    # The PG GIN that previously backed this lookup
+    # (``tracer_obse_eval_attr_gin``) was dropped in migration 0074. The
+    # equivalent containment check now goes to ClickHouse, which has the
+    # same data and is much cheaper for this access pattern.
+    spans_by_call_exec = spans_by_eval_attribute_call_execution_ids(
+        call_execution_ids
     )
 
     # Collect trace IDs and build trace_details
     trace_ids = set()
     trace_details_map = {}
 
-    for span in matching_spans:
-        # Extract call_execution_id from eval_attributes
-        call_exec_id = (
-            span.eval_attributes.get("fi.simulator.call_execution_id")
-            if span.eval_attributes
-            else None
-        )
-        if call_exec_id and str(call_exec_id) in call_executions_dict:
-            trace_id = span.trace.id
-            trace_ids.add(trace_id)
-            # Use the first span found for each call_execution_id
-            if str(call_exec_id) not in trace_details_map:
-                trace_details_map[str(call_exec_id)] = {
-                    "trace_id": str(trace_id),
-                    "parent_span_id": str(span.id),
-                    "attributes": span.eval_attributes,
-                    "_trace_id_uuid": trace_id,  # Keep UUID for mapping
-                }
+    for call_exec_id, spans in spans_by_call_exec.items():
+        if not spans or call_exec_id not in call_executions_dict:
+            continue
+        # Use the first span returned for each call_execution_id (the
+        # original PG version also took whichever row came first).
+        span = spans[0]
+        try:
+            eval_attrs = json.loads(span["eval_attributes"]) if span.get("eval_attributes") else {}
+        except (TypeError, ValueError):
+            eval_attrs = {}
+        trace_id_str = span["trace_id"]
+        trace_ids.add(trace_id_str)
+        trace_details_map[call_exec_id] = {
+            "trace_id": trace_id_str,
+            "parent_span_id": span["id"],
+            "attributes": eval_attrs,
+            "_trace_id_uuid": trace_id_str,  # Keep for mapping below
+        }
 
     # Bulk fetch session IDs for all traces
     if trace_ids:
@@ -6921,7 +7029,9 @@ def add_trace_details_to_call_executions(call_executions):
         ).values_list("id", "session_id")
 
         for trace_id, session_id in traces_with_sessions:
-            trace_to_session[trace_id] = str(session_id)
+            # ``trace_id`` is a UUID from PG; the CH lookup gave us strings.
+            # Key on str to match what's stored in ``_trace_id_uuid`` below.
+            trace_to_session[str(trace_id)] = str(session_id)
 
         # Add sessions to trace_details (as list for consistency with serializer format)
         for call_exec_id, trace_details in trace_details_map.items():

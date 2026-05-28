@@ -193,11 +193,7 @@ from tfc.utils.storage import (
     upload_file_to_s3,
     upload_image_to_s3,
 )
-try:
-    from ee.usage.models.usage import APICallStatusChoices, APICallTypeChoices
-except ImportError:
-    APICallStatusChoices = None
-    APICallTypeChoices = None
+from tfc.constants.api_calls import APICallStatusChoices, APICallTypeChoices
 try:
     from ee.usage.utils.usage_entries import ROW_LIMIT_REACHED_MESSAGE, log_and_deduct_cost_for_resource_request
 except ImportError:
@@ -492,19 +488,20 @@ class AddRowsFromFile(CreateAPIView):
             ).count()
             # total_rows_allowed = get_number_of_rows_allowed(organization)
 
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": existing_rows_count + new_rows_count},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": existing_rows_count + new_rows_count},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
             # --- Row Limit Check End ---
 
             data = data.reset_index(drop=True)
@@ -661,22 +658,23 @@ class CloneDatasetView(APIView):
 
     def post(self, request, dataset_id, *args, **kwargs):
         try:
-            call_log_row_entry = log_and_deduct_cost_for_resource_request(
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                api_call_type=APICallTypeChoices.DATASET_ADD.value,
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row_entry is None
-                or call_log_row_entry.status
-                == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(
-                    get_error_message("DATASET_CREATE_LIMIT_REACHED")
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row_entry = log_and_deduct_cost_for_resource_request(
+                    organization=getattr(request, "organization", None)
+                    or request.user.organization,
+                    api_call_type=APICallTypeChoices.DATASET_ADD.value,
+                    workspace=request.workspace,
                 )
-            call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
-            call_log_row_entry.save()
+                if (
+                    call_log_row_entry is None
+                    or call_log_row_entry.status
+                    == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(
+                        get_error_message("DATASET_CREATE_LIMIT_REACHED")
+                    )
+                call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
+                call_log_row_entry.save()
             # Get the source dataset (org-scoped)
             source_dataset = get_object_or_404(
                 Dataset,
@@ -705,19 +703,20 @@ class CloneDatasetView(APIView):
             row_count = Row.objects.filter(
                 dataset=source_dataset, deleted=False
             ).count()
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                getattr(request, "organization", None) or request.user.organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": row_count},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    getattr(request, "organization", None) or request.user.organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": row_count},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
 
             if source_dataset.dataset_config.get("eval_recommendations", None) is None:
                 get_recommendations(source_dataset)
@@ -834,22 +833,23 @@ class AddAsNewDataset(APIView):
     def post(self, request, *args, **kwargs):
         try:
             dataset_id = request.data.get("dataset_id")
-            call_log_row_entry = log_and_deduct_cost_for_resource_request(
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                api_call_type=APICallTypeChoices.DATASET_ADD.value,
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row_entry is None
-                or call_log_row_entry.status
-                == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(
-                    get_error_message("DATASET_CREATE_LIMIT_REACHED")
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row_entry = log_and_deduct_cost_for_resource_request(
+                    organization=getattr(request, "organization", None)
+                    or request.user.organization,
+                    api_call_type=APICallTypeChoices.DATASET_ADD.value,
+                    workspace=request.workspace,
                 )
-            call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
-            call_log_row_entry.save()
+                if (
+                    call_log_row_entry is None
+                    or call_log_row_entry.status
+                    == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(
+                        get_error_message("DATASET_CREATE_LIMIT_REACHED")
+                    )
+                call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
+                call_log_row_entry.save()
             # Get the source dataset (org-scoped)
             _org = getattr(request, "organization", None) or request.user.organization
             source_dataset = Dataset.objects.filter(
@@ -893,19 +893,20 @@ class AddAsNewDataset(APIView):
                 row_count = Row.objects.filter(
                     dataset=source_dataset, deleted=False
                 ).count()
-                call_log_row = log_and_deduct_cost_for_resource_request(
-                    getattr(request, "organization", None) or request.user.organization,
-                    api_call_type=APICallTypeChoices.ROW_ADD.value,
-                    config={"total_rows": row_count},
-                    workspace=request.workspace,
-                )
-                if (
-                    call_log_row is None
-                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-                ):
-                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-                call_log_row.status = APICallStatusChoices.SUCCESS.value
-                call_log_row.save()
+                if log_and_deduct_cost_for_resource_request is not None:
+                    call_log_row = log_and_deduct_cost_for_resource_request(
+                        getattr(request, "organization", None) or request.user.organization,
+                        api_call_type=APICallTypeChoices.ROW_ADD.value,
+                        config={"total_rows": row_count},
+                        workspace=request.workspace,
+                    )
+                    if (
+                        call_log_row is None
+                        or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                    ):
+                        return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                    call_log_row.status = APICallStatusChoices.SUCCESS.value
+                    call_log_row.save()
             # ---------------------------------------------------------
 
             # Create new dataset
@@ -3887,9 +3888,35 @@ class DeleteColumnView(APIView):
                             f"Failed to cleanup derived variables for column {column.name}: {cleanup_error}"
                         )
                 if column.source == SourceChoices.EVALUATION.value:
-                    UserEvalMetric.objects.filter(id=column.source_id).update(
-                        deleted=True
-                    )
+                    eval_metric = UserEvalMetric.objects.filter(
+                        id=column.source_id
+                    ).first()
+                    if eval_metric and eval_metric.status in (
+                        StatusType.RUNNING.value,
+                        StatusType.NOT_STARTED.value,
+                        StatusType.EXPERIMENT_EVALUATION.value,
+                    ):
+                        try:
+                            from tfc.utils.distributed_state import (
+                                evaluation_tracker,
+                            )
+
+                            evaluation_tracker.request_cancel(
+                                eval_metric.id, reason="eval_column_deleted"
+                            )
+                        except Exception:
+                            pass
+                        from model_hub.utils.eval_cell_status import (
+                            mark_eval_cells_stopped,
+                        )
+
+                        mark_eval_cells_stopped(
+                            eval_metric,
+                            reason="Evaluation column deleted by user",
+                        )
+                    if eval_metric:
+                        eval_metric.deleted = True
+                        eval_metric.save(update_fields=["deleted"])
                 if column.source == SourceChoices.ANNOTATION_LABEL.value:
                     source_parts = column.source_id.split("-sourceid-")
 
@@ -3936,28 +3963,30 @@ class DeleteColumnView(APIView):
                     Q(id=column.id) | Q(source_id__startswith=f"{column.id}")
                 ).values_list("id", flat=True)
 
+                col_ids_to_remove = {str(c) for c in columns_to_delete}
                 dataset.column_order = [
                     col_id
                     for col_id in dataset.column_order
-                    if col_id not in map(str, columns_to_delete)
+                    if col_id not in col_ids_to_remove
                 ]
                 dataset.save(update_fields=["column_order"])
 
-            # Delete the columns (this will cascade delete related cells)
-            Column.objects.filter(
-                Q(id=column.id) | Q(source_id__startswith=f"{column.id}")
-            ).update(deleted=True)
-
-            # Delete the column (this will cascade delete related cells)
-            column.deleted = True
-            column.save()
+            # Update metrics BEFORE deleting columns — get_metrics_using_column
+            # scopes by dataset via the Column row, which must still be
+            # visible (deleted=False) for BaseModelManager to find it.
             metrics = UserEvalMetric.get_metrics_using_column(
                 getattr(request, "organization", None) or request.user.organization.id,
                 column_id,
             )
-            for metric in metrics:
-                metric.column_deleted = True
-                metric.save()
+            if metrics:
+                UserEvalMetric.objects.filter(
+                    id__in=[m.id for m in metrics]
+                ).update(column_deleted=True)
+
+            # Now safe to delete columns
+            Column.objects.filter(
+                Q(id=column.id) | Q(source_id__startswith=f"{column.id}")
+            ).update(deleted=True)
 
             return self._gm.success_response("Column deleted successfully")
 
@@ -4055,19 +4084,20 @@ class AddEmptyRowsView(APIView):
                 dataset=dataset, deleted=False
             ).count()
             prospective_total = existing_rows_count + num_rows
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": prospective_total},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": prospective_total},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
 
             # Get all columns for this dataset
             columns = Column.objects.filter(dataset=dataset, deleted=False).exclude(
@@ -4145,19 +4175,20 @@ class AddSDKRowsView(APIView):
             existing_rows_count = Row.objects.filter(
                 dataset=dataset, deleted=False
             ).count()
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                getattr(request, "organization", None) or request.user.organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": existing_rows_count},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    getattr(request, "organization", None) or request.user.organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": existing_rows_count},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
             # --- Row Limit Check End ---
 
             apiKeys = OrgApiKey.objects.filter(
@@ -4245,20 +4276,21 @@ class ManuallyCreateDatasetView(APIView):
             number_of_rows = int(request.data.get("number_of_rows", 1))
             number_of_columns = int(request.data.get("number_of_columns", 1))
 
-            call_log_row_entry = log_and_deduct_cost_for_resource_request(
-                getattr(request, "organization", None) or request.user.organization,
-                api_call_type=APICallTypeChoices.DATASET_ADD.value,
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row_entry is None
-                or call_log_row_entry.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(
-                    get_error_message("DATASET_CREATE_LIMIT_REACHED")
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row_entry = log_and_deduct_cost_for_resource_request(
+                    getattr(request, "organization", None) or request.user.organization,
+                    api_call_type=APICallTypeChoices.DATASET_ADD.value,
+                    workspace=request.workspace,
                 )
-            call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
-            call_log_row_entry.save()
+                if (
+                    call_log_row_entry is None
+                    or call_log_row_entry.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(
+                        get_error_message("DATASET_CREATE_LIMIT_REACHED")
+                    )
+                call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
+                call_log_row_entry.save()
 
             if not dataset_name:
                 return self._gm.bad_request(get_error_message("MISSING_DATASET_NAME"))
@@ -4297,19 +4329,20 @@ class ManuallyCreateDatasetView(APIView):
                 getattr(request, "organization", None) or request.user.organization
             )
 
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": number_of_rows},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": number_of_rows},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
 
             # Create dataset
             dataset = Dataset.objects.create(
@@ -4413,19 +4446,20 @@ class AddDataRowsView(APIView):
             new_rows_count = len(rows)
             prospective_total = existing_rows_count + new_rows_count
 
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": prospective_total},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": prospective_total},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
 
             # Get valid columns for this dataset
             columns = Column.objects.filter(dataset=dataset, deleted=False).exclude(
@@ -6450,7 +6484,7 @@ class GetEvalsListView(APIView):
         )
 
         eval_templates = EvalTemplate.no_workspace_objects.filter(
-            organization__isnull=True, deleted=False
+            organization__isnull=True, deleted=False, visible_ui=True
         )
 
         # IMPORTANT: do NOT call insert_evals_template() here.
@@ -6573,10 +6607,13 @@ class GetEvalsListView(APIView):
                 organization=organization,
                 deleted=False,
                 template__deleted=False,
+                template__visible_ui=True,
             )
         else:
             # Filter by show_in_sidebar even when user_evals is provided
-            user_evals = user_evals.filter(show_in_sidebar=True)
+            user_evals = user_evals.filter(
+                show_in_sidebar=True, template__visible_ui=True
+            )
 
         if search_text:
             user_evals = user_evals.filter(name__icontains=search_text)
@@ -6598,7 +6635,10 @@ class GetEvalsListView(APIView):
         )
 
         eval_templates = EvalTemplate.objects.filter(
-            organization=organization, owner=OwnerChoices.USER.value, deleted=False
+            organization=organization,
+            owner=OwnerChoices.USER.value,
+            deleted=False,
+            visible_ui=True,
         ).prefetch_related("evaluators__user", "versions__created_by")
 
         if search_text:
@@ -6658,7 +6698,7 @@ class GetEvalsListView(APIView):
         self, validated_data, organization, search_text
     ):
         eval_templates = EvalTemplate.objects.filter(
-            organization=organization, deleted=False
+            organization=organization, deleted=False, visible_ui=True
         )
         if search_text:
             eval_templates = eval_templates.filter(Q(name__icontains=search_text))
@@ -7208,6 +7248,26 @@ class DeleteEvalsView(APIView):
                         "An experiment must have at least one evaluation."
                     )
 
+            # Stop any in-flight eval runner before deleting columns
+            if delete_column and eval_metric.status in (
+                StatusType.RUNNING.value,
+                StatusType.NOT_STARTED.value,
+                StatusType.EXPERIMENT_EVALUATION.value,
+            ):
+                try:
+                    from tfc.utils.distributed_state import evaluation_tracker
+
+                    evaluation_tracker.request_cancel(
+                        eval_metric.id, reason="eval_deleted"
+                    )
+                except Exception:
+                    pass
+                from model_hub.utils.eval_cell_status import mark_eval_cells_stopped
+
+                mark_eval_cells_stopped(
+                    eval_metric, reason="Evaluation deleted by user"
+                )
+
             if delete_column:
                 if experiment_id:
                     # Experiment evals: one EXPERIMENT_EVALUATION column per EDT
@@ -7252,9 +7312,6 @@ class DeleteEvalsView(APIView):
                         source_id=eval_metric.id, deleted=False
                     ).first()
                     if column:
-                        # Get the main column
-                        column = get_object_or_404(Column, source_id=eval_metric.id)
-
                         # Delete all cells associated with the column and its dependent columns
                         Cell.objects.filter(
                             Q(column=column)
@@ -7275,12 +7332,15 @@ class DeleteEvalsView(APIView):
                                 deleted=False,
                             ).values_list("id", flat=True)
 
-                            dataset.column_order = [
+                            col_ids_to_remove = {str(c) for c in columns_to_delete}
+                            new_column_order = [
                                 col_id
                                 for col_id in dataset.column_order
-                                if col_id not in map(str, columns_to_delete)
+                                if col_id not in col_ids_to_remove
                             ]
-                            dataset.save()
+                            Dataset.objects.filter(id=dataset.id).update(
+                                column_order=new_column_order
+                            )
 
                         # Update metrics BEFORE deleting columns — the
                         # lookup scopes by dataset via the Column row, which
@@ -7291,9 +7351,10 @@ class DeleteEvalsView(APIView):
                             or request.user.organization.id,
                             column.id,
                         )
-                        for metric in metrics:
-                            metric.column_deleted = True
-                            metric.save()
+                        if metrics:
+                            UserEvalMetric.objects.filter(
+                                id__in=[m.id for m in metrics]
+                            ).update(column_deleted=True)
 
                         # Delete all related columns
                         Column.objects.filter(
@@ -7740,7 +7801,10 @@ class AddUserEvalView(CreateAPIView):
                     getattr(template, "error_localizer_enabled", False)
                 )
 
-            # Validate required mapping keys
+            # Validate required mapping keys. System evals stay strict —
+            # every required key must be mapped. Custom evals allow
+            # partial mappings; the shared validator at run time decides
+            # whether to fail (all empty) or run with a warning.
             from model_hub.utils.eval_validators import validate_required_key_mapping
 
             mapping = validated_data.get("config", {}).get("mapping", {})
@@ -7749,11 +7813,17 @@ class AddUserEvalView(CreateAPIView):
                 if template.config and isinstance(template.config, dict)
                 else []
             )
-            missing_keys = validate_required_key_mapping(mapping, required_keys)
-            if missing_keys:
-                return self._gm.bad_request(
-                    f"Missing required mapping keys: {', '.join(missing_keys)}"
+            is_user_custom_eval = bool(
+                template.config and template.config.get("custom_eval", False)
+            )
+            if not is_user_custom_eval:
+                missing_keys = validate_required_key_mapping(
+                    mapping, required_keys
                 )
+                if missing_keys:
+                    return self._gm.bad_request(
+                        f"Missing required mapping keys: {', '.join(missing_keys)}"
+                    )
 
             try:
                 validated_data["config"] = normalize_eval_runtime_config(
@@ -11005,20 +11075,21 @@ class DuplicateRowsView(APIView):
                     id__in=row_ids, dataset=dataset, deleted=False
                 )
 
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": source_rows.count() * num_copies},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    organization=getattr(request, "organization", None)
+                    or request.user.organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": source_rows.count() * num_copies},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
             source_cells = Cell.objects.filter(
                 row__in=source_rows, deleted=False
             ).select_related("column")
@@ -11094,22 +11165,23 @@ class DuplicateDatasetView(APIView):
                     get_error_message("MISSING_NEW_DATASET_NAME")
                 )
 
-            call_log_row_entry = log_and_deduct_cost_for_resource_request(
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                api_call_type=APICallTypeChoices.DATASET_ADD.value,
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row_entry is None
-                or call_log_row_entry.status
-                == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(
-                    get_error_message("DATASET_CREATE_LIMIT_REACHED")
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row_entry = log_and_deduct_cost_for_resource_request(
+                    organization=getattr(request, "organization", None)
+                    or request.user.organization,
+                    api_call_type=APICallTypeChoices.DATASET_ADD.value,
+                    workspace=request.workspace,
                 )
-            call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
-            call_log_row_entry.save()
+                if (
+                    call_log_row_entry is None
+                    or call_log_row_entry.status
+                    == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(
+                        get_error_message("DATASET_CREATE_LIMIT_REACHED")
+                    )
+                call_log_row_entry.status = APICallStatusChoices.SUCCESS.value
+                call_log_row_entry.save()
 
             # Get source dataset and verify it exists
             source_dataset = get_object_or_404(Dataset, id=dataset_id, deleted=False)
@@ -11196,20 +11268,21 @@ class DuplicateDatasetView(APIView):
             new_rows = []
             new_cells = []
 
-            call_log_row = log_and_deduct_cost_for_resource_request(
-                organization=getattr(request, "organization", None)
-                or request.user.organization,
-                api_call_type=APICallTypeChoices.ROW_ADD.value,
-                config={"total_rows": source_rows.count()},
-                workspace=request.workspace,
-            )
-            if (
-                call_log_row is None
-                or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-            ):
-                return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
-            call_log_row.status = APICallStatusChoices.SUCCESS.value
-            call_log_row.save()
+            if log_and_deduct_cost_for_resource_request is not None:
+                call_log_row = log_and_deduct_cost_for_resource_request(
+                    organization=getattr(request, "organization", None)
+                    or request.user.organization,
+                    api_call_type=APICallTypeChoices.ROW_ADD.value,
+                    config={"total_rows": source_rows.count()},
+                    workspace=request.workspace,
+                )
+                if (
+                    call_log_row is None
+                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                ):
+                    return self._gm.too_many_requests(ROW_LIMIT_REACHED_MESSAGE)
+                call_log_row.status = APICallStatusChoices.SUCCESS.value
+                call_log_row.save()
             # Process in batches of 1000 rows
             batch_size = 1000
             for i in range(0, source_rows.count(), batch_size):
@@ -14066,36 +14139,39 @@ class CreateKnowledgeBaseView(APIView):
                 kb_count = KnowledgeBaseFile.objects.filter(
                     organization=org, deleted=False
                 ).count()
-                ent_check = Entitlements.can_create(
+                if Entitlements is not None:
+                    ent_check = Entitlements.can_create(
                     str(org.id), "knowledge_bases", kb_count
                 )
                 if not ent_check.allowed:
                     return self._gm.forbidden_response(ent_check.reason)
 
-                feat_check = Entitlements.check_feature(
-                    str(org.id), "has_knowledge_base"
-                )
-                if not feat_check.allowed:
-                    return self._gm.forbidden_response(feat_check.reason)
+                if Entitlements is not None:
+                    feat_check = Entitlements.check_feature(
+                        str(org.id), "has_knowledge_base"
+                    )
+                    if not feat_check.allowed:
+                        return self._gm.forbidden_response(feat_check.reason)
                 entitlements_checked = True
             except ImportError:
                 pass
 
             if not entitlements_checked:
-                call_log_row = log_and_deduct_cost_for_resource_request(
-                    organization=org,
-                    api_call_type=APICallTypeChoices.KNOWLEDGE_BASE.value,
-                    workspace=request.workspace,
-                )
-                if (
-                    call_log_row is None
-                    or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
-                ):
-                    return self._gm.too_many_requests(
-                        get_error_message("KB_CREATION_LIMIT_REACHED")
+                if log_and_deduct_cost_for_resource_request is not None:
+                    call_log_row = log_and_deduct_cost_for_resource_request(
+                        organization=org,
+                        api_call_type=APICallTypeChoices.KNOWLEDGE_BASE.value,
+                        workspace=request.workspace,
                     )
-                call_log_row.status = APICallStatusChoices.SUCCESS.value
-                call_log_row.save()
+                    if (
+                        call_log_row is None
+                        or call_log_row.status == APICallStatusChoices.RESOURCE_LIMIT.value
+                    ):
+                        return self._gm.too_many_requests(
+                            get_error_message("KB_CREATION_LIMIT_REACHED")
+                        )
+                    call_log_row.status = APICallStatusChoices.SUCCESS.value
+                    call_log_row.save()
 
             # Validate ALL files FIRST (before creating KB)
             # Uses is_file_readable for full validation (password check, content parsing)
@@ -14202,11 +14278,12 @@ class CreateKnowledgeBaseView(APIView):
                 except ImportError:
                     Entitlements = None
 
-                feat_check = Entitlements.check_feature(
-                    str(org.id), "has_knowledge_base"
-                )
-                if not feat_check.allowed:
-                    return self._gm.forbidden_response(feat_check.reason)
+                if Entitlements is not None:
+                    feat_check = Entitlements.check_feature(
+                        str(org.id), "has_knowledge_base"
+                    )
+                    if not feat_check.allowed:
+                        return self._gm.forbidden_response(feat_check.reason)
             except ImportError:
                 pass
 

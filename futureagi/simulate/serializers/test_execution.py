@@ -217,11 +217,13 @@ class CallExecutionDetailSerializer(serializers.ModelSerializer):
             "call_type",
             "status",
             "duration",
+            "duration_seconds",
             "start_time",
             "transcript",
             "scenario",
             "overall_score",
             "response_time",
+            "response_time_ms",
             "audio_url",
             "customer_name",
             "eval_outputs",
@@ -237,6 +239,7 @@ class CallExecutionDetailSerializer(serializers.ModelSerializer):
             "scenario_id",
             # Conversation metrics fields
             "avg_agent_latency",
+            "avg_agent_latency_ms",
             "user_interruption_count",
             "user_interruption_rate",
             "user_wpm",
@@ -263,6 +266,7 @@ class CallExecutionDetailSerializer(serializers.ModelSerializer):
             "rerun_type",
             "original_call_execution_id",
             "tool_outputs",
+            "cost_cents",
             "customer_cost_cents",
             "customer_cost_breakdown",
             "customer_latency_metrics",
@@ -324,7 +328,31 @@ class CallExecutionDetailSerializer(serializers.ModelSerializer):
         return vsm.get_recording_urls(provider_payload) or {}
 
     def get_provider(self, obj):
-        """Return the voice provider for this call (e.g. vapi, retell, livekit_bridge)."""
+        """Return the provider that produced this call's stored provider payload.
+
+        The agent definition can be Vapi while the executed call payload is
+        stored under another provider key (for example LiveKit web/SIP flows).
+        The drawer uses this value for both the chip and provider-specific
+        metrics rendering, so prefer the actual payload key when available.
+        """
+        provider_data = getattr(obj, "provider_call_data", None)
+        if isinstance(provider_data, dict):
+            for provider in (
+                ProviderChoices.VAPI.value,
+                ProviderChoices.RETELL.value,
+                ProviderChoices.LIVEKIT.value,
+                ProviderChoices.ELEVEN_LABS.value,
+                ProviderChoices.OTHERS.value,
+            ):
+                if isinstance(provider_data.get(provider), dict) and provider_data.get(
+                    provider
+                ):
+                    return provider
+
+            for provider, payload in provider_data.items():
+                if isinstance(payload, dict) and payload:
+                    return provider
+
         try:
             return obj.test_execution.agent_definition.provider
         except (AttributeError, Exception):
@@ -599,7 +627,10 @@ class CallExecutionDetailSerializer(serializers.ModelSerializer):
                 row_cells = cells_by_row.get(row_id_str, {})
             else:
                 # Fallback: individual queries (for grouped results or missing context)
-                row = Row.all_objects.get(id=row_id)
+                try:
+                    row = Row.all_objects.get(id=row_id)
+                except Row.DoesNotExist:
+                    return {}
                 dataset_columns = Column.all_objects.filter(
                     id__in=row.dataset.column_order
                 )
@@ -1374,7 +1405,7 @@ class TestExecutionBulkDeleteSerializer(serializers.Serializer):
 
 # Migrated to simulate/serializers/requests/run_test_evals.py
 # Re-exported here for backward compatibility.
-from simulate.serializers.requests.run_test_evals import (
+from simulate.serializers.requests.run_test_evals import (  # noqa: E402
     RunNewEvalsOnTestExecutionSerializer,
 )
 

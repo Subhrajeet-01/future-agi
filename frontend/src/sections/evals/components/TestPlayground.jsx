@@ -20,11 +20,13 @@ import React, {
   useState,
 } from "react";
 import { useSnackbar } from "notistack";
+import { useSearchParams } from "react-router-dom";
 import { CreditExhaustionBanner } from "src/components/CreditExhaustionBanner";
 import Iconify from "src/components/iconify";
 import SvgColor from "src/components/svg-color";
 import { useCreditExhaustion } from "src/hooks/use-credit-exhaustion";
 import axios, { endpoints } from "src/utils/axios";
+import { extractCodeEvaluateParams } from "src/utils/codeEvalParams";
 import { extractJinjaVariables } from "src/utils/jinjaVariables";
 import { canonicalEntries } from "src/utils/utils";
 import { camelCaseToTitleCase } from "src/utils/utils";
@@ -628,6 +630,11 @@ const TestPlayground = React.forwardRef(
       templateFormat = "mustache",
       functionParamsSchema = null,
       configParamsDesc = null,
+      codeParams: controlledCodeParams = null,
+      onCodeParamsChange,
+      code = "",
+      codeLanguage = "python",
+      isSystemEval = false,
       onReadyChange,
     },
     ref,
@@ -658,7 +665,25 @@ const TestPlayground = React.forwardRef(
     const [hoveredVersionId, setHoveredVersionId] = useState(null);
     const [menuVersion, setMenuVersion] = useState(null);
     const [selectedVersionId, setSelectedVersionId] = useState(null);
+    const [searchParams] = useSearchParams();
 
+    const urlVersionParam = searchParams.get("v");
+    useEffect(() => {
+      const list = versionsData?.versions || [];
+      if (!list.length) return;
+      if (urlVersionParam) {
+        const match = list.find(
+      ver =>
+            String(ver.version_number ?? ver.versionNumber) ===
+            String(urlVersionParam),
+        );
+        if (match && match.id !== selectedVersionId) {
+          setSelectedVersionId(match.id);
+        }
+      } else if (selectedVersionId) {
+        setSelectedVersionId(null);
+      }
+    }, [urlVersionParam, versionsData]);
     const handleVersionMenuOpen = useCallback((e, version) => {
       e.stopPropagation();
       setVersionMenuAnchor(e.currentTarget);
@@ -741,14 +766,23 @@ const TestPlayground = React.forwardRef(
         return Array.isArray(requiredKeys) ? [...new Set(requiredKeys)] : [];
       }
 
-      // For code evals: use explicit requiredKeys if provided (e.g. system evals define these),
-      // otherwise fall back to the standard input/output/expected trio.
+      // For code evals: system evals always have the canonical signature
+      // `evaluate(input, output, expected, context, **kwargs)` and store
+      // the real keys in YAML required_keys — use those directly.
+      // User-authored code is live-parsed so newly typed kwargs surface
+      // as mapping rows. Standard trio is the last-resort fallback.
       let codeStdVars = [];
       if (evalType === "code") {
-        codeStdVars =
-          Array.isArray(requiredKeys) && requiredKeys.length > 0
-            ? requiredKeys
-            : ["input", "output", "expected"];
+        if (isSystemEval) {
+          codeStdVars =
+            Array.isArray(requiredKeys) && requiredKeys.length > 0
+              ? requiredKeys
+              : ["input", "output", "expected"];
+        } else {
+          const liveParams = extractCodeEvaluateParams(code, codeLanguage);
+          codeStdVars =
+            liveParams.length > 0 ? liveParams : ["input", "output", "expected"];
+        }
       }
 
       if (!instructions && evalType !== "code") return [...codeStdVars];
@@ -762,7 +796,16 @@ const TestPlayground = React.forwardRef(
         vars = matches.map((m) => m.replace(/\{\{|\}\}/g, "").trim());
       }
       return [...new Set([...codeStdVars, ...vars])];
-    }, [instructions, evalType, requiredKeys, isComposite, templateFormat]);
+    }, [
+      instructions,
+      evalType,
+      requiredKeys,
+      isComposite,
+      templateFormat,
+      code,
+      codeLanguage,
+      isSystemEval,
+    ]);
 
     // Custom input values
     const [inputValues, setInputValues] = useState({});
@@ -776,15 +819,21 @@ const TestPlayground = React.forwardRef(
     }, []);
 
     // Schema-defined params for code evals (from function_params_schema)
-    const [codeParams, setCodeParams] = useState({});
+    const [internalCodeParams, setInternalCodeParams] = useState({});
+    const codeParams =
+      controlledCodeParams && typeof controlledCodeParams === "object"
+        ? controlledCodeParams
+        : internalCodeParams;
     const codeParamsRef = useRef(codeParams);
     useEffect(() => {
       codeParamsRef.current = codeParams;
     }, [codeParams]);
 
     const handleCodeParamChange = useCallback((key, value) => {
-      setCodeParams((prev) => ({ ...prev, [key]: value }));
-    }, []);
+      const next = { ...codeParamsRef.current, [key]: value };
+      setInternalCodeParams(next);
+      onCodeParamsChange?.(next);
+    }, [onCodeParamsChange]);
 
     const visibleFunctionParamEntries = React.useMemo(() => {
       if (!functionParamsSchema) return [];
@@ -805,25 +854,37 @@ const TestPlayground = React.forwardRef(
       Simulation: false,
     });
 
-    const handleDatasetReady = useCallback((isReady) => {
-      setTabReady((prev) =>
-        prev.Dataset === !!isReady ? prev : { ...prev, Dataset: !!isReady },
-      );
-    }, []);
-    const handleTracingReady = useCallback((isReady) => {
-      setTabReady((prev) =>
-        prev.Tracing === !!isReady ? prev : { ...prev, Tracing: !!isReady },
-      );
-    }, []);
-    const handleSimulationReady = useCallback((isReady) => {
-      setTabReady((prev) =>
-        prev.Simulation === !!isReady
-          ? prev
-          : { ...prev, Simulation: !!isReady },
-      );
-    }, []);
-
-    useEffect(() => {
+ 
+    const handleDatasetReady = useCallback(
+      (isReady, mapping) => {
+        setTabReady((prev) =>
+          prev.Dataset === !!isReady ? prev : { ...prev, Dataset: !!isReady },
+        );
+        onReadyChange?.(!!isReady, mapping);
+      },
+      [onReadyChange],
+    );
+    const handleTracingReady = useCallback(
+      (isReady, mapping) => {
+        setTabReady((prev) =>
+          prev.Tracing === !!isReady ? prev : { ...prev, Tracing: !!isReady },
+        );
+        onReadyChange?.(!!isReady, mapping);
+      },
+      [onReadyChange],
+    );
+    const handleSimulationReady = useCallback(
+      (isReady, mapping) => {
+        setTabReady((prev) =>
+          prev.Simulation === !!isReady
+            ? prev
+            : { ...prev, Simulation: !!isReady },
+        );
+        onReadyChange?.(!!isReady, mapping);
+      },
+      [onReadyChange],
+    );
+  useEffect(() => {
       if (!onReadyChange) return;
       onReadyChange(!!tabReady[activeTab]);
     }, [activeTab, tabReady, onReadyChange]);
@@ -1365,6 +1426,7 @@ const TestPlayground = React.forwardRef(
                   onReadyChange={handleTracingReady}
                   isComposite={isComposite}
                   compositeAdhocConfig={compositeAdhocConfig}
+                  hostsFilter
                 />
               )}
 
@@ -1440,9 +1502,19 @@ const TestPlayground = React.forwardRef(
                                 : String(schema?.default ?? "")
                             }
                             value={codeParams[key] ?? ""}
-                            onChange={(e) =>
-                              handleCodeParamChange(key, e.target.value)
-                            }
+                            onChange={(e) => {
+                              // BE's `type: number` schema rejects strings; coerce here.
+                              const raw = e.target.value;
+                              const isNumeric =
+                                schema?.type === "integer" ||
+                                schema?.type === "number";
+                              let next = raw;
+                              if (isNumeric && raw !== "") {
+                                const n = Number(raw);
+                                if (!Number.isNaN(n)) next = n;
+                              }
+                              handleCodeParamChange(key, next);
+                            }}
                             sx={{
                               flex: 1,
                               px: 1,
@@ -1592,7 +1664,7 @@ const TestPlayground = React.forwardRef(
                                 fontWeight: 600,
                                 fontFamily: "'IBM Plex Sans', sans-serif",
                                 color: isSelected
-                                  ? "common.white"
+                                  ? "primary.contrastText"
                                   : isDefault
                                     ? "info.main"
                                     : "text.primary",
@@ -1838,7 +1910,12 @@ TestPlayground.propTypes = {
   model: PropTypes.string,
   functionParamsSchema: PropTypes.object,
   configParamsDesc: PropTypes.object,
+  codeParams: PropTypes.object,
+  onCodeParamsChange: PropTypes.func,
+  code: PropTypes.string,
+  codeLanguage: PropTypes.string,
   onReadyChange: PropTypes.func,
+  isSystemEval: PropTypes.bool,
 };
 
 export default TestPlayground;

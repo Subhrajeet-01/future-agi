@@ -87,6 +87,7 @@ class SpanListQueryBuilder(BaseQueryBuilder):
         fb = ClickHouseFilterBuilder(
             table=self.TABLE,
             query_mode=ClickHouseFilterBuilder.QUERY_MODE_SPAN,
+            annotation_label_ids=self.annotation_label_ids,
         )
         extra_where, extra_params = fb.translate(self.filters)
         self.params.update(extra_params)
@@ -163,6 +164,7 @@ class SpanListQueryBuilder(BaseQueryBuilder):
         fb = ClickHouseFilterBuilder(
             table=self.TABLE,
             query_mode=ClickHouseFilterBuilder.QUERY_MODE_SPAN,
+            annotation_label_ids=self.annotation_label_ids,
         )
         extra_where, extra_params = fb.translate(self.filters)
         params = dict(self.params)
@@ -253,6 +255,7 @@ class SpanListQueryBuilder(BaseQueryBuilder):
             ) AS str_lists
         FROM {self.EVAL_TABLE} FINAL
         WHERE _peerdb_is_deleted = 0
+          AND (deleted = 0 OR deleted IS NULL)
           AND observation_span_id IN %(span_ids)s
           AND custom_eval_config_id IN %(eval_config_ids)s
         GROUP BY observation_span_id, custom_eval_config_id
@@ -283,6 +286,7 @@ class SpanListQueryBuilder(BaseQueryBuilder):
             anyLast(value) AS value
         FROM {self.ANNOTATION_TABLE} FINAL
         WHERE _peerdb_is_deleted = 0
+          AND deleted = false
           AND observation_span_id IN %(span_ids)s
           AND label_id IN %(label_ids)s
         GROUP BY observation_span_id, label_id
