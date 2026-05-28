@@ -77,3 +77,14 @@ export const buildGatewayFallbackPolicyCreatedPayload = ({
     },
   });
 };
+
+export const buildGatewayOnboardingCompletionHref = ({
+  eventName = "gateway_policy_created",
+} = {}) => {
+  const params = new URLSearchParams();
+  params.set("mode", "daily-quality");
+  params.set("source", "onboarding");
+  params.set("target_event", eventName);
+
+  return `/dashboard/home?${params.toString()}`;
+};

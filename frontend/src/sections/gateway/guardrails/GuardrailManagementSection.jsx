@@ -43,7 +43,10 @@ import GuardrailAnalyticsTab from "./GuardrailAnalyticsTab";
 import FeedbackSummaryCard from "./FeedbackSummaryCard";
 import GuardrailConfigTab from "../settings/GuardrailConfigTab";
 import { recordActivationEvent } from "src/sections/onboarding-home/api/onboarding-home-api";
-import { buildGatewayPolicyCreatedPayload } from "../gatewayOnboardingEvents";
+import {
+  buildGatewayOnboardingCompletionHref,
+  buildGatewayPolicyCreatedPayload,
+} from "../gatewayOnboardingEvents";
 
 // Tab slug <-> index mapping
 const TAB_SLUGS = [
@@ -366,6 +369,7 @@ const ConfigTab = () => {
   const { data: orgConfig, isLoading } = useOrgConfig();
   const createOrgConfig = useCreateOrgConfig();
   const { gatewayId } = useGatewayContext();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [localGuardrails, setLocalGuardrails] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -390,11 +394,11 @@ const ConfigTab = () => {
         routing: orgConfig?.routing || {},
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           setDirty(false);
           if (isOnboardingRoute) {
-            recordActivationEvent(
-              buildGatewayPolicyCreatedPayload({
+            try {
+              const eventPayload = buildGatewayPolicyCreatedPayload({
                 gatewayId,
                 policyId: "guardrail",
                 policyType: "guardrail",
@@ -403,8 +407,17 @@ const ConfigTab = () => {
                 metadata: {
                   guardrail_rule_count: guardrailRuleCount(toSave),
                 },
-              }),
-            ).catch(() => null);
+              });
+              await recordActivationEvent(eventPayload);
+              navigate(buildGatewayOnboardingCompletionHref(eventPayload), {
+                replace: true,
+              });
+            } catch {
+              enqueueSnackbar(
+                "Guardrail saved, but onboarding could not be completed. Please try again.",
+                { variant: "error" },
+              );
+            }
           }
         },
       },

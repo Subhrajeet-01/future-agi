@@ -94,6 +94,15 @@ describe("FallbacksSection onboarding activation", () => {
         idempotencyKey: "gateway_policy_created:fallback:req-123:gateway-1",
       }),
     );
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/dashboard/home");
+    });
+    expect(new URLSearchParams(window.location.search).get("mode")).toBe(
+      "daily-quality",
+    );
+    expect(
+      new URLSearchParams(window.location.search).get("target_event"),
+    ).toBe("gateway_policy_created");
   });
 
   it("does not record policy completion outside onboarding route context", async () => {

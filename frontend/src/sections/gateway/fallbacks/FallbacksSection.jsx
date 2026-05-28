@@ -31,7 +31,10 @@ import { useProviderHealth } from "../providers/hooks/useGatewayConfig";
 import { useGatewayContext } from "../context/useGatewayContext";
 import GatewayOnboardingFocusPanel from "../components/GatewayOnboardingFocusPanel";
 import { recordActivationEvent } from "src/sections/onboarding-home/api/onboarding-home-api";
-import { buildGatewayFallbackPolicyCreatedPayload } from "../gatewayOnboardingEvents";
+import {
+  buildGatewayFallbackPolicyCreatedPayload,
+  buildGatewayOnboardingCompletionHref,
+} from "../gatewayOnboardingEvents";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -490,13 +493,19 @@ const FallbacksSection = () => {
       await saveRouting(draft);
       setHasChanges(false);
       if (showOnboardingFocus) {
-        recordActivationEvent(
-          buildGatewayFallbackPolicyCreatedPayload({
+        try {
+          const eventPayload = buildGatewayFallbackPolicyCreatedPayload({
             gatewayId,
             requestId: onboardingRequestId,
             routing: draft,
-          }),
-        ).catch(() => null);
+          });
+          await recordActivationEvent(eventPayload);
+          navigate(buildGatewayOnboardingCompletionHref(eventPayload), {
+            replace: true,
+          });
+        } catch {
+          // Keep the policy save intact if activation recording is unavailable.
+        }
       }
     } catch {
       // error handled by mutation

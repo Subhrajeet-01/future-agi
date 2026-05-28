@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGatewayFallbackPolicyCreatedPayload,
+  buildGatewayOnboardingCompletionHref,
   buildGatewayPolicyCreatedPayload,
 } from "./gatewayOnboardingEvents";
 
@@ -76,5 +77,11 @@ describe("gatewayOnboardingEvents", () => {
       },
       idempotencyKey: "gateway_policy_created:budget:req-123:gateway-1",
     });
+  });
+
+  it("builds the gateway onboarding completion destination", () => {
+    expect(buildGatewayOnboardingCompletionHref()).toBe(
+      "/dashboard/home?mode=daily-quality&source=onboarding&target_event=gateway_policy_created",
+    );
   });
 });

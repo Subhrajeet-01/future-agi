@@ -12,10 +12,14 @@ import {
   MenuItem,
   Typography,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { enqueueSnackbar } from "notistack";
 import { useSetBudget } from "../providers/hooks/useGatewayConfig";
 import { recordActivationEvent } from "src/sections/onboarding-home/api/onboarding-home-api";
-import { buildGatewayPolicyCreatedPayload } from "../gatewayOnboardingEvents";
+import {
+  buildGatewayOnboardingCompletionHref,
+  buildGatewayPolicyCreatedPayload,
+} from "../gatewayOnboardingEvents";
 
 const BUDGET_LEVELS = [
   {
@@ -71,6 +75,7 @@ const SetBudgetDialog = ({
   onboardingRequestId,
   shouldRecordOnboardingCompletion = false,
 }) => {
+  const navigate = useNavigate();
   const isEditMode = Boolean(budget);
   const [level, setLevel] = useState("");
   const [limit, setLimit] = useState("");
@@ -109,13 +114,13 @@ const SetBudgetDialog = ({
     setBudgetMutation.mutate(
       { gatewayId, level, config },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           const label =
             BUDGET_LEVELS.find((b) => b.value === level)?.label || level;
           enqueueSnackbar(`Budget "${label}" saved`, { variant: "success" });
           if (shouldRecordOnboardingCompletion) {
-            recordActivationEvent(
-              buildGatewayPolicyCreatedPayload({
+            try {
+              const eventPayload = buildGatewayPolicyCreatedPayload({
                 gatewayId,
                 policyId: `budget:${level}`,
                 policyType: "budget",
@@ -127,8 +132,17 @@ const SetBudgetDialog = ({
                   alert_threshold: Number(alertThreshold),
                   on_exceed: onExceed,
                 },
-              }),
-            ).catch(() => null);
+              });
+              await recordActivationEvent(eventPayload);
+              navigate(buildGatewayOnboardingCompletionHref(eventPayload), {
+                replace: true,
+              });
+            } catch {
+              enqueueSnackbar(
+                "Budget saved, but onboarding could not be completed. Please try again.",
+                { variant: "error" },
+              );
+            }
           }
           onClose();
         },

@@ -7,6 +7,7 @@ import GuardrailManagementSection from "./GuardrailManagementSection";
 
 const mockCreateOrgConfigMutate = vi.fn();
 const mockRecordActivationEvent = vi.fn();
+const mockNavigate = vi.hoisted(() => vi.fn());
 
 let mockOrgConfigReturn;
 
@@ -15,7 +16,7 @@ vi.mock("react-router-dom", async () => {
   return {
     ...actual,
     useParams: () => ({ tab: "configuration" }),
-    useNavigate: () => vi.fn(),
+    useNavigate: () => mockNavigate,
   };
 });
 
@@ -121,6 +122,12 @@ describe("GuardrailManagementSection onboarding activation", () => {
           guardrail_rule_count: 1,
         }),
       }),
+    );
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith(
+        "/dashboard/home?mode=daily-quality&source=onboarding&target_event=gateway_policy_created",
+        { replace: true },
+      ),
     );
   });
 

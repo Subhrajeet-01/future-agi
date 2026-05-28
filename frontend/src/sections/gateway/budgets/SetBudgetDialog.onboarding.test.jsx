@@ -34,6 +34,12 @@ describe("SetBudgetDialog onboarding activation", () => {
   });
 
   it("records policy completion after saving an onboarding budget", async () => {
+    window.history.pushState(
+      {},
+      "Budgets",
+      "/dashboard/gateway/budgets?source=onboarding&request_id=req-123",
+    );
+
     render(
       <SetBudgetDialog
         open
@@ -70,6 +76,15 @@ describe("SetBudgetDialog onboarding activation", () => {
         }),
       }),
     );
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/dashboard/home");
+    });
+    expect(new URLSearchParams(window.location.search).get("mode")).toBe(
+      "daily-quality",
+    );
+    expect(
+      new URLSearchParams(window.location.search).get("target_event"),
+    ).toBe("gateway_policy_created");
   });
 
   it("does not record policy completion for ordinary budget saves", async () => {
