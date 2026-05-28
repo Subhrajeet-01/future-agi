@@ -101,6 +101,26 @@ describe("OpenAPI runtime contract", () => {
     ).toMatchObject({ ok: true });
   });
 
+  it("accepts JSON-valued Gateway guardrail config maps", () => {
+    expect(
+      validateContractedRequestConfig({
+        url: "/agentcc/gateways/default/update-guardrail/",
+        method: "post",
+        data: {
+          name: "keyword-blocklist",
+          config: {
+            enabled: true,
+            action: "log",
+            confidence_threshold: 0.65,
+            config: {
+              words: ["browser_guardrail_smoke"],
+            },
+          },
+        },
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
   it("validates form bodies against the same request schema", () => {
     const body = new FormData();
     body.set("code", "123456");

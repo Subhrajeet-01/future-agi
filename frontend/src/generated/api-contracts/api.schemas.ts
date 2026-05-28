@@ -2860,7 +2860,7 @@ export interface GatewayConfigPatchRequestApi {
   model_map?: GatewayConfigPatchRequestApiModelMap;
 }
 
-export type GatewayNamedConfigRequestApiConfig = {[key: string]: string};
+export type GatewayNamedConfigRequestApiConfig = {[key: string]: unknown};
 
 export interface GatewayNamedConfigRequestApi {
   /** @minLength 1 */

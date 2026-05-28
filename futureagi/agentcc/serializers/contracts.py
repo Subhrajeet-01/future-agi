@@ -328,7 +328,7 @@ class GatewayToggleGuardrailRequestSerializer(serializers.Serializer):
 
 class GatewayNamedConfigRequestSerializer(serializers.Serializer):
     name = serializers.CharField()
-    config = serializers.DictField()
+    config = serializers.DictField(child=serializers.JSONField())
 
 
 class GatewayPlaygroundTestRequestSerializer(serializers.Serializer):
