@@ -12,9 +12,13 @@ const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
 
 const APP_BASE = process.env.APP_BASE || "http://127.0.0.1:3032";
+const VIEWPORT_NAME = process.env.ONBOARDING_SMOKE_VIEWPORT || "desktop";
+const EXISTING_PROJECT = envFlag("ONBOARDING_SMOKE_EXISTING_PROJECT");
 const SCREENSHOT_PATH =
   process.env.ONBOARDING_HOME_OBSERVE_SCREENSHOT ||
-  "/tmp/onboarding-home-observe-smoke.png";
+  `/tmp/onboarding-home-observe-smoke-${VIEWPORT_NAME}${
+    EXISTING_PROJECT ? "-existing-project" : ""
+  }.png`;
 const STUB_AUTH = envFlag("ONBOARDING_SMOKE_STUB_AUTH");
 const STUB_ONBOARDING = process.env.ONBOARDING_SMOKE_STUB_ONBOARDING !== "0";
 
@@ -34,12 +38,14 @@ async function main() {
   const evidence = {
     stub_auth: STUB_AUTH,
     stub_onboarding: STUB_ONBOARDING,
+    viewport: VIEWPORT_NAME,
+    existing_project: EXISTING_PROJECT,
   };
 
   const browser = await puppeteer.launch({
     executablePath: browserExecutablePath(),
     headless: process.env.HEADLESS !== "0",
-    defaultViewport: { width: 1440, height: 950 },
+    defaultViewport: viewportForName(VIEWPORT_NAME),
     args: ["--no-sandbox"],
   });
 
@@ -150,6 +156,9 @@ async function main() {
     await expectVisibleText(page, "Install Dependencies", { exact: true });
     await expectVisibleText(page, "Setup Telemetry", { exact: true });
     await expectVisibleText(page, "Setup Instrumentation", { exact: true });
+    if (EXISTING_PROJECT) {
+      await expectVisibleText(page, "New Projects", { exact: true });
+    }
     await waitForNoVisibleText(page, "Invalid Date");
 
     await waitForCondition(
@@ -334,11 +343,19 @@ async function installRuntime(
         status: true,
         result: {
           metadata: {
-            total_rows: 0,
+            total_rows: EXISTING_PROJECT ? 1 : 0,
             page_number: 0,
             page_size: 25,
           },
-          projects: [],
+          projects: EXISTING_PROJECT
+            ? [
+                {
+                  id: "observe-smoke-project",
+                  name: "Observe smoke project",
+                  project_type: "observe",
+                },
+              ]
+            : [],
         },
       });
       return;
@@ -673,6 +690,19 @@ function browserExecutablePath() {
   }
   if (process.platform === "linux") return "/usr/bin/google-chrome";
   return undefined;
+}
+
+function viewportForName(name) {
+  if (name === "mobile") {
+    return {
+      width: 390,
+      height: 844,
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 2,
+    };
+  }
+  return { width: 1440, height: 950 };
 }
 
 main().catch((error) => {
