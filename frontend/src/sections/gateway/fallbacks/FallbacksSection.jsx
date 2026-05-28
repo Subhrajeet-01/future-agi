@@ -30,6 +30,8 @@ import { useFallbackConfig } from "./hooks/useFallbackConfig";
 import { useProviderHealth } from "../providers/hooks/useGatewayConfig";
 import { useGatewayContext } from "../context/useGatewayContext";
 import GatewayOnboardingFocusPanel from "../components/GatewayOnboardingFocusPanel";
+import { recordActivationEvent } from "src/sections/onboarding-home/api/onboarding-home-api";
+import { buildGatewayFallbackPolicyCreatedPayload } from "../gatewayOnboardingEvents";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -487,6 +489,15 @@ const FallbacksSection = () => {
     try {
       await saveRouting(draft);
       setHasChanges(false);
+      if (showOnboardingFocus) {
+        recordActivationEvent(
+          buildGatewayFallbackPolicyCreatedPayload({
+            gatewayId,
+            requestId: onboardingRequestId,
+            routing: draft,
+          }),
+        ).catch(() => null);
+      }
     } catch {
       // error handled by mutation
     }
