@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildEvalCreateDraftHref,
   buildEvalDatasetCreatedPayload,
+  buildEvalFixRerunCompletedPayload,
   buildEvalFailureActionCreatedPayload,
   buildEvalFailuresReviewedPayload,
   buildEvalReviewDetailHref,
@@ -22,6 +23,7 @@ import {
   buildEvalSourceSetupHref,
   EVAL_CREATE_ONBOARDING_STEPS,
   EVAL_CREATE_SOURCE_TABS,
+  EVAL_FIX_RERUN_ORIGINS,
   evalCreateOnboardingStage,
   evalUsageLogMatchesRun,
   getEvalUsageLogId,
@@ -46,7 +48,24 @@ describe("evalCreateOnboarding", () => {
       ),
     ).toEqual({
       isOnboarding: true,
+      previousRunId: null,
+      rerunFrom: null,
       runId: "run-1",
+      sourceId: "data-1",
+      sourceType: "dataset",
+      step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
+    });
+  });
+
+  it("parses fix-rerun context on eval create routes", () => {
+    expect(
+      getEvalCreateOnboardingParams(
+        "?source=onboarding&step=run&source_type=dataset&source_id=data-1&rerun_from=source_fix&previous_run_id=run-1",
+      ),
+    ).toMatchObject({
+      isOnboarding: true,
+      previousRunId: "run-1",
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
       sourceId: "data-1",
       sourceType: "dataset",
       step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
@@ -74,11 +93,13 @@ describe("evalCreateOnboarding", () => {
     expect(
       buildEvalScorerEditHref({
         evalId: "eval-1",
+        previousRunId: "run-1",
+        rerunFrom: EVAL_FIX_RERUN_ORIGINS.SCORER_EDIT,
         sourceId: "data-1",
         sourceType: "dataset",
       }),
     ).toBe(
-      "/dashboard/evaluations/create/eval-1?source=onboarding&step=scorer&source_type=dataset&source_id=data-1",
+      "/dashboard/evaluations/create/eval-1?source=onboarding&step=scorer&source_type=dataset&source_id=data-1&rerun_from=scorer_edit&previous_run_id=run-1",
     );
     expect(buildEvalScorerEditHref()).toBeNull();
     expect(
@@ -89,6 +110,17 @@ describe("evalCreateOnboarding", () => {
       }),
     ).toBe(
       "/dashboard/evaluations/create/eval-1?source=onboarding&step=run&source_type=dataset&source_id=data-1",
+    );
+    expect(
+      buildEvalRunStepHref({
+        evalId: "eval-1",
+        previousRunId: "run-1",
+        rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+        sourceId: "data-1",
+        sourceType: "dataset",
+      }),
+    ).toBe(
+      "/dashboard/evaluations/create/eval-1?source=onboarding&step=run&source_type=dataset&source_id=data-1&rerun_from=source_fix&previous_run_id=run-1",
     );
   });
 
@@ -299,6 +331,50 @@ describe("evalCreateOnboarding", () => {
         step: "run",
       },
       idempotencyKey: "eval_run_completed:data-1:eval-1:log-1",
+    });
+    expect(payload.metadata).not.toHaveProperty("output");
+    expect(payload.metadata).not.toHaveProperty("reason");
+  });
+
+  it("builds a fix-rerun completed payload without result content", () => {
+    const payload = buildEvalFixRerunCompletedPayload({
+      evalId: "eval-1",
+      evalType: "agent",
+      mode: "single",
+      previousRunId: "run-1",
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
+      result: {
+        log_id: "run-2",
+        output: "Do not include result content",
+        reason: "Do not include result content",
+      },
+      sourceId: "data-1",
+      sourceType: "dataset",
+    });
+
+    expect(payload).toMatchObject({
+      eventName: "onboarding_eval_fix_rerun_completed",
+      primaryPath: "evals",
+      stage: "fix_eval_source",
+      source: "eval_review_onboarding",
+      artifactType: "eval_run",
+      artifactId: "run-2",
+      metadata: {
+        eval_id: "eval-1",
+        eval_type: "agent",
+        is_composite: false,
+        log_id: "run-2",
+        mode: "single",
+        previous_run_id: "run-1",
+        rerun_from: "source_fix",
+        run_id: "run-2",
+        source_id: "data-1",
+        source_type: "dataset",
+        status: "completed",
+        step: "run",
+      },
+      idempotencyKey:
+        "onboarding_eval_fix_rerun_completed:source_fix:run-1:run-2",
     });
     expect(payload.metadata).not.toHaveProperty("output");
     expect(payload.metadata).not.toHaveProperty("reason");

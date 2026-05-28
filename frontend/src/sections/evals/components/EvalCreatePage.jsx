@@ -48,6 +48,7 @@ import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/use
 import EvalOnboardingFocusPanel from "./EvalOnboardingFocusPanel";
 import {
   buildEvalCreateDraftHref,
+  buildEvalFixRerunCompletedPayload,
   buildEvalReviewStepHref,
   buildEvalRouteFocusPayload,
   buildEvalRunCompletedPayload,
@@ -300,6 +301,22 @@ const EvalCreatePage = () => {
             sourceType: onboardingParams.sourceType,
           }),
         );
+        if (onboardingParams.rerunFrom) {
+          recordActivationEvent?.(
+            buildEvalFixRerunCompletedPayload({
+              evalId: draftId,
+              evalType: mode === "composite" ? "composite" : evalType,
+              isComposite: mode === "composite",
+              mode,
+              previousRunId: onboardingParams.previousRunId,
+              rerunFrom: onboardingParams.rerunFrom,
+              result,
+              runId: completedRunId,
+              sourceId: onboardingParams.sourceId,
+              sourceType: onboardingParams.sourceType,
+            }),
+          );
+        }
         navigate(
           buildEvalReviewStepHref({
             evalId: draftId,
@@ -599,6 +616,8 @@ const EvalCreatePage = () => {
         shouldContinueToRunStep
           ? buildEvalRunStepHref({
               evalId: draftId,
+              previousRunId: onboardingParams.previousRunId,
+              rerunFrom: onboardingParams.rerunFrom,
               sourceId: onboardingParams.sourceId,
               sourceType: onboardingParams.sourceType,
             })

@@ -52,6 +52,7 @@ import {
   buildEvalRunStepHref,
   buildEvalSourceFixRerunClickedPayload,
   buildEvalSourceFixRouteFocusPayload,
+  EVAL_FIX_RERUN_ORIGINS,
   getEvalSourceFixOnboardingCopy,
   getEvalSourceFixOnboardingParams,
 } from "src/sections/evals/components/evalCreateOnboarding";
@@ -158,6 +159,8 @@ const DevelopDetailView = () => {
 
     return buildEvalRunStepHref({
       evalId: sourceFixOnboardingParams.evalId,
+      previousRunId: sourceFixOnboardingParams.runId,
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SOURCE_FIX,
       sourceId: sourceFixOnboardingParams.sourceId,
       sourceType: sourceFixOnboardingParams.sourceType,
     });

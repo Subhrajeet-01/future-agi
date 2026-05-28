@@ -6,6 +6,11 @@ const EVAL_FIX_STEP = "fix-eval-failure";
 const EVAL_REVIEW_STEP = "review";
 const EVAL_REVIEW_STAGE = "review_eval_failures";
 
+export const EVAL_FIX_RERUN_ORIGINS = {
+  SCORER_EDIT: "scorer_edit",
+  SOURCE_FIX: "source_fix",
+};
+
 export const EVAL_CREATE_ONBOARDING_STEPS = {
   DATA: "data",
   SCORER: "scorer",
@@ -103,6 +108,7 @@ const EVAL_SOURCE_FIX_COPY = {
 };
 
 const validSteps = new Set(Object.values(EVAL_CREATE_ONBOARDING_STEPS));
+const validFixRerunOrigins = new Set(Object.values(EVAL_FIX_RERUN_ORIGINS));
 
 const compactMetadata = (metadata = {}) =>
   Object.fromEntries(
@@ -121,6 +127,18 @@ const toSearchParams = (search = "") =>
     ? new URLSearchParams(search)
     : new URLSearchParams(search);
 
+const normalizeFixRerunOrigin = (value) =>
+  validFixRerunOrigins.has(value) ? value : null;
+
+const appendEvalFixRerunParams = (
+  params,
+  { previousRunId, rerunFrom } = {},
+) => {
+  const normalizedRerunFrom = normalizeFixRerunOrigin(rerunFrom);
+  if (normalizedRerunFrom) params.set("rerun_from", normalizedRerunFrom);
+  if (previousRunId) params.set("previous_run_id", previousRunId);
+};
+
 export const getEvalCreateOnboardingParams = (search = "") => {
   const params = toSearchParams(search);
   const rawStep = params.get("step");
@@ -130,6 +148,8 @@ export const getEvalCreateOnboardingParams = (search = "") => {
 
   return {
     isOnboarding: params.get("source") === "onboarding",
+    previousRunId: params.get("previous_run_id"),
+    rerunFrom: normalizeFixRerunOrigin(params.get("rerun_from")),
     runId: params.get("run_id"),
     sourceId: params.get("source_id"),
     sourceType: params.get("source_type"),
@@ -198,6 +218,8 @@ export const buildEvalScorerSourceHref = ({ sourceId } = {}) => {
 
 export const buildEvalScorerEditHref = ({
   evalId,
+  previousRunId,
+  rerunFrom,
   sourceId,
   sourceType,
 } = {}) => {
@@ -208,16 +230,24 @@ export const buildEvalScorerEditHref = ({
   params.set("step", EVAL_CREATE_ONBOARDING_STEPS.SCORER);
   if (sourceType) params.set("source_type", sourceType);
   if (sourceId) params.set("source_id", sourceId);
+  appendEvalFixRerunParams(params, { previousRunId, rerunFrom });
 
   return `/dashboard/evaluations/create/${evalId}?${params.toString()}`;
 };
 
-export const buildEvalRunStepHref = ({ evalId, sourceId, sourceType } = {}) => {
+export const buildEvalRunStepHref = ({
+  evalId,
+  previousRunId,
+  rerunFrom,
+  sourceId,
+  sourceType,
+} = {}) => {
   const params = new URLSearchParams();
   params.set("source", "onboarding");
   params.set("step", EVAL_CREATE_ONBOARDING_STEPS.RUN);
   if (sourceType) params.set("source_type", sourceType);
   if (sourceId) params.set("source_id", sourceId);
+  appendEvalFixRerunParams(params, { previousRunId, rerunFrom });
 
   return `/dashboard/evaluations/create/${evalId}?${params.toString()}`;
 };
@@ -579,6 +609,56 @@ export const buildEvalRunCompletedPayload = ({
       "eval_run_completed",
       safeKeyPart(sourceId, "no-source"),
       safeKeyPart(evalId, "no-eval"),
+      artifactId,
+    ].join(":"),
+    isSample: false,
+  };
+};
+
+export const buildEvalFixRerunCompletedPayload = ({
+  evalId,
+  evalType,
+  isComposite = false,
+  mode,
+  previousRunId,
+  rerunFrom,
+  result = {},
+  runId,
+  sourceId,
+  sourceType,
+} = {}) => {
+  const normalizedRerunFrom = normalizeFixRerunOrigin(rerunFrom);
+  const resultRunId = getEvalRunResultId(result);
+  const artifactId = safeKeyPart(runId || resultRunId || evalId, "eval-run");
+
+  return {
+    eventName: "onboarding_eval_fix_rerun_completed",
+    primaryPath: "evals",
+    stage: "fix_eval_source",
+    source: "eval_review_onboarding",
+    artifactType: "eval_run",
+    artifactId,
+    metadata: compactMetadata({
+      eval_id: evalId,
+      eval_type: evalType,
+      eval_log_id: result?.eval_log_id,
+      eval_task_id: result?.eval_task_id,
+      evaluation_id: result?.evaluation_id,
+      is_composite: Boolean(isComposite),
+      log_id: result?.log_id,
+      mode,
+      previous_run_id: previousRunId,
+      rerun_from: normalizedRerunFrom,
+      run_id: runId || resultRunId,
+      source_id: sourceId,
+      source_type: sourceType,
+      status: result?.status || "completed",
+      step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
+    }),
+    idempotencyKey: [
+      "onboarding_eval_fix_rerun_completed",
+      safeKeyPart(normalizedRerunFrom, "rerun"),
+      safeKeyPart(previousRunId, "no-previous-run"),
       artifactId,
     ].join(":"),
     isSample: false,

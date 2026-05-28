@@ -45,6 +45,7 @@ import {
   buildEvalScorerEditHref,
   buildEvalSourceFixCtaClickedPayload,
   buildEvalSourceFixHref,
+  EVAL_FIX_RERUN_ORIGINS,
   evalUsageLogMatchesRun,
   getEvalUsageLogId,
   getEvalUsageReviewOutcome,
@@ -457,11 +458,14 @@ const EvalUsageTab = ({
 
     return buildEvalScorerEditHref({
       evalId: templateId,
+      previousRunId: failureActionOnboardingParams.runId,
+      rerunFrom: EVAL_FIX_RERUN_ORIGINS.SCORER_EDIT,
       sourceId: failureActionOnboardingParams.sourceId,
       sourceType: failureActionOnboardingParams.sourceType,
     });
   }, [
     failureActionOnboardingParams.isOnboarding,
+    failureActionOnboardingParams.runId,
     failureActionOnboardingParams.sourceId,
     failureActionOnboardingParams.sourceType,
     failureActionOnboardingParams.step,
