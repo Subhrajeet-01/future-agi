@@ -8,7 +8,9 @@ import {
   buildEvalRunCompletedPayload,
   buildEvalScorerCreatedPayload,
   EVAL_CREATE_ONBOARDING_STEPS,
+  EVAL_CREATE_SOURCE_TABS,
   evalCreateOnboardingStage,
+  getEvalCreateInitialSourceTab,
   getEvalCreateOnboardingCopy,
   getEvalCreateOnboardingParams,
   getEvalReviewOnboardingCopy,
@@ -53,6 +55,30 @@ describe("evalCreateOnboarding", () => {
     expect(evalCreateOnboardingStage(EVAL_CREATE_ONBOARDING_STEPS.RUN)).toBe(
       "run_eval",
     );
+  });
+
+  it("chooses the initial source tab for onboarding create routes", () => {
+    expect(
+      getEvalCreateInitialSourceTab({
+        isOnboarding: true,
+        step: EVAL_CREATE_ONBOARDING_STEPS.DATA,
+      }),
+    ).toBe(EVAL_CREATE_SOURCE_TABS.DATASET);
+
+    expect(
+      getEvalCreateInitialSourceTab({
+        isOnboarding: true,
+        sourceType: "trace_project",
+        step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
+      }),
+    ).toBe(EVAL_CREATE_SOURCE_TABS.TRACING);
+
+    expect(
+      getEvalCreateInitialSourceTab({
+        isOnboarding: false,
+        step: EVAL_CREATE_ONBOARDING_STEPS.DATA,
+      }),
+    ).toBe(EVAL_CREATE_SOURCE_TABS.CUSTOM);
   });
 
   it("builds a safe route focus payload", () => {

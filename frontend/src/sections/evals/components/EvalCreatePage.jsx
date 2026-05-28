@@ -52,6 +52,7 @@ import {
   buildEvalRunCompletedPayload,
   buildEvalScorerCreatedPayload,
   EVAL_CREATE_ONBOARDING_STEPS,
+  getEvalCreateInitialSourceTab,
   getEvalCreateOnboardingCopy,
   getEvalCreateOnboardingParams,
 } from "./evalCreateOnboarding";
@@ -167,6 +168,10 @@ const EvalCreatePage = () => {
   );
   const onboardingCopy = useMemo(
     () => getEvalCreateOnboardingCopy(onboardingParams),
+    [onboardingParams],
+  );
+  const onboardingInitialSourceTab = useMemo(
+    () => getEvalCreateInitialSourceTab(onboardingParams),
     [onboardingParams],
   );
 
@@ -1350,6 +1355,7 @@ const EvalCreatePage = () => {
                   errorLocalizerEnabled={
                     mode === "composite" ? false : errorLocalizerEnabled
                   }
+                  initialSourceTab={onboardingInitialSourceTab}
                   templateFormat={templateFormat}
                 />
               </Box>

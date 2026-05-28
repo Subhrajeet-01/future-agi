@@ -9,10 +9,24 @@ export const EVAL_CREATE_ONBOARDING_STEPS = {
   RUN: "run",
 };
 
+export const EVAL_CREATE_SOURCE_TABS = {
+  CUSTOM: "Custom",
+  DATASET: "Dataset",
+  SIMULATION: "Simulation",
+  TRACING: "Tracing",
+};
+
 const STEP_TO_STAGE = {
   [EVAL_CREATE_ONBOARDING_STEPS.DATA]: "create_eval_dataset",
   [EVAL_CREATE_ONBOARDING_STEPS.SCORER]: "add_eval_scorer",
   [EVAL_CREATE_ONBOARDING_STEPS.RUN]: "run_eval",
+};
+
+const SOURCE_TYPE_TO_TAB = {
+  dataset: EVAL_CREATE_SOURCE_TABS.DATASET,
+  simulation: EVAL_CREATE_SOURCE_TABS.SIMULATION,
+  trace: EVAL_CREATE_SOURCE_TABS.TRACING,
+  trace_project: EVAL_CREATE_SOURCE_TABS.TRACING,
 };
 
 const STEP_COPY = {
@@ -97,6 +111,24 @@ export const getEvalCreateOnboardingParams = (search = "") => {
 
 export const getEvalCreateOnboardingCopy = ({ step } = {}) =>
   STEP_COPY[step] || STEP_COPY[EVAL_CREATE_ONBOARDING_STEPS.SCORER];
+
+export const getEvalCreateInitialSourceTab = ({
+  isOnboarding,
+  sourceType,
+  step,
+} = {}) => {
+  if (!isOnboarding) return EVAL_CREATE_SOURCE_TABS.CUSTOM;
+
+  if (step === EVAL_CREATE_ONBOARDING_STEPS.DATA) {
+    return SOURCE_TYPE_TO_TAB[sourceType] || EVAL_CREATE_SOURCE_TABS.DATASET;
+  }
+
+  if (step === EVAL_CREATE_ONBOARDING_STEPS.RUN && sourceType) {
+    return SOURCE_TYPE_TO_TAB[sourceType] || EVAL_CREATE_SOURCE_TABS.CUSTOM;
+  }
+
+  return EVAL_CREATE_SOURCE_TABS.CUSTOM;
+};
 
 export const buildEvalCreateDraftHref = (draftId, search = "") => {
   const query = toSearchParams(search).toString();

@@ -49,6 +49,9 @@ import {
 
 const SOURCE_TABS = ["Dataset", "Tracing", "Simulation", "Custom"];
 
+const normalizeSourceTab = (tab) =>
+  SOURCE_TABS.includes(tab) ? tab : "Custom";
+
 const camelizeKey = (key = "") =>
   key.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
 
@@ -635,12 +638,15 @@ const TestPlayground = React.forwardRef(
       code = "",
       codeLanguage = "python",
       isSystemEval = false,
+      initialSourceTab = "Custom",
       onReadyChange,
     },
     ref,
   ) => {
     const [activeMainTab, setActiveMainTab] = useState("test"); // "test" or "versions"
-    const [activeTab, setActiveTab] = useState("Custom");
+    const [activeTab, setActiveTab] = useState(() =>
+      normalizeSourceTab(initialSourceTab),
+    );
     const { data: versionsData } = useEvalVersions(templateId);
     const setDefaultVersion = useSetDefaultVersion(templateId);
     const restoreVersion = useRestoreVersion(templateId);
@@ -813,11 +819,14 @@ const TestPlayground = React.forwardRef(
       codeParamsRef.current = codeParams;
     }, [codeParams]);
 
-    const handleCodeParamChange = useCallback((key, value) => {
-      const next = { ...codeParamsRef.current, [key]: value };
-      setInternalCodeParams(next);
-      onCodeParamsChange?.(next);
-    }, [onCodeParamsChange]);
+    const handleCodeParamChange = useCallback(
+      (key, value) => {
+        const next = { ...codeParamsRef.current, [key]: value };
+        setInternalCodeParams(next);
+        onCodeParamsChange?.(next);
+      },
+      [onCodeParamsChange],
+    );
 
     const visibleFunctionParamEntries = React.useMemo(() => {
       if (!functionParamsSchema) return [];
@@ -1878,6 +1887,7 @@ TestPlayground.propTypes = {
   onCodeParamsChange: PropTypes.func,
   code: PropTypes.string,
   codeLanguage: PropTypes.string,
+  initialSourceTab: PropTypes.string,
   onReadyChange: PropTypes.func,
   isSystemEval: PropTypes.bool,
 };
