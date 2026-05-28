@@ -146,7 +146,8 @@ x-backend-env: &backend-env
 
   # Accounts: OSS self-host allows any email domain for signup / admin seeding.
   # The hosted SaaS gates this to work emails; self-hosters use whatever they
-  # have. Set ALLOW_ANY_EMAIL=false in .env to require work emails.
+  # have. The production overlay (deploy/docker-compose.production.yml) flips
+  # this default to false so EE/prod requires work emails by default.
   ALLOW_ANY_EMAIL: ${ALLOW_ANY_EMAIL:-true}
 
 

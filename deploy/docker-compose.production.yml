@@ -6,6 +6,11 @@ services:
   backend:
     environment:
       ENV_TYPE: production
+      # OSS root sets ALLOW_ANY_EMAIL=true by default for self-host
+      # friendliness; production should require work-email signups. Operator
+      # can flip back via ALLOW_ANY_EMAIL=true in .env if a specific
+      # deployment genuinely needs personal-email accounts.
+      ALLOW_ANY_EMAIL: ${ALLOW_ANY_EMAIL:-false}
       SECRET_KEY: ${SECRET_KEY:?must be set for production}
       AGENTCC_INTERNAL_API_KEY: ${AGENTCC_INTERNAL_API_KEY:?must be set for production}
       AGENTCC_ADMIN_TOKEN: ${AGENTCC_ADMIN_TOKEN:?must be set for production}
@@ -19,6 +24,9 @@ services:
   worker:
     environment:
       ENV_TYPE: production
+      # Same OSS-default override as the backend — kept in sync so all
+      # services sharing the &backend-env anchor land on the same value.
+      ALLOW_ANY_EMAIL: ${ALLOW_ANY_EMAIL:-false}
       SECRET_KEY: ${SECRET_KEY:?must be set for production}
       AGENTCC_INTERNAL_API_KEY: ${AGENTCC_INTERNAL_API_KEY:?must be set for production}
       AGENTCC_ADMIN_TOKEN: ${AGENTCC_ADMIN_TOKEN:?must be set for production}
