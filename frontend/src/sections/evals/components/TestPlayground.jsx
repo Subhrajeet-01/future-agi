@@ -41,7 +41,6 @@ import {
 import useErrorLocalizerPoll from "../hooks/useErrorLocalizerPoll";
 import EvalResultDisplay from "./EvalResultDisplay";
 import { buildCompositeRuntimeConfig } from "../Helpers/compositeRuntimeConfig";
-import VersionBadge from "./VersionBadge";
 import {
   useExecuteCompositeEval,
   useExecuteCompositeEvalAdhoc,
@@ -641,6 +640,7 @@ const TestPlayground = React.forwardRef(
       codeLanguage = "python",
       isSystemEval = false,
       initialSourceTab = "Custom",
+      initialTraceProjectId = null,
       onReadyChange,
     },
     ref,
@@ -998,6 +998,8 @@ const TestPlayground = React.forwardRef(
       }
     }, [
       variables,
+      evalType,
+      model,
       onTestResult,
       errorLocalizerEnabled,
       startErrorLocalizerPoll,
@@ -1410,6 +1412,7 @@ const TestPlayground = React.forwardRef(
                   onClearResult={onClearResult}
                   errorLocalizerEnabled={errorLocalizerEnabled}
                   onReadyChange={handleTracingReady}
+                  initialProjectId={initialTraceProjectId}
                   isComposite={isComposite}
                   compositeAdhocConfig={compositeAdhocConfig}
                   hostsFilter
@@ -1896,6 +1899,7 @@ TestPlayground.propTypes = {
   code: PropTypes.string,
   codeLanguage: PropTypes.string,
   initialSourceTab: PropTypes.string,
+  initialTraceProjectId: PropTypes.string,
   onReadyChange: PropTypes.func,
   isSystemEval: PropTypes.bool,
 };

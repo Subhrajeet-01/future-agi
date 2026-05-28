@@ -50,11 +50,31 @@ async function main() {
   });
 
   const page = await browser.newPage();
+  await page.evaluateOnNewDocument((apiBase) => {
+    window.__FUTURE_AGI_CONFIG__ = {
+      ...(window.__FUTURE_AGI_CONFIG__ || {}),
+      VITE_HOST_API: apiBase,
+    };
+  }, API_BASE);
   await page.setCacheEnabled(false);
   await page.setBypassServiceWorker(true);
+  await page.setRequestInterception(true);
+  const appOrigin = new URL(APP_BASE).origin;
+  const apiOrigin = new URL(API_BASE).origin;
   page.on("request", (request) => {
     const url = safeUrl(request.url());
-    if (!url || url.origin !== new URL(API_BASE).origin) return;
+    if (url?.origin === appOrigin && url.pathname === "/config.js") {
+      request.respond({
+        status: 200,
+        contentType: "application/javascript",
+        body: `window.__FUTURE_AGI_CONFIG__ = { VITE_HOST_API: ${JSON.stringify(API_BASE)} };`,
+      });
+      return;
+    }
+    if (!url || url.origin !== apiOrigin) {
+      request.continue();
+      return;
+    }
     const path = slashPath(url.pathname);
     if (path === "/accounts/signup/" && request.method() === "POST") {
       evidence.signupPosts.push(
@@ -87,6 +107,7 @@ async function main() {
     if (/^\/tracer\/trace\/[^/]+\/$/.test(path) && request.method() === "GET") {
       evidence.traceDetailRequests.push(path);
     }
+    request.continue();
   });
   page.on("response", async (response) => {
     const url = safeUrl(response.url());
@@ -120,9 +141,33 @@ async function main() {
     });
     await expectVisibleText(page, "Create an account");
 
-    await page.type('input[placeholder="Enter fullname"]', user.fullName);
-    await page.type('input[placeholder="Enter Email address"]', user.email);
-    await page.type('input[placeholder="Create password"]', user.password);
+    await page.waitForSelector('input[placeholder="Enter fullname"]', {
+      visible: true,
+      timeout: 30000,
+    });
+    await page.waitForSelector('input[placeholder="Enter Email address"]', {
+      visible: true,
+      timeout: 30000,
+    });
+    await page.waitForSelector('input[placeholder="Create password"]', {
+      visible: true,
+      timeout: 30000,
+    });
+    await fillVisibleInput(
+      page,
+      'input[placeholder="Enter fullname"]',
+      user.fullName,
+    );
+    await fillVisibleInput(
+      page,
+      'input[placeholder="Enter Email address"]',
+      user.email,
+    );
+    await fillVisibleInput(
+      page,
+      'input[placeholder="Create password"]',
+      user.password,
+    );
     await clickVisibleButtonText(page, "Create account and continue");
 
     await expectVisibleText(page, "What's your role");
@@ -461,6 +506,12 @@ async function main() {
       "Choose the data or trace source before adding the scorer.",
       { timeout: 45000 },
     );
+    await expectVisibleText(page, "Trace project selected", {
+      timeout: 45000,
+    });
+    await expectVisibleText(page, "Use this source to add a scorer next.", {
+      timeout: 45000,
+    });
     await waitForCondition(
       () =>
         evidence.activationEventPosts.some(
@@ -479,6 +530,79 @@ async function main() {
       45000,
     );
     const evalCreateOnboardingUrl = page.url();
+    await clickVisibleButtonText(page, "Use trace project", 45000);
+    await page.waitForFunction(
+      ({ projectId }) => {
+        const params = new URLSearchParams(window.location.search);
+        const isEvalCreateRoute =
+          window.location.pathname === "/dashboard/evaluations/create" ||
+          /^\/dashboard\/evaluations\/create\/[^/]+$/.test(
+            window.location.pathname,
+          );
+        return (
+          isEvalCreateRoute &&
+          params.get("source") === "onboarding" &&
+          params.get("step") === "scorer" &&
+          params.get("source_type") === "trace_project" &&
+          params.get("source_id") === projectId
+        );
+      },
+      { timeout: 45000 },
+      { projectId: realProject.projectId },
+    );
+    await expectVisibleTestId(page, "eval-onboarding-focus", {
+      timeout: 45000,
+    });
+    await expectVisibleText(page, "Scorer", { timeout: 45000 });
+    await expectVisibleText(page, "Add the eval scorer", { timeout: 45000 });
+    await expectVisibleText(
+      page,
+      "Save one scorer so FutureAGI can evaluate this source.",
+      { timeout: 45000 },
+    );
+    await expectVisibleText(page, "Trace project ready", { timeout: 45000 });
+    await expectVisibleText(
+      page,
+      "The next scorer you save will evaluate this source.",
+      { timeout: 45000 },
+    );
+    await waitForCondition(
+      () =>
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "onboarding_eval_source_selected" &&
+            payload?.primary_path === "evals" &&
+            payload?.stage === "create_eval_dataset" &&
+            payload?.source === "eval_create_onboarding" &&
+            payload?.artifact_type === "observe_project" &&
+            payload?.artifact_id === realProject.projectId &&
+            payload?.metadata?.source_id === realProject.projectId &&
+            payload?.metadata?.source_type === "trace_project" &&
+            payload?.metadata?.row_type === "Span" &&
+            payload?.metadata?.surface === "tracing" &&
+            payload?.metadata?.step === "data",
+        ),
+      "Expected eval source selected activation event.",
+      45000,
+    );
+    await waitForCondition(
+      () =>
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "onboarding_eval_route_focus_viewed" &&
+            payload?.primary_path === "evals" &&
+            payload?.stage === "add_eval_scorer" &&
+            payload?.source === "eval_create_onboarding" &&
+            payload?.artifact_type === "eval" &&
+            payload?.artifact_id === realProject.projectId &&
+            payload?.metadata?.source_id === realProject.projectId &&
+            payload?.metadata?.source_type === "trace_project" &&
+            payload?.metadata?.step === "scorer",
+        ),
+      "Expected focused eval scorer activation event.",
+      45000,
+    );
+    const evalScorerOnboardingUrl = page.url();
 
     assert(evidence.signupPosts.length === 1, "Expected one signup POST.");
     assert(evidence.tokenPosts.length === 1, "Expected one token POST.");
@@ -593,6 +717,18 @@ async function main() {
                 payload?.stage === "create_eval_dataset" &&
                 payload?.artifact_id === realProject.projectId,
             ),
+            eval_source_selected_event: evidence.activationEventPosts.find(
+              (payload) =>
+                payload?.event_name === "onboarding_eval_source_selected" &&
+                payload?.artifact_id === realProject.projectId,
+            ),
+            eval_scorer_focus_event: evidence.activationEventPosts.find(
+              (payload) =>
+                payload?.event_name === "onboarding_eval_route_focus_viewed" &&
+                payload?.stage === "add_eval_scorer" &&
+                payload?.artifact_id === realProject.projectId,
+            ),
+            eval_scorer_onboarding_url: evalScorerOnboardingUrl,
             post_review_home_url: postReviewHomeUrl,
             post_review_state: summarizeActivationState(postReviewState),
             real_observe_project: realProject,
@@ -643,6 +779,7 @@ async function main() {
           diagnostic: {
             ...evidence,
             body_text: await safeBodyText(page),
+            signup_form_state: await safeSignupFormState(page),
             page_errors: pageErrors,
             url: page.url(),
           },
@@ -719,6 +856,60 @@ async function expectNoVisibleText(page, text, { timeout = 30000 } = {}) {
     },
     { timeout },
     text,
+  );
+}
+
+async function fillVisibleInput(
+  page,
+  selector,
+  value,
+  { timeout = 30000 } = {},
+) {
+  await page.waitForFunction(
+    (targetSelector) => {
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          !element.disabled
+        );
+      };
+      return Array.from(document.querySelectorAll(targetSelector)).some(
+        isVisible,
+      );
+    },
+    { timeout },
+    selector,
+  );
+  await page.evaluate(
+    ({ targetSelector, nextValue }) => {
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          !element.disabled
+        );
+      };
+      const input = Array.from(document.querySelectorAll(targetSelector)).find(
+        isVisible,
+      );
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(input, nextValue);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+    { targetSelector: selector, nextValue: value },
   );
 }
 
@@ -847,7 +1038,7 @@ async function clickVisibleActionHref(
 }
 
 async function clickVisibleButtonText(page, text, timeout = 30000) {
-  await page.waitForFunction(
+  const handle = await page.waitForFunction(
     (expectedText) => {
       const normalized = (value) => String(value || "").trim();
       const isVisible = (element) => {
@@ -861,22 +1052,21 @@ async function clickVisibleButtonText(page, text, timeout = 30000) {
           !element.disabled
         );
       };
-      return Array.from(document.querySelectorAll("button")).some(
-        (element) =>
-          isVisible(element) &&
-          normalized(element.textContent) === expectedText,
+      return (
+        Array.from(document.querySelectorAll("button")).find(
+          (element) =>
+            isVisible(element) &&
+            normalized(element.textContent) === expectedText,
+        ) || false
       );
     },
     { timeout },
     text,
   );
-  await page.evaluate((expectedText) => {
-    const normalized = (value) => String(value || "").trim();
-    const button = Array.from(document.querySelectorAll("button")).find(
-      (element) => normalized(element.textContent) === expectedText,
-    );
-    button.click();
-  }, text);
+  const button = handle.asElement();
+  assert(button, `Expected visible button: ${text}`);
+  await button.click();
+  await handle.dispose();
 }
 
 function parseJsonPostData(requestOrData) {
@@ -1078,6 +1268,42 @@ async function safeBodyText(page) {
     ).slice(0, 1600);
   } catch (error) {
     return error.message;
+  }
+}
+
+async function safeSignupFormState(page) {
+  try {
+    return await page.evaluate(() => {
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      return {
+        runtime_config: window.__FUTURE_AGI_CONFIG__ || null,
+        inputs: Array.from(document.querySelectorAll("input")).map((input) => ({
+          name: input.name,
+          placeholder: input.getAttribute("placeholder"),
+          value: input.type === "password" ? "[redacted]" : input.value,
+          visible: isVisible(input),
+        })),
+        buttons: Array.from(document.querySelectorAll("button")).map(
+          (button) => ({
+            disabled: button.disabled,
+            text: String(button.textContent || "").trim(),
+            type: button.type,
+            visible: isVisible(button),
+          }),
+        ),
+      };
+    });
+  } catch (error) {
+    return { error: error.message };
   }
 }
 

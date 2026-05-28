@@ -25,6 +25,10 @@ describe("EvalOnboardingFocusPanel", () => {
         currentStep="Scorer"
         description="Save one scorer so this source can be evaluated."
         onViewed={onViewed}
+        primaryAction={{
+          label: "Use trace project",
+          onClick: vi.fn(),
+        }}
         sourceSummary={{
           description: "The next scorer you save will evaluate this source.",
           label: "Dataset ready",
@@ -50,6 +54,9 @@ describe("EvalOnboardingFocusPanel", () => {
     expect(screen.getByText("Source")).toBeVisible();
     expect(screen.getAllByText("Scorer").length).toBeGreaterThan(0);
     expect(screen.getByText("Run")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Use trace project" }),
+    ).toBeVisible();
     expect(onViewed).toHaveBeenCalledTimes(1);
   });
 });

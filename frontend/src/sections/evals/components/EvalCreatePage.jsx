@@ -54,6 +54,7 @@ import {
   buildEvalRunCompletedPayload,
   buildEvalRunStepHref,
   buildEvalScorerCreatedPayload,
+  buildEvalScorerSourceHref,
   buildEvalSourceSelectedPayload,
   buildEvalSourceSetupHref,
   EVAL_CREATE_ONBOARDING_STEPS,
@@ -168,7 +169,7 @@ const EvalCreatePage = () => {
   const createComposite = useCreateCompositeEval();
   const { mutate: recordActivationEvent } = useRecordActivationEvent();
   const testPlaygroundRef = useRef(null);
-  const recordedOnboardingFocusRef = useRef(false);
+  const recordedOnboardingFocusRef = useRef(new Set());
   const recordedSourceSelectionRef = useRef(new Set());
   const onboardingParams = useMemo(
     () => getEvalCreateOnboardingParams(location.search),
@@ -192,6 +193,16 @@ const EvalCreatePage = () => {
       onboardingParams.step === EVAL_CREATE_ONBOARDING_STEPS.DATA
     ) {
       return buildEvalSourceSetupHref();
+    }
+    return null;
+  }, [onboardingParams]);
+  const onboardingTraceProjectId = useMemo(() => {
+    if (
+      onboardingParams.isOnboarding &&
+      onboardingParams.sourceType === "trace_project" &&
+      onboardingParams.sourceId
+    ) {
+      return onboardingParams.sourceId;
     }
     return null;
   }, [onboardingParams]);
@@ -428,10 +439,16 @@ const EvalCreatePage = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOnboardingFocusViewed = useCallback(() => {
-    if (!onboardingParams.isOnboarding || recordedOnboardingFocusRef.current) {
+    if (!onboardingParams.isOnboarding) {
       return;
     }
-    recordedOnboardingFocusRef.current = true;
+    const focusKey = [
+      onboardingParams.step,
+      onboardingParams.sourceType || "source",
+      onboardingParams.sourceId || draftId || "route",
+    ].join(":");
+    if (recordedOnboardingFocusRef.current.has(focusKey)) return;
+    recordedOnboardingFocusRef.current.add(focusKey);
     recordActivationEvent?.(
       buildEvalRouteFocusPayload({
         draftId,
@@ -472,6 +489,52 @@ const EvalCreatePage = () => {
     },
     [draftId, onboardingParams, recordActivationEvent],
   );
+
+  const handleConfirmOnboardingSource = useCallback(() => {
+    if (
+      !onboardingParams.isOnboarding ||
+      onboardingParams.step !== EVAL_CREATE_ONBOARDING_STEPS.DATA ||
+      !onboardingParams.sourceId ||
+      !onboardingParams.sourceType
+    ) {
+      return;
+    }
+
+    handleOnboardingSourceSelected({
+      rowType: onboardingParams.sourceType === "trace_project" ? "Span" : null,
+      sourceId: onboardingParams.sourceId,
+      sourceType: onboardingParams.sourceType,
+      surface:
+        onboardingParams.sourceType === "trace_project" ? "tracing" : "route",
+    });
+    navigate(
+      buildEvalScorerSourceHref({
+        evalId: draftId,
+        sourceId: onboardingParams.sourceId,
+        sourceType: onboardingParams.sourceType,
+      }),
+    );
+  }, [draftId, handleOnboardingSourceSelected, navigate, onboardingParams]);
+
+  const onboardingPrimaryAction = useMemo(() => {
+    if (
+      !onboardingParams.isOnboarding ||
+      onboardingParams.step !== EVAL_CREATE_ONBOARDING_STEPS.DATA ||
+      !onboardingParams.sourceId ||
+      !onboardingParams.sourceType
+    ) {
+      return null;
+    }
+
+    return {
+      disabled: !draftId,
+      label:
+        onboardingParams.sourceType === "trace_project"
+          ? "Use trace project"
+          : "Use source",
+      onClick: handleConfirmOnboardingSource,
+    };
+  }, [draftId, handleConfirmOnboardingSource, onboardingParams]);
 
   const handleCreateOnboardingSource = useCallback(() => {
     if (!onboardingSourceSetupHref) return;
@@ -884,6 +947,7 @@ const EvalCreatePage = () => {
         description={onboardingCopy.description}
         hidden={!onboardingParams.isOnboarding}
         onViewed={handleOnboardingFocusViewed}
+        primaryAction={onboardingPrimaryAction}
         sourceSummary={onboardingSourceSummary}
         steps={onboardingCopy.steps}
         title={onboardingCopy.title}
@@ -1467,6 +1531,7 @@ const EvalCreatePage = () => {
                   initialSourceTab={onboardingInitialSourceTab}
                   onSourceSelected={handleOnboardingSourceSelected}
                   templateFormat={templateFormat}
+                  initialTraceProjectId={onboardingTraceProjectId}
                 />
               </Box>
 

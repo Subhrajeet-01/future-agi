@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import PropTypes from "prop-types";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -11,6 +12,7 @@ export default function EvalOnboardingFocusPanel({
   description,
   hidden = false,
   onViewed,
+  primaryAction = null,
   sourceSummary = null,
   steps = [],
   title,
@@ -95,6 +97,18 @@ export default function EvalOnboardingFocusPanel({
             ))}
           </Stack>
         ) : null}
+        {primaryAction?.label && primaryAction?.onClick ? (
+          <Button
+            size="small"
+            variant="contained"
+            onClick={primaryAction.onClick}
+            disabled={!!primaryAction.disabled}
+            startIcon={<Iconify icon="mdi:arrow-right" width={16} />}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {primaryAction.label}
+          </Button>
+        ) : null}
       </Stack>
     </Box>
   );
@@ -105,6 +119,11 @@ EvalOnboardingFocusPanel.propTypes = {
   description: PropTypes.string.isRequired,
   hidden: PropTypes.bool,
   onViewed: PropTypes.func,
+  primaryAction: PropTypes.shape({
+    disabled: PropTypes.bool,
+    label: PropTypes.string.isRequired,
+    onClick: PropTypes.func.isRequired,
+  }),
   sourceSummary: PropTypes.shape({
     description: PropTypes.string,
     label: PropTypes.string.isRequired,

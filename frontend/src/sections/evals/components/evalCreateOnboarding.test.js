@@ -92,6 +92,15 @@ describe("evalCreateOnboarding", () => {
       "/dashboard/evaluations/create?source=onboarding&step=scorer&source_type=dataset&source_id=data-1",
     );
     expect(
+      buildEvalScorerSourceHref({
+        evalId: "eval-1",
+        sourceId: "project-1",
+        sourceType: "trace_project",
+      }),
+    ).toBe(
+      "/dashboard/evaluations/create/eval-1?source=onboarding&step=scorer&source_type=trace_project&source_id=project-1",
+    );
+    expect(
       buildEvalScorerEditHref({
         evalId: "eval-1",
         previousRunId: "run-1",
@@ -183,7 +192,10 @@ describe("evalCreateOnboarding", () => {
         sourceType: "dataset",
         step: EVAL_CREATE_ONBOARDING_STEPS.DATA,
       }),
-    ).toBeNull();
+    ).toEqual({
+      description: "Use this source to add a scorer next.",
+      label: "Dataset selected",
+    });
   });
 
   it("builds a safe route focus payload", () => {
@@ -226,7 +238,7 @@ describe("evalCreateOnboarding", () => {
       primaryPath: "evals",
       stage: "create_eval_dataset",
       source: "eval_create_onboarding",
-      artifactType: "eval_source",
+      artifactType: "observe_project",
       artifactId: "project-1",
       metadata: {
         draft_id: "eval-1",

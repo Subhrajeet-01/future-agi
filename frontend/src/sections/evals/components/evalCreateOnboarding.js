@@ -44,6 +44,13 @@ const SOURCE_TYPE_LABELS = {
   trace_project: "Trace project",
 };
 
+const SOURCE_TYPE_ARTIFACT_TYPES = {
+  dataset: "dataset",
+  simulation: "project",
+  trace: "trace",
+  trace_project: "observe_project",
+};
+
 const STEP_COPY = {
   [EVAL_CREATE_ONBOARDING_STEPS.DATA]: {
     currentStep: "Source",
@@ -201,12 +208,15 @@ export const getEvalOnboardingSourceSummary = ({
   sourceType,
   step,
 } = {}) => {
-  if (
-    !isOnboarding ||
-    !sourceId ||
-    step === EVAL_CREATE_ONBOARDING_STEPS.DATA
-  ) {
+  if (!isOnboarding || !sourceId) {
     return null;
+  }
+
+  if (step === EVAL_CREATE_ONBOARDING_STEPS.DATA) {
+    return {
+      description: "Use this source to add a scorer next.",
+      label: `${SOURCE_TYPE_LABELS[sourceType] || "Source"} selected`,
+    };
   }
 
   return {
@@ -223,14 +233,18 @@ export const buildEvalCreateDraftHref = (draftId, search = "") => {
 export const buildEvalSourceSetupHref = () =>
   "/dashboard/develop?source=onboarding&action=create-eval-dataset";
 
-export const buildEvalScorerSourceHref = ({ sourceId } = {}) => {
+export const buildEvalScorerSourceHref = ({
+  evalId,
+  sourceId,
+  sourceType = "dataset",
+} = {}) => {
   const params = new URLSearchParams();
   params.set("source", "onboarding");
   params.set("step", EVAL_CREATE_ONBOARDING_STEPS.SCORER);
-  params.set("source_type", "dataset");
+  params.set("source_type", sourceType || "dataset");
   if (sourceId) params.set("source_id", sourceId);
 
-  return `/dashboard/evaluations/create?${params.toString()}`;
+  return `/dashboard/evaluations/create${evalId ? `/${evalId}` : ""}?${params.toString()}`;
 };
 
 export const buildEvalScorerEditHref = ({
@@ -519,7 +533,7 @@ export const buildEvalSourceSelectedPayload = ({
     primaryPath: "evals",
     stage: evalCreateOnboardingStage(normalizedStep),
     source: "eval_create_onboarding",
-    artifactType: "eval_source",
+    artifactType: SOURCE_TYPE_ARTIFACT_TYPES[sourceType] || "eval",
     artifactId,
     metadata: compactMetadata({
       draft_id: draftId,
