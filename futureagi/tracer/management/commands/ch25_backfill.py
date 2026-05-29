@@ -77,13 +77,15 @@ class Command(BaseCommand):
 
         argv = [
             sys.executable, str(candidate),
+            # Coerce passwords to str — None (e.g. legacy CLICKHOUSE.CH_PASSWORD
+            # unset) makes subprocess.call raise "expected str, not NoneType".
             "--pg-host", pg["HOST"], "--pg-port", str(pg["PORT"]),
-            "--pg-user", pg["USER"], "--pg-pass", pg["PASSWORD"], "--pg-db", pg["NAME"],
+            "--pg-user", pg["USER"], "--pg-pass", pg["PASSWORD"] or "", "--pg-db", pg["NAME"],
             "--ch-host", cfg["host"],
             "--ch-http-port", str(cfg["http_port"]),
             "--ch-tcp-port", str(cfg["tcp_port"]),
             "--ch-user", cfg["user"],
-            "--ch-pass", cfg["password"],
+            "--ch-pass", cfg["password"] or "",
             "--ch-db", cfg["database"],
             "--batch-size", str(opts["batch_size"]),
         ]
