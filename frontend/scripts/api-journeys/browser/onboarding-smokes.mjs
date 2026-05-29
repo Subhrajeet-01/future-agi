@@ -61,6 +61,17 @@ const SMOKES = [
     },
   },
   {
+    id: "onboarding-post-aha-fallback-controlled",
+    mode: "controlled",
+    file: "onboarding-home-observe-smoke.mjs",
+    description:
+      "Stubbed auth proof that post-Aha Home stays actionable without Daily Quality.",
+    env: {
+      ONBOARDING_SMOKE_STUB_AUTH: "1",
+      ONBOARDING_SMOKE_POST_AHA_HOME: "1",
+    },
+  },
+  {
     id: "signup-quick-start-real",
     mode: "real-signup",
     file: "signup-quick-start-smoke.mjs",

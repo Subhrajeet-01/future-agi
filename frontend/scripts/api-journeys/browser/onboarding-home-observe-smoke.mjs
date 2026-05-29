@@ -17,11 +17,14 @@ const VIEWPORT_NAME = process.env.ONBOARDING_SMOKE_VIEWPORT || "desktop";
 const EXISTING_PROJECT = envFlag("ONBOARDING_SMOKE_EXISTING_PROJECT");
 const EXISTING_TRACE =
   EXISTING_PROJECT && envFlag("ONBOARDING_SMOKE_EXISTING_TRACE");
+const POST_AHA_HOME = envFlag("ONBOARDING_SMOKE_POST_AHA_HOME");
 const SCREENSHOT_PATH =
   process.env.ONBOARDING_HOME_OBSERVE_SCREENSHOT ||
   `/tmp/onboarding-home-observe-smoke-${VIEWPORT_NAME}${
     EXISTING_PROJECT ? "-existing-project" : ""
-  }${EXISTING_TRACE ? "-first-trace" : ""}.png`;
+  }${EXISTING_TRACE ? "-first-trace" : ""}${
+    POST_AHA_HOME ? "-post-aha-fallback" : ""
+  }.png`;
 const STUB_AUTH = envFlag("ONBOARDING_SMOKE_STUB_AUTH");
 const STUB_ONBOARDING = process.env.ONBOARDING_SMOKE_STUB_ONBOARDING !== "0";
 
@@ -44,6 +47,7 @@ async function main() {
     viewport: VIEWPORT_NAME,
     existing_project: EXISTING_PROJECT,
     existing_trace: EXISTING_TRACE,
+    post_aha_home: POST_AHA_HOME,
   };
 
   const browser = await puppeteer.launch({
@@ -110,6 +114,74 @@ async function main() {
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   try {
+    if (POST_AHA_HOME) {
+      await page.goto(`${APP_BASE}/dashboard/home?source=onboarding`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.waitForFunction(
+        () =>
+          window.location.pathname === "/dashboard/home" &&
+          new URLSearchParams(window.location.search).get("source") ===
+            "onboarding",
+        { timeout: 30000 },
+      );
+
+      await expectSelector(page, '[data-testid="first-loop-complete-panel"]');
+      await expectVisibleText(page, "Aha moment reached", { exact: true });
+      await expectVisibleText(page, "Your first quality loop is live", {
+        exact: true,
+      });
+      await expectVisibleText(
+        page,
+        "Open the current loop next. Daily quality will take over when a reviewable signal is available.",
+        { exact: true },
+      );
+      const hasDailyQualityAction = await visibleActionExists(
+        page,
+        "Review daily quality",
+        { rootSelector: '[data-testid="first-loop-complete-panel"]' },
+      );
+      assert(
+        !hasDailyQualityAction,
+        "Post-Aha fallback should not show a Daily Quality action when the route is unavailable.",
+      );
+      const openObserveHref = await visibleLinkHrefByText(
+        page,
+        "Open observe",
+        {
+          rootSelector: '[data-testid="first-loop-complete-panel"]',
+        },
+      );
+      assert(
+        openObserveHref === "/dashboard/observe/observe-1",
+        `Unexpected post-Aha Observe CTA href: ${openObserveHref}`,
+      );
+      evidence.post_aha_open_observe_href = openObserveHref;
+      await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
+      evidence.screenshot = SCREENSHOT_PATH;
+      evidence.activation_state_requests = activationStateRequests.length;
+      assert(
+        apiFailures.length === 0,
+        `API failures: ${apiFailures.join("; ")}`,
+      );
+      assert(pageErrors.length === 0, `Page errors: ${pageErrors.join("; ")}`);
+      console.log(
+        JSON.stringify(
+          {
+            status: "passed",
+            app_base: APP_BASE,
+            api_base: auth.apiBase,
+            organization_id: auth.organizationId,
+            workspace_id: auth.workspaceId,
+            evidence,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
     await page.goto(`${APP_BASE}/dashboard/home?source=setup_org`, {
       waitUntil: "domcontentloaded",
     });
@@ -564,9 +636,30 @@ async function installRuntime(
 }
 
 function stubbedActivationState(auth, { firstTraceReady = false } = {}) {
-  const activationState = getActivationStateFixture(
-    firstTraceReady ? "observeFirstTraceReady" : "observeNoSetup",
-  );
+  const fixtureName = POST_AHA_HOME
+    ? "observeFirstLoopComplete"
+    : firstTraceReady
+      ? "observeFirstTraceReady"
+      : "observeNoSetup";
+  const activationState = getActivationStateFixture(fixtureName);
+  if (POST_AHA_HOME) {
+    return {
+      ...activationState,
+      request_id: "onboarding_home_observe_smoke",
+      organization_id: auth.organizationId,
+      workspace_id: auth.workspaceId,
+      user_id: auth.user.id,
+      route_availability: {
+        ...activationState.route_availability,
+        daily_quality_home: {
+          href: "/dashboard/home?mode=daily-quality",
+          is_available: false,
+          isAvailable: false,
+          reason: "feature_disabled",
+        },
+      },
+    };
+  }
   const firstTraceReviewHref =
     "/dashboard/observe/observe-smoke-project/trace/trace-smoke-1?source=onboarding&onboarding=review-first-trace";
   const recommendedAction =
@@ -912,6 +1005,33 @@ async function visibleLinkHrefByText(page, text, { rootSelector } = {}) {
       );
       const link = element?.tagName === "A" ? element : element?.closest("a");
       return link?.getAttribute("href") || null;
+    },
+    { expectedText: text, selector: rootSelector },
+  );
+}
+
+async function visibleActionExists(page, text, { rootSelector } = {}) {
+  return page.evaluate(
+    ({ expectedText, selector }) => {
+      const normalized = (value) => String(value || "").trim();
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      const root = selector ? document.querySelector(selector) : document.body;
+      return Array.from(
+        root?.querySelectorAll("a[href],button,[role='button']") || [],
+      ).some(
+        (candidate) =>
+          isVisible(candidate) &&
+          normalized(candidate.textContent) === expectedText,
+      );
     },
     { expectedText: text, selector: rootSelector },
   );
