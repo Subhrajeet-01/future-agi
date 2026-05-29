@@ -455,12 +455,9 @@ def create_eval_instance(
     ):
         config = eval_template.config.get("config")
 
-    # Per-attachment rule_prompt override wins over template + version.
-    # `runtime_config` is UserEvalMetric.config (dataset path) or
-    # CustomEvalConfig.config (tracer path). Applied AFTER the function-eval
-    # config reassignments above, otherwise those wipe the override for
-    # function-param / function_eval templates. Blank / whitespace-only
-    # values fall back to the template (matching is_rule_prompt_customized).
+    # Per-attachment rule_prompt override. Must run AFTER the function-eval
+    # config reassignments above, which would otherwise wipe it. Blank values
+    # fall back to the template.
     if config is not None and runtime_config:
         _rule_prompt_override = runtime_config.get("rule_prompt")
         if _rule_prompt_override and _rule_prompt_override.strip():

@@ -1,6 +1,6 @@
 """
 Regression tests for the per-attachment ``rule_prompt`` override in
-``evaluations.engine.instance.create_eval_instance`` (TH-4908).
+``evaluations.engine.instance.create_eval_instance``.
 
 The override (``runtime_config['rule_prompt']`` from CustomEvalConfig.config /
 UserEvalMetric.config) must win over the template default. Critically it must be
@@ -59,7 +59,7 @@ def _run(template_config, runtime_config):
 
 def test_override_survives_function_eval_reassignment(stub_db_helpers):
     # function_eval templates reassign `config` to template.config["config"];
-    # the override must land AFTER that, not before (the original TH-4908 bug).
+    # the override must land AFTER that, not before.
     captured = _run(
         template_config={
             "eval_type_id": "DeterministicEvaluator",

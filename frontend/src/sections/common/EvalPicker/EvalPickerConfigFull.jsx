@@ -437,10 +437,8 @@ const EvalPickerConfigFull = ({ evalData, onBack, onSave, isSaving }) => {
         ...(fullEval.config || {}),
         ...normalizedRunConfig,
       };
-      // Per-attachment saved override (TH-4908): a rule_prompt / messages saved
-      // on THIS attachment (evalData.config) must win over the template default,
-      // otherwise the editor re-hydrates from the template — hiding the override,
-      // killing the "Customized" banner, and clobbering the override on save.
+      // Saved per-attachment override must win over the template default,
+      // else re-opening hydrates from the template and a save clobbers it.
       const savedConfig = evalData?.config || {};
       if (savedConfig.rule_prompt) {
         config.rule_prompt = savedConfig.rule_prompt;
@@ -1357,19 +1355,13 @@ const EvalPickerConfigFull = ({ evalData, onBack, onSave, isSaving }) => {
                 )}
 
               {(() => {
-                // Precedence matches getEvalPromptText (rule_prompt wins) so the
-                // banner's "View template" / "Reset to default" use the same base
-                // the engine treats as the template default.
+                // Same precedence as getEvalPromptText so View/Reset use the engine's base.
                 const templateDefault =
                   fullEval?.config?.rule_prompt ||
                   fullEval?.instructions ||
                   fullEval?.criteria ||
                   "";
-                // The editable prompt lives in `messages` for llm evals and in
-                // `instructions` for agent evals — compare the right one. The
-                // load effect hydrates this from the saved per-attachment
-                // override, so a comparison against the template detects a
-                // customization on open AND clears correctly on "Reset".
+                // llm evals hold the prompt in messages, agent evals in instructions.
                 const currentPrompt =
                   (evalType === "llm"
                     ? messages?.[0]?.content || instructions
