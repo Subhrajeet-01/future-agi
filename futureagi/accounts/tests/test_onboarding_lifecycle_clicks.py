@@ -1,4 +1,5 @@
 from datetime import timedelta
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.utils import timezone
@@ -68,6 +69,11 @@ def test_valid_click_marks_clicked_and_redirects(client, organization, workspace
     assert response.status_code == 302
     assert response["Location"].startswith("/dashboard/home?onboarding=choose-goal")
     assert "source=onboarding_email" in response["Location"]
+    params = parse_qs(urlsplit(response["Location"]).query)
+    assert params["target_stage"] == ["choose_goal"]
+    assert params["target_route"] == ["/dashboard/home?onboarding=choose-goal"]
+    assert params["email_status"] == ["current"]
+    assert params["link_issued_at"]
     assert send_log.status == OnboardingLifecycleSendLog.STATUS_CLICKED
     assert send_log.clicked_at is not None
 
@@ -92,6 +98,9 @@ def test_stale_click_redirects_to_current_home(client, organization, workspace, 
     assert response["Location"].startswith("/dashboard/home?")
     assert "status=stale" in response["Location"]
     assert "stale_reason=target_complete" in response["Location"]
+    params = parse_qs(urlsplit(response["Location"]).query)
+    assert params["email_status"] == ["stale"]
+    assert params["target_stage"] == ["choose_goal"]
     assert send_log.metadata["stale_reason"] == "target_complete"
 
 

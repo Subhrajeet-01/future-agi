@@ -2666,6 +2666,9 @@ export const activationStateFixtures = {
     email_context: {
       campaign_key: "observe_waiting_for_first_trace",
       email_key: "observe_waiting_for_first_trace_1",
+      send_log_id: "send-123",
+      email_status: "stale",
+      link_issued_at: "2026-05-26T15:00:00Z",
       target_stage: "waiting_for_first_trace",
       target_event: "trace_received",
       target_route: "/dashboard/observe/observe-1",

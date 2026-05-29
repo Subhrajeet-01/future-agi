@@ -220,6 +220,71 @@ def test_activation_state_stale_email_query_reflects_current_state(auth_client, 
 
 
 @pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
+def test_activation_state_returns_lifecycle_email_context(auth_client, user):
+    user.goals = ["monitor_production_ai_app"]
+    user.save(update_fields=["goals"])
+
+    response = auth_client.get(
+        "/accounts/activation-state/"
+        "?source=onboarding_email"
+        "&campaign_key=observe_waiting_for_first_trace"
+        "&email_key=observe_waiting_for_first_trace_v1"
+        "&send_log_id=send-123"
+        "&email_status=stale"
+        "&target_stage=activated"
+        "&target_event=first_quality_loop_completed"
+        "&target_route=/dashboard/observe/observe-1"
+        "&link_issued_at=2026-05-26T15:00:00Z"
+        "&stale_reason=target_complete"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()["result"]
+    assert payload["stage"] == "connect_observability"
+    assert payload["email_context"] == {
+        "campaign_key": "observe_waiting_for_first_trace",
+        "email_key": "observe_waiting_for_first_trace_v1",
+        "send_log_id": "send-123",
+        "email_status": "stale",
+        "link_issued_at": "2026-05-26T15:00:00Z",
+        "target_stage": "activated",
+        "target_event": "first_quality_loop_completed",
+        "target_route": "/dashboard/observe/observe-1",
+        "context_status": "stale",
+        "stale_reason": "target_complete",
+        "resolved_href": "/dashboard/observe?setup=true&source=onboarding",
+    }
+    assert "email_context_stale" in payload["warnings"]
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
+def test_activation_state_does_not_echo_unsafe_email_target_route(auth_client, user):
+    user.goals = ["monitor_production_ai_app"]
+    user.save(update_fields=["goals"])
+
+    response = auth_client.get(
+        "/accounts/activation-state/"
+        "?source=onboarding_email"
+        "&campaign_key=observe_waiting_for_first_trace"
+        "&email_key=observe_waiting_for_first_trace_v1"
+        "&send_log_id=send-123"
+        "&email_status=current"
+        "&target_stage=connect_observability"
+        "&target_event=observe_project_created"
+        "&target_route=https://example.invalid/unsafe"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    email_context = response.json()["result"]["email_context"]
+    assert email_context["target_route"] is None
+    assert email_context["context_status"] == "route_unavailable"
+    assert email_context["stale_reason"] == "route_unavailable"
+    assert email_context["resolved_href"].startswith("/dashboard/")
+
+
+@pytest.mark.django_db
 def test_onboarding_goal_requires_auth(api_client):
     response = api_client.post(
         "/accounts/onboarding/goal/",

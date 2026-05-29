@@ -3,7 +3,10 @@ import uuid
 from django.utils import timezone
 
 from accounts.serializers.onboarding import ActivationStateResponseSerializer
-from accounts.services.onboarding.constants import ACTIVATION_SCHEMA_VERSION
+from accounts.services.onboarding.constants import (
+    ACTIVATION_SCHEMA_VERSION,
+    EMAIL_CONTEXT_STATUSES,
+)
 from accounts.services.onboarding.context import resolve_onboarding_context
 from accounts.services.onboarding.daily_quality import resolve_daily_quality_state
 from accounts.services.onboarding.feature_flags import get_onboarding_flags
@@ -167,6 +170,91 @@ def _last_event_payload(event):
     }
 
 
+def _safe_internal_href(value):
+    if not isinstance(value, str) or not value:
+        return None
+    if not value.startswith("/") or value.startswith("//"):
+        return None
+    return value
+
+
+def _action_href(action):
+    if not action:
+        return None
+    return _safe_internal_href(action.get("href")) or _safe_internal_href(
+        action.get("fallback_href")
+    )
+
+
+def _email_status_to_context_status(status):
+    if status in EMAIL_CONTEXT_STATUSES:
+        return status
+    if status in {"clicked", "fresh", "sent"}:
+        return "current"
+    if status == "missing":
+        return "invalid"
+    return None
+
+
+def _resolve_email_context(*, context, stage, recommended_action, fallback_action):
+    raw_context = context.email_context or {}
+    if not raw_context:
+        return None
+
+    target_route = _safe_internal_href(raw_context.get("target_route"))
+    email_status = raw_context.get("email_status")
+    context_status = _email_status_to_context_status(
+        raw_context.get("context_status") or email_status
+    )
+    stale_reason = raw_context.get("stale_reason")
+    target_stage = raw_context.get("target_stage")
+
+    if raw_context.get("target_route") and target_route is None:
+        context_status = "route_unavailable"
+        stale_reason = stale_reason or "route_unavailable"
+    elif stale_reason and context_status in {None, "current"}:
+        context_status = "stale"
+    elif target_stage and target_stage != stage:
+        context_status = "stale"
+        stale_reason = stale_reason or "stage_changed"
+    elif context_status is None:
+        context_status = "current"
+
+    resolved_href = (
+        target_route
+        if context_status == "current" and target_route
+        else _action_href(recommended_action)
+        or _action_href(fallback_action)
+        or "/dashboard/home"
+    )
+
+    email_context = {
+        "campaign_key": raw_context.get("campaign_key"),
+        "email_key": raw_context.get("email_key"),
+        "send_log_id": raw_context.get("send_log_id"),
+        "email_status": email_status,
+        "link_issued_at": raw_context.get("link_issued_at"),
+        "target_stage": target_stage,
+        "target_event": raw_context.get("target_event"),
+        "target_route": target_route,
+        "context_status": context_status,
+        "stale_reason": stale_reason,
+        "resolved_href": resolved_href,
+    }
+    return email_context
+
+
+def _append_email_context_warning(payload, email_context):
+    if not email_context:
+        return
+    status = email_context.get("context_status")
+    if not status or status == "current":
+        return
+    warning = f"email_context_{status}"
+    if warning not in payload["warnings"]:
+        payload["warnings"].append(warning)
+
+
 def _validate_payload(payload):
     serializer = ActivationStateResponseSerializer(data=payload)
     serializer.is_valid(raise_exception=True)
@@ -275,6 +363,13 @@ def resolve_activation_state(*, context, flags, signals):
         payload["route_availability"].update(daily_quality.route_availability)
         if daily_quality.recommended_action:
             payload["recommended_action"] = daily_quality.recommended_action
+    payload["email_context"] = _resolve_email_context(
+        context=context,
+        stage=stage,
+        recommended_action=payload["recommended_action"],
+        fallback_action=payload["fallback_action"],
+    )
+    _append_email_context_warning(payload, payload["email_context"])
     lifecycle = _lifecycle_preview(context, flags, payload, now)
     payload["lifecycle"] = lifecycle
     payload["email_eligibility"] = _apply_daily_quality_email_guardrail(

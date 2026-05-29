@@ -237,18 +237,25 @@ def _build_permissions(
 
 
 def _email_context(query_params):
-    keys = {
+    keys = (
         "campaign_key",
         "email_key",
+        "send_log_id",
+        "email_status",
         "target_stage",
         "target_event",
         "target_route",
-    }
+        "link_issued_at",
+        "stale_reason",
+        "context_status",
+    )
     context = {
         key: query_params.get(key)
         for key in keys
         if query_params.get(key) not in {None, ""}
     }
+    if "email_status" not in context and query_params.get("status") not in {None, ""}:
+        context["email_status"] = query_params.get("status")
     return context or None
 
 

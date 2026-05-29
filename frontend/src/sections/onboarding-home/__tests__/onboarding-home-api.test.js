@@ -74,10 +74,13 @@ describe("onboarding home API", () => {
       source: "email",
       campaignKey: "observe_waiting",
       emailKey: "observe_waiting_1",
+      sendLogId: "send-123",
+      emailStatus: "stale",
       targetStage: "waiting_for_first_trace",
       targetEvent: "trace_received",
       targetRoute: "/dashboard/observe/observe-1",
       linkIssuedAt: "2026-05-26T15:00:00Z",
+      staleReason: "target_complete",
       mode: "email",
     });
 
@@ -86,10 +89,13 @@ describe("onboarding home API", () => {
         source: "email",
         campaign_key: "observe_waiting",
         email_key: "observe_waiting_1",
+        send_log_id: "send-123",
+        email_status: "stale",
         target_stage: "waiting_for_first_trace",
         target_event: "trace_received",
         target_route: "/dashboard/observe/observe-1",
         link_issued_at: "2026-05-26T15:00:00Z",
+        stale_reason: "target_complete",
         mode: "email",
       },
     });

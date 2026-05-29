@@ -11,13 +11,18 @@ from accounts.services.onboarding.lifecycle_tokens import verify_lifecycle_token
 def _append_source_params(route, send_log, extra_params=None):
     parts = urlsplit(route)
     params = dict(parse_qsl(parts.query, keep_blank_values=True))
+    link_issued_at = send_log.sent_at or send_log.queued_at or send_log.created_at
     params.update(
         {
             "source": "onboarding_email",
             "campaign_key": send_log.campaign_key,
             "email_key": send_log.template_key,
+            "target_stage": send_log.activation_stage,
             "target_event": send_log.target_success_event or "",
+            "target_route": route,
             "send_log_id": str(send_log.id),
+            "email_status": "current",
+            "link_issued_at": link_issued_at.isoformat() if link_issued_at else "",
         }
     )
     if extra_params:
@@ -73,5 +78,9 @@ def resolve_lifecycle_click(token, *, now=None):
     mark_lifecycle_send_clicked(send_log, now=now, metadata=metadata)
     extra_params = None
     if stale_reason:
-        extra_params = {"status": "stale", "stale_reason": stale_reason}
+        extra_params = {
+            "status": "stale",
+            "email_status": "stale",
+            "stale_reason": stale_reason,
+        }
     return send_log, _append_source_params(route, send_log, extra_params)

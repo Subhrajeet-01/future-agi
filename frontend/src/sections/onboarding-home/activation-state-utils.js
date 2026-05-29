@@ -875,6 +875,9 @@ const normalizeEmailContext = (raw) => {
   return {
     campaignKey: raw.campaign_key ?? raw.campaignKey ?? null,
     emailKey: raw.email_key ?? raw.emailKey ?? null,
+    sendLogId: raw.send_log_id ?? raw.sendLogId ?? null,
+    emailStatus: raw.email_status ?? raw.emailStatus ?? null,
+    linkIssuedAt: raw.link_issued_at ?? raw.linkIssuedAt ?? null,
     targetStage: raw.target_stage ?? raw.targetStage ?? null,
     targetEvent: raw.target_event ?? raw.targetEvent ?? null,
     targetRoute: raw.target_route ?? raw.targetRoute ?? null,
@@ -988,7 +991,7 @@ export const normalizeActivationState = (raw) => {
     permissions: normalizePermissions(raw.permissions),
     featureFlags: raw.feature_flags || {},
     routeAvailability,
-    emailContext: normalizeEmailContext(raw.email_context),
+    emailContext: normalizeEmailContext(raw.email_context ?? raw.emailContext),
     lastMeaningfulEvent: normalizeLastMeaningfulEvent(
       raw.last_meaningful_event,
     ),

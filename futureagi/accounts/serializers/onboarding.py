@@ -1334,11 +1334,30 @@ class RouteAvailabilitySerializer(serializers.Serializer):
 
 
 class ActivationEmailContextSerializer(serializers.Serializer):
-    campaign_key = serializers.CharField()
-    email_key = serializers.CharField()
-    target_stage = serializers.ChoiceField(choices=choices(ACTIVATION_STAGES))
-    target_event = serializers.CharField()
-    target_route = serializers.CharField()
+    campaign_key = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    email_key = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    send_log_id = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    email_status = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    link_issued_at = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    target_stage = serializers.ChoiceField(
+        choices=choices(ACTIVATION_STAGES),
+        required=False,
+        allow_null=True,
+    )
+    target_event = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    target_route = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
     context_status = serializers.ChoiceField(choices=choices(EMAIL_CONTEXT_STATUSES))
     stale_reason = serializers.CharField(
         required=False, allow_blank=True, allow_null=True
@@ -1500,6 +1519,33 @@ class ActivationStateQuerySerializer(serializers.Serializer):
         allow_blank=True,
         allow_null=True,
     )
+    send_log_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    email_status = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    status = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    link_issued_at = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    stale_reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+    context_status = serializers.ChoiceField(
+        choices=choices(EMAIL_CONTEXT_STATUSES),
+        required=False,
+        allow_null=True,
+    )
+    mode = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     debug = serializers.BooleanField(required=False)
 
 

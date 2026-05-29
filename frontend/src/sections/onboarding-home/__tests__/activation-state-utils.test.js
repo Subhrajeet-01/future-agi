@@ -251,6 +251,57 @@ describe("activation-state utilities", () => {
     );
   });
 
+  it("normalizes lifecycle email context attribution", () => {
+    const staleLink = normalizeActivationState(
+      getActivationStateFixture("staleEmailLink"),
+    );
+
+    expect(staleLink.emailContext).toEqual({
+      campaignKey: "observe_waiting_for_first_trace",
+      emailKey: "observe_waiting_for_first_trace_1",
+      sendLogId: "send-123",
+      emailStatus: "stale",
+      linkIssuedAt: "2026-05-26T15:00:00Z",
+      targetStage: "waiting_for_first_trace",
+      targetEvent: "trace_received",
+      targetRoute: "/dashboard/observe/observe-1",
+      contextStatus: "stale",
+      staleReason: "stage_changed",
+      resolvedHref: "/dashboard/observe/observe-1/trace/trace-1",
+    });
+
+    const camelCaseContext = normalizeActivationState({
+      ...getActivationStateFixture("observeNoSetup"),
+      emailContext: {
+        campaignKey: "observe_waiting",
+        emailKey: "observe_waiting_1",
+        sendLogId: "send-456",
+        emailStatus: "fresh",
+        linkIssuedAt: "2026-05-27T12:00:00Z",
+        targetStage: "waiting_for_first_trace",
+        targetEvent: "trace_received",
+        targetRoute: "/dashboard/observe/observe-1",
+        contextStatus: "fresh",
+        staleReason: null,
+        resolvedHref: "/dashboard/observe/observe-1",
+      },
+    });
+
+    expect(camelCaseContext.emailContext).toEqual({
+      campaignKey: "observe_waiting",
+      emailKey: "observe_waiting_1",
+      sendLogId: "send-456",
+      emailStatus: "fresh",
+      linkIssuedAt: "2026-05-27T12:00:00Z",
+      targetStage: "waiting_for_first_trace",
+      targetEvent: "trace_received",
+      targetRoute: "/dashboard/observe/observe-1",
+      contextStatus: "fresh",
+      staleReason: null,
+      resolvedHref: "/dashboard/observe/observe-1",
+    });
+  });
+
   it("creates a renderable local fallback for hard API failures", () => {
     const fallback = makeActivationStateErrorFallback({
       message: "Network error",

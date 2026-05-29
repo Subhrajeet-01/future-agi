@@ -109,7 +109,7 @@ export default function OnboardingHomeView() {
       targetRoute: params.get("target_route"),
       linkIssuedAt: params.get("link_issued_at"),
       sendLogId: params.get("send_log_id"),
-      emailStatus: params.get("status"),
+      emailStatus: params.get("email_status") || params.get("status"),
       staleReason: params.get("stale_reason"),
       mode: params.get("mode"),
     };
