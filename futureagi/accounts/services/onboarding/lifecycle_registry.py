@@ -25,6 +25,8 @@ REQUIRED_FIELDS = (
     "template_key",
     "template_version",
     "campaign_group",
+    "email_subject",
+    "email_preheader",
     "primary_path",
     "entry_stages",
     "wait_window_minutes",

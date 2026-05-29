@@ -351,6 +351,11 @@ def test_helper_success_records_sent_log(
     assert sent_log.provider_status == "accepted"
     assert sent_log.click_url
     helper.assert_called_once()
+    assert helper.call_args.args[0] == log.registry_snapshot["email_subject"]
+    assert (
+        helper.call_args.args[2]["preheader_text"]
+        == (log.registry_snapshot["email_preheader"])
+    )
 
 
 @pytest.mark.django_db
@@ -467,6 +472,8 @@ def test_daily_quality_digest_send_log_carries_safe_preview(
         "onboarding_lifecycle/daily_quality_open_actions_v1.html"
     )
     template_context = helper.call_args.args[2]
+    assert helper.call_args.args[0] == campaign["email_subject"]
+    assert template_context["preheader_text"] == campaign["email_preheader"]
     assert template_context["digest_preview"]["actions"][0]["action_id"] == (
         "trace-action-1"
     )

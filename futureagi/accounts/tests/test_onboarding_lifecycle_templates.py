@@ -18,6 +18,7 @@ from accounts.services.onboarding.lifecycle_template_context import (
     render_lifecycle_email_preview,
 )
 from accounts.services.onboarding.lifecycle_template_contract import (
+    lifecycle_email_copy_for_campaign,
     required_context_keys_for_template,
 )
 
@@ -122,8 +123,12 @@ def test_lifecycle_email_template_renders_for_campaign(
         target_route=send_log.target_route,
         now=now,
     )
+    email_copy = lifecycle_email_copy_for_campaign(campaign)
 
-    assert preview["subject"]
+    assert preview["subject"] == email_copy["subject"]
+    assert preview["preheader"] == email_copy["preheader"]
+    assert preview["context"]["email_subject"] == email_copy["subject"]
+    assert preview["context"]["preheader_text"] == email_copy["preheader"]
     assert (
         preview["template"] == f"onboarding_lifecycle/{campaign['template_key']}.html"
     )
@@ -131,6 +136,7 @@ def test_lifecycle_email_template_renders_for_campaign(
         preview["context"]
     )
     assert "FutureAGI onboarding" in preview["html"]
+    assert email_copy["preheader"] in preview["html"]
     assert preview["context"]["primary_action_url"] in preview["html"]
     assert "snooze onboarding emails for 7 days" in preview["html"]
     assert "turn off onboarding lifecycle emails" in preview["html"]
@@ -141,6 +147,7 @@ def test_lifecycle_email_template_renders_for_campaign(
     assert "secret-value" not in preview["html"]
     assert "Sensitive debugging notes" not in preview["html"]
     assert preview["text"]
+    assert email_copy["preheader"] in preview["text"]
 
     if campaign.get("requires_digest_preview"):
         assert "Review trace regression" in preview["html"]
@@ -170,6 +177,10 @@ def test_lifecycle_preview_command_writes_no_send_snapshot(tmp_path):
     assert "snooze onboarding emails for 7 days" in html
     assert "Connect the first observe project" in text
     assert "welcome_resume_goal" in index
+    assert (
+        "| Campaign | Group | Template | Subject | Preheader | HTML | Text |" in index
+    )
+    assert "Create the project that will receive your first trace" in index
     assert "These previews are generated without sending email." in index
 
 
@@ -188,6 +199,7 @@ def test_lifecycle_preview_command_writes_all_campaign_snapshots(tmp_path):
     assert f"count={len(CAMPAIGN_KEYS)}" in output.getvalue()
     index = (tmp_path / "index.md").read_text()
     assert "daily_quality_open_actions" in index
+    assert "Review, assign, or dismiss the open item" in index
     assert (tmp_path / "daily_quality_open_actions.html").is_file()
     digest_html = (tmp_path / "daily_quality_open_actions.html").read_text()
     assert "Review trace regression" in digest_html

@@ -5,6 +5,8 @@ campaigns:
     template_key: welcome_choose_goal_v1
     template_version: "2026-05-27.1"
     campaign_group: welcome
+    email_subject: Choose one FutureAGI workflow to finish first
+    email_preheader: Pick the first setup path so the product can route you to the right next action.
     primary_path: any
     entry_stages:
       - choose_goal
@@ -24,6 +26,8 @@ campaigns:
     template_key: welcome_resume_goal_v1
     template_version: "2026-05-27.1"
     campaign_group: welcome
+    email_subject: Continue with your first observe project
+    email_preheader: Create the project that will receive your first trace and unlock the quality loop.
     primary_path: observe
     entry_stages:
       - connect_observability
@@ -43,6 +47,8 @@ campaigns:
     template_key: prompt_create_first_v1
     template_version: "2026-05-27.1"
     campaign_group: prompt
+    email_subject: Create the prompt you want to test
+    email_preheader: Start with one prompt so the next step can run an example and show a result.
     primary_path: prompt
     entry_stages:
       - start_prompt
@@ -62,6 +68,8 @@ campaigns:
     template_key: prompt_run_first_test_v1
     template_version: "2026-05-27.1"
     campaign_group: prompt
+    email_subject: Run one prompt test before editing
+    email_preheader: Use a single example to turn the prompt draft into a visible test result.
     primary_path: prompt
     entry_stages:
       - run_prompt_test
@@ -81,6 +89,8 @@ campaigns:
     template_key: prompt_save_baseline_v1
     template_version: "2026-05-27.1"
     campaign_group: prompt
+    email_subject: Save a baseline before the next edit
+    email_preheader: Keep the current result as a version so future prompt changes have a comparison point.
     primary_path: prompt
     entry_stages:
       - save_prompt_version
@@ -100,6 +110,8 @@ campaigns:
     template_key: prompt_compare_candidate_v1
     template_version: "2026-05-27.1"
     campaign_group: prompt
+    email_subject: See whether the next prompt edit is better
+    email_preheader: Compare the candidate against the baseline before deciding what to ship.
     primary_path: prompt
     entry_stages:
       - compare_prompt_versions
@@ -119,6 +131,8 @@ campaigns:
     template_key: prompt_add_failure_example_v1
     template_version: "2026-05-27.1"
     campaign_group: prompt
+    email_subject: Keep the failing example for future tests
+    email_preheader: Save the regression as eval data so the same issue is easier to catch next time.
     primary_path: prompt
     entry_stages:
       - prompt_next_loop
@@ -138,6 +152,8 @@ campaigns:
     template_key: agent_create_first_v1
     template_version: "2026-05-27.1"
     campaign_group: agent
+    email_subject: Create one agent task first
+    email_preheader: Define the task that the first scenario can run and inspect.
     primary_path: agent
     entry_stages:
       - create_agent
@@ -157,6 +173,8 @@ campaigns:
     template_key: agent_run_first_scenario_v1
     template_version: "2026-05-27.1"
     campaign_group: agent
+    email_subject: Run one agent scenario before users do
+    email_preheader: Generate the first prototype run so the trace can be reviewed before launch.
     primary_path: agent
     entry_stages:
       - run_agent_scenario
@@ -176,6 +194,8 @@ campaigns:
     template_key: agent_review_failed_scenario_v1
     template_version: "2026-05-27.1"
     campaign_group: agent
+    email_subject: Review the agent run that needs attention
+    email_preheader: Open the run output and inspect the failed step before saving eval coverage.
     primary_path: agent
     entry_stages:
       - review_agent_trace
@@ -195,6 +215,8 @@ campaigns:
     template_key: agent_save_scenario_v1
     template_version: "2026-05-27.1"
     campaign_group: agent
+    email_subject: Save this agent scenario as a regression test
+    email_preheader: Turn the reviewed scenario into a reusable check for future changes.
     primary_path: agent
     entry_stages:
       - save_agent_eval
@@ -214,6 +236,8 @@ campaigns:
     template_key: agent_create_eval_v1
     template_version: "2026-05-27.1"
     campaign_group: agent
+    email_subject: Turn agent scenarios into eval coverage
+    email_preheader: Group saved scenarios into an eval so future runs can be measured.
     primary_path: agent
     entry_stages:
       - agent_create_eval
@@ -233,6 +257,8 @@ campaigns:
     template_key: agent_sample_bridge_v1
     template_version: "2026-05-27.1"
     campaign_group: agent
+    email_subject: Try a sample agent scenario first
+    email_preheader: Review sample behavior before connecting a real agent workflow.
     primary_path: agent
     entry_stages:
       - create_agent
@@ -252,6 +278,8 @@ campaigns:
     template_key: gateway_add_provider_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: Add the provider your gateway will route to
+    email_preheader: Connect one provider so a gateway key can send the first request.
     primary_path: gateway
     entry_stages:
       - configure_gateway_provider
@@ -271,6 +299,8 @@ campaigns:
     template_key: gateway_create_key_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: Create a gateway key for one route
+    email_preheader: Generate the key that lets your app send traffic through the gateway.
     primary_path: gateway
     entry_stages:
       - create_gateway_key
@@ -290,6 +320,8 @@ campaigns:
     template_key: gateway_send_first_request_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: Send one request through the gateway
+    email_preheader: Make the first request so latency, provider, and policy behavior become visible.
     primary_path: gateway
     entry_stages:
       - run_gateway_request
@@ -309,6 +341,8 @@ campaigns:
     template_key: gateway_review_request_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: Review your first gateway request
+    email_preheader: Open the request log to inspect route, provider, latency, and outcome.
     primary_path: gateway
     entry_stages:
       - review_gateway_log
@@ -328,6 +362,8 @@ campaigns:
     template_key: gateway_fix_failed_request_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: Review the failed gateway request
+    email_preheader: Inspect the failure details before changing provider, route, or policy settings.
     primary_path: gateway
     entry_stages:
       - fix_gateway_failure
@@ -347,6 +383,8 @@ campaigns:
     template_key: gateway_add_policy_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: Add one control to your gateway route
+    email_preheader: Use a policy to make the route safer before more traffic goes through it.
     primary_path: gateway
     entry_stages:
       - add_gateway_policy
@@ -366,6 +404,8 @@ campaigns:
     template_key: gateway_sample_bridge_v1
     template_version: "2026-05-27.1"
     campaign_group: gateway
+    email_subject: See a sample routed request first
+    email_preheader: Review sample gateway traffic before sending your own production request.
     primary_path: gateway
     entry_stages:
       - run_gateway_request
@@ -385,6 +425,8 @@ campaigns:
     template_key: observe_connect_first_v1
     template_version: "2026-05-27.1"
     campaign_group: recovery
+    email_subject: Connect one observe project first
+    email_preheader: Create the project that will receive your first trace and start quality review.
     primary_path: observe
     entry_stages:
       - connect_observability
@@ -404,6 +446,8 @@ campaigns:
     template_key: observe_waiting_for_first_trace_v1
     template_version: "2026-05-27.1"
     campaign_group: recovery
+    email_subject: Send one trace to see the quality signal
+    email_preheader: Once a real trace arrives, FutureAGI can show the first review action.
     primary_path: observe
     entry_stages:
       - waiting_for_first_trace
@@ -424,6 +468,8 @@ campaigns:
     template_key: observe_sample_bridge_v1
     template_version: "2026-05-27.1"
     campaign_group: sample
+    email_subject: Review a sample trace before connecting data
+    email_preheader: Open sample data to see the review loop without treating it as live traffic.
     primary_path: observe
     entry_stages:
       - waiting_for_first_trace
@@ -444,6 +490,8 @@ campaigns:
     template_key: observe_first_trace_ready_v1
     template_version: "2026-05-27.1"
     campaign_group: first_signal
+    email_subject: Review your first AI trace
+    email_preheader: A real trace is ready, so review the signal and decide the next quality action.
     primary_path: observe
     entry_stages:
       - review_first_trace
@@ -463,6 +511,8 @@ campaigns:
     template_key: observe_next_loop_v1
     template_version: "2026-05-27.1"
     campaign_group: next_loop
+    email_subject: Create one evaluator from the trace
+    email_preheader: Turn the reviewed trace into a repeatable quality check for future traffic.
     primary_path: observe
     entry_stages:
       - create_trace_evaluator
@@ -482,6 +532,8 @@ campaigns:
     template_key: first_loop_complete_next_v1
     template_version: "2026-05-27.1"
     campaign_group: activation_success
+    email_subject: Your first AI quality loop is live
+    email_preheader: Open daily quality to review the next signal after your first loop.
     primary_path: observe
     entry_stages:
       - activated
@@ -502,6 +554,8 @@ campaigns:
     template_key: daily_quality_open_actions_v1
     template_version: "2026-05-27.1"
     campaign_group: activation_success
+    email_subject: A quality action is waiting for review
+    email_preheader: Review, assign, or dismiss the open item from the daily quality view.
     primary_path: observe
     entry_stages:
       - activated

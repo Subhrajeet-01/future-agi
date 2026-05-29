@@ -8,15 +8,12 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 from accounts.services.onboarding.lifecycle_template_contract import (
-    LIFECYCLE_CAMPAIGN_SUBJECTS,
     TEMPLATE_PREFIX,
+    lifecycle_email_copy_for_campaign,
 )
 from accounts.services.onboarding.lifecycle_tokens import sign_lifecycle_token
 
 SUPPORT_URL = "/dashboard/settings/support"
-
-
-SUBJECTS = LIFECYCLE_CAMPAIGN_SUBJECTS
 
 
 def _base_url():
@@ -49,10 +46,11 @@ def template_path(template_key):
 
 
 def subject_for_campaign(campaign):
-    return SUBJECTS.get(
-        campaign.get("campaign_group"),
-        "Continue your FutureAGI setup",
-    )
+    return lifecycle_email_copy_for_campaign(campaign)["subject"]
+
+
+def preheader_for_campaign(campaign):
+    return lifecycle_email_copy_for_campaign(campaign)["preheader"]
 
 
 def build_lifecycle_template_context(*, send_log, campaign, target_route, now=None):
@@ -74,10 +72,13 @@ def build_lifecycle_template_context(*, send_log, campaign, target_route, now=No
         send_log.recommended_action_id,
         send_log.campaign_group,
     )
+    email_copy = lifecycle_email_copy_for_campaign(campaign)
 
     return {
         "user_name": user_name,
         "workspace_name": workspace_name,
+        "email_subject": email_copy["subject"],
+        "preheader_text": email_copy["preheader"],
         "campaign_key": send_log.campaign_key,
         "campaign_family": send_log.campaign_group,
         "template_key": send_log.template_key,
@@ -108,7 +109,8 @@ def render_lifecycle_email_preview(*, send_log, campaign, target_route, now=None
     html = render_to_string(template, context)
     text = " ".join(unescape(strip_tags(html)).split())
     return {
-        "subject": subject_for_campaign(campaign),
+        "subject": context["email_subject"],
+        "preheader": context["preheader_text"],
         "template": template,
         "context": context,
         "html": html,

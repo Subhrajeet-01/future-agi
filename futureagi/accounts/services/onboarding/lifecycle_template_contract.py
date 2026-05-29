@@ -2,18 +2,27 @@ from pathlib import Path
 
 TEMPLATE_PREFIX = "onboarding_lifecycle"
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "templates" / TEMPLATE_PREFIX
+EMAIL_SUBJECT_MAX_LENGTH = 78
+EMAIL_PREHEADER_MAX_LENGTH = 120
 
-LIFECYCLE_CAMPAIGN_SUBJECTS = {
-    "welcome": "Pick the first FutureAGI setup path",
-    "recovery": "Continue your FutureAGI setup",
-    "sample": "Use a sample trace while you connect data",
-    "first_signal": "Your first trace is ready to review",
-    "prompt": "Continue your prompt quality loop",
-    "agent": "Continue your agent quality loop",
-    "gateway": "Continue your gateway request loop",
-    "next_loop": "Turn the trace review into coverage",
-    "activation_success": "Review today's AI quality signal",
+DEFAULT_LIFECYCLE_EMAIL_COPY = {
+    "subject": "Continue your FutureAGI setup",
+    "preheader": "Open the next setup step for this workspace.",
 }
+
+SUPPORTED_LIFECYCLE_CAMPAIGN_GROUPS = frozenset(
+    {
+        "activation_success",
+        "agent",
+        "first_signal",
+        "gateway",
+        "next_loop",
+        "prompt",
+        "recovery",
+        "sample",
+        "welcome",
+    }
+)
 
 SUPPORTED_LIFECYCLE_TEMPLATE_KEYS = frozenset(
     {
@@ -51,6 +60,8 @@ BASE_REQUIRED_CONTEXT_KEYS = frozenset(
     {
         "primary_action_label",
         "primary_action_url",
+        "email_subject",
+        "preheader_text",
         "snooze_url",
         "unsubscribe_url",
         "user_name",
@@ -75,6 +86,38 @@ def template_file_path(template_key):
     return TEMPLATE_DIR / f"{template_key}.html"
 
 
+def lifecycle_email_copy_for_campaign(campaign):
+    campaign = campaign or {}
+    subject = campaign.get("email_subject")
+    preheader = campaign.get("email_preheader")
+    if isinstance(subject, str):
+        subject = subject.strip()
+    else:
+        subject = ""
+    if isinstance(preheader, str):
+        preheader = preheader.strip()
+    else:
+        preheader = ""
+    return {
+        "subject": subject or DEFAULT_LIFECYCLE_EMAIL_COPY["subject"],
+        "preheader": preheader or DEFAULT_LIFECYCLE_EMAIL_COPY["preheader"],
+    }
+
+
+def _copy_text_errors(value, field_name, max_length):
+    if not isinstance(value, str) or not value.strip():
+        return [f"{field_name} must be a non-empty string."]
+    value = value.strip()
+    errors = []
+    if len(value) > max_length:
+        errors.append(f"{field_name} must be {max_length} characters or fewer.")
+    if "\n" in value or "\r" in value:
+        errors.append(f"{field_name} must be a single line.")
+    if "{{" in value or "{%" in value:
+        errors.append(f"{field_name} must not contain template syntax.")
+    return errors
+
+
 def lifecycle_template_contract_errors(campaign):
     template_key = campaign.get("template_key")
     campaign_group = campaign.get("campaign_group")
@@ -86,8 +129,30 @@ def lifecycle_template_contract_errors(campaign):
         return tuple(errors)
     if not template_file_path(template_key).is_file():
         errors.append("template_key references missing lifecycle template file.")
-    if campaign_group not in LIFECYCLE_CAMPAIGN_SUBJECTS:
-        errors.append("campaign_group has no lifecycle email subject.")
+    if campaign_group not in SUPPORTED_LIFECYCLE_CAMPAIGN_GROUPS:
+        errors.append("campaign_group is not supported by lifecycle email.")
+    subject = campaign.get("email_subject")
+    preheader = campaign.get("email_preheader")
+    errors.extend(
+        _copy_text_errors(
+            subject,
+            "email_subject",
+            EMAIL_SUBJECT_MAX_LENGTH,
+        )
+    )
+    errors.extend(
+        _copy_text_errors(
+            preheader,
+            "email_preheader",
+            EMAIL_PREHEADER_MAX_LENGTH,
+        )
+    )
+    if (
+        isinstance(subject, str)
+        and isinstance(preheader, str)
+        and subject.strip().lower() == preheader.strip().lower()
+    ):
+        errors.append("email_preheader must not repeat email_subject.")
     if template_key in DIGEST_PREVIEW_TEMPLATE_KEYS and not requires_digest_preview:
         errors.append("requires_digest_preview must be true for this template.")
     if requires_digest_preview and template_key not in DIGEST_PREVIEW_TEMPLATE_KEYS:

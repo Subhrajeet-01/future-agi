@@ -111,19 +111,25 @@ def _campaigns_for_snapshot(campaign_key=None):
     return lifecycle_campaigns()
 
 
+def _markdown_cell(value):
+    return str(value).replace("\n", " ").replace("|", "\\|")
+
+
 def _markdown_index(rows):
     lines = [
         "# Onboarding lifecycle email previews",
         "",
         "These previews are generated without sending email.",
         "",
-        "| Campaign | Group | Template | Subject | HTML | Text |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Campaign | Group | Template | Subject | Preheader | HTML | Text |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         lines.append(
             "| {campaign_key} | {campaign_group} | {template_key} | {subject} | "
-            "[html]({html_file}) | [text]({text_file}) |".format(**row)
+            "{preheader} | [html]({html_file}) | [text]({text_file}) |".format(
+                **{key: _markdown_cell(value) for key, value in row.items()}
+            )
         )
     lines.append("")
     return "\n".join(lines)
@@ -175,6 +181,7 @@ def write_lifecycle_preview_snapshots(
                 "campaign_group": campaign["campaign_group"],
                 "template_key": campaign["template_key"],
                 "subject": preview["subject"],
+                "preheader": preview["preheader"],
                 "html_file": html_name,
                 "text_file": text_name,
             }

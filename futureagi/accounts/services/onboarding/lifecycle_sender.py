@@ -31,7 +31,6 @@ from accounts.services.onboarding.lifecycle_eligibility import (
 from accounts.services.onboarding.lifecycle_preferences import lifecycle_preference_for
 from accounts.services.onboarding.lifecycle_template_context import (
     build_lifecycle_template_context,
-    subject_for_campaign,
     template_path,
 )
 from accounts.services.onboarding.notification_delivery import (
@@ -723,7 +722,7 @@ def send_onboarding_lifecycle_email(send_log, *, now=None):
         return _mark_suppressed(send_log, _NON_CLOUD_SUPPRESSION_REASON, now)
     try:
         email_helper(
-            subject_for_campaign(campaign),
+            context["email_subject"],
             template_path(send_log.template_key),
             context,
             [send_log.user.email],

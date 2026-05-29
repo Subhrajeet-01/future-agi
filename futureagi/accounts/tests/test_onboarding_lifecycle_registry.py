@@ -11,6 +11,8 @@ from accounts.services.onboarding.lifecycle_registry import (
     lifecycle_campaigns,
 )
 from accounts.services.onboarding.lifecycle_template_contract import (
+    EMAIL_PREHEADER_MAX_LENGTH,
+    EMAIL_SUBJECT_MAX_LENGTH,
     SUPPORTED_LIFECYCLE_TEMPLATE_KEYS,
     template_file_path,
 )
@@ -89,6 +91,8 @@ def test_prompt_campaigns_are_configured_as_real_only():
         assert campaign["route_strategy"] == "activation_recommendation"
         assert campaign["dry_run_flag"] == "onboarding_email_prompt_enabled"
 
+    assert len({campaign["email_subject"] for campaign in campaigns}) == len(campaigns)
+
 
 def test_lifecycle_registry_rejects_target_action_success_event_mismatch():
     config = _valid_lifecycle_config()
@@ -126,10 +130,56 @@ def test_lifecycle_registry_rejects_unknown_template_key():
         _validate_config(config)
 
 
-def test_lifecycle_registry_rejects_campaign_group_without_subject():
+def test_lifecycle_registry_rejects_unsupported_campaign_group():
     config = _valid_lifecycle_config()
     campaign = _campaign(config, "prompt_create_first")
     campaign["campaign_group"] = "unknown_group"
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
+def test_lifecycle_registry_requires_campaign_email_copy():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign.pop("email_subject")
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign.pop("email_preheader")
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
+def test_lifecycle_registry_rejects_unsafe_campaign_email_copy():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["email_subject"] = "x" * (EMAIL_SUBJECT_MAX_LENGTH + 1)
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["email_preheader"] = "x" * (EMAIL_PREHEADER_MAX_LENGTH + 1)
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["email_subject"] = "Run {{ product }}"
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["email_preheader"] = campaign["email_subject"]
 
     with pytest.raises(ImproperlyConfigured):
         _validate_config(config)
