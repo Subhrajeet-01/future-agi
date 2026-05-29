@@ -787,6 +787,31 @@ def _register_bridge_tool(
 
             input_model = EmptyInput
 
+    # Detail actions need the record id in their input. The retrieve/destroy
+    # branch already adds it; serializer-based detail actions (update + custom
+    # detail @actions like submit) otherwise expose no id field, leaving
+    # pk_field required-but-unsettable — so the tool can't target a record.
+    # Inject the pk_field so callers can identify which record to act on.
+    if detail and pk_field and pk_field not in (
+        getattr(input_model, "model_fields", {}) or {}
+    ):
+        _id_hint = tool_config.get("id_source") or _find_list_tool_for_viewset(
+            viewset_path
+        )
+        _id_desc = f"UUID of the {entity_name} to {action_name}. UUID v4 format."
+        if _id_hint:
+            _id_desc += (
+                f" **How to get it:** call `{_id_hint}` and copy the 'id'."
+            )
+        input_model = type(
+            f"Input_{tool_name}",
+            (input_model,),
+            {
+                "__annotations__": {pk_field: str},
+                pk_field: PydanticField(description=_id_desc),
+            },
+        )
+
     binding = ViewSetBinding(
         viewset_class=viewset_path,
         action=action_name,
