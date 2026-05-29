@@ -85,6 +85,54 @@ def test_stale_click_redirects_to_current_home(client, organization, workspace, 
 
 
 @pytest.mark.django_db
+def test_sample_completion_does_not_stale_lifecycle_click(
+    client,
+    organization,
+    workspace,
+    user,
+):
+    send_log = _sent_log(user, organization, workspace)
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="onboarding_goal_selected",
+        source="test",
+        product_path="observe",
+        is_sample=True,
+    )
+    token = sign_lifecycle_token(send_log=send_log, kind="click")
+
+    response = client.get(f"/accounts/onboarding/lifecycle/click/?token={token}")
+
+    send_log.refresh_from_db()
+    assert response.status_code == 302
+    assert response["Location"].startswith("/dashboard/home?onboarding=choose-goal")
+    assert send_log.metadata["click_status"] == "current"
+    assert "stale_reason" not in send_log.metadata
+
+
+@pytest.mark.django_db
+def test_unsafe_click_target_redirects_to_current_home(
+    client,
+    organization,
+    workspace,
+    user,
+):
+    send_log = _sent_log(user, organization, workspace)
+    send_log.target_route = "https://example.invalid/unsafe"
+    send_log.save(update_fields=["target_route", "updated_at"])
+    token = sign_lifecycle_token(send_log=send_log, kind="click")
+
+    response = client.get(f"/accounts/onboarding/lifecycle/click/?token={token}")
+
+    send_log.refresh_from_db()
+    assert response.status_code == 302
+    assert response["Location"].startswith("/dashboard/home?")
+    assert send_log.metadata["stale_reason"] == "route_unavailable"
+
+
+@pytest.mark.django_db
 def test_invalid_click_token_redirects_safely(client):
     response = client.get("/accounts/onboarding/lifecycle/click/?token=bad")
 
