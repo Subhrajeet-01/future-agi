@@ -83,7 +83,9 @@ from ai_tools.tools.docs import (
 from ai_tools.tools.evaluations import (
     compare_evaluations,  # noqa: F401
     create_composite_eval,  # noqa: F401
+    create_eval_template,  # noqa: F401  — eval creation from Falcon (restored)
     delete_eval_logs,  # noqa: F401
+    delete_eval_template,  # noqa: F401  — eval creation from Falcon (restored)
     duplicate_eval_template,  # noqa: F401
     evaluate_with_agent,  # noqa: F401
     execute_composite_eval,  # noqa: F401
@@ -96,6 +98,7 @@ from ai_tools.tools.evaluations import (
     list_eval_templates,  # noqa: F401
     list_evaluations,  # noqa: F401
     test_eval_template,  # noqa: F401
+    update_eval_template,  # noqa: F401  — eval creation from Falcon (restored)
 )
 
 # Experiment tools (11)
