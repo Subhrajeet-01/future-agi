@@ -1,7 +1,27 @@
 from collections import Counter
+from copy import deepcopy
+
+import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from accounts.services.onboarding.constants import ONBOARDING_ACTIVATION_EVENTS
-from accounts.services.onboarding.lifecycle_registry import lifecycle_campaigns
+from accounts.services.onboarding.lifecycle_registry import (
+    _validate_config,
+    get_lifecycle_registry_config,
+    lifecycle_campaigns,
+)
+
+
+def _valid_lifecycle_config():
+    return deepcopy(get_lifecycle_registry_config())
+
+
+def _campaign(config, campaign_key):
+    return next(
+        campaign
+        for campaign in config["campaigns"]
+        if campaign["campaign_key"] == campaign_key
+    )
 
 
 def test_lifecycle_campaign_registry_is_editable_and_valid():
@@ -64,3 +84,30 @@ def test_prompt_campaigns_are_configured_as_real_only():
         assert campaign["sample_policy"] == "real_only"
         assert campaign["route_strategy"] == "activation_recommendation"
         assert campaign["dry_run_flag"] == "onboarding_email_prompt_enabled"
+
+
+def test_lifecycle_registry_rejects_target_action_success_event_mismatch():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["target_success_event"] = "trace_received"
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
+def test_lifecycle_registry_rejects_primary_path_target_action_mismatch():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["primary_path"] = "agent"
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
+def test_lifecycle_registry_rejects_unsupported_campaign_feature_flags():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["dry_run_flag"] = "onboarding_email_not_real"
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)

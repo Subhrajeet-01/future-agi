@@ -1,6 +1,7 @@
 from urllib.parse import urlencode
 
 from accounts.services.onboarding.constants import PRODUCT_PATHS
+from accounts.services.onboarding.route_contract import route_keys_for_paths
 
 
 def route_entry(href, is_available=True, reason=None):
@@ -575,4 +576,8 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
                 else "route_not_implemented"
             ),
         )
+    missing_contract_keys = route_keys_for_paths(PRODUCT_PATHS) - set(routes)
+    if missing_contract_keys:
+        missing = ", ".join(sorted(missing_contract_keys))
+        raise RuntimeError(f"Onboarding route contract is missing keys: {missing}")
     return routes

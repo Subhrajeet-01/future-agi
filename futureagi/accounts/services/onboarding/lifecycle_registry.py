@@ -10,6 +10,10 @@ from accounts.services.onboarding.constants import (
     ACTIVATION_STAGES,
     ONBOARDING_ACTIVATION_EVENTS,
 )
+from accounts.services.onboarding.feature_flag_contract import (
+    SUPPORTED_ONBOARDING_FLAG_NAMES,
+)
+from accounts.services.onboarding.flow_config import get_activation_flow_config
 
 CONFIG_PATH = Path(__file__).with_name("lifecycle_campaigns.yml")
 
@@ -48,6 +52,11 @@ DAILY_QUALITY_MODES = {
     "no_new_signal",
     "permission_limited",
     "unavailable",
+}
+PRIMARY_PATHS_WITH_INTENTIONAL_ACTION_MISMATCH = {"observe_sample_bridge"}
+TARGET_EVENTS_WITH_INTENTIONAL_ACTION_MISMATCH = {
+    "daily_quality_open_actions",
+    "observe_sample_bridge",
 }
 
 
@@ -93,7 +102,7 @@ def _load_config_file() -> dict:
     return _mapping(raw, CONFIG_PATH.name)
 
 
-def _validate_campaign(campaign: dict, path: str) -> None:
+def _validate_campaign(campaign: dict, path: str, activation_config: dict) -> None:
     for field in REQUIRED_FIELDS:
         if field not in campaign:
             raise _config_error(f"{path}.{field} is required.")
@@ -104,16 +113,45 @@ def _validate_campaign(campaign: dict, path: str) -> None:
         raise _config_error(f"{path}.template_key must include a version suffix.")
     _required_text(campaign, "template_version", path)
     _required_text(campaign, "campaign_group", path)
-    _required_text(campaign, "primary_path", path)
+    primary_path = _required_text(campaign, "primary_path", path)
+    configured_paths = set(activation_config["paths"])
+    if primary_path not in configured_paths and primary_path != "any":
+        raise _config_error(f"{path}.primary_path references unknown path.")
     _required_positive_int(campaign, "wait_window_minutes", path)
     _required_positive_int(campaign, "priority", path)
-    _required_text(campaign, "target_action_id", path)
+    target_action_id = _required_text(campaign, "target_action_id", path)
+    actions = activation_config["actions"]
+    if target_action_id not in actions:
+        raise _config_error(f"{path}.target_action_id references unknown action.")
     if campaign["target_success_event"] not in ONBOARDING_ACTIVATION_EVENTS:
         raise _config_error(f"{path}.target_success_event is not supported.")
+    target_action = actions[target_action_id]
+    target_path = target_action.get("target_path")
+    if (
+        target_path
+        and primary_path not in {target_path, "any"}
+        and campaign["campaign_key"]
+        not in PRIMARY_PATHS_WITH_INTENTIONAL_ACTION_MISMATCH
+    ):
+        raise _config_error(f"{path}.primary_path does not match target action path.")
+    completion_event = target_action.get("completion_event")
+    if (
+        completion_event
+        and campaign["target_success_event"] != completion_event
+        and campaign["campaign_key"]
+        not in TARGET_EVENTS_WITH_INTENTIONAL_ACTION_MISMATCH
+    ):
+        raise _config_error(
+            f"{path}.target_success_event does not match target action completion."
+        )
     if campaign["route_strategy"] not in ROUTE_STRATEGIES:
         raise _config_error(f"{path}.route_strategy is not supported.")
-    _required_text(campaign, "dry_run_flag", path)
-    _required_text(campaign, "send_flag", path)
+    dry_run_flag = _required_text(campaign, "dry_run_flag", path)
+    if dry_run_flag not in SUPPORTED_ONBOARDING_FLAG_NAMES:
+        raise _config_error(f"{path}.dry_run_flag references unknown feature flag.")
+    send_flag = _required_text(campaign, "send_flag", path)
+    if send_flag not in SUPPORTED_ONBOARDING_FLAG_NAMES:
+        raise _config_error(f"{path}.send_flag references unknown feature flag.")
     _required_text(campaign, "frequency_cap_key", path)
     if campaign["sample_policy"] not in SAMPLE_POLICIES:
         raise _config_error(f"{path}.sample_policy is not supported.")
@@ -147,10 +185,11 @@ def _validate_campaign(campaign: dict, path: str) -> None:
 def _validate_config(config: dict) -> None:
     _required_text(config, "schema_version", CONFIG_PATH.name)
     campaigns = _sequence(config.get("campaigns"), "campaigns")
+    activation_config = get_activation_flow_config()
     seen = set()
     for index, campaign in enumerate(campaigns):
         campaign = _mapping(campaign, f"campaigns.{index}")
-        _validate_campaign(campaign, f"campaigns.{index}")
+        _validate_campaign(campaign, f"campaigns.{index}", activation_config)
         key = campaign["campaign_key"]
         if key in seen:
             raise _config_error(f"Duplicate campaign_key: {key}.")

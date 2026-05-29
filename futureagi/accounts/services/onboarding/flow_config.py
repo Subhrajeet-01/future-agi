@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
@@ -7,6 +8,11 @@ from typing import Any
 
 import yaml
 from django.core.exceptions import ImproperlyConfigured
+
+from accounts.services.onboarding.feature_flag_contract import (
+    SUPPORTED_ONBOARDING_FLAG_NAMES,
+)
+from accounts.services.onboarding.route_contract import route_keys_for_paths
 
 CONFIG_PATH = Path(__file__).with_name("activation_flow.yml")
 
@@ -19,6 +25,37 @@ PROGRESS_STATES = {
     "blocked",
     "complete",
     "sample_only",
+}
+
+CONDITION_KEYS = {
+    "always",
+    "all",
+    "any",
+    "not",
+    "flag_enabled",
+    "flag_disabled",
+    "signal",
+    "signal_not",
+    "missing",
+    "missing_any",
+    "context_equals",
+    "context_not_equals",
+}
+CONTEXT_FIELDS = {
+    "user",
+    "organization",
+    "workspace",
+    "organization_role",
+    "workspace_role",
+    "organization_level",
+    "workspace_level",
+    "selected_goal",
+    "primary_path",
+    "persona",
+    "source",
+    "email_context",
+    "permissions",
+    "warnings",
 }
 
 
@@ -52,6 +89,20 @@ def _optional_text(mapping: dict, key: str, path: str) -> str | None:
     if not isinstance(value, str):
         raise _config_error(f"{path}.{key} must be a string.")
     return value
+
+
+def _validate_supported_flag(flag: str, path: str) -> None:
+    if not isinstance(flag, str) or not flag:
+        raise _config_error(f"{path} must be a non-empty string.")
+    if flag not in SUPPORTED_ONBOARDING_FLAG_NAMES:
+        raise _config_error(f"{path} references unknown feature flag.")
+
+
+def _validate_context_field(field: str, path: str) -> None:
+    if not isinstance(field, str) or not field:
+        raise _config_error(f"{path} must be a non-empty string.")
+    if field not in CONTEXT_FIELDS:
+        raise _config_error(f"{path} references unknown context field.")
 
 
 def _load_config_file() -> dict:
@@ -134,6 +185,7 @@ def _validate_actions(config: dict) -> None:
     action_kinds = set(_sequence(config.get("action_kinds"), "action_kinds"))
     actions = _mapping(config.get("actions"), "actions")
     paths = _mapping(config.get("paths"), "paths")
+    route_keys = route_keys_for_paths(paths)
 
     for action_id, action_config in actions.items():
         path = f"actions.{action_id}"
@@ -143,9 +195,13 @@ def _validate_actions(config: dict) -> None:
             raise _config_error(f"{path}.kind references unknown action kind.")
         _required_text(action_config, "title", path)
         _required_text(action_config, "description", path)
-        _required_text(action_config, "route_key", path)
+        route_key = _required_text(action_config, "route_key", path)
+        if route_key not in route_keys:
+            raise _config_error(f"{path}.route_key references unknown route.")
         _required_text(action_config, "cta_label", path)
-        _required_text(action_config, "fallback_route_key", path)
+        fallback_route_key = _required_text(action_config, "fallback_route_key", path)
+        if fallback_route_key not in route_keys:
+            raise _config_error(f"{path}.fallback_route_key references unknown route.")
         priority = action_config.get("priority")
         if not isinstance(priority, int):
             raise _config_error(f"{path}.priority must be an integer.")
@@ -191,6 +247,7 @@ def _validate_stage(config: dict, stage_id: str, stage_config: dict) -> None:
     for flag, action_id in flagged.items():
         if not isinstance(flag, str) or not flag:
             raise _config_error(f"{path}.flagged_fallback_actions has invalid flag.")
+        _validate_supported_flag(flag, f"{path}.flagged_fallback_actions.{flag}")
         if action_id not in actions:
             raise _config_error(
                 f"{path}.flagged_fallback_actions references unknown action."
@@ -218,7 +275,54 @@ def _validate_stage_rules(config: dict) -> None:
         stage = _required_text(rule, "stage", path)
         if stage not in stages:
             raise _config_error(f"{path}.stage references unknown stage.")
-        _mapping(rule.get("when"), f"{path}.when")
+        _validate_stage_rule_condition(_mapping(rule.get("when"), f"{path}.when"), path)
+
+
+def _validate_stage_rule_condition(condition: dict, path: str) -> None:
+    unknown = set(condition) - CONDITION_KEYS
+    if unknown:
+        names = ", ".join(sorted(unknown))
+        raise _config_error(f"{path}.when contains unsupported condition: {names}.")
+    if not condition:
+        raise _config_error(f"{path}.when cannot be empty.")
+
+    if "all" in condition:
+        for index, nested in enumerate(_sequence(condition["all"], f"{path}.when.all")):
+            _validate_stage_rule_condition(
+                _mapping(nested, f"{path}.when.all.{index}"),
+                f"{path}.when.all.{index}",
+            )
+    if "any" in condition:
+        for index, nested in enumerate(_sequence(condition["any"], f"{path}.when.any")):
+            _validate_stage_rule_condition(
+                _mapping(nested, f"{path}.when.any.{index}"),
+                f"{path}.when.any.{index}",
+            )
+    if "not" in condition:
+        _validate_stage_rule_condition(
+            _mapping(condition["not"], f"{path}.when.not"),
+            f"{path}.when.not",
+        )
+    if "flag_enabled" in condition:
+        _validate_supported_flag(condition["flag_enabled"], f"{path}.when.flag_enabled")
+    if "flag_disabled" in condition:
+        _validate_supported_flag(
+            condition["flag_disabled"], f"{path}.when.flag_disabled"
+        )
+    if "missing" in condition:
+        _validate_context_field(condition["missing"], f"{path}.when.missing")
+    if "missing_any" in condition:
+        for index, field in enumerate(
+            _sequence(condition["missing_any"], f"{path}.when.missing_any")
+        ):
+            _validate_context_field(field, f"{path}.when.missing_any.{index}")
+    for key in ("context_equals", "context_not_equals"):
+        if key in condition:
+            expected = _mapping(condition[key], f"{path}.when.{key}")
+            if not expected:
+                raise _config_error(f"{path}.when.{key} cannot be empty.")
+            for field in expected:
+                _validate_context_field(field, f"{path}.when.{key}.{field}")
 
 
 def _validate_activation_events(config: dict) -> None:
@@ -226,6 +330,11 @@ def _validate_activation_events(config: dict) -> None:
     names = _sequence(events.get("names"), "activation_events.names")
     if not names or not all(isinstance(name, str) and name for name in names):
         raise _config_error("activation_events.names must contain event names.")
+    duplicates = sorted(name for name, count in Counter(names).items() if count > 1)
+    if duplicates:
+        raise _config_error(
+            f"activation_events.names contains duplicate events: {', '.join(duplicates)}."
+        )
     aliases = _mapping(events.get("aliases", {}), "activation_events.aliases")
     for alias, canonical in aliases.items():
         if canonical not in names:
