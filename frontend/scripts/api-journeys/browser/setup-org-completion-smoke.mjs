@@ -82,19 +82,11 @@ async function main() {
     await page.goto(`${APP_BASE}/auth/jwt/setup-org?step=0`, {
       waitUntil: "domcontentloaded",
     });
-    await expectVisibleText(page, "What's your role");
+    await expectVisibleText(page, "Start with your first quality loop");
     await page.evaluate(() => {
       localStorage.setItem("redirectUrl", "/dashboard/observe?project=stale");
     });
     await clickVisibleButtonText(page, "Connect observability first");
-    await expectVisibleText(page, "Invite your team later");
-
-    const organizationNameInput = 'input[placeholder="Add organization name"]';
-    await page.click(organizationNameInput, { clickCount: 3 });
-    await page.keyboard.press("Backspace");
-    await page.type(organizationNameInput, "Smoke Org");
-    await page.type('input[placeholder="Email"]', "teammate@example.com");
-    await page.click('button[type="submit"]');
     await page.waitForFunction(
       () =>
         window.location.pathname === "/dashboard/home" &&
@@ -131,7 +123,10 @@ async function main() {
         onboardingPosts[0]?.goals,
       )}`,
     );
-    assert(setupPosts.length === 1, "Expected one setup organization POST.");
+    assert(
+      setupPosts.length === 0,
+      "Expected no setup organization POST on observe quick start.",
+    );
     assert(
       activationStateRequests.length === 1,
       `Expected one activation-state request, got ${activationStateRequests.length}`,
@@ -152,7 +147,7 @@ async function main() {
             browser_state: browserState,
             onboarding_post: onboardingPosts[0],
             screenshot: SCREENSHOT_PATH,
-            setup_post: setupPosts[0],
+            setup_posts: setupPosts,
           },
         },
         null,

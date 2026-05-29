@@ -39,7 +39,10 @@ import { generateNameFromEmail } from "./common";
 import FormTextFieldV2 from "src/components/FormTextField/FormTextFieldV2";
 import SvgColor from "src/components/svg-color";
 import { useSearchParams } from "react-router-dom";
-import { resolveSetupCompletionHref } from "./setup-org-routing";
+import {
+  resolveSetupCompletionHref,
+  shouldShowInviteStepAfterProfileSave,
+} from "./setup-org-routing";
 
 const QUICK_START_ROLE = "AI Builder";
 const QUICK_START_GOAL_LABEL =
@@ -359,7 +362,12 @@ const SetupOrganization = ({ getStarted = false }) => {
         [PropertyName.method]: provider,
       });
       localStorage.removeItem("signupProvider");
-      if (isOwner && !shouldFinishQuickStart) {
+      if (
+        shouldShowInviteStepAfterProfileSave({
+          isOwner,
+          quickStartRequested: shouldFinishQuickStart,
+        })
+      ) {
         setActiveStep(2);
       } else {
         finishSetup();

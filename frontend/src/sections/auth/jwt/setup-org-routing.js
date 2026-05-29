@@ -6,3 +6,8 @@ export const setupCompletionHomeHref = () =>
   `${paths.dashboard.home}?source=${SETUP_COMPLETION_SOURCE}`;
 
 export const resolveSetupCompletionHref = () => setupCompletionHomeHref();
+
+export const shouldShowInviteStepAfterProfileSave = ({
+  isOwner,
+  quickStartRequested,
+} = {}) => Boolean(isOwner && !quickStartRequested);

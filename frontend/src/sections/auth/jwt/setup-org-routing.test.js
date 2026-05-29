@@ -4,6 +4,7 @@ import { paths } from "src/routes/paths";
 
 import {
   resolveSetupCompletionHref,
+  shouldShowInviteStepAfterProfileSave,
   setupCompletionHomeHref,
 } from "./setup-org-routing";
 
@@ -31,5 +32,26 @@ describe("setup org completion routing", () => {
     expect(resolveSetupCompletionHref("/auth/jwt/login")).toBe(
       setupCompletionHomeHref(),
     );
+  });
+
+  it("keeps owner invites off the observe quick-start path", () => {
+    expect(
+      shouldShowInviteStepAfterProfileSave({
+        isOwner: true,
+        quickStartRequested: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowInviteStepAfterProfileSave({
+        isOwner: true,
+        quickStartRequested: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowInviteStepAfterProfileSave({
+        isOwner: false,
+        quickStartRequested: false,
+      }),
+    ).toBe(false);
   });
 });

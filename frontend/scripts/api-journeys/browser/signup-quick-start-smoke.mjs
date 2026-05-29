@@ -249,14 +249,6 @@ async function main() {
     });
     await waitForBrowserFrame();
     await clickVisibleButtonText(page, "Connect observability first");
-    await expectVisibleText(page, "Invite your team later");
-    await expectVisibleText(page, "Continue now and review the first signal");
-
-    const organizationNameInput = 'input[placeholder="Add organization name"]';
-    await page.click(organizationNameInput, { clickCount: 3 });
-    await page.keyboard.press("Backspace");
-    await page.type(organizationNameInput, "Smoke Org");
-    await clickVisibleButtonText(page, "Continue to onboarding");
 
     await page.waitForFunction(
       () =>
@@ -265,6 +257,9 @@ async function main() {
           "setup_org",
       { timeout: 45000 },
     );
+    await expectNoVisibleText(page, "Invite your team later", {
+      timeout: 1000,
+    });
     await expectVisibleText(page, "Connect observability", { timeout: 45000 });
     await expectVisibleTestId(page, "observe-setup-panel", { timeout: 45000 });
     await expectVisibleText(page, "Connect one observe project", {
@@ -1012,7 +1007,10 @@ async function main() {
         evidence.onboardingPosts[0]?.goals,
       )}`,
     );
-    assert(evidence.setupPosts.length === 1, "Expected one setup POST.");
+    assert(
+      evidence.setupPosts.length === 0,
+      "Expected no setup POST on observe quick start.",
+    );
     assert(
       evidence.sampleProjectPosts[0]?.source === "observe_setup_onboarding",
       `Expected sample source observe_setup_onboarding, got ${evidence.sampleProjectPosts[0]?.source}`,
@@ -1230,7 +1228,7 @@ async function main() {
             sample_trace_url: sampleTraceUrl,
             real_setup_return_url: realSetupReturnUrl,
             screenshot: SCREENSHOT_PATH,
-            setup_post: evidence.setupPosts[0],
+            setup_posts: evidence.setupPosts,
             signup_post: evidence.signupPosts[0],
             token_post: evidence.tokenPosts[0],
           },
