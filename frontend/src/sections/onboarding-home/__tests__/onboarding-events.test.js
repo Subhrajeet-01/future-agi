@@ -50,6 +50,9 @@ describe("onboarding home events", () => {
     expect(OnboardingHomeEvents.recommendedActionClicked).toBe(
       "onboarding_recommended_action_clicked",
     );
+    expect(OnboardingHomeEvents.activationEventRecorded).toBe(
+      "onboarding_activation_event_recorded",
+    );
   });
 
   it("exposes daily quality analytics events", () => {

@@ -3,12 +3,50 @@ import {
   onboardingHomeQueryKeys,
   recordActivationEvent,
 } from "../api/onboarding-home-api";
+import {
+  OnboardingHomeEvents,
+  trackOnboardingHomeEvent,
+} from "../analytics/onboarding-events";
+
+const compactProperties = (properties = {}) =>
+  Object.entries(properties).reduce((result, [key, value]) => {
+    if (value === undefined || value === null || value === "") return result;
+    result[key] = value;
+    return result;
+  }, {});
+
+const trackActivationEventRecorded = (activationState, payload = {}) => {
+  const eventName = payload.eventName ?? payload.event_name;
+  if (!eventName) return;
+
+  trackOnboardingHomeEvent(
+    OnboardingHomeEvents.activationEventRecorded,
+    compactProperties({
+      activation_event_name: eventName,
+      primary_path: payload.primaryPath ?? payload.primary_path,
+      activation_stage: payload.stage,
+      source: payload.source,
+      artifact_type: payload.artifactType ?? payload.artifact_type,
+      artifact_id: payload.artifactId ?? payload.artifact_id,
+      project_id: payload.projectId ?? payload.project_id,
+      is_sample: payload.isSample ?? payload.is_sample,
+      next_stage: activationState?.stage,
+      next_primary_path: activationState?.primaryPath,
+      next_is_activated: activationState?.isActivated,
+      next_request_id: activationState?.requestId,
+      workspace_id: activationState?.workspaceId,
+      organization_id: activationState?.organizationId,
+      user_id: activationState?.userId,
+    }),
+  );
+};
 
 export const useRecordActivationEvent = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: recordActivationEvent,
-    onSuccess: () => {
+    onSuccess: (activationState, payload) => {
+      trackActivationEventRecorded(activationState, payload);
       queryClient.invalidateQueries({
         queryKey: onboardingHomeQueryKeys.all,
       });
