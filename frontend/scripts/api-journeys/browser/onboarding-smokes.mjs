@@ -148,6 +148,17 @@ const SMOKES = [
       ONBOARDING_REAL_SIGNUP: "1",
     },
   },
+  {
+    id: "signup-sample-open-real",
+    mode: "real-signup",
+    file: "signup-quick-start-smoke.mjs",
+    description:
+      "Disposable-account proof that sample trace opens and stays non-activating.",
+    env: {
+      ONBOARDING_REAL_SIGNUP: "1",
+      ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY: "1",
+    },
+  },
 ];
 
 const args = parseArgs(process.argv.slice(2));

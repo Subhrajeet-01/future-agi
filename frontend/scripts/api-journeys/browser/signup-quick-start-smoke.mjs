@@ -11,9 +11,12 @@ const VIEWPORT_NAME = process.env.ONBOARDING_SMOKE_VIEWPORT || "desktop";
 const VIEWPORT = viewportForName(VIEWPORT_NAME);
 const SCREENSHOT_PATH =
   process.env.SIGNUP_QUICK_START_SCREENSHOT ||
-  `/tmp/signup-quick-start-smoke-${VIEWPORT_NAME}.png`;
+  `/tmp/signup-quick-start-smoke-${VIEWPORT_NAME}${
+    envFlag("ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY") ? "-sample-open" : ""
+  }.png`;
 const REQUIRE_REAL_SIGNUP = envFlag("ONBOARDING_REAL_SIGNUP");
 const ALLOW_REMOTE = envFlag("ONBOARDING_REAL_SIGNUP_ALLOW_REMOTE");
+const SAMPLE_ONLY = envFlag("ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY");
 
 async function main() {
   assert(REQUIRE_REAL_SIGNUP, "Set ONBOARDING_REAL_SIGNUP=1 for this smoke.");
@@ -340,6 +343,123 @@ async function main() {
       () => evidence.traceDetailRequests.length >= 1,
       "Expected trace detail request for sample trace.",
     );
+    if (SAMPLE_ONLY) {
+      const authState = await page.evaluate(() => ({
+        accessToken: localStorage.getItem("accessToken"),
+        initialRender: localStorage.getItem("initial-render"),
+        organizationId: sessionStorage.getItem("organizationId"),
+        redirectUrl: localStorage.getItem("redirectUrl"),
+        workspaceId: sessionStorage.getItem("workspaceId"),
+      }));
+      const browserState = {
+        initialRender: authState.initialRender,
+        organizationId: authState.organizationId,
+        redirectUrl: authState.redirectUrl,
+        workspaceId: authState.workspaceId,
+      };
+      const apiHeaders = authenticatedApiHeaders(authState);
+      const sampleOpenState = await fetchSmokeActivationState(
+        apiHeaders,
+        "sample_open_smoke",
+      );
+      assert(
+        sampleOpenState.is_activated === false,
+        `Sample open must not activate the user; got ${sampleOpenState.is_activated}`,
+      );
+      assert(
+        (sampleOpenState.signals?.observe_projects || 0) === 0,
+        `Sample open must not count as a real observe project; got ${sampleOpenState.signals?.observe_projects}`,
+      );
+      assert(
+        (sampleOpenState.signals?.traces || 0) === 0,
+        `Sample open must not count as a real trace; got ${sampleOpenState.signals?.traces}`,
+      );
+      assert(
+        !sampleOpenState.signals?.first_observe_id,
+        `Sample open must not set first_observe_id; got ${sampleOpenState.signals?.first_observe_id}`,
+      );
+      assert(
+        !sampleOpenState.signals?.first_trace_id,
+        `Sample open must not set first_trace_id; got ${sampleOpenState.signals?.first_trace_id}`,
+      );
+      assert(
+        sampleOpenState.sample_project?.created === true,
+        "Expected sample project to be created after opening sample trace.",
+      );
+      assert(
+        sampleOpenState.sample_project?.entry_route ||
+          sampleOpenState.sample_project?.entry_routes?.length,
+        "Expected sample project activation state to expose an entry route.",
+      );
+      assert(
+        evidence.activationEventPosts.some(
+          (payload) =>
+            payload?.event_name === "sample_trace_detail_opened" &&
+            payload?.primary_path === "sample" &&
+            payload?.stage === "review_first_trace" &&
+            payload?.is_sample === true,
+        ),
+        "Expected sample trace detail activation event.",
+      );
+      assert(
+        evidence.sampleProjectPosts[0]?.source === "observe_setup_onboarding",
+        `Expected sample source observe_setup_onboarding, got ${evidence.sampleProjectPosts[0]?.source}`,
+      );
+      assert(
+        evidence.sampleProjectPosts[0]?.reason === "setup_observe",
+        `Expected sample reason setup_observe, got ${evidence.sampleProjectPosts[0]?.reason}`,
+      );
+      assert(
+        browserState.initialRender === "done",
+        `Expected initial-render=done, got ${browserState.initialRender}`,
+      );
+      assert(
+        browserState.redirectUrl === null,
+        `Expected redirectUrl to be cleared, got ${browserState.redirectUrl}`,
+      );
+      assert(
+        evidence.apiFailures.length === 0,
+        `API failures: ${evidence.apiFailures.join("; ")}`,
+      );
+      assert(pageErrors.length === 0, `Page errors: ${pageErrors.join("; ")}`);
+
+      await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
+      console.log(
+        JSON.stringify(
+          {
+            status: "passed",
+            app_base: APP_BASE,
+            api_base: API_BASE,
+            viewport: {
+              name: VIEWPORT_NAME,
+              ...VIEWPORT,
+            },
+            evidence: {
+              activation_state_requests: evidence.activationStateRequests,
+              browser_state: browserState,
+              email: user.email,
+              onboarding_post: evidence.onboardingPosts[0],
+              observe_cta_href: observeCtaHref,
+              observe_setup_url: observeSetupUrl,
+              sample_open_state: summarizeActivationState(sampleOpenState),
+              sample_project_post: evidence.sampleProjectPosts[0],
+              sample_project_response: evidence.sampleProjectResponses[0],
+              sample_trace_activation_event: evidence.activationEventPosts.find(
+                (payload) =>
+                  payload?.event_name === "sample_trace_detail_opened",
+              ),
+              sample_trace_url: sampleTraceUrl,
+              screenshot: SCREENSHOT_PATH,
+              signup_post: evidence.signupPosts[0],
+              token_post: evidence.tokenPosts[0],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
     await clickVisibleButtonText(page, "Connect your app", 45000);
     await page.waitForFunction(
       () =>
@@ -1693,12 +1813,28 @@ function unwrapApiResult(payload) {
 
 function summarizeActivationState(state) {
   return {
+    is_activated: state?.is_activated,
     recommended_action: state?.recommended_action
       ? {
           cta_label: state.recommended_action.cta_label,
           href: state.recommended_action.href,
           id: state.recommended_action.id,
           title: state.recommended_action.title,
+        }
+      : null,
+    sample_project: state?.sample_project
+      ? {
+          created: state.sample_project.created,
+          entry_route: state.sample_project.entry_route,
+          status: state.sample_project.status,
+        }
+      : null,
+    signals: state?.signals
+      ? {
+          first_observe_id: state.signals.first_observe_id,
+          first_trace_id: state.signals.first_trace_id,
+          observe_projects: state.signals.observe_projects,
+          traces: state.signals.traces,
         }
       : null,
     stage: state?.stage,
