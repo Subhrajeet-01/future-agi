@@ -181,6 +181,9 @@ export const buildObserveProjectOnboardingHref = ({ observeId, mode } = {}) => {
   const params = new URLSearchParams();
   params.set("source", "onboarding");
   if (projectModeSet.has(mode)) params.set("onboarding", mode);
+  if (mode === OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE) {
+    params.set("selectedTab", "trace");
+  }
   return `/dashboard/observe/${observeId}/llm-tracing?${params.toString()}`;
 };
 

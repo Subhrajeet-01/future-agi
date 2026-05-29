@@ -15,11 +15,13 @@ const puppeteer = require("puppeteer-core");
 const APP_BASE = process.env.APP_BASE || "http://127.0.0.1:3032";
 const VIEWPORT_NAME = process.env.ONBOARDING_SMOKE_VIEWPORT || "desktop";
 const EXISTING_PROJECT = envFlag("ONBOARDING_SMOKE_EXISTING_PROJECT");
+const EXISTING_TRACE =
+  EXISTING_PROJECT && envFlag("ONBOARDING_SMOKE_EXISTING_TRACE");
 const SCREENSHOT_PATH =
   process.env.ONBOARDING_HOME_OBSERVE_SCREENSHOT ||
   `/tmp/onboarding-home-observe-smoke-${VIEWPORT_NAME}${
     EXISTING_PROJECT ? "-existing-project" : ""
-  }.png`;
+  }${EXISTING_TRACE ? "-first-trace" : ""}.png`;
 const STUB_AUTH = envFlag("ONBOARDING_SMOKE_STUB_AUTH");
 const STUB_ONBOARDING = process.env.ONBOARDING_SMOKE_STUB_ONBOARDING !== "0";
 
@@ -41,6 +43,7 @@ async function main() {
     stub_onboarding: STUB_ONBOARDING,
     viewport: VIEWPORT_NAME,
     existing_project: EXISTING_PROJECT,
+    existing_trace: EXISTING_TRACE,
   };
 
   const browser = await puppeteer.launch({
@@ -166,14 +169,38 @@ async function main() {
             window.location.pathname ===
               "/dashboard/observe/observe-smoke-project/llm-tracing" &&
             params.get("source") === "onboarding" &&
-            params.get("onboarding") === "send-first-trace"
+            params.get("onboarding") === "send-first-trace" &&
+            params.get("selectedTab") === "trace"
           );
         },
         { timeout: 30000 },
       );
       evidence.first_trace_step_url = relativeUrl(page.url());
       await expectSelector(page, '[data-testid="observe-onboarding-focus"]');
-      await expectVisibleText(page, "Send the first trace", { exact: true });
+      if (EXISTING_TRACE) {
+        await expectVisibleText(page, "Review the first trace", {
+          exact: true,
+        });
+        await expectVisibleText(page, "Review trace", { exact: true });
+        await clickVisibleText(page, "Review trace", {
+          rootSelector: '[data-testid="observe-onboarding-focus"]',
+        });
+        await page.waitForFunction(
+          () => {
+            const params = new URLSearchParams(window.location.search);
+            return (
+              window.location.pathname ===
+                "/dashboard/observe/observe-smoke-project/trace/trace-smoke-1" &&
+              params.get("source") === "onboarding" &&
+              params.get("onboarding") === "review-first-trace"
+            );
+          },
+          { timeout: 30000 },
+        );
+        evidence.first_trace_review_url = relativeUrl(page.url());
+      } else {
+        await expectVisibleText(page, "Send the first trace", { exact: true });
+      }
       await waitForCondition(
         () =>
           activationEventPosts.some(
@@ -356,12 +383,16 @@ async function installRuntime(
       stubbedApiRequests.push(`${request.method()} ${normalizedPath}`);
       const payload = parseJsonPostData(request.postData());
       activationEventPosts.push(payload);
+      const shouldReturnFirstTraceReady =
+        EXISTING_TRACE && payload?.metadata?.route_mode === "send-first-trace";
       await respondJson(request, {
         status: true,
         result: {
           event_id: "00000000-0000-4000-8000-000000000188",
           event_name: payload?.event_name || "onboarding_home_viewed",
-          activation_state: stubbedActivationState(auth),
+          activation_state: stubbedActivationState(auth, {
+            firstTraceReady: shouldReturnFirstTraceReady,
+          }),
         },
       });
       return;
@@ -386,6 +417,8 @@ async function installRuntime(
                   id: "observe-smoke-project",
                   name: "Observe smoke project",
                   project_type: "observe",
+                  source: "prototype",
+                  trace_type: "observe",
                 },
               ]
             : [],
@@ -417,7 +450,50 @@ async function installRuntime(
           id: "observe-smoke-project",
           name: "Observe smoke project",
           project_type: "observe",
-          source: null,
+          trace_type: "observe",
+          source: "prototype",
+        },
+      });
+      return;
+    }
+
+    if (
+      STUB_ONBOARDING &&
+      normalizedPath === "/tracer/project/list_project_ids/"
+    ) {
+      stubbedApiRequests.push(`${request.method()} ${normalizedPath}`);
+      await respondJson(request, {
+        status: true,
+        result: {
+          projects: EXISTING_PROJECT
+            ? [
+                {
+                  id: "observe-smoke-project",
+                  name: "Observe smoke project",
+                  trace_type: "observe",
+                },
+              ]
+            : [],
+        },
+      });
+      return;
+    }
+
+    if (STUB_ONBOARDING && normalizedPath === "/tracer/dashboard/metrics/") {
+      stubbedApiRequests.push(`${request.method()} ${normalizedPath}`);
+      await respondJson(request, dashboardMetricsResponse());
+      return;
+    }
+
+    if (
+      STUB_ONBOARDING &&
+      normalizedPath === "/tracer/trace/get_graph_methods/"
+    ) {
+      stubbedApiRequests.push(`${request.method()} ${normalizedPath}`);
+      await respondJson(request, {
+        status: true,
+        result: {
+          data: [],
         },
       });
       return;
@@ -443,13 +519,13 @@ async function installRuntime(
       await respondJson(request, {
         status: true,
         result: {
-          config: [],
+          config: traceListConfig(),
           metadata: {
-            total_rows: 0,
+            total_rows: EXISTING_TRACE ? 1 : 0,
             page_number: 0,
             page_size: 100,
           },
-          table: [],
+          table: EXISTING_TRACE ? [traceListRow()] : [],
         },
       });
       return;
@@ -467,17 +543,60 @@ async function installRuntime(
       return;
     }
 
+    if (STUB_ONBOARDING && normalizedPath === "/tracer/trace/trace-smoke-1/") {
+      stubbedApiRequests.push(`${request.method()} ${normalizedPath}`);
+      await respondJson(request, traceDetailResponse());
+      return;
+    }
+
     await request.continue();
   });
 }
 
-function stubbedActivationState(auth) {
+function stubbedActivationState(auth, { firstTraceReady = false } = {}) {
+  const activationState = getActivationStateFixture(
+    firstTraceReady ? "observeFirstTraceReady" : "observeNoSetup",
+  );
+  const firstTraceReviewHref =
+    "/dashboard/observe/observe-smoke-project/trace/trace-smoke-1?source=onboarding&onboarding=review-first-trace";
+  const recommendedAction =
+    firstTraceReady && activationState.recommended_action
+      ? {
+          ...activationState.recommended_action,
+          href: firstTraceReviewHref,
+        }
+      : activationState.recommended_action;
+  const routeAvailability = firstTraceReady
+    ? {
+        ...activationState.route_availability,
+        observe_trace_detail: {
+          ...activationState.route_availability?.observe_trace_detail,
+          href: firstTraceReviewHref,
+        },
+      }
+    : activationState.route_availability;
+
   return {
-    ...getActivationStateFixture("observeNoSetup"),
+    ...activationState,
+    recommended_action: recommendedAction,
+    route_availability: routeAvailability,
     request_id: "onboarding_home_observe_smoke",
     organization_id: auth.organizationId,
     workspace_id: auth.workspaceId,
     user_id: auth.user.id,
+    signals: {
+      ...activationState.signals,
+      observe_projects: firstTraceReady
+        ? 1
+        : activationState.signals?.observe_projects,
+      traces: firstTraceReady ? 1 : activationState.signals?.traces,
+      first_observe_id: firstTraceReady
+        ? "observe-smoke-project"
+        : activationState.signals?.first_observe_id,
+      first_trace_id: firstTraceReady
+        ? "trace-smoke-1"
+        : activationState.signals?.first_trace_id,
+    },
   };
 }
 
@@ -507,6 +626,97 @@ function observeSetupCodeBlock() {
           code: "import { instrumentOpenAI } from 'futureagi';\ninstrumentOpenAI();",
           github: "https://github.com/future-agi",
         },
+      },
+    },
+  };
+}
+
+function traceListConfig() {
+  return [
+    {
+      id: "trace_id",
+      name: "Trace ID",
+      type: "string",
+      is_visible: true,
+    },
+    {
+      id: "name",
+      name: "Name",
+      type: "string",
+      is_visible: true,
+    },
+    {
+      id: "latency_ms",
+      name: "Latency",
+      type: "number",
+      is_visible: true,
+    },
+  ];
+}
+
+function dashboardMetricsResponse() {
+  return {
+    status: true,
+    result: {
+      metrics: [
+        {
+          category: "system_metric",
+          displayName: "Latency",
+          name: "latency",
+          type: "number",
+        },
+        {
+          category: "system_metric",
+          displayName: "Tokens",
+          name: "tokens",
+          type: "number",
+        },
+      ],
+    },
+  };
+}
+
+function traceListRow() {
+  return {
+    trace_id: "trace-smoke-1",
+    name: "First checkout trace",
+    project_id: "observe-smoke-project",
+    start_time: "2026-05-26T15:04:00Z",
+    end_time: "2026-05-26T15:04:01Z",
+    latency_ms: 420,
+    total_tokens: 42,
+    total_cost: 0.00042,
+    status: "OK",
+  };
+}
+
+function traceDetailResponse() {
+  return {
+    status: true,
+    result: {
+      trace: {
+        id: "trace-smoke-1",
+        project: "observe-smoke-project",
+        name: "First checkout trace",
+        input: {
+          prompt: "Summarize the customer request.",
+        },
+        output: {
+          answer: "The customer needs setup guidance.",
+        },
+        external_id: "first-checkout-trace",
+        tags: [],
+      },
+      observation_spans: [],
+      summary: {
+        total_spans: 0,
+        total_duration_ms: 420,
+        total_tokens: 42,
+        total_cost: 0.00042,
+      },
+      graph: {
+        nodes: [],
+        edges: [],
       },
     },
   };
@@ -763,6 +973,7 @@ function isStubbedApiPath(path) {
   return (
     path.startsWith("/accounts/") ||
     path.startsWith("/tracer/project/") ||
+    path.startsWith("/tracer/dashboard/") ||
     path.startsWith("/tracer/saved-views/") ||
     path.startsWith("/tracer/trace/") ||
     path.startsWith("/tracer/observation-span/get_eval_attributes_list/")
@@ -784,6 +995,10 @@ function isOnboardingSmokeApiUrl(url) {
     url.includes("/tracer/project/list_projects/") ||
     url.includes("/tracer/project/project_sdk_code/") ||
     url.includes("/tracer/project/observe-smoke-project/") ||
+    url.includes("/tracer/project/list_project_ids/") ||
+    url.includes("/tracer/dashboard/metrics/") ||
+    url.includes("/tracer/trace/get_graph_methods/") ||
+    url.includes("/tracer/trace/trace-smoke-1/") ||
     url.includes("/tracer/saved-views/") ||
     url.includes("/tracer/trace/list_traces_of_session/") ||
     url.includes("/tracer/observation-span/get_eval_attributes_list/")

@@ -39,6 +39,18 @@ const SMOKES = [
     },
   },
   {
+    id: "onboarding-observe-project-first-trace-controlled",
+    mode: "controlled",
+    file: "onboarding-home-observe-smoke.mjs",
+    description:
+      "Stubbed auth proof for Observe project first trace arrival into trace review.",
+    env: {
+      ONBOARDING_SMOKE_STUB_AUTH: "1",
+      ONBOARDING_SMOKE_EXISTING_PROJECT: "1",
+      ONBOARDING_SMOKE_EXISTING_TRACE: "1",
+    },
+  },
+  {
     id: "onboarding-first-trace-review-controlled",
     mode: "controlled",
     file: "onboarding-first-trace-review-smoke.mjs",

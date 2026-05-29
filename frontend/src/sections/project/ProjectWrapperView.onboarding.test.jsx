@@ -154,9 +154,10 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       expect(window.location.pathname).toBe(
         "/dashboard/observe/project-1/llm-tracing",
       );
-      expect(window.location.search).toBe(
-        "?source=onboarding&onboarding=send-first-trace",
-      );
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("source")).toBe("onboarding");
+      expect(params.get("onboarding")).toBe("send-first-trace");
+      expect(params.get("selectedTab")).toBe("trace");
     });
   });
 

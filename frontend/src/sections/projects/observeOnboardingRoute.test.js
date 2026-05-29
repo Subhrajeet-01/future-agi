@@ -88,6 +88,17 @@ describe("observeOnboardingRoute", () => {
     );
   });
 
+  it("opens the trace tab for the first-trace project route", () => {
+    expect(
+      buildObserveProjectOnboardingHref({
+        observeId: "project-1",
+        mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+      }),
+    ).toBe(
+      "/dashboard/observe/project-1/llm-tracing?source=onboarding&onboarding=send-first-trace&selectedTab=trace",
+    );
+  });
+
   it("builds observe trace review hrefs", () => {
     expect(
       buildObserveTraceReviewHref({
