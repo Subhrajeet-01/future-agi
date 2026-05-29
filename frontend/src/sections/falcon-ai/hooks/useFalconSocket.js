@@ -19,6 +19,10 @@ export const useFalconSocket = () => {
   const timerRef = useRef(null);
   const pingRef = useRef(null);
   const mountedRef = useRef(true);
+  // Holds a chat payload sent while the socket was not yet OPEN, so it can be
+  // flushed once the connection opens instead of being silently dropped
+  // (otherwise the UI streams forever with no reply — TH-4873).
+  const pendingChatRef = useRef(null);
 
   const {
     appendTextDelta,
@@ -64,6 +68,16 @@ export const useFalconSocket = () => {
           ws.send(JSON.stringify({ type: "ping" }));
         }
       }, 30000);
+
+      // Flush a chat that was queued while the socket was still connecting
+      // (e.g. the first message right after page load, or during a slow
+      // handshake). Without this the frame was silently dropped and the UI
+      // streamed forever with no reply (TH-4873).
+      if (pendingChatRef.current) {
+        ws.send(JSON.stringify(pendingChatRef.current));
+        pendingChatRef.current = null;
+        return;
+      }
 
       // On reconnect, check if there is an active stream to resume
       const store = useFalconStore.getState();
@@ -287,8 +301,8 @@ export const useFalconSocket = () => {
     };
   }, [connect]);
 
-  const sendChat = useCallback((message, conversationId, context, fileIds) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+  const sendChat = useCallback(
+    (message, conversationId, context, fileIds) => {
       const store = useFalconStore.getState();
       const selectedCtx = store.selectedContext;
       const activeSkill = store.activeSkill;
@@ -311,9 +325,18 @@ export const useFalconSocket = () => {
         payload.skill_id = activeSkill.id;
       }
 
-      socketRef.current.send(JSON.stringify(payload));
-    }
-  }, []);
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify(payload));
+      } else {
+        // Socket not open yet (first message after load / slow handshake).
+        // Queue it and flush on open instead of silently dropping it, which
+        // left the UI streaming forever with no reply (TH-4873).
+        pendingChatRef.current = payload;
+        connect();
+      }
+    },
+    [connect],
+  );
 
   const sendActivateSkill = useCallback((skillId) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
