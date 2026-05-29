@@ -195,6 +195,8 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       route: "/dashboard/observe?setup=true&source=onboarding",
     });
 
+    expect(screen.getByText("Checking for your first trace")).toBeVisible();
+
     await user.click(
       screen.getByRole("button", { name: /open sample trace/i }),
     );

@@ -223,6 +223,9 @@ async function main() {
         30000,
       );
     } else {
+      await expectVisibleText(page, "Checking for your first trace", {
+        exact: true,
+      });
       await expectVisibleText(page, "Install Dependencies", { exact: true });
       await expectVisibleText(page, "Setup Telemetry", { exact: true });
       await expectVisibleText(page, "Setup Instrumentation", { exact: true });

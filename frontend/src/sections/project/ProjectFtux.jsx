@@ -12,6 +12,7 @@ const ProjectFtux = ({
   observeSetupCopy,
   observeSetupPrimaryAction,
   observeSetupSecondaryAction,
+  observeSetupVerification,
 }) => {
   const location = useLocation();
   const currentPath = location.pathname;
@@ -72,7 +73,7 @@ const ProjectFtux = ({
           <NewExperiment />
         </ShowComponent>
         <ShowComponent condition={isObserve}>
-          <NewObserve />
+          <NewObserve setupVerification={observeSetupVerification} />
         </ShowComponent>
       </Box>
     </Box>
@@ -100,6 +101,16 @@ ProjectFtux.propTypes = {
     disabled: PropTypes.bool,
     label: PropTypes.string.isRequired,
     onClick: PropTypes.func.isRequired,
+  }),
+  observeSetupVerification: PropTypes.shape({
+    description: PropTypes.string.isRequired,
+    primaryAction: PropTypes.shape({
+      disabled: PropTypes.bool,
+      label: PropTypes.string.isRequired,
+      onClick: PropTypes.func.isRequired,
+    }),
+    status: PropTypes.oneOf(["ready", "waiting"]).isRequired,
+    title: PropTypes.string.isRequired,
   }),
 };
 

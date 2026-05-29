@@ -71,9 +71,21 @@ const ProjectWrapperView = () => {
   const gridRef = useRef(null);
   const recordedObserveSetupFocusRef = useRef(false);
   const autoOpenedObserveSetupDrawerRef = useRef(false);
+  const sawEmptyObserveSetupRef = useRef(false);
   const currentTab = location.pathname.split("/").pop();
   const { enqueueSnackbar } = useSnackbar();
   const queryClient = useQueryClient();
+  const observeSetupOnboardingParams = useMemo(
+    () => getObserveSetupOnboardingParams(location.search),
+    [location.search],
+  );
+  const showObserveSetupFocus =
+    currentTab === "observe" &&
+    observeSetupOnboardingParams.mode ===
+      OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE;
+  const isSampleReviewReturn =
+    observeSetupOnboardingParams.source ===
+    OBSERVE_ONBOARDING_SOURCES.SAMPLE_TRACE_REVIEW;
   const { data: observeSetupFocusState, mutate: recordActivationEvent } =
     useRecordActivationEvent();
   const {
@@ -96,6 +108,7 @@ const ProjectWrapperView = () => {
         },
       ),
     select: (data) => data.data,
+    refetchInterval: showObserveSetupFocus ? 5000 : false,
   });
 
   const theme = useTheme();
@@ -113,17 +126,6 @@ const ProjectWrapperView = () => {
       ? observeProjectRows.find((project) => project?.id)?.id || null
       : null;
 
-  const observeSetupOnboardingParams = useMemo(
-    () => getObserveSetupOnboardingParams(location.search),
-    [location.search],
-  );
-  const showObserveSetupFocus =
-    currentTab === "observe" &&
-    observeSetupOnboardingParams.mode ===
-      OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE;
-  const isSampleReviewReturn =
-    observeSetupOnboardingParams.source ===
-    OBSERVE_ONBOARDING_SOURCES.SAMPLE_TRACE_REVIEW;
   const observeSetupCopy = useMemo(
     () =>
       showObserveSetupFocus
@@ -165,6 +167,28 @@ const ProjectWrapperView = () => {
     autoOpenedObserveSetupDrawerRef.current = true;
     setSetupDrawerOpen(true);
   }, [firstObserveProjectId, isLoading, isProjectCount, showObserveSetupFocus]);
+
+  useEffect(() => {
+    if (!showObserveSetupFocus || isLoading) return;
+    if (!isProjectCount) {
+      sawEmptyObserveSetupRef.current = true;
+      return;
+    }
+    if (!firstObserveProjectId || !sawEmptyObserveSetupRef.current) return;
+    navigate(
+      buildObserveProjectOnboardingHref({
+        observeId: firstObserveProjectId,
+        mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+      }),
+      { replace: true },
+    );
+  }, [
+    firstObserveProjectId,
+    isLoading,
+    isProjectCount,
+    navigate,
+    showObserveSetupFocus,
+  ]);
 
   const handleObserveSetupPrimaryAction = useCallback(() => {
     if (firstObserveProjectId) {
@@ -268,6 +292,18 @@ const ProjectWrapperView = () => {
     showObserveSetupFocus,
   ]);
 
+  const observeSetupVerification = useMemo(() => {
+    if (!observeSetupCopy || !showObserveSetupFocus || isProjectCount) {
+      return null;
+    }
+    return {
+      description:
+        "Keep this page open after running your app. We check every few seconds and move you forward when data arrives.",
+      status: "waiting",
+      title: "Checking for your first trace",
+    };
+  }, [isProjectCount, observeSetupCopy, showObserveSetupFocus]);
+
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
   };
@@ -359,6 +395,7 @@ const ProjectWrapperView = () => {
         observeSetupCopy={observeSetupCopy}
         observeSetupPrimaryAction={observeSetupPrimaryAction}
         observeSetupSecondaryAction={observeSetupSecondaryAction}
+        observeSetupVerification={observeSetupVerification}
       />
     );
   }

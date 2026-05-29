@@ -6,7 +6,17 @@ import { renderWithRouter } from "src/utils/test-utils";
 import ProjectFtux from "./ProjectFtux";
 
 vi.mock("./NewProject/NewObserve", () => ({
-  default: () => <div>Observe setup instructions</div>,
+  default: ({ setupVerification }) => (
+    <div>
+      <div>Observe setup instructions</div>
+      {setupVerification ? (
+        <div>
+          <div>{setupVerification.title}</div>
+          <div>{setupVerification.description}</div>
+        </div>
+      ) : null}
+    </div>
+  ),
 }));
 
 vi.mock("./NewProject/NewExperiment", () => ({
@@ -40,6 +50,12 @@ describe("ProjectFtux observe onboarding", () => {
           label: "Open sample trace",
           onClick: vi.fn(),
         }}
+        observeSetupVerification={{
+          description:
+            "Keep this page open after running your app. We check every few seconds and move you forward when data arrives.",
+          status: "waiting",
+          title: "Checking for your first trace",
+        }}
       />,
       { route: "/dashboard/observe?setup=true&source=onboarding" },
     );
@@ -49,6 +65,7 @@ describe("ProjectFtux observe onboarding", () => {
     expect(screen.getByText("Trace")).toBeVisible();
     expect(screen.getByText("Review")).toBeVisible();
     expect(screen.getByText("Observe setup instructions")).toBeVisible();
+    expect(screen.getByText("Checking for your first trace")).toBeVisible();
     expect(
       screen.getByRole("button", { name: /open sample trace/i }),
     ).toBeVisible();

@@ -1,4 +1,14 @@
-import { Box, LinearProgress, useTheme } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  LinearProgress,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import PropTypes from "prop-types";
 import React, { useMemo, useState } from "react";
 import { Events, handleOnDocsClicked, trackEvent } from "src/utils/Mixpanel";
 import { useQuery } from "@tanstack/react-query";
@@ -18,7 +28,7 @@ const CODE_SECTION_ALIASES = {
   projectAddCode: "project_add_code",
 };
 
-const NewObserve = () => {
+const NewObserve = ({ setupVerification }) => {
   const theme = useTheme();
   const [languageTab, setLanguageTab] = useState("python");
   const {
@@ -63,8 +73,6 @@ const NewObserve = () => {
     return cleanCode(sectionData?.[languageKey]);
   };
 
-  if (!isSuccess || !keysData) return <LinearProgress />;
-
   return (
     <Box
       sx={{
@@ -74,123 +82,176 @@ const NewObserve = () => {
         gap: 4, // 32px spacing between major sections
       }}
     >
-      {/* Installation & Keys Section */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-        <InstructionTitle
-          title="Install Dependencies"
-          description="For more instructions, checkout our "
-          url="https://docs.futureagi.com/docs/observe"
-          urltext="Docs"
-          onUrlClick={() => handleOnDocsClicked("observe_page")}
-        />
+      {setupVerification ? (
+        <Alert
+          data-testid="observe-setup-verification"
+          severity={setupVerification.status === "ready" ? "success" : "info"}
+          icon={
+            setupVerification.status === "waiting" ? (
+              <CircularProgress size={18} />
+            ) : undefined
+          }
+          action={
+            setupVerification.primaryAction ? (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={setupVerification.primaryAction.onClick}
+                disabled={setupVerification.primaryAction.disabled}
+              >
+                {setupVerification.primaryAction.label}
+              </Button>
+            ) : null
+          }
+          sx={{ alignItems: "center" }}
+        >
+          <Stack spacing={0.25}>
+            <Typography variant="subtitle2">
+              {setupVerification.title}
+            </Typography>
+            <Typography variant="body2">
+              {setupVerification.description}
+            </Typography>
+          </Stack>
+        </Alert>
+      ) : null}
 
-        <InstructionTitle description="Configure your application to send traces to Future AGI" />
+      {!isSuccess || !keysData ? <LinearProgress /> : null}
 
-        {/* Tab selector for installation */}
-        <TabWrapper sx={tabWrapperStyles}>
-          <CustomTabs
-            textColor="primary"
-            value={languageTab}
-            onChange={(e, value) => setLanguageTab(value)}
-            TabIndicatorProps={{
-              style: {
-                backgroundColor: theme.palette.primary.main,
-                opacity: 0.08,
-                height: "100%",
-                borderRadius: "8px",
-              },
-            }}
-          >
-            {tabOptions.map((tab) => (
-              <CustomTab
-                key={`config-${tab.value}`}
-                label={tab.label}
-                value={tab.value}
-                disabled={tab.disabled}
+      {isSuccess && keysData ? (
+        <>
+          {/* Installation & Keys Section */}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <InstructionTitle
+              title="Install Dependencies"
+              description="For more instructions, checkout our "
+              url="https://docs.futureagi.com/docs/observe"
+              urltext="Docs"
+              onUrlClick={() => handleOnDocsClicked("observe_page")}
+            />
+
+            <InstructionTitle description="Configure your application to send traces to Future AGI" />
+
+            {/* Tab selector for installation */}
+            <TabWrapper sx={tabWrapperStyles}>
+              <CustomTabs
+                textColor="primary"
+                value={languageTab}
+                onChange={(e, value) => setLanguageTab(value)}
+                TabIndicatorProps={{
+                  style: {
+                    backgroundColor: theme.palette.primary.main,
+                    opacity: 0.08,
+                    height: "100%",
+                    borderRadius: "8px",
+                  },
+                }}
+              >
+                {tabOptions.map((tab) => (
+                  <CustomTab
+                    key={`config-${tab.value}`}
+                    label={tab.label}
+                    value={tab.value}
+                    disabled={tab.disabled}
+                  />
+                ))}
+              </CustomTabs>
+            </TabWrapper>
+
+            <InstructionCodeCopy
+              text={getCodeBySection("installationGuide")}
+              language={languageTab}
+              // onCopy={() => trackEvent(Events.installDependenciesCopied)}
+            />
+
+            {/* API Keys */}
+            <Box sx={{ mt: 1.5 }}>
+              <InstructionTitle
+                title="Load API keys"
+                description="load your API keys"
               />
-            ))}
-          </CustomTabs>
-        </TabWrapper>
+            </Box>
 
-        <InstructionCodeCopy
-          text={getCodeBySection("installationGuide")}
-          language={languageTab}
-          // onCopy={() => trackEvent(Events.installDependenciesCopied)}
-        />
+            <InstructionCodeCopy
+              text={getCodeBySection("keys")}
+              language={languageTab}
+              onCopy={() => trackEvent(Events.apikeys)}
+            />
+          </Box>
 
-        {/* API Keys */}
-        <Box sx={{ mt: 1.5 }}>
-          <InstructionTitle
-            title="Load API keys"
-            description="load your API keys"
-          />
-        </Box>
+          {/* Telemetry Section with its own tab control */}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <InstructionTitle
+              title="Setup Telemetry"
+              description="Register your application to send traces to this project. The code should be added BEFORE any code execution."
+            />
 
-        <InstructionCodeCopy
-          text={getCodeBySection("keys")}
-          language={languageTab}
-          onCopy={() => trackEvent(Events.apikeys)}
-        />
-      </Box>
+            {/* Separate tab selector for telemetry */}
+            <TabWrapper sx={tabWrapperStyles}>
+              <CustomTabs
+                textColor="primary"
+                value={languageTab}
+                onChange={(e, value) => setLanguageTab(value)}
+                TabIndicatorProps={{
+                  style: {
+                    backgroundColor: theme.palette.primary.main,
+                    opacity: 0.08,
+                    height: "100%",
+                    borderRadius: "8px",
+                  },
+                }}
+              >
+                {tabOptions.map((tab) => (
+                  <CustomTab
+                    key={`telemetry-${tab.value}`}
+                    label={tab.label}
+                    value={tab.value}
+                    disabled={tab.disabled}
+                  />
+                ))}
+              </CustomTabs>
+            </TabWrapper>
 
-      {/* Telemetry Section with its own tab control */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-        <InstructionTitle
-          title="Setup Telemetry"
-          description="Register your application to send traces to this project. The code should be added BEFORE any code execution."
-        />
+            <InstructionCodeCopy
+              text={getCodeBySection("projectAddCode")}
+              language={languageTab}
+              // onCopy={() => trackEvent(Events.setupTelemetryCopied)}
+            />
+          </Box>
 
-        {/* Separate tab selector for telemetry */}
-        <TabWrapper sx={tabWrapperStyles}>
-          <CustomTabs
-            textColor="primary"
-            value={languageTab}
-            onChange={(e, value) => setLanguageTab(value)}
-            TabIndicatorProps={{
-              style: {
-                backgroundColor: theme.palette.primary.main,
-                opacity: 0.08,
-                height: "100%",
-                borderRadius: "8px",
-              },
-            }}
-          >
-            {tabOptions.map((tab) => (
-              <CustomTab
-                key={`telemetry-${tab.value}`}
-                label={tab.label}
-                value={tab.value}
-                disabled={tab.disabled}
-              />
-            ))}
-          </CustomTabs>
-        </TabWrapper>
+          {/* Instruments Section */}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <InstructionTitle
+              title="Setup Instrumentation"
+              description="Add tracing instrumentation to give you observability into your application."
+            />
 
-        <InstructionCodeCopy
-          text={getCodeBySection("projectAddCode")}
-          language={languageTab}
-          // onCopy={() => trackEvent(Events.setupTelemetryCopied)}
-        />
-      </Box>
-
-      {/* Instruments Section */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-        <InstructionTitle
-          title="Setup Instrumentation"
-          description="Add tracing instrumentation to give you observability into your application."
-        />
-
-        <ObserveInstruments
-          data={keysData?.instruments}
-          isLoading={isLoading}
-          isSuccess={isSuccess}
-          error={error}
-          languageTab={languageTab}
-          onLanguageChange={setLanguageTab}
-        />
-      </Box>
+            <ObserveInstruments
+              data={keysData?.instruments}
+              isLoading={isLoading}
+              isSuccess={isSuccess}
+              error={error}
+              languageTab={languageTab}
+              onLanguageChange={setLanguageTab}
+            />
+          </Box>
+        </>
+      ) : null}
     </Box>
   );
+};
+
+NewObserve.propTypes = {
+  setupVerification: PropTypes.shape({
+    description: PropTypes.string.isRequired,
+    primaryAction: PropTypes.shape({
+      disabled: PropTypes.bool,
+      label: PropTypes.string.isRequired,
+      onClick: PropTypes.func.isRequired,
+    }),
+    status: PropTypes.oneOf(["ready", "waiting"]).isRequired,
+    title: PropTypes.string.isRequired,
+  }),
 };
 
 export default NewObserve;
