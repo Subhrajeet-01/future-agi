@@ -80,6 +80,12 @@ const SENTRY_IGNORE_ERRORS = [
   "TypeError: cancelled",
   "AbortError",
   "Non-Error promise rejection captured",
+  // Transient third-party / backend load failures: surfaced to the user via
+  // snackbars but not actionable as Sentry issues (adblock/HTTP for Stripe.js,
+  // a backend 500 for pricing-card-details, transient CDN fetch on SW update).
+  "Failed to load Stripe.js",
+  "Failed to get pricing card details",
+  "Failed to update a ServiceWorker",
 ];
 
 Sentry.init({
@@ -90,7 +96,15 @@ Sentry.init({
   environment: CURRENT_ENVIRONMENT || "development",
   release: import.meta.env.VITE_APP_VERSION || undefined,
   integrations: [
-    Sentry.browserTracingIntegration(),
+    Sentry.browserTracingIntegration({
+      // Don't instrument third-party marketing/analytics beacons (Google Ads,
+      // GTM, GA, Reddit/Twitter pixels) — their repeated conversion pings get
+      // flagged as N+1 API-call perf issues even though they aren't app fetches.
+      shouldCreateSpanForRequest: (url) =>
+        !/(?:googleadservices|googletagmanager|google-analytics|doubleclick|googlesyndication|redditstatic|reddit\.com|ads-twitter|t\.co|analytics\.twitter)\.com/i.test(
+          url,
+        ),
+    }),
     // Mask text and media in session replays so we never stream customer
     // content (prompts, PII, uploads) to a third party.
     Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
@@ -105,6 +119,20 @@ Sentry.init({
   // Ignore noise injected by browser extensions / third-party scripts.
   denyUrls: [/extensions\//i, /^chrome:\/\//i, /^moz-extension:\/\//i],
   tracePropagationTargets: [HOST_API],
+  // Drop Vite dev-server dep-optimizer artifacts: when Vite re-bundles
+  // .vite/deps it forces a reload, and an in-flight dep chunk can transiently
+  // be null (e.g. "Cannot read properties of null (reading 'useContext')").
+  // These frames only exist under /node_modules/.vite/deps/* in dev, never in a
+  // production build, so genuine production errors stay reported.
+  beforeSend(event) {
+    const fromViteDeps = event?.exception?.values?.some((value) =>
+      value?.stacktrace?.frames?.some((frame) =>
+        frame?.filename?.includes("/.vite/deps/"),
+      ),
+    );
+    if (fromViteDeps) return null;
+    return event;
+  },
 });
 
 // Initialize PostHog (autocapture, session replay, web vitals)
@@ -140,7 +168,13 @@ if (CURRENT_ENVIRONMENT !== "local" && "serviceWorker" in navigator) {
           registration.scope,
         );
         // Check for updates every 5 minutes
-        setInterval(() => registration.update(), 5 * 60 * 1000);
+        setInterval(() => {
+          // Transient CDN/network failures fetching service-worker.js are
+          // non-fatal; swallow so they don't surface as unhandled rejections.
+          registration.update().catch((err) => {
+            logger.debug("ServiceWorker update check failed:", err);
+          });
+        }, 5 * 60 * 1000);
         // When a new SW is found, activate it immediately
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;

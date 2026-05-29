@@ -71,6 +71,26 @@ def _format_if_needed(raw: str) -> str | None:
 # --- Helper Functions for Database Interaction ---
 
 
+def _sanitize_nonfinite_floats(value: Any) -> Any:
+    """Recursively replace NaN/+-Infinity floats with ``None``.
+
+    Python's ``json.dumps`` emits the bare tokens ``NaN``/``Infinity``/
+    ``-Infinity`` for non-finite floats, which PostgreSQL's json/jsonb type
+    rejects during COPY (``invalid input syntax for type json``). User-supplied
+    span attributes can carry these values, so scrub them before serialization.
+    Mirrors ``tracer.views.trace._sanitize_nonfinite_floats`` on the read path.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _sanitize_nonfinite_floats(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_nonfinite_floats(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_nonfinite_floats(v) for v in value)
+    return value
+
+
 def _serialize_json_field_value(val: Any) -> str | None:
     """
     Serialize a value for PostgreSQL JSONField in COPY operations.
@@ -86,12 +106,22 @@ def _serialize_json_field_value(val: Any) -> str | None:
 
     if isinstance(val, str):
         try:
-            json.loads(val)
-            return val
+            parsed = json.loads(val)
         except (json.JSONDecodeError, TypeError):
-            return json.dumps(val)
+            return json.dumps(val, allow_nan=False)
+        try:
+            # Fast path: already-valid JSON with no non-finite floats.
+            json.dumps(parsed, allow_nan=False)
+            return val
+        except ValueError:
+            return json.dumps(_sanitize_nonfinite_floats(parsed), allow_nan=False)
 
-    return json.dumps(val)
+    # Fast path: dump directly; only pay the recursive scrub when a non-finite
+    # float is actually present (keeps the common clean-data path allocation-free).
+    try:
+        return json.dumps(val, allow_nan=False)
+    except ValueError:
+        return json.dumps(_sanitize_nonfinite_floats(val), allow_nan=False)
 
 
 def _bulk_create_with_copy(model: models.Model, objects: list[models.Model]):
@@ -593,7 +623,27 @@ def _bulk_insert_observation_spans(spans_to_create: list[ObservationSpan]):
         if not span.updated_at:
             span.updated_at = now
 
-    _bulk_create_with_copy(ObservationSpan, spans_to_create)
+    # Idempotent on Temporal retry: COPY FROM STDIN has no ON CONFLICT support,
+    # so a re-ingest of the same span IDs would violate tracer_observation_span_pkey.
+    # Use a savepoint (we run inside an outer transaction.atomic) so a conflict does
+    # not poison the outer transaction, then fall back to an ON CONFLICT DO NOTHING
+    # insert. NOTE: _bulk_create_with_copy uses psycopg3's COPY API, which bypasses
+    # Django's error wrapping — the duplicate-key error surfaces as a raw psycopg
+    # UniqueViolation (often chained via __cause__), NOT django.db.IntegrityError.
+    # Mirror the sibling Trace handler above and match on that.
+    try:
+        with transaction.atomic():
+            _bulk_create_with_copy(ObservationSpan, spans_to_create)
+    except Exception as e:
+        from django.db import DatabaseError
+        from psycopg.errors import UniqueViolation
+
+        if isinstance(getattr(e, "__cause__", None), UniqueViolation) or isinstance(
+            e, DatabaseError
+        ):
+            ObservationSpan.objects.bulk_create(spans_to_create, ignore_conflicts=True)
+        else:
+            raise
 
 
 def _bulk_update_traces(

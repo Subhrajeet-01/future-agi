@@ -457,7 +457,10 @@ def _process_mapping(
             # what dataset/playground do when a column cell is empty.
             parsed_mapping[key] = ""
         else:
-            logger.error(
+            # Expected: the user's eval references an attribute absent on this
+            # span. Raw emitter before the ValueError that the outer
+            # evaluate_*_observe handler catches and persists as failed. Warning.
+            logger.warning(
                 f"Required attribute '{attribute}' for key '{key}' not found for span {span.id}"
             )
             raise ValueError(
@@ -1799,7 +1802,9 @@ def evaluate_observation_span_observe(
                     eval_task.failed_spans = failed_spans
                     eval_task.save(update_fields=["failed_spans", "updated_at"])
             except EvalTask.DoesNotExist:
-                logger.error(f"EvalTask with id {eval_task_id} does not exist.")
+                # Expected race: the EvalTask was deleted before this async task
+                # ran. Nothing to update; downgrade to warning.
+                logger.warning(f"EvalTask with id {eval_task_id} does not exist.")
             except Exception as e:
                 logger.error(
                     f"Error during updating failed spans in exception handling evaluate_observation_span_observe: {e}"
@@ -2394,7 +2399,10 @@ def _process_trace_mapping(
                 # (partial). Mirrors the span / dataset behaviour.
                 parsed[key] = ""
                 continue
-            logger.error(
+            # Expected: the user's eval references an attribute absent on this
+            # trace. Raw emitter before the ValueError that the outer
+            # evaluate_trace_observe handler catches and persists as failed. Warning.
+            logger.warning(
                 f"Required attribute '{attribute}' for key '{key}' not found "
                 f"on trace {trace.id}"
             )
@@ -2445,7 +2453,10 @@ def _process_session_mapping(
                 # (partial), matching dataset/span behaviour.
                 parsed[key] = ""
                 continue
-            logger.error(
+            # Expected: the user's eval references an attribute absent on this
+            # session. Raw emitter before the ValueError that the outer
+            # evaluate_trace_session_observe handler catches and persists as failed. Warning.
+            logger.warning(
                 f"Required attribute '{attribute}' for key '{key}' not found "
                 f"on session {trace_session.id}"
             )
@@ -3085,7 +3096,9 @@ def evaluate_trace_observe(
                     eval_task.failed_spans = failed
                     eval_task.save(update_fields=["failed_spans", "updated_at"])
             except EvalTask.DoesNotExist:
-                logger.error(f"EvalTask with id {eval_task_id} does not exist.")
+                # Expected race: the EvalTask was deleted before this async task
+                # ran. Nothing to update; downgrade to warning.
+                logger.warning(f"EvalTask with id {eval_task_id} does not exist.")
             except Exception as save_err:
                 logger.error(
                     f"Error updating failed_spans during trace eval error: {save_err}"
@@ -3183,7 +3196,9 @@ def evaluate_trace_session_observe(
                     eval_task.failed_spans = failed
                     eval_task.save(update_fields=["failed_spans", "updated_at"])
             except EvalTask.DoesNotExist:
-                logger.error(f"EvalTask with id {eval_task_id} does not exist.")
+                # Expected race: the EvalTask was deleted before this async task
+                # ran. Nothing to update; downgrade to warning.
+                logger.warning(f"EvalTask with id {eval_task_id} does not exist.")
             except Exception as save_err:
                 logger.error(
                     f"Error updating failed_spans during session eval error: {save_err}"
