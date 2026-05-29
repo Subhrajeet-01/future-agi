@@ -26,6 +26,10 @@ from accounts.services.onboarding.lifecycle_preview_approval import (
     PREVIEW_APPROVAL_MISSING_REASON,
 )
 from accounts.services.onboarding.lifecycle_registry import lifecycle_campaign_by_key
+from accounts.services.onboarding.lifecycle_send_reports import (
+    DRY_RUN_REPORT_METADATA_KEY,
+    DRY_RUN_REPORT_MISSING_REASON,
+)
 from accounts.services.onboarding.lifecycle_sender import (
     queue_onboarding_lifecycle_email,
     send_limited_onboarding_lifecycle_batch,
@@ -86,7 +90,7 @@ def _allow_user(user):
     )
 
 
-def _approval_metadata(campaign_key):
+def _preview_approval_metadata(campaign_key):
     return {
         APPROVAL_METADATA_KEY: {
             "manifest_path": "/tmp/manifest.json",
@@ -102,6 +106,34 @@ def _approval_metadata(campaign_key):
             "html_sha256": "c" * 64,
             "text_sha256": "d" * 64,
         }
+    }
+
+
+def _approval_metadata(campaign_key):
+    return {
+        **_preview_approval_metadata(campaign_key),
+        DRY_RUN_REPORT_METADATA_KEY: {
+            "path": "/tmp/dry-run-report.json",
+            "sha256": "e" * 64,
+            "generated_at": "2026-05-29T10:10:00+00:00",
+            "command": "run_onboarding_lifecycle_send",
+            "cohort": "internal",
+            "limit": 1,
+            "campaign_group": None,
+            "user_id": None,
+            "workspace_id": None,
+            "require_campaign_group_allowlist": False,
+            "approval_manifest_sha256": "a" * 64,
+            "approval_record_sha256": "b" * 64,
+            "evaluated": 1,
+            "candidate_count": 1,
+            "status_counts": {"would_send": 1},
+            "suppression_counts": {},
+            "review_record_path": "/tmp/dry-run-report-review.json",
+            "review_record_sha256": "f" * 64,
+            "reviewed_by": "Lifecycle reviewer <reviewer@example.com>",
+            "reviewed_at": "2026-05-29T10:15:00+00:00",
+        },
     }
 
 
@@ -391,6 +423,34 @@ def test_batch_real_send_requires_preview_approval_record(
 
 @pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_batch_real_send_requires_dry_run_report_review(
+    organization,
+    workspace,
+    user,
+):
+    _allow_user(user)
+    _eligible_log(user, organization, workspace)
+    preview_approval = type(
+        "PreviewApproval",
+        (),
+        {
+            "approval_record_sha256": "b" * 64,
+        },
+    )()
+
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="dry-run report review is required",
+    ):
+        send_limited_onboarding_lifecycle_batch(
+            cohort="internal",
+            limit=1,
+            preview_approval=preview_approval,
+        )
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
 def test_provider_send_requires_preview_approval_metadata(
     organization,
     workspace,
@@ -405,6 +465,31 @@ def test_provider_send_requires_preview_approval_metadata(
 
     assert suppressed_log.status == OnboardingLifecycleSendLog.STATUS_SUPPRESSED
     assert suppressed_log.suppression_reason == PREVIEW_APPROVAL_MISSING_REASON
+    assert not suppressed_log.click_url
+    helper.assert_not_called()
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_provider_send_requires_dry_run_report_metadata(
+    organization,
+    workspace,
+    user,
+):
+    _allow_user(user)
+    log = _eligible_log(user, organization, workspace)
+    send_log = queue_onboarding_lifecycle_email(log)
+    send_log.metadata = {
+        **(send_log.metadata or {}),
+        **_preview_approval_metadata(send_log.campaign_key),
+    }
+    send_log.save(update_fields=["metadata", "updated_at"])
+
+    with patch("accounts.services.onboarding.lifecycle_sender.email_helper") as helper:
+        suppressed_log = send_onboarding_lifecycle_email(send_log)
+
+    assert suppressed_log.status == OnboardingLifecycleSendLog.STATUS_SUPPRESSED
+    assert suppressed_log.suppression_reason == DRY_RUN_REPORT_MISSING_REASON
     assert not suppressed_log.click_url
     helper.assert_not_called()
 

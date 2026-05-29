@@ -8,6 +8,7 @@ from accounts.services.onboarding.lifecycle_preview_approval import (
     load_lifecycle_preview_approval,
 )
 from accounts.services.onboarding.lifecycle_send_reports import (
+    load_lifecycle_send_dry_run_report_review,
     write_lifecycle_send_dry_run_report,
 )
 from accounts.services.onboarding.lifecycle_sender import (
@@ -29,6 +30,8 @@ class Command(BaseCommand):
         parser.add_argument("--approval-record")
         parser.add_argument("--report-output")
         parser.add_argument("--report-force", action="store_true")
+        parser.add_argument("--dry-run-report")
+        parser.add_argument("--dry-run-report-review-record")
         parser.add_argument("--now")
 
     def handle(self, *args, **options):
@@ -36,6 +39,10 @@ class Command(BaseCommand):
             raise CommandError("--limit must be greater than zero.")
         if options.get("report_output") and not options["dry_run"]:
             raise CommandError("--report-output requires --dry-run.")
+        if options["dry_run"] and (
+            options.get("dry_run_report") or options.get("dry_run_report_review_record")
+        ):
+            raise CommandError("--dry-run-report is only supported for sends.")
         now = None
         if options.get("now"):
             now = parse_datetime(options["now"])
@@ -58,6 +65,29 @@ class Command(BaseCommand):
             raise CommandError("--approval-manifest is required for sends.")
         if not options["dry_run"] and not options.get("approval_record"):
             raise CommandError("--approval-record is required for sends.")
+        dry_run_report_review = None
+        if not options["dry_run"]:
+            if not options.get("dry_run_report"):
+                raise CommandError("--dry-run-report is required for sends.")
+            if not options.get("dry_run_report_review_record"):
+                raise CommandError(
+                    "--dry-run-report-review-record is required for sends."
+                )
+            try:
+                dry_run_report_review = load_lifecycle_send_dry_run_report_review(
+                    report_path=options["dry_run_report"],
+                    review_record_path=options["dry_run_report_review_record"],
+                    command_name="run_onboarding_lifecycle_send",
+                    cohort=options["cohort"],
+                    limit=options["limit"],
+                    campaign_group=options.get("campaign_family"),
+                    user_id=options.get("user_id"),
+                    workspace_id=options.get("workspace_id"),
+                    approval_manifest_sha256=preview_approval.manifest_sha256,
+                    approval_record_sha256=preview_approval.approval_record_sha256,
+                )
+            except ImproperlyConfigured as exc:
+                raise CommandError(str(exc)) from exc
 
         result = send_limited_onboarding_lifecycle_batch(
             cohort=options["cohort"],
@@ -68,6 +98,7 @@ class Command(BaseCommand):
             dry_run=options["dry_run"],
             now=now,
             preview_approval=preview_approval,
+            dry_run_report_review=dry_run_report_review,
         )
         payload = result.to_payload()
         if options.get("report_output"):
@@ -93,6 +124,15 @@ class Command(BaseCommand):
         if payload["approval_record_sha256"]:
             self.stdout.write(
                 f"approval_record_sha256={payload['approval_record_sha256']}"
+            )
+        if payload["dry_run_report_sha256"]:
+            self.stdout.write(
+                f"dry_run_report_sha256={payload['dry_run_report_sha256']}"
+            )
+        if payload["dry_run_report_review_record_sha256"]:
+            self.stdout.write(
+                "dry_run_report_review_record_sha256="
+                f"{payload['dry_run_report_review_record_sha256']}"
             )
         self.stdout.write(f"run_id={payload['run_id']}")
         self.stdout.write(f"evaluated={payload['evaluated']}")

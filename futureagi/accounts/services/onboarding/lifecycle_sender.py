@@ -34,6 +34,10 @@ from accounts.services.onboarding.lifecycle_preview_approval import (
     APPROVAL_METADATA_KEY,
     PREVIEW_APPROVAL_MISSING_REASON,
 )
+from accounts.services.onboarding.lifecycle_send_reports import (
+    DRY_RUN_REPORT_METADATA_KEY,
+    DRY_RUN_REPORT_MISSING_REASON,
+)
 from accounts.services.onboarding.lifecycle_template_context import (
     build_lifecycle_template_context,
     template_path,
@@ -78,6 +82,8 @@ class LifecycleSendBatchResult:
     candidates: tuple[dict, ...] = ()
     approval_manifest_sha256: str | None = None
     approval_record_sha256: str | None = None
+    dry_run_report_sha256: str | None = None
+    dry_run_report_review_record_sha256: str | None = None
 
     def to_payload(self):
         return {
@@ -94,6 +100,10 @@ class LifecycleSendBatchResult:
             "candidates": list(self.candidates),
             "approval_manifest_sha256": self.approval_manifest_sha256,
             "approval_record_sha256": self.approval_record_sha256,
+            "dry_run_report_sha256": self.dry_run_report_sha256,
+            "dry_run_report_review_record_sha256": (
+                self.dry_run_report_review_record_sha256
+            ),
         }
 
 
@@ -529,6 +539,7 @@ def _suppression_reason(
     *,
     require_campaign_group_allowlist=False,
     preview_approval=None,
+    dry_run_report_review=None,
 ):
     campaign = decision.campaign
     if not flags.get("onboarding_lifecycle_email_dry_run"):
@@ -573,6 +584,10 @@ def _suppression_reason(
         return frequency_reason
     if not _internal_route(decision.target_url):
         return "route_unavailable"
+    if dry_run_report_review and not dry_run_report_review.has_sendable_candidate(
+        evaluation_log.id
+    ):
+        return DRY_RUN_REPORT_MISSING_REASON
     return None
 
 
@@ -583,6 +598,7 @@ def _send_log_defaults(
     now,
     cohort,
     preview_approval=None,
+    dry_run_report_review=None,
 ):
     campaign = campaign or {}
     snapshot = decision.activation_state or {}
@@ -600,6 +616,12 @@ def _send_log_defaults(
     if preview_approval and preview_approval.has_campaign(campaign_key):
         metadata[APPROVAL_METADATA_KEY] = preview_approval.metadata_for_campaign(
             campaign_key
+        )
+    if dry_run_report_review and dry_run_report_review.has_sendable_candidate(
+        evaluation_log.id
+    ):
+        metadata[DRY_RUN_REPORT_METADATA_KEY] = (
+            dry_run_report_review.metadata_for_send()
         )
     return {
         "user": evaluation_log.user,
@@ -686,6 +708,7 @@ def _get_or_create_send_log(
     now,
     cohort,
     preview_approval=None,
+    dry_run_report_review=None,
 ):
     defaults = _send_log_defaults(
         evaluation_log,
@@ -694,6 +717,7 @@ def _get_or_create_send_log(
         now,
         cohort,
         preview_approval=preview_approval,
+        dry_run_report_review=dry_run_report_review,
     )
     try:
         with transaction.atomic():
@@ -753,6 +777,7 @@ def queue_onboarding_lifecycle_email(
     cohort="internal",
     require_campaign_group_allowlist=False,
     preview_approval=None,
+    dry_run_report_review=None,
 ):
     now = now or timezone.now()
     _context, flags, decision = _fresh_decision(evaluation_log, now)
@@ -764,6 +789,7 @@ def queue_onboarding_lifecycle_email(
         now,
         cohort,
         preview_approval=preview_approval,
+        dry_run_report_review=dry_run_report_review,
     )
     if send_log.status in SUCCESS_SEND_STATUSES:
         return send_log
@@ -774,6 +800,7 @@ def queue_onboarding_lifecycle_email(
         now,
         require_campaign_group_allowlist=require_campaign_group_allowlist,
         preview_approval=preview_approval,
+        dry_run_report_review=dry_run_report_review,
     )
     if reason:
         return _mark_suppressed(send_log, reason, now)
@@ -800,6 +827,11 @@ def _has_preview_approval_metadata(send_log):
     return isinstance(metadata, dict) and bool(metadata.get("approval_record_sha256"))
 
 
+def _has_dry_run_report_metadata(send_log):
+    metadata = (send_log.metadata or {}).get(DRY_RUN_REPORT_METADATA_KEY)
+    return isinstance(metadata, dict) and bool(metadata.get("review_record_sha256"))
+
+
 def send_onboarding_lifecycle_email(send_log, *, now=None):
     now = now or timezone.now()
     if send_log.status in SUCCESS_SEND_STATUSES:
@@ -810,6 +842,8 @@ def send_onboarding_lifecycle_email(send_log, *, now=None):
         return _mark_suppressed(send_log, "target_success_event_completed", now)
     if not _has_preview_approval_metadata(send_log):
         return _mark_suppressed(send_log, PREVIEW_APPROVAL_MISSING_REASON, now)
+    if not _has_dry_run_report_metadata(send_log):
+        return _mark_suppressed(send_log, DRY_RUN_REPORT_MISSING_REASON, now)
     campaign = send_log.evaluation_log.registry_snapshot or {}
     if not campaign:
         send_log.status = OnboardingLifecycleSendLog.STATUS_FAILED
@@ -900,6 +934,7 @@ def send_limited_onboarding_lifecycle_batch(
     now=None,
     require_campaign_group_allowlist=False,
     preview_approval=None,
+    dry_run_report_review=None,
 ):
     now = now or timezone.now()
     if not dry_run and (
@@ -907,6 +942,10 @@ def send_limited_onboarding_lifecycle_batch(
     ):
         raise ImproperlyConfigured(
             "Lifecycle preview approval record is required for sends."
+        )
+    if not dry_run and not dry_run_report_review:
+        raise ImproperlyConfigured(
+            "Lifecycle send dry-run report review is required for sends."
         )
     run_id = uuid.uuid4()
     queryset = OnboardingLifecycleEvaluationLog.no_workspace_objects.filter(
@@ -935,6 +974,7 @@ def send_limited_onboarding_lifecycle_batch(
                 now,
                 require_campaign_group_allowlist=require_campaign_group_allowlist,
                 preview_approval=preview_approval,
+                dry_run_report_review=dry_run_report_review,
             )
             status = "would_suppress" if reason else "would_send"
             status_counts[status] += 1
@@ -956,6 +996,7 @@ def send_limited_onboarding_lifecycle_batch(
             cohort=cohort,
             require_campaign_group_allowlist=require_campaign_group_allowlist,
             preview_approval=preview_approval,
+            dry_run_report_review=dry_run_report_review,
         )
         if send_log.status == OnboardingLifecycleSendLog.STATUS_QUEUED:
             send_log = send_onboarding_lifecycle_email(send_log, now=now)
@@ -988,6 +1029,14 @@ def send_limited_onboarding_lifecycle_batch(
         ),
         approval_record_sha256=(
             preview_approval.approval_record_sha256 if preview_approval else None
+        ),
+        dry_run_report_sha256=(
+            dry_run_report_review.report.sha256 if dry_run_report_review else None
+        ),
+        dry_run_report_review_record_sha256=(
+            dry_run_report_review.review_record_sha256
+            if dry_run_report_review
+            else None
         ),
     )
 
