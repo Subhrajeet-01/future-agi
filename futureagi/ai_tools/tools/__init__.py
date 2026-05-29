@@ -9,11 +9,12 @@
 import accounts.views.workspace_management  # noqa: F401
 import tracer.views.project  # noqa: F401  — registers tracing_* bridge tools
 from ai_tools.tools.agents import (
-    get_call_execution,  # noqa: F401
     get_test_execution,  # noqa: F401
     list_scenarios,  # noqa: F401
     list_test_executions,  # noqa: F401
 )
+
+# get_call_execution -> DRF bridge on CallExecutionDetailView (see _simulate.py)
 
 # list_agents, list_agent_versions -> DRF bridge (see _agents.py)
 # Annotation Queue tools (8)
@@ -42,6 +43,7 @@ from ai_tools.tools.bridge import (
     _prompt_folders,  # noqa: F401  list/get/create/update/delete_prompt_folder
     _prompt_labels,  # noqa: F401  list/get/create/update/delete_prompt_label
     _prompt_templates,  # noqa: F401  list/get/create/update/delete_prompt_template
+    _simulate,  # noqa: F401  get_call_execution (analytics), get_scenario (graph)
     _tracing,  # noqa: F401  list/get_trace, list/get_span, list/get_session, list/get/update_eval_task, list/get/create/update/delete_alert_monitor, project versions
 )
 
@@ -171,7 +173,7 @@ from ai_tools.tools.simulation import (
     get_agent_version,  # noqa: F401
     get_call_logs,  # noqa: F401
     get_call_transcript,  # noqa: F401
-    get_scenario,  # noqa: F401
+    # get_scenario -> DRF bridge on ScenarioDetailView (see _simulate.py)
     get_test_execution_analytics,  # noqa: F401
     list_eval_mapping_options,  # noqa: F401
     list_simulate_eval_configs,  # noqa: F401
