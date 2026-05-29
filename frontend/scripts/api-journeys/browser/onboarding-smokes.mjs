@@ -84,6 +84,17 @@ const SMOKES = [
     },
   },
   {
+    id: "onboarding-get-started-fallback-controlled",
+    mode: "controlled",
+    file: "onboarding-home-observe-smoke.mjs",
+    description:
+      "Stubbed auth proof that disabled onboarding Home keeps Get Started available.",
+    env: {
+      ONBOARDING_SMOKE_STUB_AUTH: "1",
+      ONBOARDING_SMOKE_FEATURE_DISABLED_HOME: "1",
+    },
+  },
+  {
     id: "signup-quick-start-real",
     mode: "real-signup",
     file: "signup-quick-start-smoke.mjs",

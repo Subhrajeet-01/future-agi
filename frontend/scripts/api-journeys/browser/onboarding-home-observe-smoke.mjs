@@ -18,13 +18,14 @@ const EXISTING_PROJECT = envFlag("ONBOARDING_SMOKE_EXISTING_PROJECT");
 const EXISTING_TRACE =
   EXISTING_PROJECT && envFlag("ONBOARDING_SMOKE_EXISTING_TRACE");
 const POST_AHA_HOME = envFlag("ONBOARDING_SMOKE_POST_AHA_HOME");
+const FEATURE_DISABLED_HOME = envFlag("ONBOARDING_SMOKE_FEATURE_DISABLED_HOME");
 const SCREENSHOT_PATH =
   process.env.ONBOARDING_HOME_OBSERVE_SCREENSHOT ||
   `/tmp/onboarding-home-observe-smoke-${VIEWPORT_NAME}${
     EXISTING_PROJECT ? "-existing-project" : ""
   }${EXISTING_TRACE ? "-first-trace" : ""}${
     POST_AHA_HOME ? "-post-aha-fallback" : ""
-  }.png`;
+  }${FEATURE_DISABLED_HOME ? "-get-started-fallback" : ""}.png`;
 const STUB_AUTH = envFlag("ONBOARDING_SMOKE_STUB_AUTH");
 const STUB_ONBOARDING = process.env.ONBOARDING_SMOKE_STUB_ONBOARDING !== "0";
 
@@ -48,6 +49,7 @@ async function main() {
     existing_project: EXISTING_PROJECT,
     existing_trace: EXISTING_TRACE,
     post_aha_home: POST_AHA_HOME,
+    feature_disabled_home: FEATURE_DISABLED_HOME,
   };
 
   const browser = await puppeteer.launch({
@@ -114,6 +116,63 @@ async function main() {
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   try {
+    if (FEATURE_DISABLED_HOME) {
+      await page.goto(`${APP_BASE}/dashboard/home?source=onboarding`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.waitForFunction(
+        () =>
+          window.location.pathname === "/dashboard/home" &&
+          new URLSearchParams(window.location.search).get("source") ===
+            "onboarding",
+        { timeout: 30000 },
+      );
+
+      await expectSelector(page, '[data-testid="onboarding-home-view"]');
+      await expectVisibleText(page, "Start with the setup checklist", {
+        exact: true,
+      });
+      await expectVisibleText(
+        page,
+        "The existing setup checklist is available for this workspace.",
+        { exact: true },
+      );
+      await expectVisibleText(page, "Open Get Started", { exact: true });
+      const getStartedHref = await visibleLinkHrefByText(
+        page,
+        "Open Get Started",
+        { rootSelector: '[data-testid="onboarding-primary-action"]' },
+      );
+      assert(
+        getStartedHref === "/dashboard/get-started",
+        `Unexpected Get Started fallback CTA href: ${getStartedHref}`,
+      );
+      evidence.get_started_href = getStartedHref;
+      await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
+      evidence.screenshot = SCREENSHOT_PATH;
+      evidence.activation_state_requests = activationStateRequests.length;
+      assert(
+        apiFailures.length === 0,
+        `API failures: ${apiFailures.join("; ")}`,
+      );
+      assert(pageErrors.length === 0, `Page errors: ${pageErrors.join("; ")}`);
+      console.log(
+        JSON.stringify(
+          {
+            status: "passed",
+            app_base: APP_BASE,
+            api_base: auth.apiBase,
+            organization_id: auth.organizationId,
+            workspace_id: auth.workspaceId,
+            evidence,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
     if (POST_AHA_HOME) {
       await page.goto(`${APP_BASE}/dashboard/home?source=onboarding`, {
         waitUntil: "domcontentloaded",
@@ -636,28 +695,32 @@ async function installRuntime(
 }
 
 function stubbedActivationState(auth, { firstTraceReady = false } = {}) {
-  const fixtureName = POST_AHA_HOME
-    ? "observeFirstLoopComplete"
-    : firstTraceReady
-      ? "observeFirstTraceReady"
-      : "observeNoSetup";
+  const fixtureName = FEATURE_DISABLED_HOME
+    ? "featureDisabled"
+    : POST_AHA_HOME
+      ? "observeFirstLoopComplete"
+      : firstTraceReady
+        ? "observeFirstTraceReady"
+        : "observeNoSetup";
   const activationState = getActivationStateFixture(fixtureName);
-  if (POST_AHA_HOME) {
+  if (FEATURE_DISABLED_HOME || POST_AHA_HOME) {
     return {
       ...activationState,
       request_id: "onboarding_home_observe_smoke",
       organization_id: auth.organizationId,
       workspace_id: auth.workspaceId,
       user_id: auth.user.id,
-      route_availability: {
-        ...activationState.route_availability,
-        daily_quality_home: {
-          href: "/dashboard/home?mode=daily-quality",
-          is_available: false,
-          isAvailable: false,
-          reason: "feature_disabled",
-        },
-      },
+      route_availability: POST_AHA_HOME
+        ? {
+            ...activationState.route_availability,
+            daily_quality_home: {
+              href: "/dashboard/home?mode=daily-quality",
+              is_available: false,
+              isAvailable: false,
+              reason: "feature_disabled",
+            },
+          }
+        : activationState.route_availability,
     };
   }
   const firstTraceReviewHref =
