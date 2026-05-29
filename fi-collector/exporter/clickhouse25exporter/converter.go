@@ -97,9 +97,17 @@ func spanToRow(
 		latencyMs = int32(ms)
 	}
 
-	// trace_id / span_id are 16- and 8-byte values in OTel; CH stores them
-	// as hex Strings (matches our PG legacy data shape).
-	traceID := strings.ToLower(span.TraceID().String())
+	// trace_id is the 16-byte OTel value, but PG `tracer_trace.id` is a UUID
+	// and the migration backfill lands it as the 36-char DASHED uuid string in
+	// `spans`/`traces`. We must match that exactly: live spans have to join the
+	// backfilled history on trace_id, and spans.trace_name resolves the trace
+	// name via toUUID(trace_id) against trace_dict (v2 schema 015) — toUUID()
+	// only parses the dashed form. `span.TraceID().String()` emits 32-char hex
+	// (no dashes), so we format the bytes as a dashed UUID instead.
+	//
+	// span_id / parent_span_id are 8-byte values stored as 16-char hex — that
+	// already matches PG `tracer_observation_span.id`, so leave them as-is.
+	traceID := traceIDToUUIDString(span.TraceID())
 	spanID := strings.ToLower(span.SpanID().String())
 	parentID := ""
 	if !span.ParentSpanID().IsEmpty() {
@@ -291,6 +299,17 @@ func nullableUUID(s string) any {
 		return nil
 	}
 	return s
+}
+
+// traceIDToUUIDString formats an OTel 16-byte trace id as the canonical
+// 36-char dashed UUID (8-4-4-4-12), matching PG `tracer_trace.id` and the
+// migration backfill. Uses the same byte-formatting idiom as randomUUID.
+// An empty/zero trace id yields the all-zero UUID string; the caller's
+// upstream validation rejects spans without a trace before we get here.
+func traceIDToUUIDString(t pcommon.TraceID) string {
+	b := t // pcommon.TraceID is [16]byte
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 func randomUUID() string {

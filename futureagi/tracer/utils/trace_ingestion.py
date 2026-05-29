@@ -771,6 +771,21 @@ def bulk_create_observation_span_task(
             _bulk_insert_observation_spans(observation_spans_to_create)
             _bulk_update_traces(traces_to_update, all_traces)
 
+            # CH25: mirror this batch's traces into the CH `traces` table — the
+            # app-level replacement for the removed PeerDB CDC path that fed
+            # trace_dict (the source of every span's trace_name). One upsert
+            # batch per ingest batch (not per span); post-commit + best-effort
+            # so a CH hiccup never breaks PG ingestion.
+            if all_traces:
+                from tracer.services.clickhouse.v2.trace_writer import (
+                    mirror_traces_to_clickhouse,
+                )
+
+                _ch_trace_ids = [str(tid) for tid in all_traces]
+                transaction.on_commit(
+                    lambda ids=_ch_trace_ids: mirror_traces_to_clickhouse(ids)
+                )
+
             # 5. Trigger scanner for completed traces (root span with end_time)
             _trigger_trace_scanner(observation_spans_to_create)
 

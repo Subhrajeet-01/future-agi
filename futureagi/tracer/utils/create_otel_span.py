@@ -179,4 +179,18 @@ def create_single_otel_span(data, organization_id, user_id, workspace_id=None):
                 "Error creating trace while creating observation span from otel"
             )
 
+    # CH25: mirror the trace into the CH `traces` table (the app-level
+    # replacement for the removed PeerDB CDC path that fed trace_dict). Gate on
+    # the ROOT span — it carries the trace's identity + input/output, so this
+    # fires ~once per trace instead of once per span. Post-commit + best-effort
+    # so a CH hiccup never breaks PG ingestion.
+    if observation_span.parent_span_id is None:
+        from tracer.services.clickhouse.v2.trace_writer import (
+            mirror_traces_to_clickhouse,
+        )
+
+        transaction.on_commit(
+            lambda tid=str(trace.id): mirror_traces_to_clickhouse([tid])
+        )
+
     return observation_span

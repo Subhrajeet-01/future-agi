@@ -61,7 +61,10 @@ func TestConvertMinimalGenAISpan(t *testing.T) {
 		"project_id":         "11111111-1111-4111-8111-111111111111",
 		"observation_type":   "LLM",
 		"service_name":       "my-llm-app",
-		"trace_id":           "0102030405060708090a0b0c0d0e0f10",
+		// trace_id is emitted as the 36-char DASHED UUID (not 32-char hex) so it
+		// matches PG tracer_trace.id + the migration backfill and resolves via
+		// toUUID() in the trace_dict lookup. span id stays 16-char hex.
+		"trace_id":           "01020304-0506-0708-090a-0b0c0d0e0f10",
 		"id":                 "0908070605040302",
 		"name":               "llm.chat.completion",
 		"latency_ms":         int32(1500),

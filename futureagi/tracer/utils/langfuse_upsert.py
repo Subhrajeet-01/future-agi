@@ -305,4 +305,16 @@ def upsert_langfuse_trace(
             )
             scores_count += 1
 
+    # CH25: mirror this trace into the CH `traces` table — the app-level
+    # replacement for the removed PeerDB CDC path feeding trace_dict. The
+    # Langfuse path is where trace.name is promoted from the root span, so this
+    # keeps named traces correct in CH. One mirror per upsert; best-effort.
+    from tracer.services.clickhouse.v2.trace_writer import (
+        mirror_traces_to_clickhouse,
+    )
+
+    transaction.on_commit(
+        lambda tid=str(trace.id): mirror_traces_to_clickhouse([tid])
+    )
+
     return created, spans_count, scores_count
