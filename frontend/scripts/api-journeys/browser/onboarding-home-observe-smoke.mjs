@@ -288,6 +288,24 @@ async function main() {
     await expectVisibleText(page, "Connect Observe to your app", {
       exact: true,
     });
+    const observeSetupActionTexts = await visibleActionTexts(page, {
+      rootSelector: '[data-testid="observe-onboarding-focus"]',
+    });
+    if (!EXISTING_PROJECT) {
+      assert(
+        observeSetupActionTexts.includes("Open sample trace"),
+        `Expected sample trace to remain available. Actions: ${observeSetupActionTexts.join(
+          ", ",
+        )}`,
+      );
+      assert(
+        observeSetupActionTexts.at(-1) === "Review setup",
+        `Expected real setup to remain primary. Actions: ${observeSetupActionTexts.join(
+          ", ",
+        )}`,
+      );
+      evidence.observe_setup_actions = observeSetupActionTexts;
+    }
     if (EXISTING_PROJECT) {
       await expectVisibleText(page, "Open first trace step", { exact: true });
       await clickVisibleText(page, "Open first trace step", {
@@ -1098,6 +1116,29 @@ async function visibleActionExists(page, text, { rootSelector } = {}) {
     },
     { expectedText: text, selector: rootSelector },
   );
+}
+
+async function visibleActionTexts(page, { rootSelector } = {}) {
+  return page.evaluate((selector) => {
+    const normalized = (value) => String(value || "").trim();
+    const isVisible = (element) => {
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return (
+        style.visibility !== "hidden" &&
+        style.display !== "none" &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    };
+    const root = selector ? document.querySelector(selector) : document.body;
+    return Array.from(
+      root?.querySelectorAll("a[href],button,[role='button']") || [],
+    )
+      .filter(isVisible)
+      .map((element) => normalized(element.textContent))
+      .filter(Boolean);
+  }, rootSelector);
 }
 
 async function clickVisibleText(page, text, { rootSelector } = {}) {

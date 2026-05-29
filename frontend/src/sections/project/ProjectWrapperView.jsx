@@ -272,23 +272,22 @@ const ProjectWrapperView = () => {
     observeSetupCopy,
   ]);
 
-  const observeSetupPrimaryAction =
-    openSampleTraceAction || reviewObserveSetupAction;
+  const observeSetupPrimaryAction = reviewObserveSetupAction;
 
   const observeSetupSecondaryAction = useMemo(() => {
     if (
       !observeSetupCopy ||
       !showObserveSetupFocus ||
       !canOpenObserveSetupSample ||
-      !reviewObserveSetupAction
+      !openSampleTraceAction
     ) {
       return null;
     }
-    return reviewObserveSetupAction;
+    return openSampleTraceAction;
   }, [
     canOpenObserveSetupSample,
     observeSetupCopy,
-    reviewObserveSetupAction,
+    openSampleTraceAction,
     showObserveSetupFocus,
   ]);
 

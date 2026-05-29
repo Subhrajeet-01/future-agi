@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "src/utils/test-utils";
+import { screen, waitFor, within } from "src/utils/test-utils";
 import { renderWithRouter } from "src/utils/test-utils";
 import userEvent from "@testing-library/user-event";
 import ProjectWrapperView from "./ProjectWrapperView";
@@ -196,6 +196,10 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     });
 
     expect(screen.getByText("Checking for your first trace")).toBeVisible();
+    const focusPanel = screen.getByTestId("observe-onboarding-focus");
+    const focusButtons = within(focusPanel).getAllByRole("button");
+    expect(focusButtons[0]).toHaveTextContent(/open sample trace/i);
+    expect(focusButtons[1]).toHaveTextContent(/review setup/i);
 
     await user.click(
       screen.getByRole("button", { name: /open sample trace/i }),
