@@ -12,6 +12,7 @@ from accounts.models import (
     OnboardingLifecycleEvaluationLog,
     OnboardingLifecycleSendAllowlist,
     OnboardingLifecycleSendLog,
+    User,
 )
 from accounts.models.workspace import Workspace
 from accounts.services.onboarding.lifecycle_registry import lifecycle_campaign_by_key
@@ -177,6 +178,7 @@ def test_welcome_email_beta_send_requires_explicit_flag_and_allowlist(
         scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
         scope_value=str(user.id),
         environment="local",
+        campaign_group="welcome",
     )
     output = StringIO()
 
@@ -202,6 +204,110 @@ def test_welcome_email_beta_send_requires_explicit_flag_and_allowlist(
 
 
 @pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_welcome_email_beta_requires_welcome_specific_allowlist(
+    organization,
+    workspace,
+    user,
+):
+    _eligible_campaign_log(user, organization, workspace, "welcome_resume_goal")
+    OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
+        scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
+        scope_value=str(user.id),
+        environment="local",
+    )
+    output = StringIO()
+
+    with patch("accounts.services.onboarding.lifecycle_sender.email_helper"):
+        call_command(
+            "run_onboarding_welcome_email_beta",
+            "--send",
+            "--limit",
+            "1",
+            stdout=output,
+        )
+
+    value = output.getvalue()
+    assert "mode=send" in value
+    assert "sent=0" in value
+    assert "suppressed=1" in value
+    assert "not_in_send_cohort" in value
+    assert OnboardingLifecycleSendLog.no_workspace_objects.filter(
+        campaign_group="welcome",
+        status=OnboardingLifecycleSendLog.STATUS_SUPPRESSED,
+        suppression_reason="not_in_send_cohort",
+    ).exists()
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_welcome_email_beta_filters_by_user_id(organization, workspace, user):
+    _eligible_campaign_log(user, organization, workspace, "welcome_resume_goal")
+    other_user = User.objects.create_user(
+        email="welcome-filter-other@example.com",
+        name="Welcome Filter Other",
+        organization=organization,
+    )
+    _eligible_campaign_log(
+        other_user,
+        organization,
+        workspace,
+        "welcome_resume_goal",
+    )
+    output = StringIO()
+
+    call_command(
+        "run_onboarding_welcome_email_beta",
+        "--user-id",
+        str(user.id),
+        "--limit",
+        "10",
+        stdout=output,
+    )
+
+    value = output.getvalue()
+    assert "mode=dry_run" in value
+    assert "campaign_group=welcome" in value
+    assert "evaluated=1" in value
+    assert "sent=0" in value
+    assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_welcome_email_beta_filters_by_workspace_id(organization, workspace, user):
+    _eligible_campaign_log(user, organization, workspace, "welcome_resume_goal")
+    other_workspace = Workspace.no_workspace_objects.create(
+        name="Welcome Filter Other Workspace",
+        organization=organization,
+        created_by=user,
+    )
+    _eligible_campaign_log(
+        user,
+        organization,
+        other_workspace,
+        "welcome_resume_goal",
+    )
+    output = StringIO()
+
+    call_command(
+        "run_onboarding_welcome_email_beta",
+        "--workspace-id",
+        str(workspace.id),
+        "--limit",
+        "10",
+        stdout=output,
+    )
+
+    value = output.getvalue()
+    assert "mode=dry_run" in value
+    assert "campaign_group=welcome" in value
+    assert "evaluated=1" in value
+    assert "sent=0" in value
+    assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
+
+
+@pytest.mark.django_db
 def test_welcome_email_beta_rejects_unbounded_limit():
     output = StringIO()
 
@@ -210,5 +316,19 @@ def test_welcome_email_beta_rejects_unbounded_limit():
             "run_onboarding_welcome_email_beta",
             "--limit",
             "101",
+            stdout=output,
+        )
+
+
+def test_welcome_email_beta_rejects_invalid_now():
+    output = StringIO()
+
+    with pytest.raises(CommandError, match="--now must be an ISO datetime"):
+        call_command(
+            "run_onboarding_welcome_email_beta",
+            "--limit",
+            "1",
+            "--now",
+            "not-a-date",
             stdout=output,
         )

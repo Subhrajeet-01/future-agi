@@ -47,6 +47,7 @@ class Command(BaseCommand):
             user_id=options.get("user_id"),
             dry_run=dry_run,
             now=now,
+            require_campaign_group_allowlist=True,
         )
         payload = result.to_payload()
         self.stdout.write(f"mode={'send' if options['send'] else 'dry_run'}")

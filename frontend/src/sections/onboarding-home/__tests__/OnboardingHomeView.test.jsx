@@ -134,7 +134,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
   });
 
-  it("renders the default Observe first action for first-run users", () => {
+  it("renders the sample Aha panel before real Observe setup for first-run users", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("newWorkspaceNoGoal"),
       isLoading: false,
@@ -145,14 +145,31 @@ describe("OnboardingHomeView", () => {
 
     renderView("/dashboard/home?source=email&campaign_key=welcome");
 
-    expect(screen.getByTestId("sample-project-panel")).toBeVisible();
-    expect(screen.getByText("Fastest path to Aha")).toBeVisible();
-    expect(screen.getByText("Preview the quality loop first")).toBeVisible();
-    expect(screen.getByTestId("observe-setup-panel")).toBeVisible();
+    const samplePanel = screen.getByTestId("sample-project-panel");
+    const observeSetupPanel = screen.getByTestId("observe-setup-panel");
+    const onboardingView = screen.getByTestId("onboarding-home-view");
+    const panelOrder = Array.from(
+      onboardingView.querySelectorAll(
+        '[data-testid="sample-project-panel"], [data-testid="observe-setup-panel"]',
+      ),
+    );
+
+    expect(samplePanel).toBeVisible();
+    expect(within(samplePanel).getByText("Fastest path to Aha")).toBeVisible();
+    expect(
+      within(samplePanel).getByText("Preview the quality loop first"),
+    ).toBeVisible();
+    expect(
+      within(samplePanel).getByRole("button", { name: /open sample trace/i }),
+    ).toBeVisible();
+    expect(observeSetupPanel).toBeVisible();
+    expect(
+      within(observeSetupPanel).getByText("Connect one observe project"),
+    ).toBeVisible();
+    expect(panelOrder).toEqual([samplePanel, observeSetupPanel]);
     expect(
       screen.queryByTestId("onboarding-goal-picker"),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Connect one observe project")).toBeVisible();
     expect(screen.getByText("Workspace: Quality Workspace")).toBeVisible();
     expect(mocks.useActivationState).toHaveBeenCalledWith(
       expect.objectContaining({

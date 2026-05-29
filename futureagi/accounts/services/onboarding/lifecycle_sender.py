@@ -255,7 +255,7 @@ def _denylisted(evaluation_log):
     return False
 
 
-def _allowlisted(evaluation_log, campaign):
+def _allowlisted(evaluation_log, campaign, *, require_campaign_group=False):
     email = (getattr(evaluation_log.user, "email", "") or "").lower()
     domain = email.split("@", 1)[1] if "@" in email else ""
     values = {
@@ -269,12 +269,16 @@ def _allowlisted(evaluation_log, campaign):
         OnboardingLifecycleSendAllowlist.SCOPE_DOMAIN: domain,
     }
     campaign_group = campaign.get("campaign_group") if campaign else None
+    if require_campaign_group and not campaign_group:
+        return False
     queryset = OnboardingLifecycleSendAllowlist.no_workspace_objects.filter(
         enabled=True,
         environment=send_environment(),
-    ).filter(
-        models_q_campaign_group(campaign_group),
     )
+    if require_campaign_group:
+        queryset = queryset.filter(campaign_group=campaign_group)
+    else:
+        queryset = queryset.filter(models_q_campaign_group(campaign_group))
     for allowlist in queryset:
         if values.get(allowlist.scope_type) == allowlist.scope_value.lower():
             return True
@@ -367,7 +371,14 @@ def _missing_required_digest_preview(evaluation_log, campaign, decision):
     return not bool(_digest_preview_for(decision, evaluation_log))
 
 
-def _suppression_reason(evaluation_log, flags, decision, now):
+def _suppression_reason(
+    evaluation_log,
+    flags,
+    decision,
+    now,
+    *,
+    require_campaign_group_allowlist=False,
+):
     campaign = decision.campaign
     if not flags.get("onboarding_lifecycle_email_dry_run"):
         return "dry_run_not_eligible"
@@ -395,7 +406,11 @@ def _suppression_reason(evaluation_log, flags, decision, now):
         return "missing_digest_preview"
     if _denylisted(evaluation_log):
         return "denylisted"
-    if not _allowlisted(evaluation_log, campaign):
+    if not _allowlisted(
+        evaluation_log,
+        campaign,
+        require_campaign_group=require_campaign_group_allowlist,
+    ):
         return "not_in_send_cohort"
     preference_reason = _preference_suppression(evaluation_log, now, campaign)
     if preference_reason:
@@ -496,14 +511,26 @@ def _mark_suppressed(send_log, reason, now):
     return send_log
 
 
-def queue_onboarding_lifecycle_email(evaluation_log, *, now=None, cohort="internal"):
+def queue_onboarding_lifecycle_email(
+    evaluation_log,
+    *,
+    now=None,
+    cohort="internal",
+    require_campaign_group_allowlist=False,
+):
     now = now or timezone.now()
     _context, flags, decision = _fresh_decision(evaluation_log, now)
     campaign = decision.campaign or evaluation_log.registry_snapshot or {}
     send_log = _get_or_create_send_log(evaluation_log, campaign, decision, now, cohort)
     if send_log.status in SUCCESS_SEND_STATUSES:
         return send_log
-    reason = _suppression_reason(evaluation_log, flags, decision, now)
+    reason = _suppression_reason(
+        evaluation_log,
+        flags,
+        decision,
+        now,
+        require_campaign_group_allowlist=require_campaign_group_allowlist,
+    )
     if reason:
         return _mark_suppressed(send_log, reason, now)
     send_log.status = OnboardingLifecycleSendLog.STATUS_QUEUED
@@ -616,6 +643,7 @@ def send_limited_onboarding_lifecycle_batch(
     workspace_id=None,
     dry_run=False,
     now=None,
+    require_campaign_group_allowlist=False,
 ):
     now = now or timezone.now()
     run_id = uuid.uuid4()
@@ -637,7 +665,13 @@ def send_limited_onboarding_lifecycle_batch(
         evaluated += 1
         if dry_run:
             _context, flags, decision = _fresh_decision(evaluation_log, now)
-            reason = _suppression_reason(evaluation_log, flags, decision, now)
+            reason = _suppression_reason(
+                evaluation_log,
+                flags,
+                decision,
+                now,
+                require_campaign_group_allowlist=require_campaign_group_allowlist,
+            )
             status = "would_suppress" if reason else "would_send"
             status_counts[status] += 1
             if reason:
@@ -647,6 +681,7 @@ def send_limited_onboarding_lifecycle_batch(
             evaluation_log,
             now=now,
             cohort=cohort,
+            require_campaign_group_allowlist=require_campaign_group_allowlist,
         )
         if send_log.status == OnboardingLifecycleSendLog.STATUS_QUEUED:
             send_log = send_onboarding_lifecycle_email(send_log, now=now)
