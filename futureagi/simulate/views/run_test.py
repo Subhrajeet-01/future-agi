@@ -2003,6 +2003,8 @@ class TestExecutionDetailView(APIView):
                     "test_execution",
                     "test_execution__simulator_agent",
                     "test_execution__agent_definition",
+                    "test_execution__run_test",
+                    "test_execution__run_test__agent_definition",
                 )
                 .prefetch_related("transcripts", "snapshots", "chat_messages")
             ).order_by("created_at")

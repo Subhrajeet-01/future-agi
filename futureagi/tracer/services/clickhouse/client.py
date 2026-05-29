@@ -151,6 +151,7 @@ class ClickHouseClient:
         query: str,
         params: Optional[Dict[str, Any]] = None,
         with_column_types: bool = False,
+        settings: Optional[Dict[str, Any]] = None,
     ) -> List[Tuple]:
         """
         Execute a query and return results.
@@ -159,6 +160,9 @@ class ClickHouseClient:
             query: SQL query string
             params: Query parameters for parameterized queries
             with_column_types: If True, returns (results, column_types)
+            settings: Optional per-query ClickHouse settings (e.g.
+                {"data_type_default_nullable": 0} for DDL that must not be
+                auto-wrapped in Nullable when the server profile sets it to 1)
 
         Returns:
             List of result tuples, or (results, column_types) if with_column_types=True
@@ -172,6 +176,7 @@ class ClickHouseClient:
                 query,
                 params or {},
                 with_column_types=with_column_types,
+                settings=settings,
             )
 
             query_time_ms = (time.monotonic() - t_start) * 1000
