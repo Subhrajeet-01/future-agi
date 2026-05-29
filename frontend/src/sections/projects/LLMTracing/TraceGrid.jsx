@@ -12,11 +12,9 @@ import React, {
 } from "react";
 import { useAgTheme } from "src/hooks/use-ag-theme";
 import axios, { endpoints } from "src/utils/axios";
-import { getRandomId } from "src/utils/utils";
 import NumberQuickFilterPopover from "src/components/ComplexFilter/QuickFilterComponents/NumberQuickFilterPopover/NumberQuickFilterPopover";
 import NoRowsOverlay from "src/sections/project-detail/CompareDrawer/NoRowsOverlay";
 import {
-  AllowedGroups,
   applyQuickFilters,
   TRACE_DEFAULT_COLUMNS,
   getTraceListColumnDefs,
@@ -33,6 +31,7 @@ import { APP_CONSTANTS } from "src/utils/constants";
 import { useReplaySessionsStoreShallow } from "../SessionsView/ReplaySessions/store";
 import { REPLAY_MODULES } from "../SessionsView/ReplaySessions/configurations";
 import { useShallowToggleAnnotationsStore } from "../../agents/store";
+import { OBSERVE_FIRST_TRACE_LOADED_EVENT } from "../observeOnboardingRoute";
 
 const ROWS_LIMIT = 100;
 const EMPTY_EXTRA_FILTERS = [];
@@ -63,6 +62,7 @@ const TraceGrid = React.forwardRef(
       hasEvalFilter,
       metricFilters,
       pendingCustomColumnsRef,
+      onRowsLoaded,
       enabled = true,
       showErrors = false,
     },
@@ -129,6 +129,14 @@ const TraceGrid = React.forwardRef(
       ],
     );
     const previousFilterRequestKeyRef = useRef(filterRequestKey);
+    const extraFiltersKey = useMemo(
+      () => JSON.stringify(extraFilters),
+      [extraFilters],
+    );
+    const metricFiltersKey = useMemo(
+      () => JSON.stringify(metricFilters),
+      [metricFilters],
+    );
 
     useEffect(() => {
       if (previousFilterRequestKeyRef.current === filterRequestKey) return;
@@ -294,6 +302,19 @@ const TraceGrid = React.forwardRef(
 
               const rows = res?.table || [];
               const totalRows = res?.metadata?.total_rows;
+              if (pageNumber === 0) {
+                onRowsLoaded?.(rows, res);
+                const firstTraceId = rows.find(
+                  (row) => row?.trace_id,
+                )?.trace_id;
+                if (firstTraceId && projectId) {
+                  window.dispatchEvent(
+                    new CustomEvent(OBSERVE_FIRST_TRACE_LOADED_EVENT, {
+                      detail: { projectId, traceId: firstTraceId },
+                    }),
+                  );
+                }
+              }
               params.api.totalRowCount = totalRows;
               useTraceGridStore.setState({ totalRowCount: totalRows || 0 });
 
@@ -348,13 +369,14 @@ const TraceGrid = React.forwardRef(
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [
         filters,
-        JSON.stringify(extraFilters),
-        JSON.stringify(metricFilters),
+        extraFiltersKey,
+        metricFiltersKey,
         projectId,
         setLoading,
         hasEvalFilter,
         enabled,
         dateInterval,
+        onRowsLoaded,
       ],
     );
 
@@ -637,6 +659,7 @@ TraceGrid.propTypes = {
   cellHeight: PropTypes.string,
   hasEvalFilter: PropTypes.bool,
   metricFilters: PropTypes.array,
+  onRowsLoaded: PropTypes.func,
   enabled: PropTypes.bool,
   showErrors: PropTypes.bool,
 };

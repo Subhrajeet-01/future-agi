@@ -121,13 +121,15 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     });
   });
 
-  it("shows setup focus on the observe setup onboarding route", async () => {
+  it("moves existing observe projects to the first-trace step", async () => {
+    const user = userEvent.setup();
     renderWithRouter(<ProjectWrapperView />, {
       route: "/dashboard/observe?setup=true&source=onboarding",
     });
 
     expect(screen.getByText("Connect Observe to your app")).toBeVisible();
     expect(screen.getByText("Observe list")).toBeVisible();
+    expect(screen.queryByText("Observe setup drawer")).toBeNull();
 
     await waitFor(() => {
       expect(mocks.recordActivationEvent).toHaveBeenCalledWith(
@@ -144,8 +146,17 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       );
     });
 
+    await user.click(
+      screen.getByRole("button", { name: /open first trace step/i }),
+    );
+
     await waitFor(() => {
-      expect(screen.getByText("Observe setup drawer")).toBeVisible();
+      expect(window.location.pathname).toBe(
+        "/dashboard/observe/project-1/llm-tracing",
+      );
+      expect(window.location.search).toBe(
+        "?source=onboarding&onboarding=send-first-trace",
+      );
     });
   });
 

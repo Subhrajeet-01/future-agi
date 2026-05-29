@@ -40,6 +40,7 @@ import { useRecordActivationEvent } from "src/sections/onboarding-home/hooks/use
 import { useSampleProject } from "src/sections/onboarding-home/hooks/useSampleProject";
 import ObserveOnboardingFocusPanel from "src/sections/projects/ObserveOnboardingFocusPanel";
 import {
+  buildObserveProjectOnboardingHref,
   buildObserveRouteFocusPayload,
   getObserveOnboardingCopy,
   getObserveSetupOnboardingParams,
@@ -103,6 +104,14 @@ const ProjectWrapperView = () => {
     currentTab === "observe"
       ? data?.result?.metadata?.total_rows > 0
       : data?.result?.projects?.length > 0;
+  const observeProjectRows =
+    data?.result?.table?.length > 0
+      ? data.result.table
+      : data?.result?.projects || [];
+  const firstObserveProjectId =
+    currentTab === "observe"
+      ? observeProjectRows.find((project) => project?.id)?.id || null
+      : null;
 
   const observeSetupOnboardingParams = useMemo(
     () => getObserveSetupOnboardingParams(location.search),
@@ -148,15 +157,26 @@ const ProjectWrapperView = () => {
       !showObserveSetupFocus ||
       isLoading ||
       !isProjectCount ||
+      firstObserveProjectId ||
       autoOpenedObserveSetupDrawerRef.current
     ) {
       return;
     }
     autoOpenedObserveSetupDrawerRef.current = true;
     setSetupDrawerOpen(true);
-  }, [isLoading, isProjectCount, showObserveSetupFocus]);
+  }, [firstObserveProjectId, isLoading, isProjectCount, showObserveSetupFocus]);
 
   const handleObserveSetupPrimaryAction = useCallback(() => {
+    if (firstObserveProjectId) {
+      navigate(
+        buildObserveProjectOnboardingHref({
+          observeId: firstObserveProjectId,
+          mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        }),
+      );
+      return;
+    }
+
     if (isProjectCount) {
       setSetupDrawerOpen(true);
       return;
@@ -164,7 +184,7 @@ const ProjectWrapperView = () => {
     document
       .getElementById("observe-setup-instructions")
       ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, [isProjectCount]);
+  }, [firstObserveProjectId, isProjectCount, navigate]);
 
   const handleOpenSampleTrace = useCallback(async () => {
     try {
@@ -200,10 +220,19 @@ const ProjectWrapperView = () => {
   const reviewObserveSetupAction = useMemo(() => {
     if (!observeSetupCopy) return null;
     return {
-      label: isProjectCount ? "Open setup" : observeSetupCopy.primaryLabel,
+      label: firstObserveProjectId
+        ? "Open first trace step"
+        : isProjectCount
+          ? "Open setup"
+          : observeSetupCopy.primaryLabel,
       onClick: handleObserveSetupPrimaryAction,
     };
-  }, [handleObserveSetupPrimaryAction, isProjectCount, observeSetupCopy]);
+  }, [
+    firstObserveProjectId,
+    handleObserveSetupPrimaryAction,
+    isProjectCount,
+    observeSetupCopy,
+  ]);
 
   const openSampleTraceAction = useMemo(() => {
     if (!observeSetupCopy || !canOpenObserveSetupSample) return null;

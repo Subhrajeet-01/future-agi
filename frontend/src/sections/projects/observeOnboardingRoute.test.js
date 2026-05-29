@@ -4,6 +4,7 @@ import {
   buildObserveProjectOnboardingHref,
   buildObserveRouteFocusPayload,
   buildObserveTraceReviewHref,
+  getObserveFirstTraceReviewTarget,
   getObserveOnboardingCopy,
   getObserveOnboardingParams,
   getObserveSetupOnboardingParams,
@@ -104,6 +105,36 @@ describe("observeOnboardingRoute", () => {
     );
   });
 
+  it("selects the first trace review target once a trace is available", () => {
+    expect(
+      getObserveFirstTraceReviewTarget({
+        activationObserveId: "project-1",
+        activationTraceId: "trace-1",
+        mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        observeId: "project-1",
+      }),
+    ).toEqual({ observeId: "project-1", traceId: "trace-1" });
+
+    expect(
+      getObserveFirstTraceReviewTarget({
+        activationObserveId: "project-1",
+        activationTraceId: "trace-1",
+        loadedTraceId: "trace-2",
+        mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        observeId: "project-1",
+      }),
+    ).toEqual({ observeId: "project-1", traceId: "trace-2" });
+
+    expect(
+      getObserveFirstTraceReviewTarget({
+        activationObserveId: "project-2",
+        activationTraceId: "trace-1",
+        mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        observeId: "project-1",
+      }),
+    ).toBeNull();
+  });
+
   it("maps modes to activation stages", () => {
     expect(observeOnboardingStage(OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE)).toBe(
       "connect_observability",
@@ -133,6 +164,13 @@ describe("observeOnboardingRoute", () => {
       currentStep: "First trace",
       primaryLabel: "Refresh traces",
       title: "Send the first trace",
+    });
+    expect(
+      getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE),
+    ).toMatchObject({
+      currentStep: "Review",
+      primaryLabel: "Review trace",
+      title: "Review the first trace",
     });
     expect(
       getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE, {

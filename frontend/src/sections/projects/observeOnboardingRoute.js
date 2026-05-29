@@ -1,5 +1,7 @@
 const DEFAULT_ARTIFACT_ID = "observe-onboarding";
 
+export const OBSERVE_FIRST_TRACE_LOADED_EVENT = "observe-first-trace-loaded";
+
 export const OBSERVE_ONBOARDING_MODES = {
   CREATE_EVALUATOR: "create-evaluator",
   REVIEW_FIRST_TRACE: "review-first-trace",
@@ -155,6 +157,22 @@ export const getObserveOnboardingCopy = (mode, { source } = {}) => {
     };
   }
 
+  if (mode === OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE) {
+    return {
+      currentStep: "Review",
+      description:
+        "Open the first trace and inspect latency, cost, and quality context.",
+      primaryLabel: "Review trace",
+      secondaryLabel: "Refresh traces",
+      steps: [
+        { label: "Project", complete: true },
+        { label: "Trace", complete: true },
+        { label: "Review", complete: false },
+      ],
+      title: "Review the first trace",
+    };
+  }
+
   return null;
 };
 
@@ -181,6 +199,25 @@ export const buildObserveEvaluatorCreateHref = ({ observeId } = {}) => {
   params.set("source_type", "trace_project");
   if (observeId) params.set("source_id", observeId);
   return `/dashboard/evaluations/create?${params.toString()}`;
+};
+
+export const getObserveFirstTraceReviewTarget = ({
+  activationObserveId,
+  activationTraceId,
+  loadedTraceId,
+  mode,
+  observeId,
+} = {}) => {
+  if (mode !== OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE) return null;
+  if (!observeId) return null;
+
+  const resolvedObserveId = activationObserveId || observeId;
+  if (String(resolvedObserveId) !== String(observeId)) return null;
+
+  const traceId = loadedTraceId || activationTraceId;
+  if (!traceId) return null;
+
+  return { observeId, traceId };
 };
 
 export const buildObserveRouteFocusPayload = ({

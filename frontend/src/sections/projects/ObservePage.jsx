@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import PropTypes from "prop-types";
 import {
@@ -51,8 +52,11 @@ import ObserveOnboardingFocusPanel from "./ObserveOnboardingFocusPanel";
 import {
   buildObserveEvaluatorCreateHref,
   buildObserveRouteFocusPayload,
+  buildObserveTraceReviewHref,
+  getObserveFirstTraceReviewTarget,
   getObserveOnboardingCopy,
   getObserveOnboardingParams,
+  OBSERVE_FIRST_TRACE_LOADED_EVENT,
   OBSERVE_ONBOARDING_MODES,
 } from "./observeOnboardingRoute";
 
@@ -101,9 +105,11 @@ const ObservePage = React.memo(() => {
   const { data: projectDetail } = useGetProjectDetails(observeId);
   const { data: savedViewsData } = useGetSavedViews(observeId);
   const queryClient = useQueryClient();
-  const { mutate: recordActivationEvent } = useRecordActivationEvent();
+  const { data: observeRouteActivationState, mutate: recordActivationEvent } =
+    useRecordActivationEvent();
   const recordedObserveFocusRef = useRef(null);
   const recordedSourceFixFocusRef = useRef(false);
+  const [loadedTraceId, setLoadedTraceId] = useState(null);
 
   // Tab store state for modals and context menu
   const {
@@ -128,9 +134,31 @@ const ObservePage = React.memo(() => {
     () => getObserveOnboardingParams(location.search),
     [location.search],
   );
+  const activationTraceId =
+    observeRouteActivationState?.signals?.firstTraceId || null;
+  const activationObserveId =
+    observeRouteActivationState?.signals?.firstObserveId || observeId;
+  const firstTraceReviewTarget = useMemo(() => {
+    return getObserveFirstTraceReviewTarget({
+      activationObserveId,
+      activationTraceId,
+      loadedTraceId,
+      mode: observeOnboardingParams.mode,
+      observeId,
+    });
+  }, [
+    activationObserveId,
+    activationTraceId,
+    loadedTraceId,
+    observeId,
+    observeOnboardingParams.mode,
+  ]);
+  const observeOnboardingPanelMode = firstTraceReviewTarget
+    ? OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE
+    : observeOnboardingParams.mode;
   const observeOnboardingCopy = useMemo(
-    () => getObserveOnboardingCopy(observeOnboardingParams.mode),
-    [observeOnboardingParams.mode],
+    () => getObserveOnboardingCopy(observeOnboardingPanelMode),
+    [observeOnboardingPanelMode],
   );
   const showObserveOnboardingFocus =
     observeOnboardingParams.isOnboarding && Boolean(observeOnboardingCopy);
@@ -462,6 +490,36 @@ const ObservePage = React.memo(() => {
   ]);
 
   useEffect(() => {
+    setLoadedTraceId(null);
+  }, [observeId, observeOnboardingParams.mode]);
+
+  useEffect(() => {
+    if (
+      !showObserveOnboardingFocus ||
+      observeOnboardingParams.mode !== OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE
+    ) {
+      return undefined;
+    }
+
+    const handleFirstTraceLoaded = (event) => {
+      const detail = event?.detail || {};
+      if (detail.projectId !== observeId || !detail.traceId) return;
+      setLoadedTraceId(detail.traceId);
+    };
+
+    window.addEventListener(
+      OBSERVE_FIRST_TRACE_LOADED_EVENT,
+      handleFirstTraceLoaded,
+    );
+    return () => {
+      window.removeEventListener(
+        OBSERVE_FIRST_TRACE_LOADED_EVENT,
+        handleFirstTraceLoaded,
+      );
+    };
+  }, [observeId, observeOnboardingParams.mode, showObserveOnboardingFocus]);
+
+  useEffect(() => {
     if (!showEvalSourceFixBanner || recordedSourceFixFocusRef.current) return;
 
     recordedSourceFixFocusRef.current = true;
@@ -493,6 +551,11 @@ const ObservePage = React.memo(() => {
   }, [navigate, sourceFixOnboardingParams, sourceFixRerunHref]);
 
   const handleObservePrimaryAction = useCallback(() => {
+    if (firstTraceReviewTarget) {
+      navigate(buildObserveTraceReviewHref(firstTraceReviewTarget));
+      return;
+    }
+
     if (
       observeOnboardingParams.mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR
     ) {
@@ -501,9 +564,20 @@ const ObservePage = React.memo(() => {
     }
 
     refreshObserveData?.();
-  }, [navigate, observeId, observeOnboardingParams.mode, refreshObserveData]);
+  }, [
+    firstTraceReviewTarget,
+    navigate,
+    observeId,
+    observeOnboardingParams.mode,
+    refreshObserveData,
+  ]);
 
   const handleObserveSecondaryAction = useCallback(() => {
+    if (firstTraceReviewTarget) {
+      refreshObserveData?.();
+      return;
+    }
+
     if (
       observeOnboardingParams.mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR
     ) {
@@ -512,19 +586,26 @@ const ObservePage = React.memo(() => {
     }
 
     navigate("/dashboard/observe?setup=true&source=onboarding");
-  }, [navigate, observeOnboardingParams.mode, refreshObserveData]);
+  }, [
+    firstTraceReviewTarget,
+    navigate,
+    observeOnboardingParams.mode,
+    refreshObserveData,
+  ]);
 
   const observePrimaryAction = useMemo(() => {
     if (!observeOnboardingCopy) return null;
     const isCreateEvaluator =
       observeOnboardingParams.mode ===
       OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR;
+    const isReviewReady = Boolean(firstTraceReviewTarget);
     return {
       label: observeOnboardingCopy.primaryLabel,
       onClick: handleObservePrimaryAction,
-      disabled: !isCreateEvaluator && !refreshObserveData,
+      disabled: !isCreateEvaluator && !isReviewReady && !refreshObserveData,
     };
   }, [
+    firstTraceReviewTarget,
     handleObservePrimaryAction,
     observeOnboardingCopy,
     observeOnboardingParams.mode,
@@ -536,12 +617,14 @@ const ObservePage = React.memo(() => {
     const isCreateEvaluator =
       observeOnboardingParams.mode ===
       OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR;
+    const isReviewReady = Boolean(firstTraceReviewTarget);
     return {
       label: observeOnboardingCopy.secondaryLabel,
       onClick: handleObserveSecondaryAction,
-      disabled: isCreateEvaluator && !refreshObserveData,
+      disabled: (isCreateEvaluator || isReviewReady) && !refreshObserveData,
     };
   }, [
+    firstTraceReviewTarget,
     handleObserveSecondaryAction,
     observeOnboardingCopy,
     observeOnboardingParams.mode,
