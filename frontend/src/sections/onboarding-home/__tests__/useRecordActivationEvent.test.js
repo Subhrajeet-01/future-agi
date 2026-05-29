@@ -118,9 +118,83 @@ describe("useRecordActivationEvent", () => {
     expect(trackOnboardingHomeEvent.mock.calls[0][1]).not.toHaveProperty(
       "idempotency_key",
     );
+    expect(trackOnboardingHomeEvent.mock.calls[0][1]).not.toHaveProperty(
+      "idempotencyKey",
+    );
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["onboarding-home"],
     });
+  });
+
+  it("preserves caller success callbacks and tracks snake_case payloads", async () => {
+    const nextState = {
+      requestId: "req-voice-next",
+      stage: "run_voice_test_call",
+      primaryPath: "voice",
+      isActivated: false,
+      workspaceId: "wrk-voice",
+      organizationId: "org-voice",
+      userId: "usr-voice",
+    };
+    const payload = {
+      event_name: "voice_agent_created",
+      primary_path: "voice",
+      stage: "create_voice_agent",
+      source: "voice_create_page",
+      artifact_type: "voice_agent",
+      artifact_id: "agent-1",
+      project_id: "project-voice",
+      is_sample: true,
+      metadata: {
+        message: "do not forward",
+      },
+      idempotency_key: "snake-dedupe-key",
+    };
+    const callerOnSuccess = vi.fn();
+    recordActivationEvent.mockResolvedValueOnce(nextState);
+
+    const { result } = renderWithQueryClient(() => useRecordActivationEvent());
+
+    await act(async () => {
+      result.current.mutate(payload, {
+        onSuccess: callerOnSuccess,
+      });
+    });
+
+    await waitFor(() => {
+      expect(callerOnSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    expect(callerOnSuccess.mock.calls[0][0]).toEqual(nextState);
+    expect(trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "onboarding_activation_event_recorded",
+      {
+        activation_event_name: "voice_agent_created",
+        primary_path: "voice",
+        activation_stage: "create_voice_agent",
+        source: "voice_create_page",
+        artifact_type: "voice_agent",
+        artifact_id: "agent-1",
+        project_id: "project-voice",
+        is_sample: true,
+        next_stage: "run_voice_test_call",
+        next_primary_path: "voice",
+        next_is_activated: false,
+        next_request_id: "req-voice-next",
+        workspace_id: "wrk-voice",
+        organization_id: "org-voice",
+        user_id: "usr-voice",
+      },
+    );
+    expect(trackOnboardingHomeEvent.mock.calls[0][1]).not.toHaveProperty(
+      "metadata",
+    );
+    expect(trackOnboardingHomeEvent.mock.calls[0][1]).not.toHaveProperty(
+      "idempotency_key",
+    );
+    expect(trackOnboardingHomeEvent.mock.calls[0][1]).not.toHaveProperty(
+      "idempotencyKey",
+    );
   });
 
   it("does not track failed activation event mutations", async () => {
