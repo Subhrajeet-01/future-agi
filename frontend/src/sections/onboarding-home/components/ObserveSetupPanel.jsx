@@ -8,6 +8,7 @@ import {
   ObservePanelActions,
   ObservePanelHeader,
 } from "./observe-panel-utils";
+import { journeyCurrentStep } from "./journey-guide-utils";
 
 export default function ObserveSetupPanel({
   action,
@@ -19,6 +20,8 @@ export default function ObserveSetupPanel({
   isChecking = false,
   stage = "connect_observability",
 }) {
+  const currentStep = journeyCurrentStep(journeyPlan, stage);
+
   return (
     <Box
       data-testid="observe-setup-panel"
@@ -74,6 +77,7 @@ export default function ObserveSetupPanel({
           onFallbackClick={onFallbackClick}
           onCheckAgain={onCheckAgain}
           isChecking={isChecking}
+          journeyStep={currentStep}
         />
       </Stack>
     </Box>

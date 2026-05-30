@@ -8,6 +8,7 @@ import {
   ObservePanelActions,
   ObservePanelHeader,
 } from "./observe-panel-utils";
+import { journeyCurrentStep } from "./journey-guide-utils";
 
 export default function WaitingForSignalPanel({
   action,
@@ -20,6 +21,8 @@ export default function WaitingForSignalPanel({
   onCheckAgain,
   isChecking = false,
 }) {
+  const currentStep = journeyCurrentStep(journeyPlan, stage);
+
   return (
     <Box
       data-testid="waiting-for-signal-panel"
@@ -60,6 +63,7 @@ export default function WaitingForSignalPanel({
           onFallbackClick={onFallbackClick}
           onCheckAgain={onCheckAgain}
           isChecking={isChecking}
+          journeyStep={currentStep}
         />
       </Stack>
     </Box>

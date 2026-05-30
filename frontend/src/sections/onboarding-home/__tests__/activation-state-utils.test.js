@@ -137,6 +137,9 @@ describe("activation-state utilities", () => {
     expect(normalized.journeyPlan.id).toBe("prompt_first_run");
     expect(normalized.journeyPlan.currentStepId).toBe("run_prompt_test");
     expect(normalized.journeyPlan.steps[1].status).toBe("current");
+    expect(normalized.journeyPlan.steps[1].tourAnchor).toBe(
+      "prompt_run_test_button",
+    );
   });
 
   it("keeps sample prompt activity out of real activation", () => {

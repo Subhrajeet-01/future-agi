@@ -8,6 +8,7 @@ import {
   ObservePanelActions,
   ObservePanelHeader,
 } from "./observe-panel-utils";
+import { journeyCurrentStep } from "./journey-guide-utils";
 
 export default function FirstSignalPanel({
   action,
@@ -21,6 +22,7 @@ export default function FirstSignalPanel({
   isChecking = false,
 }) {
   const isImprovement = stage === "create_trace_evaluator";
+  const currentStep = journeyCurrentStep(journeyPlan, stage);
 
   return (
     <Box
@@ -90,6 +92,7 @@ export default function FirstSignalPanel({
           onFallbackClick={onFallbackClick}
           onCheckAgain={onCheckAgain}
           isChecking={isChecking}
+          journeyStep={currentStep}
         />
       </Stack>
     </Box>

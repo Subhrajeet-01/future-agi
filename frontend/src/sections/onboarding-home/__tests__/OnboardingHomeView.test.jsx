@@ -175,6 +175,7 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
       href: "/dashboard/observe?setup=true&source=onboarding",
       fallbackHref: "/dashboard/get-started",
       routeAvailable: true,
+      tourAnchor: "observe_create_project_button",
     },
     {
       id: "send_first_trace",
@@ -185,6 +186,7 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
       href: "/dashboard/observe/observe-1",
       fallbackHref: "/dashboard/get-started",
       routeAvailable: true,
+      tourAnchor: "observe_send_trace_button",
     },
     {
       id: "review_first_trace",
@@ -195,6 +197,7 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
       href: "/dashboard/observe/observe-1/trace/trace-1",
       fallbackHref: "/dashboard/get-started",
       routeAvailable: true,
+      tourAnchor: "observe_trace_review_link",
     },
     {
       id: "create_trace_evaluator",
@@ -205,6 +208,7 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
       href: "/dashboard/observe/observe-1",
       fallbackHref: "/dashboard/get-started",
       routeAvailable: true,
+      tourAnchor: "observe_evaluator_button",
     },
   ].map((step, index) => ({
     ...step,
@@ -368,11 +372,14 @@ describe("OnboardingHomeView", () => {
       within(currentStep).getByText("Create project from manifest"),
     ).toBeVisible();
     expect(within(currentStep).getByText("Now")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Create the observe project and prepare the first trace.",
+    );
     expect(
       within(panel).getByRole("link", { name: /connect observability/i }),
     ).toHaveAttribute(
       "href",
-      "/dashboard/observe?setup=true&source=onboarding",
+      "/dashboard/observe?setup=true&source=onboarding&tour_anchor=observe_create_project_button&journey_step=connect_observability",
     );
   });
 
@@ -399,10 +406,16 @@ describe("OnboardingHomeView", () => {
       within(currentStep).getByText("Send trace from manifest"),
     ).toBeVisible();
     expect(within(currentStep).getByText("Now")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Send one production or test trace.",
+    );
     expect(within(panel).getByText("Projects: 1 · Traces: 0")).toBeVisible();
     expect(
       within(panel).getByRole("link", { name: /send trace/i }),
-    ).toHaveAttribute("href", "/dashboard/observe/observe-1");
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/observe/observe-1?tour_anchor=observe_send_trace_button&journey_step=send_first_trace",
+    );
   });
 
   it("tracks lifecycle email attribution on Home views and CTA clicks", async () => {
@@ -1197,10 +1210,16 @@ describe("OnboardingHomeView", () => {
       within(currentStep).getByText("Review signal from manifest"),
     ).toBeVisible();
     expect(within(currentStep).getByText("Now")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Inspect the first signal and decide what to measure.",
+    );
     expect(within(panel).getByText("trace-1")).toBeVisible();
     expect(
       within(panel).getByRole("link", { name: /review trace/i }),
-    ).toHaveAttribute("href", "/dashboard/observe/observe-1/trace/trace-1");
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/observe/observe-1/trace/trace-1?tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
+    );
   });
 
   it("opens the sample panel from the waiting state", async () => {
@@ -1261,7 +1280,9 @@ describe("OnboardingHomeView", () => {
     expect(
       within(panel).getByText("Build a prompt quality loop"),
     ).toBeVisible();
-    expect(within(panel).getByText("Run test: run prompt test")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Run one focused example before saving.",
+    );
     expect(
       within(panel).getByRole("link", { name: /run test/i }),
     ).toHaveAttribute(
@@ -1289,9 +1310,9 @@ describe("OnboardingHomeView", () => {
     expect(
       within(panel).getByText("Prototype an agent with a quality check"),
     ).toBeVisible();
-    expect(
-      within(panel).getByText("Run scenario: run agent scenario"),
-    ).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Exercise the agent on one task.",
+    );
     expect(
       within(panel).getByRole("link", { name: /run scenario/i }),
     ).toHaveAttribute(
@@ -1317,9 +1338,9 @@ describe("OnboardingHomeView", () => {
     const panel = screen.getByTestId("path-focus-panel-gateway");
     expect(screen.getByText("Run a gateway request")).toBeVisible();
     expect(within(panel).getByText("Route one request safely")).toBeVisible();
-    expect(
-      within(panel).getByText("Send request: run gateway request"),
-    ).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Send one request through the gateway.",
+    );
     expect(
       within(panel).getByRole("link", { name: /send request/i }),
     ).toHaveAttribute("href", "/dashboard/gateway?onboarding=test-request");
@@ -1372,7 +1393,9 @@ describe("OnboardingHomeView", () => {
         "Add a small dataset, attach a scorer, run the eval, and inspect what failed.",
       ),
     ).toBeVisible();
-    expect(within(panel).getByText("Run eval: run eval")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Run the check once.",
+    );
     expect(screen.queryByText("Open Get Started")).not.toBeInTheDocument();
     expect(cta).toHaveAttribute("href", href);
     expect(cta.getAttribute("href")).not.toMatch(/^\/\//);
@@ -1424,9 +1447,9 @@ describe("OnboardingHomeView", () => {
         "Create or connect a voice agent, run one call, review it, and add success criteria.",
       ),
     ).toBeVisible();
-    expect(
-      within(panel).getByText("Review call: review voice call"),
-    ).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Inspect the transcript and outcome.",
+    );
     expect(screen.queryByText("Open Get Started")).not.toBeInTheDocument();
     expect(cta).toBeDisabled();
     expect(cta).not.toHaveAttribute("href");

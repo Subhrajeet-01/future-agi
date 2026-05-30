@@ -8,6 +8,10 @@ import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 import { RouterLink } from "src/routes/components";
 import { readableToken } from "../onboarding-home.constants";
+import {
+  hrefWithJourneyGuide,
+  journeyCurrentStep,
+} from "./journey-guide-utils";
 
 const observeActionHref = (action) => {
   if (!action || action.blocked || !action.routeAvailable || !action.href) {
@@ -32,11 +36,6 @@ const STATUS_COPY = {
     icon: "mdi:circle-outline",
     color: "text.disabled",
   },
-};
-
-const activeStepIndex = (steps, stage) => {
-  const index = steps.findIndex((step) => step.stage === stage);
-  return index >= 0 ? index : 0;
 };
 
 const fallbackStepStatus = ({ index, activeIndex }) => {
@@ -82,19 +81,44 @@ ObservePanelHeader.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
+export function CurrentStepGuide({ step, stage }) {
+  if (!step) return null;
+
+  return (
+    <Box
+      data-testid="current-step-guide"
+      sx={{
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 1,
+        p: 1.25,
+        bgcolor: "background.neutral",
+      }}
+    >
+      <Stack spacing={0.75}>
+        <Typography variant="subtitle2">Current step</Typography>
+        <Typography variant="body2" color="text.primary">
+          {step.label}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {step.description || readableToken(stage)}
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
+
+CurrentStepGuide.propTypes = {
+  stage: PropTypes.string,
+  step: PropTypes.object,
+};
+
 export function ObserveJourneyProgress({ journeyPlan, stage }) {
   const steps = journeyPlan?.steps || [];
   if (!steps.length) return null;
 
-  const derivedCurrentIndex =
-    typeof journeyPlan.currentStepIndex === "number"
-      ? journeyPlan.currentStepIndex
-      : activeStepIndex(steps, stage);
-  const currentIndex = Math.min(
-    Math.max(derivedCurrentIndex, 0),
-    steps.length - 1,
-  );
-  const currentStep = steps[currentIndex];
+  const currentStep = journeyCurrentStep(journeyPlan, stage);
+  const currentIndex = Math.max(steps.indexOf(currentStep), 0);
 
   return (
     <Stack spacing={1.25} data-testid="observe-journey-progress">
@@ -163,20 +187,7 @@ export function ObserveJourneyProgress({ journeyPlan, stage }) {
           );
         })}
       </Box>
-      <Box
-        sx={{
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1,
-          p: 1.25,
-          bgcolor: "background.neutral",
-        }}
-      >
-        <Typography variant="subtitle2">Current step</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-          {currentStep.label}: {readableToken(stage)}
-        </Typography>
-      </Box>
+      <CurrentStepGuide step={currentStep} stage={stage} />
     </Stack>
   );
 }
@@ -193,9 +204,13 @@ export function ObservePanelActions({
   onFallbackClick,
   onCheckAgain,
   isChecking = false,
+  journeyStep,
   primaryVariant = "contained",
 }) {
-  const primaryHref = observeActionHref(action);
+  const primaryHref = hrefWithJourneyGuide(
+    observeActionHref(action),
+    journeyStep,
+  );
   const fallbackHref = observeActionHref(fallbackAction);
 
   return (
@@ -239,6 +254,7 @@ ObservePanelActions.propTypes = {
   action: PropTypes.object,
   fallbackAction: PropTypes.object,
   isChecking: PropTypes.bool,
+  journeyStep: PropTypes.object,
   onCheckAgain: PropTypes.func,
   onFallbackClick: PropTypes.func,
   onPrimaryClick: PropTypes.func,

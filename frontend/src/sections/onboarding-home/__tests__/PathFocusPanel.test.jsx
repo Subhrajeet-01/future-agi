@@ -53,7 +53,9 @@ describe("PathFocusPanel", () => {
         screen.getByTestId("path-focus-step-save_prompt_version"),
       ).getByText("Next"),
     ).toBeVisible();
-    expect(within(panel).getByText("Run test: run prompt test")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Run one focused example before saving.",
+    );
 
     await userEvent.click(
       within(panel).getByRole("link", { name: "Run test" }),
@@ -89,6 +91,7 @@ describe("PathFocusPanel", () => {
             label: "Run manifest test",
             description: "Run from manifest.",
             status: "current",
+            tourAnchor: "prompt_run_test_button",
           },
         ],
       },
@@ -96,12 +99,25 @@ describe("PathFocusPanel", () => {
 
     const panel = screen.getByTestId(`path-focus-panel-${state.primaryPath}`);
     expect(within(panel).getByText("Test from manifest")).toBeVisible();
-    expect(within(panel).getByText("Run manifest test")).toBeVisible();
+    expect(
+      within(screen.getByTestId("path-focus-step-run_prompt_test")).getByText(
+        "Run manifest test",
+      ),
+    ).toBeVisible();
     expect(
       within(screen.getByTestId("path-focus-step-run_prompt_test")).getByText(
         "Now",
       ),
     ).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Run from manifest.",
+    );
+    expect(
+      within(panel).getByRole("link", { name: "Run test" }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test&tour_anchor=prompt_run_test_button&journey_step=run_prompt_test",
+    );
   });
 
   it("guides the gateway path from key setup to first routed request", () => {

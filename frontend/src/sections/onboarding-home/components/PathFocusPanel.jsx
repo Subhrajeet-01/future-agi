@@ -5,8 +5,11 @@ import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
-import { readableToken } from "../onboarding-home.constants";
-import { ObservePanelActions, ObservePanelHeader } from "./observe-panel-utils";
+import {
+  CurrentStepGuide,
+  ObservePanelActions,
+  ObservePanelHeader,
+} from "./observe-panel-utils";
 import { PATH_FOCUS_PLANS } from "./path-focus-plan";
 
 const STATUS_COPY = {
@@ -146,22 +149,7 @@ export default function PathFocusPanel({
           })}
         </Box>
 
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 1,
-            p: 1.5,
-            bgcolor: "background.neutral",
-          }}
-        >
-          <Stack spacing={0.5}>
-            <Typography variant="subtitle2">Current step</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {currentStep.label}: {readableToken(stage)}
-            </Typography>
-          </Stack>
-        </Box>
+        <CurrentStepGuide step={currentStep} stage={stage} />
 
         <ObservePanelActions
           action={action}
@@ -170,6 +158,7 @@ export default function PathFocusPanel({
           onFallbackClick={onFallbackClick}
           onCheckAgain={onCheckAgain}
           isChecking={isChecking}
+          journeyStep={currentStep}
         />
       </Stack>
     </Box>
