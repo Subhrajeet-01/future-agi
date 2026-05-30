@@ -10,7 +10,11 @@ hand-written tools, so MCP and the UI share one source of truth:
 """
 
 from ai_tools.drf_bridge import expose_to_mcp
-from simulate.views.run_test import CallExecutionDetailView, CSVExportView
+from simulate.views.run_test import (
+    CallExecutionDetailView,
+    CSVExportView,
+    TestExecutionOptimiserAnalysisView,
+)
 from simulate.views.scenarios import ScenarioDetailView
 
 # Detail GET handlers take the id as a named URL kwarg (call_execution_id /
@@ -71,3 +75,28 @@ expose_to_mcp(
         }
     },
 )(CSVExportView)
+
+# get_fix_my_agent_analysis -> TestExecutionOptimiserAnalysisView.get(request,
+# test_execution_id): the "Fix My Agent" optimiser analysis the UI shows for a
+# test execution — the AI-generated summary of what went wrong + prioritized
+# suggestions. It had no MCP tool (TH-5385); bridge the existing read API. The
+# view auto-triggers/creates the analysis if not yet run and returns status
+# info while it is pending.
+expose_to_mcp(
+    category="agents",
+    tools={
+        "retrieve": {
+            "name": "get_fix_my_agent_analysis",
+            "pk_kwarg": "test_execution_id",
+            "entity": "test execution",
+            "description": (
+                "Get the 'Fix My Agent' optimiser analysis for a test execution "
+                "— the AI-generated summary of what went wrong and the "
+                "prioritized, actionable suggestions to improve the agent. "
+                "Provide the test execution id (from get_test_execution / "
+                "list_test_executions). If the analysis hasn't run yet it is "
+                "triggered and status info is returned; call again once ready."
+            ),
+        }
+    },
+)(TestExecutionOptimiserAnalysisView)
