@@ -88,6 +88,11 @@ export const DESTINATION_TOUR_STEP_COPY = {
     label: "Create prompt",
     description: "Use the highlighted action to start the prompt loop.",
   },
+  create_second_prompt_version: {
+    label: "Create second version",
+    description:
+      "Use the highlighted action to create, run, and save one more version.",
+  },
   create_trace_evaluator: {
     label: "Create check",
     description:
