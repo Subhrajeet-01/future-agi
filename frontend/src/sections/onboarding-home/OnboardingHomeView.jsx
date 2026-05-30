@@ -125,6 +125,35 @@ const SAMPLE_PRIMARY_STAGES = new Set([
   "connect_real_data",
 ]);
 
+const CURRENT_EMAIL_CONTEXT_STATUSES = new Set(["current", "fresh"]);
+
+const EMAIL_CONTEXT_RECOVERY_COPY = {
+  route_unavailable: {
+    title: "That link is no longer available",
+    description: "Continue with the latest recommended step below.",
+  },
+  stage_changed: {
+    title: "Your onboarding step changed",
+    description: "Continue with the latest recommended step below.",
+  },
+  target_complete: {
+    title: "That step is already done",
+    description: "Continue with the latest recommended step below.",
+  },
+};
+
+function emailContextRecoveryCopy(emailContext) {
+  if (!emailContext) return null;
+  const status = emailContext.contextStatus || emailContext.emailStatus;
+  if (!status || CURRENT_EMAIL_CONTEXT_STATUSES.has(status)) return null;
+  return (
+    EMAIL_CONTEXT_RECOVERY_COPY[emailContext.staleReason] || {
+      title: "We updated this link",
+      description: "Continue with the latest recommended step below.",
+    }
+  );
+}
+
 export default function OnboardingHomeView() {
   const { user } = useAuthContext();
   const {
@@ -517,6 +546,9 @@ export default function OnboardingHomeView() {
 
   const copy = getStageCopy(renderedState);
   const isSavingGoal = mutationPending(saveGoal);
+  const emailRecoveryCopy = emailContextRecoveryCopy(
+    renderedState.emailContext,
+  );
 
   const handleSelectGoal = (option) => {
     setSelectedGoal(option.goal);
@@ -855,6 +887,21 @@ export default function OnboardingHomeView() {
         {renderedState.stage === "feature_disabled" ? (
           <Alert severity="info" sx={{ borderRadius: 1 }}>
             The existing setup checklist is available for this workspace.
+          </Alert>
+        ) : null}
+
+        {emailRecoveryCopy ? (
+          <Alert
+            severity="info"
+            data-testid="lifecycle-email-context-alert"
+            sx={{ borderRadius: 1 }}
+          >
+            <Typography variant="subtitle2" component="div">
+              {emailRecoveryCopy.title}
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.25 }}>
+              {emailRecoveryCopy.description}
+            </Typography>
           </Alert>
         ) : null}
 

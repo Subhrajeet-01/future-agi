@@ -479,6 +479,34 @@ describe("OnboardingHomeView", () => {
     );
   });
 
+  it("shows a recovery message for stale lifecycle email links", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("staleEmailLink"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    const alert = screen.getByTestId("lifecycle-email-context-alert");
+    expect(alert).toBeVisible();
+    expect(
+      within(alert).getByText("Your onboarding step changed"),
+    ).toBeVisible();
+    expect(
+      within(alert).getByText(
+        "Continue with the latest recommended step below.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: /review trace/i })).toHaveAttribute(
+      "href",
+      "/dashboard/observe/observe-1/trace/trace-1",
+    );
+  });
+
   it("renders the observe setup panel for the observe MVP path", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("observeNoSetup"),
