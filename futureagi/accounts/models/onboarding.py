@@ -549,6 +549,13 @@ class OnboardingLifecycleEvaluationLog(BaseModel):
     activation_state_snapshot = models.JSONField(default=dict, blank=True)
     registry_snapshot = models.JSONField(default=dict, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+    source_receipt = models.OneToOneField(
+        "accounts.OnboardingActivationFactReceipt",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lifecycle_evaluation",
+    )
 
     class Meta:
         db_table = "accounts_onboarding_lifecycle_evaluation_log"

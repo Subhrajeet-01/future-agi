@@ -965,6 +965,7 @@ def send_limited_onboarding_lifecycle_batch(
     run_id = uuid.uuid4()
     queryset = OnboardingLifecycleEvaluationLog.no_workspace_objects.filter(
         status=OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE,
+        source_receipt__isnull=True,
     ).order_by("-evaluated_at")
     if campaign_group:
         queryset = queryset.filter(campaign_group=campaign_group)
