@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { renderWithRouter, screen, waitFor } from "src/utils/test-utils";
+import { destinationTourDismissalKey } from "./destinationTourDismissal";
 import DestinationTourAnchor from "./DestinationTourAnchor";
 
 const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
@@ -9,6 +10,9 @@ const scrollIntoView = vi.fn();
 describe("DestinationTourAnchor", () => {
   beforeEach(() => {
     scrollIntoView.mockClear();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.sessionStorage.setItem("currentUserId", "usr-tour");
     window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
   });
 
@@ -45,6 +49,11 @@ describe("DestinationTourAnchor", () => {
       expect(screen.queryByTestId("destination-tour-anchor")).toBeNull(),
     );
     expect(target).not.toHaveAttribute("data-onboarding-tour-active");
+    expect(
+      JSON.parse(
+        window.localStorage.getItem(destinationTourDismissalKey("usr-tour")),
+      ),
+    ).toEqual(["gateway_request_button"]);
   });
 
   it("stays hidden when no tour anchor is present", () => {
@@ -59,5 +68,50 @@ describe("DestinationTourAnchor", () => {
     );
 
     expect(screen.queryByTestId("destination-tour-anchor")).toBeNull();
+  });
+
+  it("keeps dismissed anchors hidden until replay is requested", async () => {
+    window.localStorage.setItem(
+      destinationTourDismissalKey("usr-tour"),
+      JSON.stringify(["gateway_request_button"]),
+    );
+
+    const { unmount } = renderWithRouter(
+      <>
+        <button type="button" data-tour-anchor="gateway_request_button">
+          Send test request
+        </button>
+        <DestinationTourAnchor maxAttempts={1} />
+      </>,
+      {
+        route:
+          "/dashboard/gateway?tour_anchor=gateway_request_button&journey_step=run_gateway_request",
+      },
+    );
+
+    expect(screen.queryByTestId("destination-tour-anchor")).toBeNull();
+    unmount();
+
+    renderWithRouter(
+      <>
+        <button type="button" data-tour-anchor="gateway_request_button">
+          Send test request
+        </button>
+        <DestinationTourAnchor maxAttempts={1} />
+      </>,
+      {
+        route:
+          "/dashboard/gateway?tour_anchor=gateway_request_button&journey_step=run_gateway_request&tour_replay=1",
+      },
+    );
+
+    expect(await screen.findByTestId("destination-tour-anchor")).toBeVisible();
+    await waitFor(() =>
+      expect(
+        JSON.parse(
+          window.localStorage.getItem(destinationTourDismissalKey("usr-tour")),
+        ),
+      ).toEqual([]),
+    );
   });
 });

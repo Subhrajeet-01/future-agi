@@ -7,6 +7,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 import { RouterLink } from "src/routes/components";
+import { isDestinationTourAnchorDismissed } from "src/sections/onboarding-tour/destinationTourDismissal";
 import { readableToken } from "../onboarding-home.constants";
 import {
   hrefWithJourneyGuide,
@@ -211,6 +212,12 @@ export function ObservePanelActions({
     observeActionHref(action),
     journeyStep,
   );
+  const replayHref =
+    primaryHref &&
+    journeyStep?.tourAnchor &&
+    isDestinationTourAnchorDismissed({ anchor: journeyStep.tourAnchor })
+      ? hrefWithJourneyGuide(primaryHref, journeyStep, { replay: true })
+      : null;
   const fallbackHref = observeActionHref(fallbackAction);
 
   return (
@@ -225,6 +232,16 @@ export function ObservePanelActions({
       >
         {action?.ctaLabel || "Open"}
       </Button>
+      {replayHref ? (
+        <Button
+          variant="text"
+          component={RouterLink}
+          href={replayHref}
+          startIcon={<Iconify icon="mdi:target" width={18} />}
+        >
+          Show tip
+        </Button>
+      ) : null}
       {fallbackAction ? (
         <Button
           variant="outlined"

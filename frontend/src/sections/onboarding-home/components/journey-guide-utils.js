@@ -6,7 +6,7 @@ const activeStepIndex = (steps, stage) => {
 const isInternalHref = (href) =>
   typeof href === "string" && href.startsWith("/") && !href.startsWith("//");
 
-export const hrefWithJourneyGuide = (href, step) => {
+export const hrefWithJourneyGuide = (href, step, { replay = false } = {}) => {
   if (!isInternalHref(href) || !step?.tourAnchor) {
     return href;
   }
@@ -16,6 +16,9 @@ export const hrefWithJourneyGuide = (href, step) => {
   const params = new URLSearchParams(query);
   params.set("tour_anchor", step.tourAnchor);
   params.set("journey_step", step.id || step.stage);
+  if (replay) {
+    params.set("tour_replay", "1");
+  }
 
   return `${pathname}?${params.toString()}${hash ? `#${hash}` : ""}`;
 };

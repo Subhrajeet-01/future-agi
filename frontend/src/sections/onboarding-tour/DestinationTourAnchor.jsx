@@ -11,6 +11,13 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { alpha } from "@mui/material/styles";
 import Iconify from "src/components/iconify";
+import {
+  destinationTourStorageIdentity,
+  dismissDestinationTourAnchor,
+  isDestinationTourReplay,
+  readDestinationTourDismissals,
+  resetDestinationTourAnchorDismissal,
+} from "./destinationTourDismissal";
 import { destinationTourCopyForStep } from "./destinationTourAnchorConfig";
 
 const findTourTarget = (anchor) => {
@@ -32,14 +39,29 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
   const [searchParams] = useSearchParams();
   const tourAnchor = searchParams.get("tour_anchor");
   const journeyStep = searchParams.get("journey_step");
+  const isReplay = isDestinationTourReplay(searchParams);
+  const storageIdentity = destinationTourStorageIdentity();
   const [targetEl, setTargetEl] = useState(null);
-  const [dismissedAnchor, setDismissedAnchor] = useState(null);
+  const [dismissedAnchors, setDismissedAnchors] = useState(() =>
+    readDestinationTourDismissals({ identity: storageIdentity }),
+  );
 
   const copy = useMemo(
     () => destinationTourCopyForStep(journeyStep),
     [journeyStep],
   );
-  const hidden = !tourAnchor || dismissedAnchor === tourAnchor;
+  const hidden = !tourAnchor || (!isReplay && dismissedAnchors.has(tourAnchor));
+
+  useEffect(() => {
+    const nextDismissals =
+      isReplay && tourAnchor
+        ? resetDestinationTourAnchorDismissal({
+            anchor: tourAnchor,
+            identity: storageIdentity,
+          })
+        : readDestinationTourDismissals({ identity: storageIdentity });
+    setDismissedAnchors(nextDismissals);
+  }, [isReplay, storageIdentity, tourAnchor]);
 
   useEffect(() => {
     setTargetEl(null);
@@ -130,7 +152,14 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
               <Button
                 size="small"
                 variant="text"
-                onClick={() => setDismissedAnchor(tourAnchor)}
+                onClick={() =>
+                  setDismissedAnchors(
+                    dismissDestinationTourAnchor({
+                      anchor: tourAnchor,
+                      identity: storageIdentity,
+                    }),
+                  )
+                }
                 startIcon={<Iconify icon="mdi:check" width={16} />}
               >
                 Got it

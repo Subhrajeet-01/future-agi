@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { render, screen, within } from "src/utils/test-utils";
 import { getActivationStateFixture } from "../fixtures/activation-state.fixtures";
 import { normalizeActivationState } from "../activation-state-utils";
+import { dismissDestinationTourAnchor } from "src/sections/onboarding-tour/destinationTourDismissal";
 import PathFocusPanel from "../components/PathFocusPanel";
 
 const renderPanel = (fixtureName, overrides = {}) => {
@@ -24,6 +25,12 @@ const renderPanel = (fixtureName, overrides = {}) => {
 };
 
 describe("PathFocusPanel", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.sessionStorage.setItem("currentUserId", "usr-home");
+  });
+
   it("guides the prompt path through testing and versioning", async () => {
     const onPrimaryClick = vi.fn();
     renderPanel("promptCreatedNoRun", { onPrimaryClick });
@@ -117,6 +124,52 @@ describe("PathFocusPanel", () => {
     ).toHaveAttribute(
       "href",
       "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test&tour_anchor=prompt_run_test_button&journey_step=run_prompt_test",
+    );
+    expect(within(panel).queryByRole("link", { name: /show tip/i })).toBeNull();
+  });
+
+  it("offers a replay link after the current destination tip was dismissed", () => {
+    dismissDestinationTourAnchor({
+      anchor: "prompt_run_test_button",
+      identity: "usr-home",
+    });
+
+    const { state } = renderPanel("promptCreatedNoRun", {
+      journeyPlan: {
+        id: "prompt_first_run",
+        primaryPath: "prompt",
+        eyebrow: "Prompt loop",
+        title: "Test from manifest",
+        description: "Manifest copy wins over bundled fallback copy.",
+        chips: ["prompt"],
+        currentStepId: "run_prompt_test",
+        currentStepIndex: 1,
+        steps: [
+          {
+            id: "create_prompt",
+            stage: "start_prompt",
+            label: "Create prompt",
+            description: "Create from manifest.",
+            status: "complete",
+          },
+          {
+            id: "run_prompt_test",
+            stage: "run_prompt_test",
+            label: "Run manifest test",
+            description: "Run from manifest.",
+            status: "current",
+            tourAnchor: "prompt_run_test_button",
+          },
+        ],
+      },
+    });
+
+    const panel = screen.getByTestId(`path-focus-panel-${state.primaryPath}`);
+    expect(
+      within(panel).getByRole("link", { name: /show tip/i }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=run-test&tour_anchor=prompt_run_test_button&journey_step=run_prompt_test&tour_replay=1",
     );
   });
 
