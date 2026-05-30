@@ -3,15 +3,21 @@ import PropTypes from "prop-types";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { ObservePanelActions, ObservePanelHeader } from "./observe-panel-utils";
+import {
+  ObserveJourneyProgress,
+  ObservePanelActions,
+  ObservePanelHeader,
+} from "./observe-panel-utils";
 
 export default function ObserveSetupPanel({
   action,
   fallbackAction,
+  journeyPlan,
   onPrimaryClick,
   onFallbackClick,
   onCheckAgain,
   isChecking = false,
+  stage = "connect_observability",
 }) {
   return (
     <Box
@@ -31,32 +37,36 @@ export default function ObserveSetupPanel({
           description="Create the project, send one trace, then return here for the first review."
           chips={["observe", "setup"]}
         />
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
-            gap: 1,
-          }}
-        >
-          {[
-            "Create observe project",
-            "Send one trace",
-            "Review the signal",
-          ].map((item) => (
-            <Box
-              key={item}
-              sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                p: 1.25,
-                minHeight: 76,
-              }}
-            >
-              <Typography variant="body2">{item}</Typography>
-            </Box>
-          ))}
-        </Box>
+        {journeyPlan ? (
+          <ObserveJourneyProgress journeyPlan={journeyPlan} stage={stage} />
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+              gap: 1,
+            }}
+          >
+            {[
+              "Create observe project",
+              "Send one trace",
+              "Review the signal",
+            ].map((item) => (
+              <Box
+                key={item}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  p: 1.25,
+                  minHeight: 76,
+                }}
+              >
+                <Typography variant="body2">{item}</Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
         <ObservePanelActions
           action={action}
           fallbackAction={fallbackAction}
@@ -74,7 +84,9 @@ ObserveSetupPanel.propTypes = {
   action: PropTypes.object,
   fallbackAction: PropTypes.object,
   isChecking: PropTypes.bool,
+  journeyPlan: PropTypes.object,
   onCheckAgain: PropTypes.func,
   onFallbackClick: PropTypes.func,
   onPrimaryClick: PropTypes.func,
+  stage: PropTypes.string,
 };

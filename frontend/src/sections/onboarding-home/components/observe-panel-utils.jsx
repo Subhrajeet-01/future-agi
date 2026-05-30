@@ -1,5 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
@@ -13,6 +14,35 @@ const observeActionHref = (action) => {
     return null;
   }
   return action.href;
+};
+
+const STATUS_COPY = {
+  complete: {
+    label: "Done",
+    icon: "mdi:check-circle",
+    color: "success.main",
+  },
+  current: {
+    label: "Now",
+    icon: "mdi:progress-clock",
+    color: "primary.main",
+  },
+  queued: {
+    label: "Next",
+    icon: "mdi:circle-outline",
+    color: "text.disabled",
+  },
+};
+
+const activeStepIndex = (steps, stage) => {
+  const index = steps.findIndex((step) => step.stage === stage);
+  return index >= 0 ? index : 0;
+};
+
+const fallbackStepStatus = ({ index, activeIndex }) => {
+  if (index < activeIndex) return "complete";
+  if (index === activeIndex) return "current";
+  return "queued";
 };
 
 export function ObservePanelHeader({
@@ -50,6 +80,110 @@ ObservePanelHeader.propTypes = {
   description: PropTypes.string.isRequired,
   eyebrow: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
+};
+
+export function ObserveJourneyProgress({ journeyPlan, stage }) {
+  const steps = journeyPlan?.steps || [];
+  if (!steps.length) return null;
+
+  const derivedCurrentIndex =
+    typeof journeyPlan.currentStepIndex === "number"
+      ? journeyPlan.currentStepIndex
+      : activeStepIndex(steps, stage);
+  const currentIndex = Math.min(
+    Math.max(derivedCurrentIndex, 0),
+    steps.length - 1,
+  );
+  const currentStep = steps[currentIndex];
+
+  return (
+    <Stack spacing={1.25} data-testid="observe-journey-progress">
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            lg: `repeat(${Math.min(steps.length, 4)}, minmax(0, 1fr))`,
+          },
+          gap: 1,
+        }}
+      >
+        {steps.map((step, index) => {
+          const status =
+            step.status ||
+            fallbackStepStatus({ index, activeIndex: currentIndex });
+          const statusCopy = STATUS_COPY[status] || STATUS_COPY.queued;
+
+          return (
+            <Box
+              key={step.id || step.stage}
+              data-testid={`observe-journey-step-${step.id || step.stage}`}
+              sx={{
+                border: "1px solid",
+                borderColor:
+                  status === "current"
+                    ? "primary.main"
+                    : status === "complete"
+                      ? "success.main"
+                      : "divider",
+                borderRadius: 1,
+                p: 1.25,
+                minHeight: 104,
+                bgcolor: status === "current" ? "action.hover" : "inherit",
+              }}
+            >
+              <Stack spacing={0.75}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1}
+                >
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <Iconify
+                      icon={statusCopy.icon}
+                      width={18}
+                      sx={{ color: statusCopy.color, flexShrink: 0 }}
+                    />
+                    <Typography variant="subtitle2">{step.label}</Typography>
+                  </Stack>
+                  <Chip
+                    size="small"
+                    label={statusCopy.label}
+                    color={status === "complete" ? "success" : "default"}
+                    variant={status === "complete" ? "filled" : "outlined"}
+                  />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {step.description}
+                </Typography>
+              </Stack>
+            </Box>
+          );
+        })}
+      </Box>
+      <Box
+        sx={{
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1,
+          p: 1.25,
+          bgcolor: "background.neutral",
+        }}
+      >
+        <Typography variant="subtitle2">Current step</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+          {currentStep.label}: {readableToken(stage)}
+        </Typography>
+      </Box>
+    </Stack>
+  );
+}
+
+ObserveJourneyProgress.propTypes = {
+  journeyPlan: PropTypes.object,
+  stage: PropTypes.string,
 };
 
 export function ObservePanelActions({

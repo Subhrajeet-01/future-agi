@@ -3,12 +3,18 @@ import PropTypes from "prop-types";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { ObservePanelActions, ObservePanelHeader } from "./observe-panel-utils";
+import {
+  ObserveJourneyProgress,
+  ObservePanelActions,
+  ObservePanelHeader,
+} from "./observe-panel-utils";
 
 export default function WaitingForSignalPanel({
   action,
   fallbackAction,
+  journeyPlan,
   signals,
+  stage,
   onPrimaryClick,
   onFallbackClick,
   onCheckAgain,
@@ -32,6 +38,7 @@ export default function WaitingForSignalPanel({
           description="The observe project exists. The next step unlocks after the first real trace arrives."
           chips={["observe", "waiting"]}
         />
+        <ObserveJourneyProgress journeyPlan={journeyPlan} stage={stage} />
         <Box
           sx={{
             border: "1px solid",
@@ -63,8 +70,10 @@ WaitingForSignalPanel.propTypes = {
   action: PropTypes.object,
   fallbackAction: PropTypes.object,
   isChecking: PropTypes.bool,
+  journeyPlan: PropTypes.object,
   onCheckAgain: PropTypes.func,
   onFallbackClick: PropTypes.func,
   onPrimaryClick: PropTypes.func,
   signals: PropTypes.object,
+  stage: PropTypes.string,
 };

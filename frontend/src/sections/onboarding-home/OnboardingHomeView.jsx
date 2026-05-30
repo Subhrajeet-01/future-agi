@@ -756,7 +756,11 @@ export default function OnboardingHomeView() {
     OBSERVE_PANEL_STAGES.has(renderedState.stage) ? (
       <>
         {renderedState.stage === "connect_observability" ? (
-          <ObserveSetupPanel {...observePanelProps} />
+          <ObserveSetupPanel
+            {...observePanelProps}
+            journeyPlan={renderedState.journeyPlan}
+            stage={renderedState.stage}
+          />
         ) : null}
         {[
           "waiting_for_first_trace",
@@ -764,7 +768,9 @@ export default function OnboardingHomeView() {
         ].includes(renderedState.stage) ? (
           <WaitingForSignalPanel
             {...observePanelProps}
+            journeyPlan={renderedState.journeyPlan}
             signals={renderedState.signals}
+            stage={renderedState.stage}
           />
         ) : null}
         {["review_first_trace", "create_trace_evaluator"].includes(
@@ -772,6 +778,7 @@ export default function OnboardingHomeView() {
         ) ? (
           <FirstSignalPanel
             {...observePanelProps}
+            journeyPlan={renderedState.journeyPlan}
             signals={renderedState.signals}
             stage={renderedState.stage}
           />

@@ -164,6 +164,73 @@ const pathState = ({
   };
 };
 
+const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
+  const steps = [
+    {
+      id: "connect_observability",
+      stage: "connect_observability",
+      actionId: "create_observe_project",
+      label: "Create project from manifest",
+      description: "Create the observe project and prepare the first trace.",
+      href: "/dashboard/observe?setup=true&source=onboarding",
+      fallbackHref: "/dashboard/get-started",
+      routeAvailable: true,
+    },
+    {
+      id: "send_first_trace",
+      stage: "waiting_for_first_trace",
+      actionId: "send_first_trace",
+      label: "Send trace from manifest",
+      description: "Send one production or test trace.",
+      href: "/dashboard/observe/observe-1",
+      fallbackHref: "/dashboard/get-started",
+      routeAvailable: true,
+    },
+    {
+      id: "review_first_trace",
+      stage: "review_first_trace",
+      actionId: "review_first_trace",
+      label: "Review signal from manifest",
+      description: "Inspect the first signal and decide what to measure.",
+      href: "/dashboard/observe/observe-1/trace/trace-1",
+      fallbackHref: "/dashboard/get-started",
+      routeAvailable: true,
+    },
+    {
+      id: "create_trace_evaluator",
+      stage: "create_trace_evaluator",
+      actionId: "create_trace_evaluator",
+      label: "Create check from manifest",
+      description: "Convert the reviewed trace into repeatable coverage.",
+      href: "/dashboard/observe/observe-1",
+      fallbackHref: "/dashboard/get-started",
+      routeAvailable: true,
+    },
+  ].map((step, index) => ({
+    ...step,
+    status:
+      index < currentStepIndex
+        ? "complete"
+        : index === currentStepIndex
+          ? "current"
+          : "queued",
+  }));
+
+  const currentStep = steps[currentStepIndex] || steps[0];
+  return {
+    id: "observe_first_run",
+    primaryPath: "observe",
+    eyebrow: "Observe loop",
+    title: "Start with your first quality loop",
+    description:
+      "Connect traces, review the first signal, then turn it into a check.",
+    chips: ["observe", "quality"],
+    currentStepId: currentStep.id,
+    currentStepIndex,
+    steps,
+  };
+};
+
 describe("OnboardingHomeView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -275,6 +342,67 @@ describe("OnboardingHomeView", () => {
         campaignKey: "welcome",
       }),
     );
+  });
+
+  it("renders backend observe journey progress on the setup panel", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: {
+        ...normalizedFixture("observeNoSetup"),
+        journeyPlan: observeJourneyPlan({ currentStepIndex: 0 }),
+      },
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    const panel = screen.getByTestId("observe-setup-panel");
+    const currentStep = within(panel).getByTestId(
+      "observe-journey-step-connect_observability",
+    );
+    expect(within(panel).getByTestId("observe-journey-progress")).toBeVisible();
+    expect(
+      within(currentStep).getByText("Create project from manifest"),
+    ).toBeVisible();
+    expect(within(currentStep).getByText("Now")).toBeVisible();
+    expect(
+      within(panel).getByRole("link", { name: /connect observability/i }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/observe?setup=true&source=onboarding",
+    );
+  });
+
+  it("renders backend observe journey progress while waiting for a trace", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: {
+        ...normalizedFixture("observeWaitingForTrace"),
+        journeyPlan: observeJourneyPlan({ currentStepIndex: 1 }),
+      },
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    const panel = screen.getByTestId("waiting-for-signal-panel");
+    const currentStep = within(panel).getByTestId(
+      "observe-journey-step-send_first_trace",
+    );
+    expect(
+      within(currentStep).getByText("Send trace from manifest"),
+    ).toBeVisible();
+    expect(within(currentStep).getByText("Now")).toBeVisible();
+    expect(within(panel).getByText("Projects: 1 · Traces: 0")).toBeVisible();
+    expect(
+      within(panel).getByRole("link", { name: /send trace/i }),
+    ).toHaveAttribute("href", "/dashboard/observe/observe-1");
   });
 
   it("tracks lifecycle email attribution on Home views and CTA clicks", async () => {
@@ -1041,6 +1169,35 @@ describe("OnboardingHomeView", () => {
     expect(within(panel).getByText("First trace received")).toBeVisible();
     expect(within(panel).getByText("trace-1")).toBeVisible();
     expect(within(panel).getByText("Not reviewed")).toBeVisible();
+    expect(
+      within(panel).getByRole("link", { name: /review trace/i }),
+    ).toHaveAttribute("href", "/dashboard/observe/observe-1/trace/trace-1");
+  });
+
+  it("renders backend observe journey progress on the first signal panel", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: {
+        ...normalizedFixture("observeFirstTraceReady"),
+        journeyPlan: observeJourneyPlan({ currentStepIndex: 2 }),
+      },
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView();
+
+    const panel = screen.getByTestId("first-signal-panel");
+    const currentStep = within(panel).getByTestId(
+      "observe-journey-step-review_first_trace",
+    );
+    expect(
+      within(currentStep).getByText("Review signal from manifest"),
+    ).toBeVisible();
+    expect(within(currentStep).getByText("Now")).toBeVisible();
+    expect(within(panel).getByText("trace-1")).toBeVisible();
     expect(
       within(panel).getByRole("link", { name: /review trace/i }),
     ).toHaveAttribute("href", "/dashboard/observe/observe-1/trace/trace-1");

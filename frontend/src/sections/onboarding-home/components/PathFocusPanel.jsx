@@ -50,12 +50,16 @@ export default function PathFocusPanel({
   stage,
 }) {
   const plan = journeyPlan || PATH_FOCUS_PLANS[primaryPath];
-  if (!plan) return null;
+  if (!plan || !plan.steps?.length) return null;
 
-  const currentIndex =
+  const derivedCurrentIndex =
     typeof plan.currentStepIndex === "number"
       ? plan.currentStepIndex
       : activeStepIndex(plan.steps, stage);
+  const currentIndex = Math.min(
+    Math.max(derivedCurrentIndex, 0),
+    plan.steps.length - 1,
+  );
   const currentStep = plan.steps[currentIndex];
 
   return (
@@ -91,7 +95,7 @@ export default function PathFocusPanel({
           {plan.steps.map((step, index) => {
             const status =
               step.status || stepStatus({ index, activeIndex: currentIndex });
-            const statusCopy = STATUS_COPY[status];
+            const statusCopy = STATUS_COPY[status] || STATUS_COPY.queued;
 
             return (
               <Box
