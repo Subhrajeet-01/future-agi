@@ -358,3 +358,75 @@ def test_prompt_commit_records_comparable_version_onboarding_event(
         activation_stage="create_second_prompt_version",
     )
     assert comparable_event.metadata["version_id"] == str(version_v2.id)
+
+
+@pytest.mark.django_db
+def test_prompt_commit_skips_comparable_event_without_two_outputs(
+    auth_client,
+    organization,
+    workspace,
+    user,
+):
+    first_template, version_v1 = _create_prompt_template(
+        organization,
+        workspace,
+        user,
+        "Prompt comparable negative first commit",
+    )
+    version_v1.output = ["First answer"]
+    version_v1.save(update_fields=["output"])
+
+    first_response = auth_client.post(
+        f"/model-hub/prompt-templates/{first_template.id}/commit/",
+        {
+            "version_name": "v1",
+            "message": "baseline",
+            "is_draft": False,
+            "set_default": False,
+        },
+        format="json",
+    )
+
+    assert first_response.status_code == 200
+    assert not OnboardingActivationEvent.no_workspace_objects.filter(
+        organization=organization,
+        workspace=workspace,
+        event_name="prompt_comparable_version_created",
+        activation_stage="create_second_prompt_version",
+    ).exists()
+
+    second_template, baseline = _create_prompt_template(
+        organization,
+        workspace,
+        user,
+        "Prompt comparable negative missing output",
+    )
+    baseline.commit_message = "baseline"
+    baseline.is_draft = False
+    baseline.output = ["Baseline answer"]
+    baseline.save(update_fields=["commit_message", "is_draft", "output"])
+    _create_prompt_version(
+        second_template,
+        "v2",
+        text="Candidate without output {{name}}",
+        output=None,
+    )
+
+    second_response = auth_client.post(
+        f"/model-hub/prompt-templates/{second_template.id}/commit/",
+        {
+            "version_name": "v2",
+            "message": "candidate",
+            "is_draft": False,
+            "set_default": False,
+        },
+        format="json",
+    )
+
+    assert second_response.status_code == 200
+    assert not OnboardingActivationEvent.no_workspace_objects.filter(
+        organization=organization,
+        workspace=workspace,
+        event_name="prompt_comparable_version_created",
+        activation_stage="create_second_prompt_version",
+    ).exists()

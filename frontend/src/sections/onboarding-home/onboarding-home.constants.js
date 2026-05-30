@@ -126,6 +126,11 @@ export const ONBOARDING_STAGE_COPY = {
     title: "Save the prompt version",
     description: "Save the tested version so the next edit has a baseline.",
   },
+  create_second_prompt_version: {
+    eyebrow: "Prompt version",
+    title: "Create a second version",
+    description: "Edit, run, and save one more version before comparing.",
+  },
   compare_prompt_versions: {
     eyebrow: "Prompt compare",
     title: "Compare prompt versions",

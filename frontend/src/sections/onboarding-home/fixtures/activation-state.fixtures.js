@@ -1820,16 +1820,17 @@ export const activationStateFixtures = {
   promptVersionNoComparison: baseState({
     goal: "improve_prompts",
     primary_path: "prompt",
-    stage: "compare_prompt_versions",
+    stage: "create_second_prompt_version",
     recommended_action: promptAction({
-      id: "compare_prompt_versions",
-      kind: "review",
-      title: "Compare prompt versions",
-      description: "Compare the baseline against an edit on the same example.",
+      id: "create_second_prompt_version",
+      kind: "improve",
+      title: "Create a second version",
+      description:
+        "Edit the baseline, run the prompt again, and save one more version.",
       href: "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=compare",
-      cta_label: "Compare versions",
+      cta_label: "Create second version",
       estimated_minutes: 3,
-      completion_event: "prompt_comparison_completed",
+      completion_event: "prompt_comparable_version_created",
     }),
     fallback_action: promptFallbackAction(),
     progress: {
@@ -1854,7 +1855,7 @@ export const activationStateFixtures = {
     },
     route_availability: promptRouteAvailability(),
     prompt: promptState({
-      stage: "compare_prompt_versions",
+      stage: "create_second_prompt_version",
       has_test_run: true,
       has_committed_version: true,
     }),

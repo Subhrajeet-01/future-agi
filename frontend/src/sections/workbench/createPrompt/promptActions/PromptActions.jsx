@@ -61,7 +61,10 @@ import {
   buildPromptEditorHref,
   countCommittedPromptVersions,
   getPromptOnboardingRouteParams,
+  PROMPT_ONBOARDING_JOURNEY_STEPS,
   PROMPT_ONBOARDING_MODES,
+  resolvePromptPostSaveJourneyStep,
+  resolvePromptSaveCommitTarget,
   shouldAdvancePromptRunOnboarding,
   shouldAdvancePromptSaveOnboarding,
 } from "./promptOnboardingRoute";
@@ -340,6 +343,7 @@ const PromptActions = () => {
     [searchParams],
   );
   const onboardingMode = promptOnboardingParams.mode;
+  const onboardingJourneyStep = promptOnboardingParams.journeyStep;
   const onboardingSource = promptOnboardingParams.isOnboarding
     ? "onboarding"
     : searchParams.get("source");
@@ -350,7 +354,22 @@ const PromptActions = () => {
   const compareNeedsSecondVersion =
     onboardingSource === "onboarding" &&
     onboardingMode === PROMPT_ONBOARDING_MODES.COMPARE &&
+    onboardingJourneyStep !==
+      PROMPT_ONBOARDING_JOURNEY_STEPS.COMPARE_VERSIONS &&
     committedVersionCount < 2;
+  const promptSaveCommitTarget = useMemo(
+    () =>
+      resolvePromptSaveCommitTarget({
+        mode: onboardingMode,
+        selectedVersions,
+        source: onboardingSource,
+      }),
+    [onboardingMode, onboardingSource, selectedVersions],
+  );
+  const postSaveJourneyStep = resolvePromptPostSaveJourneyStep({
+    baseVersion,
+    commitTarget: promptSaveCommitTarget,
+  });
 
   useEffect(() => {
     if (
@@ -394,14 +413,28 @@ const PromptActions = () => {
       return;
     }
 
+    queryClient.invalidateQueries({
+      queryKey: ["prompt-versions"],
+    });
+    refetch();
+
     navigate(
       buildPromptEditorHref({
+        journeyStep: postSaveJourneyStep,
         promptId: id,
         mode: PROMPT_ONBOARDING_MODES.COMPARE,
       }),
       { replace: true },
     );
-  }, [id, navigate, onboardingMode, onboardingSource]);
+  }, [
+    id,
+    navigate,
+    onboardingMode,
+    onboardingSource,
+    queryClient,
+    refetch,
+    postSaveJourneyStep,
+  ]);
 
   const handleCreateSecondVersion = useCallback(() => {
     setCurrentTab("Playground");
@@ -955,7 +988,7 @@ const PromptActions = () => {
         open={saveCommitOpen}
         onClose={() => setSaveCommitOpen(false)}
         onCommitted={handlePromptVersionCommitted}
-        data={baseVersion}
+        data={promptSaveCommitTarget}
         promptName={promptName}
       />
     </Stack>

@@ -141,6 +141,7 @@ tour_anchors:
   - prompt_create_button
   - prompt_run_test_button
   - prompt_save_version_button
+  - prompt_create_second_version_button
   - prompt_compare_versions_button
   - prompt_add_example_button
   - agent_create_button
@@ -269,7 +270,7 @@ journeys:
         stage: create_second_prompt_version
         action_id: create_second_prompt_version
         success_event: prompt_comparable_version_created
-        tour_anchor: prompt_compare_versions_button
+        tour_anchor: prompt_create_second_version_button
         label: Second version
         description: Edit, run, and save one more version before comparing.
       - id: compare_prompt_versions

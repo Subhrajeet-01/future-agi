@@ -7,7 +7,10 @@ import {
   countCommittedPromptVersions,
   getPromptOnboardingRouteParams,
   isPromptFailureCaptureOnboarding,
+  PROMPT_ONBOARDING_JOURNEY_STEPS,
   PROMPT_ONBOARDING_MODES,
+  resolvePromptPostSaveJourneyStep,
+  resolvePromptSaveCommitTarget,
   shouldAdvancePromptCompareOnboarding,
   shouldAdvancePromptRunOnboarding,
   shouldAdvancePromptSaveOnboarding,
@@ -22,6 +25,7 @@ describe("promptOnboardingRoute", () => {
     ).toEqual({
       action: "create-prompt",
       isOnboarding: true,
+      journeyStep: null,
       mode: PROMPT_ONBOARDING_MODES.SAVE_VERSION,
       tourAnchor: null,
     });
@@ -44,6 +48,7 @@ describe("promptOnboardingRoute", () => {
       ).toEqual({
         action: mode,
         isOnboarding: true,
+        journeyStep,
         mode,
         tourAnchor: "prompt_focus",
       });
@@ -58,6 +63,7 @@ describe("promptOnboardingRoute", () => {
     ).toEqual({
       action: null,
       isOnboarding: true,
+      journeyStep: null,
       mode: null,
       tourAnchor: null,
     });
@@ -90,6 +96,15 @@ describe("promptOnboardingRoute", () => {
       }),
     ).toBe(
       "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=compare&tour_anchor=prompt_compare_versions_button&journey_step=compare_prompt_versions",
+    );
+    expect(
+      buildPromptEditorHref({
+        journeyStep: PROMPT_ONBOARDING_JOURNEY_STEPS.CREATE_SECOND_VERSION,
+        promptId: "prompt-1",
+        mode: PROMPT_ONBOARDING_MODES.COMPARE,
+      }),
+    ).toBe(
+      "/dashboard/workbench/create/prompt-1?source=onboarding&onboarding=compare&tour_anchor=prompt_create_second_version_button&journey_step=create_second_prompt_version",
     );
     expect(
       buildPromptEditorHref({
@@ -202,6 +217,46 @@ describe("promptOnboardingRoute", () => {
         null,
       ]),
     ).toBe(2);
+  });
+
+  it("targets the draft second version while saving the guided prompt loop", () => {
+    const baseline = { version: "v1", isDraft: false };
+    const secondDraft = { version: "v2", isDraft: true };
+
+    expect(
+      resolvePromptSaveCommitTarget({
+        mode: PROMPT_ONBOARDING_MODES.SAVE_VERSION,
+        selectedVersions: [baseline, secondDraft],
+        source: "onboarding",
+      }),
+    ).toBe(secondDraft);
+
+    expect(
+      resolvePromptSaveCommitTarget({
+        mode: PROMPT_ONBOARDING_MODES.SAVE_VERSION,
+        selectedVersions: [baseline, secondDraft],
+        source: "workspace",
+      }),
+    ).toBe(baseline);
+  });
+
+  it("routes post-save onboarding by the committed target version", () => {
+    const baseline = { version: "v1", isDraft: false };
+    const secondVersion = { version: "v2", isDraft: false };
+
+    expect(
+      resolvePromptPostSaveJourneyStep({
+        baseVersion: baseline,
+        commitTarget: baseline,
+      }),
+    ).toBe(PROMPT_ONBOARDING_JOURNEY_STEPS.CREATE_SECOND_VERSION);
+
+    expect(
+      resolvePromptPostSaveJourneyStep({
+        baseVersion: baseline,
+        commitTarget: secondVersion,
+      }),
+    ).toBe(PROMPT_ONBOARDING_JOURNEY_STEPS.COMPARE_VERSIONS);
   });
 
   it("advances compare onboarding only after multiple committed versions are selected", () => {

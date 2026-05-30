@@ -152,6 +152,7 @@ describe("post-login routing", () => {
       "start_prompt",
       "run_prompt_test",
       "save_prompt_version",
+      "create_second_prompt_version",
       "compare_prompt_versions",
       "prompt_next_loop",
       "create_agent",

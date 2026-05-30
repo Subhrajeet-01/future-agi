@@ -9,6 +9,7 @@ export const DESTINATION_TOUR_ANCHORS = [
   "prompt_create_button",
   "prompt_run_test_button",
   "prompt_save_version_button",
+  "prompt_create_second_version_button",
   "prompt_compare_versions_button",
   "prompt_add_example_button",
   "agent_create_button",

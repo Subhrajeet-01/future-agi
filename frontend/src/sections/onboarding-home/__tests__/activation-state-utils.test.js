@@ -86,6 +86,21 @@ describe("activation-state utilities", () => {
     expect(normalized.recommendedAction.href).toContain("onboarding=run-test");
   });
 
+  it("normalizes the prompt second-version bridge stage", () => {
+    const normalized = normalizeActivationState(
+      getActivationStateFixture("promptVersionNoComparison"),
+    );
+
+    expect(normalized.primaryPath).toBe("prompt");
+    expect(normalized.stage).toBe("create_second_prompt_version");
+    expect(normalized.recommendedAction.id).toBe(
+      "create_second_prompt_version",
+    );
+    expect(normalized.recommendedAction.completionEvent).toBe(
+      "prompt_comparable_version_created",
+    );
+  });
+
   it("normalizes a backend-driven journey plan", () => {
     const fixture = getActivationStateFixture("promptCreatedNoRun");
     const normalized = normalizeActivationState({

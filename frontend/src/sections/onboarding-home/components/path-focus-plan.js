@@ -28,7 +28,7 @@ export const PATH_FOCUS_PLANS = {
         stage: "create_second_prompt_version",
         label: "Second version",
         description: "Edit, run, and save one more version before comparing.",
-        tourAnchor: "prompt_compare_versions_button",
+        tourAnchor: "prompt_create_second_version_button",
       },
       {
         stage: "compare_prompt_versions",

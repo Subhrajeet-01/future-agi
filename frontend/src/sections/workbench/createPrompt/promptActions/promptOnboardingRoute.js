@@ -7,6 +7,11 @@ export const PROMPT_ONBOARDING_MODES = {
   METRICS: "metrics",
 };
 
+export const PROMPT_ONBOARDING_JOURNEY_STEPS = {
+  CREATE_SECOND_VERSION: "create_second_prompt_version",
+  COMPARE_VERSIONS: "compare_prompt_versions",
+};
+
 const VALID_PROMPT_ONBOARDING_MODES = new Set(
   Object.values(PROMPT_ONBOARDING_MODES),
 );
@@ -34,12 +39,25 @@ const PROMPT_ONBOARDING_MODE_DESTINATIONS = {
     tourAnchor: "prompt_save_version_button",
   },
   [PROMPT_ONBOARDING_MODES.COMPARE]: {
-    journeyStep: "compare_prompt_versions",
+    journeyStep: PROMPT_ONBOARDING_JOURNEY_STEPS.COMPARE_VERSIONS,
     tourAnchor: "prompt_compare_versions_button",
   },
   [PROMPT_ONBOARDING_MODES.ADD_FAILURE]: {
     journeyStep: "prompt_next_loop",
     tourAnchor: "prompt_add_example_button",
+  },
+};
+
+const PROMPT_ONBOARDING_JOURNEY_STEP_DESTINATIONS = {
+  [PROMPT_ONBOARDING_JOURNEY_STEPS.CREATE_SECOND_VERSION]: {
+    mode: PROMPT_ONBOARDING_MODES.COMPARE,
+    journeyStep: PROMPT_ONBOARDING_JOURNEY_STEPS.CREATE_SECOND_VERSION,
+    tourAnchor: "prompt_create_second_version_button",
+  },
+  [PROMPT_ONBOARDING_JOURNEY_STEPS.COMPARE_VERSIONS]: {
+    mode: PROMPT_ONBOARDING_MODES.COMPARE,
+    journeyStep: PROMPT_ONBOARDING_JOURNEY_STEPS.COMPARE_VERSIONS,
+    tourAnchor: "prompt_compare_versions_button",
   },
 };
 
@@ -56,7 +74,8 @@ const safeKeyPart = (value, fallback) =>
 export const getPromptOnboardingRouteParams = (search = "") => {
   const params = toSearchParams(search);
   const rawMode = params.get("onboarding");
-  const journeyMode = PROMPT_JOURNEY_STEP_MODES[params.get("journey_step")];
+  const journeyStep = params.get("journey_step");
+  const journeyMode = PROMPT_JOURNEY_STEP_MODES[journeyStep];
   const mode = VALID_PROMPT_ONBOARDING_MODES.has(rawMode)
     ? rawMode
     : journeyMode || null;
@@ -65,19 +84,22 @@ export const getPromptOnboardingRouteParams = (search = "") => {
   return {
     action,
     isOnboarding: params.get("source") === "onboarding" || Boolean(mode),
+    journeyStep,
     mode,
     tourAnchor: params.get("tour_anchor"),
   };
 };
 
-export const buildPromptEditorHref = ({ mode, promptId } = {}) => {
+export const buildPromptEditorHref = ({ journeyStep, mode, promptId } = {}) => {
   if (!promptId) return null;
 
   const params = new URLSearchParams();
   params.set("source", "onboarding");
   if (VALID_PROMPT_ONBOARDING_MODES.has(mode)) {
-    params.set("onboarding", mode);
-    const destination = PROMPT_ONBOARDING_MODE_DESTINATIONS[mode];
+    const destination =
+      PROMPT_ONBOARDING_JOURNEY_STEP_DESTINATIONS[journeyStep] ||
+      PROMPT_ONBOARDING_MODE_DESTINATIONS[mode];
+    params.set("onboarding", destination?.mode || mode);
     if (destination?.tourAnchor) {
       params.set("tour_anchor", destination.tourAnchor);
     }
@@ -146,6 +168,50 @@ export const countCommittedPromptVersions = (versions = []) =>
       )
       .filter(Boolean),
   ).size;
+
+export const resolvePromptSaveCommitTarget = ({
+  mode,
+  selectedVersions = [],
+  source,
+} = {}) => {
+  if (
+    source === "onboarding" &&
+    mode === PROMPT_ONBOARDING_MODES.SAVE_VERSION &&
+    selectedVersions.length > 1
+  ) {
+    return (
+      [...selectedVersions]
+        .reverse()
+        .find((version) => version?.isDraft ?? version?.is_draft) ||
+      selectedVersions[selectedVersions.length - 1]
+    );
+  }
+
+  return selectedVersions[0] || null;
+};
+
+const promptVersionKey = (version = {}) =>
+  version?.version ||
+  version?.templateVersion ||
+  version?.template_version ||
+  version?.id ||
+  null;
+
+export const resolvePromptPostSaveJourneyStep = ({
+  baseVersion,
+  commitTarget,
+} = {}) => {
+  const baseKey = promptVersionKey(baseVersion);
+  const targetKey = promptVersionKey(commitTarget);
+  const targetsAdditionalVersion =
+    baseKey && targetKey
+      ? baseKey !== targetKey
+      : Boolean(commitTarget && commitTarget !== baseVersion);
+
+  return targetsAdditionalVersion
+    ? PROMPT_ONBOARDING_JOURNEY_STEPS.COMPARE_VERSIONS
+    : PROMPT_ONBOARDING_JOURNEY_STEPS.CREATE_SECOND_VERSION;
+};
 
 export const shouldAdvancePromptCompareOnboarding = ({
   committedVersionCount,
