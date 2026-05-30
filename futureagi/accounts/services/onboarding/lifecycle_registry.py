@@ -151,7 +151,8 @@ def _validate_campaign(campaign: dict, path: str, activation_config: dict) -> No
         raise _config_error(
             f"{path}.target_success_event does not match target action completion."
         )
-    if campaign["route_strategy"] not in ROUTE_STRATEGIES:
+    route_strategy = _required_text(campaign, "route_strategy", path)
+    if route_strategy not in ROUTE_STRATEGIES:
         raise _config_error(f"{path}.route_strategy is not supported.")
     dry_run_flag = _required_text(campaign, "dry_run_flag", path)
     if dry_run_flag not in SUPPORTED_ONBOARDING_FLAG_NAMES:

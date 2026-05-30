@@ -658,22 +658,41 @@ def _target_url(activation_state, campaign):
                 campaign,
             )
         route = route_availability.get("sample_trace") or {}
-        href = route.get("href") if route.get("is_available") else None
+        href = _available_route_href(route)
         return _url_with_campaign_params(href, campaign)
     if strategy == "artifact_deep_link":
         if recommended_action.get("id") == campaign["target_action_id"]:
             return _url_with_campaign_params(recommended_action.get("href"), campaign)
-        route = route_availability.get("observe_trace_detail") or {}
-        href = route.get("href") if route.get("is_available") else None
+        route_key = (configured_action(campaign["target_action_id"]) or {}).get(
+            "route_key"
+        )
+        route = route_availability.get(route_key) or {}
+        href = _available_route_href(route)
         return _url_with_campaign_params(href, campaign)
     if strategy == "daily_quality":
         route = route_availability.get("daily_quality_home") or {}
-        href = route.get("href") if route.get("is_available") else None
+        href = _available_route_href(route)
         return _url_with_campaign_params(href, campaign)
     return None
 
 
+def _safe_internal_url(url):
+    if not isinstance(url, str):
+        return None
+    url = url.strip()
+    if not url or not url.startswith("/") or url.startswith("//"):
+        return None
+    return url
+
+
+def _available_route_href(route):
+    if not route or not route.get("is_available"):
+        return None
+    return _safe_internal_url(route.get("href"))
+
+
 def _url_with_campaign_params(url, campaign):
+    url = _safe_internal_url(url)
     if not url:
         return None
     params = urlencode(

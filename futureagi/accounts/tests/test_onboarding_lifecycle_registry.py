@@ -150,6 +150,24 @@ def test_lifecycle_registry_rejects_unsupported_campaign_feature_flags():
         _validate_config(config)
 
 
+def test_lifecycle_registry_rejects_unsupported_route_strategy():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["route_strategy"] = "unavailable_product_route"
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
+def test_lifecycle_registry_rejects_non_text_route_strategy():
+    config = _valid_lifecycle_config()
+    campaign = _campaign(config, "prompt_create_first")
+    campaign["route_strategy"] = []
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
 def test_lifecycle_registry_rejects_unknown_template_key():
     config = _valid_lifecycle_config()
     campaign = _campaign(config, "prompt_create_first")

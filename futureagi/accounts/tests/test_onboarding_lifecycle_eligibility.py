@@ -302,6 +302,176 @@ def test_daily_quality_open_action_digest_is_repeatable_after_prior_completion(
 
 
 @pytest.mark.django_db
+def test_unavailable_daily_quality_route_suppresses_digest_campaign(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    flags = _flags()
+    activation_state = {
+        "stage": "daily_review",
+        "primary_path": "observe",
+        "is_activated": True,
+        "recommended_action": {
+            "id": "review_daily_quality",
+            "href": "/dashboard/home?mode=daily-quality",
+        },
+        "fallback_action": {"id": "open_get_started"},
+        "permissions": {
+            "can_write": True,
+            "permission_limited": False,
+        },
+        "sample_project": {},
+        "signals": {},
+        "daily_quality": {"mode": "open_action"},
+        "route_availability": {
+            "daily_quality_home": {
+                "href": "/dashboard/home?mode=daily-quality",
+                "is_available": False,
+                "reason": "feature_disabled",
+            }
+        },
+        "last_meaningful_event": {
+            "occurred_at": now - timedelta(hours=2),
+            "is_sample": False,
+        },
+    }
+
+    decision = evaluate_lifecycle_decision(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        activation_state=activation_state,
+        flags=flags,
+        now=now,
+    )
+
+    assert decision.status == OnboardingLifecycleEvaluationLog.STATUS_SUPPRESSED
+    assert decision.campaign["campaign_key"] == "daily_quality_open_actions"
+    assert decision.target_url is None
+    assert decision.suppression_reason == "route_unavailable"
+    assert decision.suppression_details == {"route_strategy": "daily_quality"}
+
+
+@pytest.mark.django_db
+def test_external_recommendation_href_suppresses_lifecycle_campaign(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    _set_workspace_created_at(workspace, now - timedelta(hours=2))
+    OnboardingGoal.no_workspace_objects.create(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        goal="improve_prompts",
+        primary_path="prompt",
+        selected_at=now - timedelta(hours=2),
+    )
+    flags = _flags(onboarding_email_prompt_enabled=True)
+    activation_state = {
+        "stage": "start_prompt",
+        "primary_path": "prompt",
+        "is_activated": False,
+        "recommended_action": {
+            "id": "create_prompt",
+            "href": "https://example.invalid/dashboard/workbench/all",
+        },
+        "fallback_action": {
+            "id": "open_prompt_workbench",
+            "href": "/dashboard/workbench/all",
+        },
+        "permissions": {
+            "can_write": True,
+            "permission_limited": False,
+        },
+        "sample_project": {},
+        "signals": {},
+        "last_meaningful_event": None,
+        "route_availability": {},
+    }
+
+    decision = evaluate_lifecycle_decision(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        activation_state=activation_state,
+        flags=flags,
+        now=now,
+    )
+
+    assert decision.status == OnboardingLifecycleEvaluationLog.STATUS_SUPPRESSED
+    assert decision.campaign["campaign_key"] == "prompt_create_first"
+    assert decision.target_url is None
+    assert decision.suppression_reason == "route_unavailable"
+    assert decision.suppression_details == {
+        "route_strategy": "activation_recommendation"
+    }
+
+
+@pytest.mark.django_db
+def test_artifact_deep_link_uses_campaign_action_route_not_observe_fallback(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    flags = _flags(onboarding_email_eval=True)
+    activation_state = {
+        "stage": "review_eval_failures",
+        "primary_path": "evals",
+        "is_activated": False,
+        "recommended_action": {
+            "id": "open_observe_dashboard",
+            "href": "/dashboard/observe",
+        },
+        "fallback_action": {
+            "id": "open_evals",
+            "href": "/dashboard/evaluations",
+        },
+        "permissions": {
+            "can_write": True,
+            "permission_limited": False,
+        },
+        "sample_project": {},
+        "signals": {},
+        "eval": {
+            "run_completed_at": now - timedelta(hours=1),
+        },
+        "last_meaningful_event": None,
+        "route_availability": {
+            "observe_trace_detail": {
+                "href": "/dashboard/observe/project-1/trace/trace-1",
+                "is_available": True,
+                "reason": None,
+            },
+            "eval_review_failures": {
+                "href": "/dashboard/evaluations/usage",
+                "is_available": False,
+                "reason": "missing_id",
+            },
+        },
+    }
+
+    decision = evaluate_lifecycle_decision(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        activation_state=activation_state,
+        flags=flags,
+        now=now,
+    )
+
+    assert decision.status == OnboardingLifecycleEvaluationLog.STATUS_SUPPRESSED
+    assert decision.campaign["campaign_key"] == "eval_review_failures"
+    assert decision.target_url is None
+    assert decision.suppression_reason == "route_unavailable"
+    assert decision.suppression_details == {"route_strategy": "artifact_deep_link"}
+
+
+@pytest.mark.django_db
 def test_daily_quality_open_action_digest_preview_uses_safe_action_snapshot(
     organization,
     workspace,
