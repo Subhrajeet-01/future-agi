@@ -357,6 +357,11 @@ export default function OnboardingHomeView() {
 
   useEffect(() => {
     if (searchContext.source !== "setup_org") return;
+    try {
+      window.localStorage?.removeItem("redirectUrl");
+    } catch {
+      // The setup handoff should not fail if storage is unavailable.
+    }
     persistSetupQuickStartAttribution({
       quickStartGoal: searchContext.quickStartGoal,
       quickStartId: searchContext.quickStartId,
@@ -629,23 +634,14 @@ export default function OnboardingHomeView() {
   const isSampleQuickStart =
     searchContext.quickStartPrimaryPath === "sample" ||
     searchContext.quickStartId === "sample_preview";
-  const setupQuickStartHandoffCopy = isSetupQuickStart
-    ? isSampleQuickStart
+  const setupQuickStartHandoffCopy =
+    isSetupQuickStart && isSampleQuickStart
       ? {
           title: "Sample data is a preview",
           description:
             "Use it to inspect screens. Real setup still starts from a product workflow.",
         }
-      : {
-          title: `You chose ${
-            selectedSetupQuickStart?.buttonLabel ||
-            selectedSetupQuickStart?.label ||
-            "this setup"
-          }`,
-          description:
-            "Use the highlighted action below. Sample data stays optional and does not finish this setup.",
-        }
-    : null;
+      : null;
   const isFirstRunQuickStartFocus =
     Boolean(renderedState) &&
     isSetupQuickStart &&
@@ -788,9 +784,9 @@ export default function OnboardingHomeView() {
           }
         : {
             eyebrow: "First setup",
-            title: `Set up: ${selectedSetupQuickStart.buttonLabel}`,
+            title: `Finish setup: ${selectedSetupQuickStart.buttonLabel}`,
             description:
-              "Start with the highlighted action below. When it is done, return here and FutureAGI will show the next step.",
+              "Complete the checklist in order. Start with the next action below, then return here for the next step.",
           }
       : quickStartMismatchAction
         ? {

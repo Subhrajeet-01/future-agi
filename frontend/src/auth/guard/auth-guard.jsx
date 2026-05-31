@@ -261,6 +261,7 @@ function Container({ children }) {
     // Onboarding not finished: keep every authenticated entry point on setup.
     if (!user?.onboarding_completed) {
       if (isSetupCompletionHandoff(currentPath)) {
+        localStorage.removeItem("redirectUrl");
         return;
       }
 

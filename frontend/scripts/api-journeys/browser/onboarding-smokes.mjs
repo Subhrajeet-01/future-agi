@@ -174,6 +174,39 @@ const SMOKES = [
     },
   },
   {
+    id: "onboarding-home-prompt-path-controlled",
+    mode: "controlled",
+    file: "onboarding-home-observe-smoke.mjs",
+    description:
+      "Stubbed auth proof that Home shows the prompt first-run path focus.",
+    env: {
+      ONBOARDING_SMOKE_STUB_AUTH: "1",
+      ONBOARDING_SMOKE_PATH_FOCUS: "prompt",
+    },
+  },
+  {
+    id: "onboarding-home-agent-path-controlled",
+    mode: "controlled",
+    file: "onboarding-home-observe-smoke.mjs",
+    description:
+      "Stubbed auth proof that Home shows the agent first-run path focus.",
+    env: {
+      ONBOARDING_SMOKE_STUB_AUTH: "1",
+      ONBOARDING_SMOKE_PATH_FOCUS: "agent",
+    },
+  },
+  {
+    id: "onboarding-home-gateway-path-controlled",
+    mode: "controlled",
+    file: "onboarding-home-observe-smoke.mjs",
+    description:
+      "Stubbed auth proof that Home shows the gateway first-run path focus.",
+    env: {
+      ONBOARDING_SMOKE_STUB_AUTH: "1",
+      ONBOARDING_SMOKE_PATH_FOCUS: "gateway",
+    },
+  },
+  {
     id: "onboarding-home-evals-path-controlled",
     mode: "controlled",
     file: "onboarding-home-observe-smoke.mjs",

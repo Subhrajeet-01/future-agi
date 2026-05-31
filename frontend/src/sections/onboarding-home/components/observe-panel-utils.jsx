@@ -1,4 +1,3 @@
-import React from "react";
 import PropTypes from "prop-types";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -119,43 +118,30 @@ export function ObserveJourneyProgress({
   singleActionFocus = false,
   stage,
 }) {
-  const [showFullJourney, setShowFullJourney] =
-    React.useState(!singleActionFocus);
   const steps = journeyPlan?.steps || [];
-
-  React.useEffect(() => {
-    setShowFullJourney(!singleActionFocus);
-  }, [singleActionFocus, stage, journeyPlan?.id]);
 
   if (!steps.length) return null;
 
   const currentStep = journeyCurrentStep(journeyPlan, stage);
   const currentIndex = Math.max(steps.indexOf(currentStep), 0);
 
-  if (singleActionFocus && !showFullJourney) {
-    return (
-      <Stack spacing={1.25} data-testid="observe-journey-progress">
-        <Chip
-          size="small"
-          variant="outlined"
-          label={`Step ${currentIndex + 1} of ${steps.length}`}
-          sx={{ alignSelf: "flex-start" }}
-        />
-        <CurrentStepGuide step={currentStep} stage={stage} />
-        <Button
-          variant="text"
-          size="small"
-          onClick={() => setShowFullJourney(true)}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          Show full path
-        </Button>
-      </Stack>
-    );
-  }
-
   return (
     <Stack spacing={1.25} data-testid="observe-journey-progress">
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1}
+        alignItems={{ xs: "flex-start", sm: "center" }}
+        justifyContent="space-between"
+      >
+        <Typography variant="subtitle2">Setup checklist</Typography>
+        {singleActionFocus ? (
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Step ${currentIndex + 1} of ${steps.length}`}
+          />
+        ) : null}
+      </Stack>
       <Box
         sx={{
           display: "grid",
@@ -256,6 +242,10 @@ export function ObservePanelActions({
       : null;
   const fallbackHref = observeActionHref(fallbackAction);
   const showSecondaryRoutes = !singleActionFocus || !primaryHref;
+  const primaryLabel =
+    singleActionFocus && journeyStep?.label
+      ? journeyStep.label
+      : action?.ctaLabel || "Open";
 
   return (
     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -267,7 +257,7 @@ export function ObservePanelActions({
         onClick={() => onPrimaryClick?.(action)}
         startIcon={<Iconify icon="mdi:arrow-right" width={18} />}
       >
-        {action?.ctaLabel || "Open"}
+        {primaryLabel}
       </Button>
       {replayHref ? (
         <Button

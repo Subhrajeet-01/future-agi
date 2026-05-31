@@ -204,7 +204,7 @@ async function main() {
     await expectVisibleText(page, "What do you want to set up first?");
     await expectVisibleText(
       page,
-      "Choose one workflow. We will show the exact checklist next.",
+      "Choose one workflow. We will show every setup step next.",
     );
     const quickStartInitiallyVisible = await isVisibleButtonText(
       page,
@@ -248,15 +248,16 @@ async function main() {
       await expectVisibleText(page, "Sample trace review");
       await expectVisibleText(page, "Connect your app", { exact: true });
     } else {
-      await expectVisibleText(page, `Set up: ${QUICK_START.buttonText}`, {
+      await expectVisibleText(page, `Finish setup: ${QUICK_START.buttonText}`, {
         exact: true,
       });
-      await expectVisibleText(page, `You chose ${QUICK_START.buttonText}`);
+      await waitForNoVisibleText(page, `You chose ${QUICK_START.buttonText}`);
+      await expectVisibleText(page, "Setup checklist", { exact: true });
       await expectVisibleText(page, "Do this now");
       await expectVisibleText(page, QUICK_START.expectedActionText, {
         exact: true,
       });
-      await expectVisibleText(page, "Show full path", { exact: true });
+      await waitForNoVisibleText(page, "Show full path");
       await expectNoSelector(page, '[data-testid="sample-project-panel"]');
 
       await waitForCondition(
@@ -1032,6 +1033,31 @@ async function expectVisibleText(
     },
     { timeout },
     { text, exact },
+  );
+}
+
+async function waitForNoVisibleText(page, text, { timeout = 30000 } = {}) {
+  await page.waitForFunction(
+    (expectedText) => {
+      const normalized = (value) => String(value || "").trim();
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      };
+      return !Array.from(document.querySelectorAll("body *")).some(
+        (element) =>
+          isVisible(element) &&
+          normalized(element.textContent).includes(expectedText),
+      );
+    },
+    { timeout },
+    text,
   );
 }
 

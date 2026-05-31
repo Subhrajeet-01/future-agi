@@ -7,7 +7,10 @@ import {
   createAuthenticatedContext,
   envFlag,
 } from "../lib/api-client.mjs";
+import { PATH_FOCUS_PLANS } from "../../../src/sections/onboarding-home/components/path-focus-plan.js";
+import { hrefWithJourneyGuide } from "../../../src/sections/onboarding-home/components/journey-guide-utils.js";
 import { getActivationStateFixture } from "../../../src/sections/onboarding-home/fixtures/activation-state.fixtures.js";
+import { ONBOARDING_STAGE_COPY } from "../../../src/sections/onboarding-home/onboarding-home.constants.js";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -281,7 +284,10 @@ async function main() {
       });
       await expectVisibleText(page, pathProfile.panelEyebrow, { exact: true });
       await expectVisibleText(page, pathProfile.panelTitle, { exact: true });
-      await expectVisibleText(page, pathProfile.currentStepText, {
+      await expectVisibleText(page, pathProfile.currentStepLabel, {
+        exact: true,
+      });
+      await expectVisibleText(page, pathProfile.currentStepDescription, {
         exact: true,
       });
       const getStartedVisible = await visibleActionExists(
@@ -306,7 +312,7 @@ async function main() {
           rootSelector: `[data-testid="path-focus-panel-${pathProfile.primaryPath}"]`,
         });
         assert(
-          ctaHref === pathProfile.href,
+          ctaHref === pathProfile.expectedHref,
           `Unexpected path-focus CTA href: ${ctaHref}`,
         );
         assert(!ctaHref.startsWith("//"), `Unsafe CTA href: ${ctaHref}`);
@@ -1019,6 +1025,53 @@ function stubbedActivationState(auth, { firstTraceReady = false } = {}) {
 
 function pathFocusProfile(pathFocus) {
   const profiles = {
+    prompt: {
+      primaryPath: "prompt",
+      goal: "improve_prompts",
+      stage: "start_prompt",
+      pathLabel: "Test prompts or agent prompts",
+      pathDescription: "Run prompt tests and compare output changes.",
+      flagName: "onboarding_prompt_path",
+      actionId: "start_prompt",
+      actionKind: "setup",
+      actionTitle: "Create prompt",
+      actionDescription:
+        "Create one prompt and run it against a focused example.",
+      cta: "Create prompt",
+      href: "/dashboard/workbench/all?source=onboarding&action=create-prompt",
+      completionEvent: "prompt_created",
+    },
+    agent: {
+      primaryPath: "agent",
+      goal: "build_ai_agent",
+      stage: "run_agent_scenario",
+      pathLabel: "Prototype agent",
+      pathDescription: "Run a first scenario and inspect the agent trace.",
+      flagName: "onboarding_agent_path",
+      actionId: "run_agent_scenario",
+      actionKind: "test",
+      actionTitle: "Run scenario",
+      actionDescription: "Run one scenario and inspect what the agent did.",
+      cta: "Run scenario",
+      href: "/dashboard/agents/playground/agent-1/build?onboarding=run-scenario",
+      completionEvent: "agent_prototype_run_completed",
+    },
+    gateway: {
+      primaryPath: "gateway",
+      goal: "control_model_traffic",
+      stage: "run_gateway_request",
+      pathLabel: "Setup gateway",
+      pathDescription:
+        "Add a provider, create a key, and send a gateway request.",
+      flagName: "onboarding_gateway_path",
+      actionId: "run_gateway_request",
+      actionKind: "test",
+      actionTitle: "Send gateway request",
+      actionDescription: "Send one request through the gateway.",
+      cta: "Send request",
+      href: "/dashboard/gateway?onboarding=test-request",
+      completionEvent: "gateway_request_sent",
+    },
     evals: {
       primaryPath: "evals",
       goal: "evaluate_quality",
@@ -1026,8 +1079,6 @@ function pathFocusProfile(pathFocus) {
       stageEyebrow: "Eval run",
       stageTitle: "Run the first eval",
       stageDescription: "Run the eval once so the first result is reviewable.",
-      panelEyebrow: "Eval loop",
-      panelTitle: "Create one eval and review the first failure",
       pathLabel: "Evaluate quality",
       pathDescription: "Create a small eval and review the first failure.",
       flagName: "onboarding_eval_path",
@@ -1038,7 +1089,6 @@ function pathFocusProfile(pathFocus) {
       cta: "Run eval",
       href: "/dashboard/evaluations/create?source=onboarding&step=run",
       completionEvent: "eval_run_completed",
-      currentStepText: "Run eval: run eval",
       disabled: false,
     },
     voice: {
@@ -1049,8 +1099,6 @@ function pathFocusProfile(pathFocus) {
       stageTitle: "Create a voice agent",
       stageDescription:
         "Create or connect one voice agent before running a test call.",
-      panelEyebrow: "Voice loop",
-      panelTitle: "Connect a voice agent quality loop",
       pathLabel: "Connect a voice AI agent",
       pathDescription: "Run or review a call with clear success criteria.",
       flagName: "onboarding_voice_path",
@@ -1062,7 +1110,6 @@ function pathFocusProfile(pathFocus) {
       cta: "Create agent",
       href: "/dashboard/simulate/agent-definitions/create-new-agent-definition?source=onboarding&onboarding=create-voice-agent",
       completionEvent: "voice_agent_created",
-      currentStepText: "Create agent: create voice agent",
       disabled: false,
     },
   };
@@ -1071,7 +1118,23 @@ function pathFocusProfile(pathFocus) {
     profile,
     `Unsupported ONBOARDING_SMOKE_PATH_FOCUS value: ${pathFocus}`,
   );
-  return profile;
+  const stageCopy = ONBOARDING_STAGE_COPY[profile.stage];
+  const plan = PATH_FOCUS_PLANS[profile.primaryPath];
+  const currentStep = plan?.steps?.find((step) => step.stage === profile.stage);
+  assert(stageCopy, `Missing stage copy for ${profile.stage}`);
+  assert(plan, `Missing path-focus plan for ${profile.primaryPath}`);
+  assert(currentStep, `Missing current step for ${profile.stage}`);
+  return {
+    ...profile,
+    stageEyebrow: stageCopy.eyebrow,
+    stageTitle: stageCopy.title,
+    stageDescription: stageCopy.description,
+    panelEyebrow: plan.eyebrow,
+    panelTitle: plan.title,
+    currentStepLabel: currentStep.label,
+    currentStepDescription: currentStep.description,
+    expectedHref: hrefWithJourneyGuide(profile.href, currentStep),
+  };
 }
 
 function pathFocusActivationState(auth, pathFocus) {

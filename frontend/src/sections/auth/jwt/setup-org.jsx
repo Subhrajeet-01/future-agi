@@ -54,18 +54,18 @@ const QUICK_START_ROLE = "AI Builder";
 const SETUP_SIDE_PANEL_STEPS = [
   {
     icon: "mdi:cursor-default-click-outline",
-    label: "Pick one setup path",
-    description: "Choose the workflow you want working first.",
+    label: "Choose what to set up",
+    description: "Pick the workflow you want working first.",
   },
   {
     icon: "mdi:clipboard-check-outline",
-    label: "Complete the checklist",
-    description: "The next screen keeps you on that selected path.",
+    label: "Follow one checklist",
+    description: "The next screen shows every step for that workflow.",
   },
   {
     icon: "mdi:database-eye-outline",
-    label: "Use real workspace data",
-    description: "Sample data stays optional and never completes setup.",
+    label: "Use real data to finish",
+    description: "Sample data is only a preview and does not finish setup.",
   },
 ];
 
@@ -262,12 +262,12 @@ const SetupOrgSidePanel = () => (
     >
       <Stack spacing={1}>
         <Typography variant="overline" color="text.secondary">
-          First setup
+          Setup flow
         </Typography>
-        <Typography variant="h4">One path at a time</Typography>
+        <Typography variant="h4">Choose, then follow the checklist</Typography>
         <Typography variant="body1" color="text.secondary">
-          Choose the workflow to set up now. FutureAGI will keep the next screen
-          focused on that checklist.
+          Start from a product workflow. FutureAGI will keep the next screen on
+          that workflow until the first real signal is set up.
         </Typography>
       </Stack>
 
@@ -701,14 +701,14 @@ const SetupOrganization = ({ getStarted = false }) => {
     return (
       <Stack spacing={1.5}>
         <Stack spacing={0.5}>
-          <Typography variant="subtitle2">Product workflows</Typography>
+          <Typography variant="subtitle2">Start with one workflow</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick the workflow you want working first. The next screen shows the
-            setup checklist for that path.
+            Pick the workflow you want working first. The next screen shows all
+            setup steps for that choice.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            We will save this as your first goal and you can invite teammates
-            later.
+            This becomes your first goal. Team invites can wait until setup is
+            working.
           </Typography>
         </Stack>
 
@@ -1098,7 +1098,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Choose one workflow. We will show the exact checklist next.
+                Choose one workflow. We will show every setup step next.
               </Typography>
             </Box>
 

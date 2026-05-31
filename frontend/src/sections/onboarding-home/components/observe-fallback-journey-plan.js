@@ -50,11 +50,11 @@ export const observeFallbackJourneyPlan = (stage) => {
   return {
     id: "observe_first_setup",
     primaryPath: "observe",
-    eyebrow: "Observe setup",
+    eyebrow: "Connect your agent",
     title: "Connect your agent",
     description:
       "Create the project, send one trace, review the first signal, then add a quality check.",
-    chips: ["observe", "setup"],
+    chips: ["setup"],
     currentStepIndex,
     steps: OBSERVE_FALLBACK_STEPS.map((step, index) => ({
       ...step,
