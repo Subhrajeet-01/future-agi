@@ -510,13 +510,16 @@ const SetupOrganization = ({ getStarted = false }) => {
         fullWidth
         sx={{
           borderRadius: 0.5,
-          minHeight: option.featured ? 58 : 52,
-          alignItems: "center",
+          minHeight: option.featured ? 78 : 72,
+          alignItems: "flex-start",
           justifyContent: "flex-start",
-          px: 1.5,
-          py: 1,
+          px: 1.75,
+          py: 1.25,
           textAlign: "left",
           whiteSpace: "normal",
+          "& .MuiButton-startIcon": {
+            mt: 0.2,
+          },
         }}
         variant={option.featured ? "contained" : "outlined"}
         loading={option.featured ? isSavingUserData : undefined}
@@ -611,10 +614,10 @@ const SetupOrganization = ({ getStarted = false }) => {
     return (
       <Stack spacing={1.5}>
         <Stack spacing={0.5}>
-          <Typography variant="subtitle2">Start with one workflow</Typography>
+          <Typography variant="subtitle2">Product workflows</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick the product workflow you want to set up now. The next screen
-            will open the matching setup steps.
+            Pick one workflow. You will see the setup steps before opening the
+            product screen.
           </Typography>
         </Stack>
 
@@ -622,10 +625,7 @@ const SetupOrganization = ({ getStarted = false }) => {
           data-testid="setup-org-product-quick-starts"
           sx={{
             display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, minmax(0, 1fr))",
-            },
+            gridTemplateColumns: "1fr",
             gap: 1,
           }}
         >
@@ -1037,7 +1037,7 @@ const SetupOrganization = ({ getStarted = false }) => {
     switch (activeStep) {
       case 0:
         return (
-          <Stack spacing={2} sx={{ width: { xs: "100%", sm: 440 } }}>
+          <Stack spacing={2} sx={{ width: { xs: "100%", sm: 520 } }}>
             <Box>
               <Typography
                 fontWeight={"fontWeightSemiBold"}
@@ -1048,7 +1048,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                What are you setting up today?
+                Choose your first setup
               </Typography>
               <Typography
                 fontWeight={"fontWeightSemiBold"}
@@ -1059,7 +1059,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Choose one workflow and continue
+                Start with the workflow you want working first
               </Typography>
             </Box>
 
@@ -1069,7 +1069,7 @@ const SetupOrganization = ({ getStarted = false }) => {
 
       case 1:
         return (
-          <Stack spacing={2} sx={{ width: { xs: "100%", sm: 440 } }}>
+          <Stack spacing={2} sx={{ width: { xs: "100%", sm: 520 } }}>
             <Box>
               <Typography
                 fontWeight={"fontWeightSemiBold"}

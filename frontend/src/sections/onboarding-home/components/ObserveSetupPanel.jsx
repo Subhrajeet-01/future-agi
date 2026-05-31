@@ -24,10 +24,12 @@ export default function ObserveSetupPanel({
 }) {
   const currentStep = journeyCurrentStep(journeyPlan, stage);
   const fallbackCurrentStep = currentStep || {
+    stage,
     label: action?.title || "Connect observability",
     description:
       action?.description ||
       "Create the observe project and prepare the first trace.",
+    tourAnchor: "observe_create_project_button",
   };
 
   return (
@@ -91,7 +93,7 @@ export default function ObserveSetupPanel({
           onFallbackClick={onFallbackClick}
           onCheckAgain={onCheckAgain}
           isChecking={isChecking}
-          journeyStep={currentStep}
+          journeyStep={fallbackCurrentStep}
           singleActionFocus={singleActionFocus}
         />
       </Stack>

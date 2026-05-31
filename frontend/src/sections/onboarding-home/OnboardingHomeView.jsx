@@ -170,15 +170,6 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
   },
 };
 
-const SETUP_QUICK_START_FIRST_STAGES = {
-  agent: "create_agent",
-  evals: "create_eval_dataset",
-  gateway: "configure_gateway_provider",
-  observe: "connect_observability",
-  prompt: "start_prompt",
-  voice: "create_voice_agent",
-};
-
 const setupQuickStartErrorFallbackAction = (searchContext = {}) => {
   if (searchContext.source !== "setup_org") return null;
   const attribution = normalizeSetupQuickStartAttribution(searchContext);
@@ -634,7 +625,6 @@ export default function OnboardingHomeView() {
   const isFirstRunQuickStartFocus =
     Boolean(renderedState) &&
     isSetupQuickStart &&
-    isSampleQuickStart &&
     !renderedState.isActivated &&
     !showGoalPicker &&
     !["feature_disabled", "activated", "daily_review"].includes(
@@ -654,6 +644,12 @@ export default function OnboardingHomeView() {
     : null;
   const showContextPanels =
     !isFirstRunQuickStartFocus && !quickStartMismatchAction;
+  const hideSetupQuickStartFallback =
+    isFirstRunQuickStartFocus &&
+    !isSampleQuickStart &&
+    Boolean(renderedState.recommendedAction?.href) &&
+    renderedState.recommendedAction?.routeAvailable !== false &&
+    !renderedState.recommendedAction?.blocked;
   const sampleProject = renderedState?.sampleProject;
   const renderedStage = renderedState?.stage;
   const showSampleAsPrimary = Boolean(
@@ -683,43 +679,6 @@ export default function OnboardingHomeView() {
         : sampleProject.realSetupHref;
     return appendSetupQuickStartAttributionToHref(baseHref, trackContext);
   }, [renderedStage, sampleProject, trackContext]);
-  const setupQuickStartDirectHandoffHref = useMemo(() => {
-    if (
-      !renderedState ||
-      !isSetupQuickStart ||
-      isSampleQuickStart ||
-      showGoalPicker ||
-      quickStartPathMismatch ||
-      renderedState.isActivated ||
-      renderedState.permissions?.permissionLimited
-    ) {
-      return null;
-    }
-
-    const expectedStage =
-      SETUP_QUICK_START_FIRST_STAGES[searchContext.quickStartId];
-    const action = renderedState.recommendedAction;
-    if (
-      !expectedStage ||
-      renderedState.stage !== expectedStage ||
-      renderedState.primaryPath !== searchContext.quickStartPrimaryPath ||
-      !action?.href ||
-      action.blocked ||
-      !action.routeAvailable
-    ) {
-      return null;
-    }
-
-    return appendSetupQuickStartAttributionToHref(action.href, searchContext);
-  }, [
-    isSampleQuickStart,
-    isSetupQuickStart,
-    quickStartPathMismatch,
-    renderedState,
-    searchContext,
-    showGoalPicker,
-  ]);
-
   const handleOpenSample = useCallback(
     async (options = {}) => {
       if (!renderedState) return;
@@ -777,11 +736,6 @@ export default function OnboardingHomeView() {
       trackContext,
     ],
   );
-
-  useEffect(() => {
-    if (!setupQuickStartDirectHandoffHref) return;
-    navigate(setupQuickStartDirectHandoffHref, { replace: true });
-  }, [navigate, setupQuickStartDirectHandoffHref]);
 
   useEffect(() => {
     if (
@@ -1087,7 +1041,7 @@ export default function OnboardingHomeView() {
       trackContext,
     ),
     fallbackAction: actionWithSetupQuickStartAttribution(
-      renderedState.fallbackAction,
+      hideSetupQuickStartFallback ? null : renderedState.fallbackAction,
       trackContext,
     ),
     onPrimaryClick: handleActionClick,
@@ -1119,7 +1073,6 @@ export default function OnboardingHomeView() {
           <ObserveSetupPanel
             {...observePanelProps}
             journeyPlan={renderedState.journeyPlan}
-            singleActionFocus={isFirstRunQuickStartFocus}
             stage={renderedState.stage}
           />
         ) : null}
@@ -1130,7 +1083,6 @@ export default function OnboardingHomeView() {
           <WaitingForSignalPanel
             {...observePanelProps}
             journeyPlan={renderedState.journeyPlan}
-            singleActionFocus={isFirstRunQuickStartFocus}
             signals={renderedState.signals}
             stage={renderedState.stage}
           />
@@ -1141,7 +1093,6 @@ export default function OnboardingHomeView() {
           <FirstSignalPanel
             {...observePanelProps}
             journeyPlan={renderedState.journeyPlan}
-            singleActionFocus={isFirstRunQuickStartFocus}
             signals={renderedState.signals}
             stage={renderedState.stage}
           />
@@ -1161,7 +1112,6 @@ export default function OnboardingHomeView() {
         {...observePanelProps}
         journeyPlan={renderedState.journeyPlan}
         primaryPath={renderedState.primaryPath}
-        singleActionFocus={isFirstRunQuickStartFocus}
         stage={renderedState.stage}
       />
     ) : null;

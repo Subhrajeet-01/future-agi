@@ -94,7 +94,7 @@ export const ONBOARDING_STAGE_COPY = {
   workspace_missing: {
     eyebrow: "Workspace",
     title: "Choose a workspace",
-    description: "Select a workspace before starting a product loop.",
+    description: "Select a workspace before starting setup.",
   },
   permission_limited: {
     eyebrow: "Access",
@@ -220,7 +220,7 @@ export const ONBOARDING_STAGE_COPY = {
   eval_next_loop: {
     eyebrow: "Eval setup",
     title: "Improve from the eval result",
-    description: "Turn the reviewed failure into the next quality-loop change.",
+    description: "Turn the reviewed failure into the next improvement.",
   },
   create_voice_agent: {
     eyebrow: "Voice",

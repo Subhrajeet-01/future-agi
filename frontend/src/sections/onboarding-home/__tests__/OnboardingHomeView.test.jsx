@@ -672,11 +672,10 @@ describe("OnboardingHomeView", () => {
       ),
     ).toBeVisible();
     expect(
-      within(panel).getByRole("link", { name: /open workbench/i }),
-    ).toHaveAttribute(
-      "href",
-      "/dashboard/workbench/all?source=onboarding&quick_start_goal=improve_prompts&quick_start_id=prompt&quick_start_primary_path=prompt",
-    );
+      within(panel).queryByRole("link", { name: /open workbench/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
+    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
   });
 
   it("renders the completed setup screen after the first observe workflow", () => {
@@ -992,13 +991,15 @@ describe("OnboardingHomeView", () => {
       },
     },
   ])(
-    "hands setup $quickStartId quick-start off to its selected first action",
+    "shows setup $quickStartId quick-start as a focused checklist",
     async ({
       actionId,
       fixture,
       quickStartGoal,
       quickStartId,
       quickStartPrimaryPath,
+      pathname,
+      routeParams,
       stage,
     }) => {
       const activationState = fixture();
@@ -1053,21 +1054,51 @@ describe("OnboardingHomeView", () => {
           quick_start_id: quickStartId,
         }),
       );
-      const expectedUrl = new URL(
-        activationState.recommendedAction.href,
+      expectCurrentRoute({
+        pathname: "/dashboard/home",
+        params: {
+          source: "setup_org",
+          quick_start_goal: quickStartGoal,
+          quick_start_id: quickStartId,
+          quick_start_primary_path: quickStartPrimaryPath,
+        },
+      });
+      const panel =
+        quickStartPrimaryPath === "observe"
+          ? screen.getByTestId("observe-setup-panel")
+          : screen.getByTestId(`path-focus-panel-${quickStartPrimaryPath}`);
+      const primaryLink = within(panel).getByRole("link", {
+        name: new RegExp(activationState.recommendedAction.ctaLabel, "i"),
+      });
+      const primaryUrl = new URL(
+        primaryLink.getAttribute("href"),
         "https://futureagi.test",
       );
-      await waitFor(() =>
-        expectCurrentRoute({
-          pathname: expectedUrl.pathname,
-          params: {
-            ...Object.fromEntries(expectedUrl.searchParams.entries()),
-            quick_start_goal: quickStartGoal,
-            quick_start_id: quickStartId,
-            quick_start_primary_path: quickStartPrimaryPath,
-          },
+      expect(primaryUrl.pathname).toBe(pathname);
+      expectRouteParams({
+        params: primaryUrl.searchParams,
+        values: {
+          ...routeParams,
+          quick_start_goal: quickStartGoal,
+          quick_start_id: quickStartId,
+          quick_start_primary_path: quickStartPrimaryPath,
+        },
+      });
+      if (quickStartPrimaryPath === "observe") {
+        expect(within(panel).getByText("Create observe project")).toBeVisible();
+      } else {
+        expect(screen.getByTestId(`path-focus-step-${stage}`)).toBeVisible();
+      }
+      expect(
+        within(panel).queryByRole("link", {
+          name: /open|get started|fallback/i,
         }),
-      );
+      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
+      expect(
+        screen.queryByTestId("onboarding-product-loop-stepper"),
+      ).toBeNull();
+      expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
       expect(readPersistedSetupQuickStartAttribution()).toEqual({
         quickStartGoal,
         quickStartId,

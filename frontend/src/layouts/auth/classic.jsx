@@ -23,7 +23,7 @@ export default function AuthClassicLayout({ children }) {
       direction="row"
       sx={{
         minHeight: "100vh",
-        minWidth: 1200,
+        minWidth: { xs: 0, md: 1200 },
         background: "url('/assets/illustrations/auth-background.png')",
         backgroundRepeat: "no-repeat",
         backgroundSize: "100% 100%",
