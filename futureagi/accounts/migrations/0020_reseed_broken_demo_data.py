@@ -123,6 +123,11 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("accounts", "0019_merge_20260407_1927"),
+        # This data migration reads model_hub (Dataset/Row/Cell/Column) and
+        # tracer (Project) via apps.get_model(), so those apps must be migrated
+        # first. Without these deps a fresh database can apply this migration
+        # before them, raising "No installed app with label 'model_hub'" and
+        # crash-looping the backend on first boot.
         ("model_hub", "0104_merge_20260526_0921"),
         ("tracer", "0078_canonicalize_persisted_filter_contracts"),
     ]
