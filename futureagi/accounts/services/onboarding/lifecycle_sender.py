@@ -4,7 +4,7 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -27,6 +27,7 @@ from accounts.services.onboarding.lifecycle_completion import (
     lifecycle_target_completed,
 )
 from accounts.services.onboarding.lifecycle_eligibility import (
+    LifecycleDecision,
     evaluate_lifecycle_decision,
     lifecycle_campaign_send_enabled,
 )
@@ -142,6 +143,42 @@ def _internal_route(route):
         return False
     parts = urlsplit(route)
     return not parts.scheme and not parts.netloc and route.startswith("/")
+
+
+def _with_lifecycle_campaign_params(route, campaign):
+    if not _internal_route(route):
+        return None
+    params = {
+        "source": "onboarding_email",
+        "campaign_key": (campaign or {}).get("campaign_key"),
+        "target_event": (campaign or {}).get("target_success_event"),
+    }
+    query = urlencode({key: value for key, value in params.items() if value})
+    if not query:
+        return route
+    separator = "&" if "?" in route else "?"
+    return f"{route}{separator}{query}"
+
+
+def _receipt_lifecycle_target_url(evaluation_log, campaign):
+    metadata = (
+        evaluation_log.metadata if isinstance(evaluation_log.metadata, dict) else {}
+    )
+    snapshot = (
+        evaluation_log.activation_state_snapshot
+        if isinstance(evaluation_log.activation_state_snapshot, dict)
+        else {}
+    )
+    candidate_routes = (
+        metadata.get("receipt_lifecycle_target_route"),
+        evaluation_log.target_url,
+        snapshot.get("recommended_action_href"),
+    )
+    for route in candidate_routes:
+        target_url = _with_lifecycle_campaign_params(route, campaign)
+        if target_url:
+            return target_url
+    return None
 
 
 def _target_success_event_completed(send_log):
@@ -400,6 +437,57 @@ def _fresh_decision(evaluation_log, now):
         skip_frequency=True,
     )
     return context, flags, decision
+
+
+def _receipt_backed_dry_run_decision(evaluation_log, now):
+    flags = get_onboarding_flags(
+        user=evaluation_log.user,
+        organization=evaluation_log.organization,
+        workspace=evaluation_log.workspace,
+    )
+    campaign = evaluation_log.registry_snapshot or {}
+    target_url = _receipt_lifecycle_target_url(evaluation_log, campaign)
+    activation_state = {
+        "stage": evaluation_log.activation_stage,
+        "primary_path": evaluation_log.primary_path,
+        "is_activated": (evaluation_log.activation_state_snapshot or {}).get(
+            "is_activated"
+        ),
+        "recommended_action": {
+            "id": evaluation_log.target_action_id,
+            "href": target_url,
+        },
+        "fallback_action": {},
+        "sample_project": {},
+    }
+    metadata = (
+        evaluation_log.metadata if isinstance(evaluation_log.metadata, dict) else {}
+    )
+    decision = LifecycleDecision(
+        run_id=uuid.uuid4(),
+        user=evaluation_log.user,
+        organization=evaluation_log.organization,
+        workspace=evaluation_log.workspace,
+        status=evaluation_log.status,
+        campaign=campaign,
+        activation_state=activation_state,
+        target_url=target_url,
+        eligible_at=evaluation_log.eligible_at,
+        suppression_reason=evaluation_log.suppression_reason,
+        suppression_details=evaluation_log.suppression_details or {},
+        evaluated_at=now,
+        metadata={
+            "source": "activation_fact_receipt_dry_run",
+            "receipt_id": metadata.get("receipt_id"),
+            "receipt_lifecycle_send_enabled": metadata.get(
+                "receipt_lifecycle_send_enabled"
+            ),
+            "receipt_lifecycle_dry_run_only": metadata.get(
+                "receipt_lifecycle_dry_run_only"
+            ),
+        },
+    )
+    return flags, decision
 
 
 def _denylisted(evaluation_log):
@@ -966,8 +1054,9 @@ def send_limited_onboarding_lifecycle_batch(
     run_id = uuid.uuid4()
     queryset = OnboardingLifecycleEvaluationLog.no_workspace_objects.filter(
         status=OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE,
-        source_receipt__isnull=True,
     ).order_by("-evaluated_at")
+    if not dry_run:
+        queryset = queryset.filter(source_receipt__isnull=True)
     if campaign_group:
         queryset = queryset.filter(campaign_group=campaign_group)
     if user_id:
@@ -983,7 +1072,13 @@ def send_limited_onboarding_lifecycle_batch(
     for evaluation_log in queryset[:limit]:
         evaluated += 1
         if dry_run:
-            _context, flags, decision = _fresh_decision(evaluation_log, now)
+            if evaluation_log.source_receipt_id:
+                flags, decision = _receipt_backed_dry_run_decision(
+                    evaluation_log,
+                    now,
+                )
+            else:
+                _context, flags, decision = _fresh_decision(evaluation_log, now)
             reason = _suppression_reason(
                 evaluation_log,
                 flags,

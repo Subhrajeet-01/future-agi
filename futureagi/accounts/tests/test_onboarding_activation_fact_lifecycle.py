@@ -6,11 +6,14 @@ from types import SimpleNamespace
 
 import pytest
 from django.core.management import call_command
+from django.test import override_settings
 from django.utils import timezone
 
 from accounts.models import (
     OnboardingActivationFactReceipt,
     OnboardingLifecycleEvaluationLog,
+    OnboardingLifecycleSendAllowlist,
+    OnboardingLifecycleSendLog,
     User,
 )
 from accounts.services.onboarding.activation_exporter import (
@@ -22,6 +25,7 @@ from accounts.services.onboarding.activation_fact_lifecycle import (
     receipt_backed_lifecycle_cohort_report,
 )
 from accounts.services.onboarding.lifecycle_sender import (
+    _receipt_lifecycle_target_url,
     send_limited_onboarding_lifecycle_batch,
 )
 
@@ -100,6 +104,37 @@ def _user(organization, email):
     )
 
 
+def _lifecycle_send_flags(**overrides):
+    flags = {
+        "onboarding_activation_state_api": True,
+        "onboarding_goal_picker": True,
+        "onboarding_path_cards": True,
+        "onboarding_sample_project": False,
+        "onboarding_daily_quality_home": False,
+        "onboarding_lifecycle_email_dry_run": True,
+        "onboarding_email_welcome_enabled": True,
+        "onboarding_email_first_action_recovery_enabled": True,
+        "onboarding_email_first_signal_enabled": True,
+        "onboarding_email_next_loop_enabled": True,
+        "onboarding_email_sample_bridge_enabled": False,
+        "onboarding_email_daily_digest_enabled": False,
+        "onboarding_email_eval": True,
+        "onboarding_email_voice": True,
+        "onboarding_lifecycle_send_enabled": True,
+    }
+    flags.update(overrides)
+    return flags
+
+
+def _allow_user_for_lifecycle_send(user):
+    return OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
+        scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
+        scope_value=str(user.id),
+        environment="local",
+        reason="test",
+    )
+
+
 def test_receipt_lifecycle_metadata_keeps_receipt_send_disabled():
     receipt = SimpleNamespace(
         id=uuid.uuid4(),
@@ -139,6 +174,49 @@ def test_receipt_lifecycle_metadata_keeps_receipt_send_disabled():
     assert string_metadata["send_enabled"] is False
     assert string_metadata["receipt_lifecycle_send_enabled"] is False
     assert string_metadata["receipt_lifecycle_dry_run_only"] is False
+
+
+def test_receipt_lifecycle_target_url_keeps_internal_campaign_context():
+    evaluation_log = SimpleNamespace(
+        metadata={
+            "receipt_lifecycle_target_route": "/dashboard/observe/project-1/llm-tracing"
+        },
+        target_url=None,
+        activation_state_snapshot={},
+    )
+
+    assert _receipt_lifecycle_target_url(
+        evaluation_log,
+        {
+            "campaign_key": "observe_waiting_for_first_trace",
+            "target_success_event": "trace_received",
+        },
+    ) == (
+        "/dashboard/observe/project-1/llm-tracing?"
+        "source=onboarding_email&campaign_key=observe_waiting_for_first_trace"
+        "&target_event=trace_received"
+    )
+
+
+def test_receipt_lifecycle_target_url_rejects_external_routes():
+    evaluation_log = SimpleNamespace(
+        metadata={"receipt_lifecycle_target_route": "https://example.com/not-internal"},
+        target_url="//example.com/protocol-relative",
+        activation_state_snapshot={
+            "recommended_action_href": "https://example.com/also-not-internal"
+        },
+    )
+
+    assert (
+        _receipt_lifecycle_target_url(
+            evaluation_log,
+            {
+                "campaign_key": "observe_waiting_for_first_trace",
+                "target_success_event": "trace_received",
+            },
+        )
+        is None
+    )
 
 
 @pytest.mark.django_db
@@ -295,13 +373,15 @@ def test_activation_fact_lifecycle_import_supports_command_no_write(
 
 
 @pytest.mark.django_db
-def test_receipt_sourced_lifecycle_logs_are_excluded_from_send_batch(
+@override_settings(ONBOARDING_FEATURE_FLAGS=_lifecycle_send_flags())
+def test_receipt_sourced_lifecycle_logs_enter_dry_run_send_batch(
     organization,
     workspace,
     user,
 ):
     _receipt(organization, workspace, user)
     import_activation_fact_lifecycle_evaluations(limit=10)
+    _allow_user_for_lifecycle_send(user)
 
     result = send_limited_onboarding_lifecycle_batch(
         cohort="internal",
@@ -309,9 +389,75 @@ def test_receipt_sourced_lifecycle_logs_are_excluded_from_send_batch(
         dry_run=True,
     )
 
+    assert result.evaluated == 1
+    assert result.sent == 0
+    assert result.status_counts == {"would_send": 1}
+    assert result.candidates[0]["campaign_key"] == "observe_waiting_for_first_trace"
+    assert result.candidates[0]["status"] == "would_send"
+    assert result.candidates[0]["target_route"] == (
+        "/dashboard/observe/project-1/llm-tracing?"
+        "source=onboarding_email&campaign_key=observe_waiting_for_first_trace"
+        "&target_event=trace_received"
+    )
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_lifecycle_send_flags())
+def test_receipt_sourced_lifecycle_dry_run_suppresses_unsafe_routes(
+    organization,
+    workspace,
+    user,
+):
+    _receipt(
+        organization,
+        workspace,
+        user,
+        metadata={
+            "source": "activation_fact_receiver",
+            "lifecycle_send_enabled": True,
+            "lifecycle_dry_run_only": False,
+            "lifecycle_target_route": "https://example.com/not-internal",
+            "lifecycle_target_action_id": "send_first_trace",
+            "lifecycle_target_success_event": "trace_received",
+        },
+    )
+    import_activation_fact_lifecycle_evaluations(limit=10)
+    _allow_user_for_lifecycle_send(user)
+
+    result = send_limited_onboarding_lifecycle_batch(
+        cohort="internal",
+        limit=10,
+        dry_run=True,
+    )
+
+    assert result.evaluated == 1
+    assert result.status_counts == {"would_suppress": 1}
+    assert result.suppression_counts == {"route_unavailable": 1}
+    assert result.candidates[0]["status"] == "would_suppress"
+    assert result.candidates[0]["suppression_reason"] == "route_unavailable"
+    assert result.candidates[0]["target_route"] == ""
+
+
+@pytest.mark.django_db
+def test_receipt_sourced_lifecycle_logs_remain_excluded_from_real_send_batch(
+    organization,
+    workspace,
+    user,
+):
+    _receipt(organization, workspace, user)
+    import_activation_fact_lifecycle_evaluations(limit=10)
+    preview_approval = SimpleNamespace(approval_record_sha256="b" * 64)
+
+    result = send_limited_onboarding_lifecycle_batch(
+        cohort="internal",
+        limit=10,
+        preview_approval=preview_approval,
+        dry_run_report_review=object(),
+    )
+
     assert result.evaluated == 0
     assert result.sent == 0
-    assert result.candidates == ()
+    assert OnboardingLifecycleSendLog.no_workspace_objects.count() == 0
 
 
 @pytest.mark.django_db
