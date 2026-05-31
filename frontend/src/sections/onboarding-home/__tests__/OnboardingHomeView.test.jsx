@@ -791,6 +791,82 @@ describe("OnboardingHomeView", () => {
     });
   });
 
+  it("lets users focus another product loop from path cards", async () => {
+    const state = normalizedFixture("observeNoSetup");
+    const refetch = vi.fn();
+    const mutateAsync = vi.fn().mockResolvedValue({
+      ...state,
+      goal: "improve_prompts",
+      primaryPath: "prompt",
+      stage: "start_prompt",
+    });
+    mocks.useSaveOnboardingGoal.mockReturnValue({
+      data: null,
+      error: null,
+      isLoading: false,
+      isPending: false,
+      mutateAsync,
+    });
+    mocks.useActivationState.mockReturnValue({
+      state: {
+        ...state,
+        availablePaths: [
+          ...state.availablePaths,
+          {
+            id: "prompt",
+            label: "Improve prompts",
+            description: "Test and compare prompt versions.",
+            status: "available",
+            href: "/dashboard/home?path=prompt",
+            isAvailable: true,
+            blockedReason: null,
+            requiresPermission: "prompt:write",
+            firstActionId: "create_prompt",
+          },
+        ],
+        routeAvailability: {
+          ...state.routeAvailability,
+          path_prompt: {
+            href: "/dashboard/home?path=prompt",
+            isAvailable: true,
+            reason: null,
+          },
+        },
+      },
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch,
+    });
+
+    renderView();
+
+    await userEvent.click(
+      within(screen.getByTestId("onboarding-path-card-prompt")).getByRole(
+        "button",
+        { name: /focus/i },
+      ),
+    );
+
+    expect(mutateAsync).toHaveBeenCalledWith({
+      goal: "improve_prompts",
+      primaryPath: "prompt",
+      source: "path_card",
+      reason: "path_change",
+      expectedStage: "connect_observability",
+    });
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "onboarding_home_goal_saved",
+      expect.objectContaining({
+        selected_goal: "improve_prompts",
+        selected_path: "prompt",
+        source: "path_card",
+      }),
+    );
+  });
+
   it("opens sample preview quick starts to the sample Aha action", async () => {
     const mutateAsync = vi
       .fn()

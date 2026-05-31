@@ -15,10 +15,11 @@ describe("PathCardGrid", () => {
     render(<PathCardGrid paths={pathsFixture()} onPathClick={onPathClick} />);
 
     expect(screen.getByText("Monitor a production AI app")).toBeVisible();
-    await userEvent.click(screen.getAllByRole("link", { name: /open/i })[0]);
+    expect(screen.getByRole("button", { name: /current/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /focus/i }));
 
     expect(onPathClick).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "observe" }),
+      expect.objectContaining({ id: "sample" }),
     );
   });
 
@@ -27,7 +28,7 @@ describe("PathCardGrid", () => {
       <PathCardGrid
         paths={[
           {
-            ...pathsFixture()[0],
+            ...pathsFixture()[1],
             isAvailable: false,
             blockedReason: "route_not_implemented",
           },
@@ -36,6 +37,6 @@ describe("PathCardGrid", () => {
     );
 
     expect(screen.getByText("route not implemented")).toBeVisible();
-    expect(screen.getByRole("button", { name: /open/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /unavailable/i })).toBeDisabled();
   });
 });

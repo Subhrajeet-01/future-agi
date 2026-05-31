@@ -148,6 +148,45 @@ def test_observe_path_no_setup_returns_connect_observability(
     assert payload["journey_plan"]["steps"][0]["status"] == "current"
 
 
+@pytest.mark.django_db
+def test_activation_state_surfaces_core_path_discovery_cards(
+    organization,
+    workspace,
+    user,
+):
+    payload = resolve_activation_state(
+        context=_context(user, organization, workspace),
+        flags=_flags(
+            onboarding_prompt_path=True,
+            onboarding_agent_path=True,
+            onboarding_gateway_path=True,
+            onboarding_eval_path=True,
+            onboarding_voice_path=True,
+            onboarding_sample_project=True,
+            onboarding_sample_project_enabled=True,
+        ),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    path_ids = [path["id"] for path in payload["available_paths"]]
+
+    assert path_ids == [
+        "observe",
+        "prompt",
+        "agent",
+        "gateway",
+        "evals",
+        "voice",
+        "sample",
+    ]
+    assert payload["available_paths"][0]["status"] == "selected"
+    assert {
+        path["id"]
+        for path in payload["available_paths"]
+        if path["status"] == "available"
+    } >= {"prompt", "agent", "gateway", "evals", "voice"}
+
+
 def test_activation_flow_config_drives_goal_and_stage_wiring():
     assert configured_default_goal_id() == "monitor_production_ai_app"
     assert configured_goal_primary_paths()["monitor_production_ai_app"] == "observe"

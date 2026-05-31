@@ -714,12 +714,48 @@ export default function OnboardingHomeView() {
     });
   };
 
-  const handlePathClick = (path) => {
+  const handlePathClick = async (path) => {
     trackOnboardingHomeEvent(OnboardingHomeEvents.homePathClicked, {
       ...trackContext,
       path_id: path.id,
       path_status: path.status,
     });
+    if (!path?.isAvailable || path.status === "selected") return;
+
+    const option = goalOptions.find(
+      (goalOption) =>
+        goalOption.primaryPath === path.id && goalOption.disabled !== true,
+    );
+    if (!option) return;
+
+    try {
+      const nextState = await saveGoal.mutateAsync({
+        goal: option.goal,
+        primaryPath: option.primaryPath,
+        source: "path_card",
+        reason: "path_change",
+        expectedStage: renderedState.stage,
+      });
+      trackOnboardingHomeEvent(OnboardingHomeEvents.homeGoalSaved, {
+        ...trackContext,
+        selected_goal: option.goal,
+        selected_path: option.primaryPath,
+        next_stage: nextState.stage,
+        source: "path_card",
+      });
+      refetch?.();
+    } catch (mutationError) {
+      trackOnboardingHomeEvent(OnboardingHomeEvents.homeGoalSaveFailed, {
+        ...trackContext,
+        selected_goal: option.goal,
+        selected_path: option.primaryPath,
+        reason:
+          mutationError?.result?.reason ||
+          mutationError?.message ||
+          "unknown_error",
+        source: "path_card",
+      });
+    }
   };
 
   const handleHideSample = async () => {
@@ -1032,6 +1068,7 @@ export default function OnboardingHomeView() {
         ) : null}
         {!isFirstRunQuickStartFocus ? (
           <PathCardGrid
+            isChangingPath={isSavingGoal}
             paths={renderedState.availablePaths}
             onPathClick={handlePathClick}
           />

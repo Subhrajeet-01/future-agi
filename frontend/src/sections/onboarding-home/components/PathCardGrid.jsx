@@ -9,7 +9,17 @@ import Iconify from "src/components/iconify";
 import { RouterLink } from "src/routes/components";
 import { readableToken } from "../onboarding-home.constants";
 
-export default function PathCardGrid({ paths = [], onPathClick }) {
+const pathButtonLabel = (path) => {
+  if (path.status === "selected") return "Current";
+  if (!path.isAvailable) return "Unavailable";
+  return "Focus";
+};
+
+export default function PathCardGrid({
+  isChangingPath = false,
+  paths = [],
+  onPathClick,
+}) {
   if (!paths.length) return null;
 
   return (
@@ -32,10 +42,15 @@ export default function PathCardGrid({ paths = [], onPathClick }) {
           }}
         >
           {paths.map((path) => {
-            const href = path.isAvailable && path.href ? path.href : null;
+            const isSelected = path.status === "selected";
+            const isDisabled =
+              !path.isAvailable || isSelected || isChangingPath;
+            const href =
+              !onPathClick && path.isAvailable && path.href ? path.href : null;
             return (
               <Box
                 key={path.id}
+                data-testid={`onboarding-path-card-${path.id}`}
                 sx={{
                   minHeight: 132,
                   border: "1px solid",
@@ -70,12 +85,12 @@ export default function PathCardGrid({ paths = [], onPathClick }) {
                     variant="text"
                     component={href ? RouterLink : "button"}
                     href={href || undefined}
-                    disabled={!href}
+                    disabled={isDisabled}
                     onClick={() => onPathClick?.(path)}
                     endIcon={<Iconify icon="mdi:arrow-right" width={16} />}
                     sx={{ alignSelf: "flex-start", px: 0.5 }}
                   >
-                    Open
+                    {pathButtonLabel(path)}
                   </Button>
                 </Stack>
               </Box>
@@ -88,6 +103,7 @@ export default function PathCardGrid({ paths = [], onPathClick }) {
 }
 
 PathCardGrid.propTypes = {
+  isChangingPath: PropTypes.bool,
   onPathClick: PropTypes.func,
   paths: PropTypes.array,
 };

@@ -6,6 +6,7 @@ from accounts.serializers.onboarding import ActivationStateResponseSerializer
 from accounts.services.onboarding.constants import (
     ACTIVATION_SCHEMA_VERSION,
     EMAIL_CONTEXT_STATUSES,
+    PRODUCT_PATHS,
 )
 from accounts.services.onboarding.context import resolve_onboarding_context
 from accounts.services.onboarding.daily_quality import resolve_daily_quality_state
@@ -34,6 +35,24 @@ from accounts.services.onboarding.signal_resolver import (
     collect_onboarding_signals,
 )
 
+DISCOVERY_PATH_IDS = (
+    "observe",
+    "prompt",
+    "agent",
+    "gateway",
+    "evals",
+    "voice",
+    "sample",
+)
+
+
+def _discovery_path_ids(selected_path):
+    path_ids = []
+    for path_id in (selected_path, *DISCOVERY_PATH_IDS):
+        if path_id and path_id in PRODUCT_PATHS and path_id not in path_ids:
+            path_ids.append(path_id)
+    return path_ids
+
 
 def _empty_signals():
     return OnboardingSignals(first_checks={})
@@ -52,12 +71,9 @@ def _stage_for_context(context, flags, signals):
 
 def _available_paths(context, flags, routes, sample_project):
     selected_path = context.primary_path
-    path_ids = ["observe", "sample"]
-    if selected_path and selected_path not in path_ids:
-        path_ids.insert(0, selected_path)
 
     paths = []
-    for path_id in path_ids:
+    for path_id in _discovery_path_ids(selected_path):
         path_config = configured_path(path_id)
         route = routes.get(f"path_{path_id}", {})
         is_available = bool(route.get("is_available"))
