@@ -751,6 +751,50 @@ describe("OnboardingHomeView", () => {
     );
   });
 
+  it("tracks the Aha moment once when the first quality loop is reached", async () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeFirstLoopComplete"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = renderView(
+      "/dashboard/home?source=setup_org&quick_start_id=observe&quick_start_goal=monitor_production_ai_app&quick_start_primary_path=observe",
+    );
+
+    expect(screen.getByTestId("first-loop-complete-panel")).toBeVisible();
+    await waitFor(() =>
+      expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+        "onboarding_aha_moment_reached",
+        expect.objectContaining({
+          source: "setup_org",
+          quick_start_id: "observe",
+          primary_path: "observe",
+          activation_stage: "activated",
+          activated_at: "2026-05-26T15:10:00Z",
+          activation_event_name: "first_quality_loop_completed",
+          activation_event_occurred_at: "2026-05-26T15:10:00Z",
+          activation_event_path: "observe",
+          daily_quality_available: true,
+          is_sample: false,
+        }),
+      ),
+    );
+
+    const ahaCalls = () =>
+      mocks.trackOnboardingHomeEvent.mock.calls.filter(
+        ([eventName]) => eventName === "onboarding_aha_moment_reached",
+      );
+    expect(ahaCalls()).toHaveLength(1);
+
+    rerender(<OnboardingHomeView />);
+
+    expect(ahaCalls()).toHaveLength(1);
+  });
+
   it("tracks canonical home and recommendation view events", async () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("observeNoSetup"),

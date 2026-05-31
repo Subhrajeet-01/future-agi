@@ -175,6 +175,7 @@ export default function OnboardingHomeView() {
   const sampleProjectActions = useSampleProject();
   const [selectedGoal, setSelectedGoal] = useState(null);
   const activationEmailContextRef = useRef({});
+  const ahaMomentTrackedRef = useRef(new Set());
   const samplePreviewAutoOpenRef = useRef(false);
 
   const searchContext = useMemo(() => {
@@ -387,6 +388,46 @@ export default function OnboardingHomeView() {
       route_available: action.routeAvailable,
     });
   }, [isError, renderedState?.recommendedAction, trackContext]);
+
+  useEffect(() => {
+    if (!trackContext || isError || !renderedState?.isActivated) return;
+
+    const activationEvent = renderedState.lastMeaningfulEvent;
+    const ahaKey = [
+      renderedState.workspaceId || workspaceId || "workspace",
+      renderedState.primaryPath || "path",
+      renderedState.activatedAt ||
+        activationEvent?.occurredAt ||
+        renderedState.stage,
+    ].join(":");
+    if (ahaMomentTrackedRef.current.has(ahaKey)) return;
+
+    ahaMomentTrackedRef.current.add(ahaKey);
+    trackOnboardingHomeEvent(OnboardingHomeEvents.ahaMomentReached, {
+      ...trackContext,
+      home_mode: renderedState.homeMode,
+      activated_at: renderedState.activatedAt,
+      activation_event_name: activationEvent?.name,
+      activation_event_occurred_at: activationEvent?.occurredAt,
+      activation_event_path: activationEvent?.path,
+      daily_quality_available: Boolean(
+        renderedState.routeAvailability?.daily_quality_home?.isAvailable,
+      ),
+      is_sample: Boolean(activationEvent?.isSample),
+    });
+  }, [
+    isError,
+    renderedState?.activatedAt,
+    renderedState?.homeMode,
+    renderedState?.isActivated,
+    renderedState?.lastMeaningfulEvent,
+    renderedState?.primaryPath,
+    renderedState?.routeAvailability?.daily_quality_home?.isAvailable,
+    renderedState?.stage,
+    renderedState?.workspaceId,
+    trackContext,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     if (!dailyTrackContext || isError) return;
