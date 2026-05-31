@@ -220,6 +220,7 @@ journeys:
         action_id: open_sample_trace
         success_event: sample_trace_available
         tour_anchor: sample_project_button
+        lifecycle_policy: sample_only
         label: Open sample
         description: Use a ready-made trace while setup is pending.
       - id: review_sample_signal
@@ -227,6 +228,7 @@ journeys:
         action_id: open_sample_trace
         success_event: sample_signal_viewed
         tour_anchor: sample_trace_link
+        lifecycle_policy: sample_only
         label: Review issue
         description: Inspect the quality issue in the sample trace.
       - id: connect_real_data
@@ -234,6 +236,7 @@ journeys:
         action_id: create_observe_project
         success_event: observe_project_created
         tour_anchor: sample_connect_real_data_button
+        lifecycle_policy: sample_only
         label: Connect real data
         description: Move from sample data to one real signal.
   prompt_first_run:
@@ -468,6 +471,7 @@ journeys:
         action_id: voice_monitor_calls
         success_event: voice_call_monitor_opened
         tour_anchor: voice_monitor_button
+        lifecycle_policy: post_activation
         label: Monitor
         description: Keep watching live calls after setup.
 

@@ -64,6 +64,11 @@ TARGET_EVENTS_WITH_INTENTIONAL_ACTION_MISMATCH = {
     "observe_sample_bridge",
 }
 JOURNEY_TARGET_ACTION_MISMATCH_ALLOWED = {"observe_sample_bridge"}
+JOURNEY_LIFECYCLE_POLICY_SKIP_REASONS = {
+    "sample_only",
+    "post_activation",
+    "in_product_only",
+}
 
 
 def _config_error(message: str) -> ImproperlyConfigured:
@@ -245,6 +250,40 @@ def _validate_campaign(campaign: dict, path: str, activation_config: dict) -> No
         raise _config_error(f"{path}.requires_digest_preview must be a boolean.")
 
 
+def _validate_journey_campaign_coverage(
+    campaigns: list[dict],
+    activation_config: dict,
+) -> None:
+    covered = {}
+    for campaign in campaigns:
+        primary_path = campaign.get("primary_path")
+        if (
+            primary_path in {None, "any"}
+            or campaign.get("route_strategy") == "daily_quality"
+        ):
+            continue
+        for stage in campaign.get("entry_stages", []):
+            covered.setdefault(primary_path, set()).add(stage)
+
+    missing = []
+    for journey_id, journey in activation_config["journeys"].items():
+        primary_path = journey["primary_path"]
+        for step in journey.get("steps", []):
+            lifecycle_policy = step.get("lifecycle_policy", "campaign_required")
+            if lifecycle_policy in JOURNEY_LIFECYCLE_POLICY_SKIP_REASONS:
+                continue
+            stages = {step["stage"], *step.get("active_stages", [])}
+            if not stages & covered.get(primary_path, set()):
+                missing.append(f"{journey_id}.{step['id']}")
+
+    if missing:
+        raise _config_error(
+            "Every campaign_required journey step must have a lifecycle campaign: "
+            + ", ".join(sorted(missing))
+            + ". Add a matching campaign or set lifecycle_policy explicitly."
+        )
+
+
 def _validate_config(config: dict) -> None:
     _required_text(config, "schema_version", CONFIG_PATH.name)
     campaigns = _sequence(config.get("campaigns"), "campaigns")
@@ -257,6 +296,7 @@ def _validate_config(config: dict) -> None:
         if key in seen:
             raise _config_error(f"Duplicate campaign_key: {key}.")
         seen.add(key)
+    _validate_journey_campaign_coverage(campaigns, activation_config)
 
 
 @lru_cache(maxsize=1)

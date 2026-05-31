@@ -86,6 +86,16 @@ def test_activation_flow_rejects_unknown_journey_tour_anchor():
         _validate_config(config)
 
 
+def test_activation_flow_rejects_unknown_journey_lifecycle_policy():
+    config = _valid_activation_flow_config()
+    config["journeys"]["prompt_first_run"]["steps"][0]["lifecycle_policy"] = (
+        "campaign_maybe_later"
+    )
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
 def test_activation_flow_rejects_unsafe_journey_copy():
     config = _valid_activation_flow_config()
     config["journeys"]["prompt_first_run"]["description"] = (

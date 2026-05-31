@@ -36,6 +36,12 @@ PROGRESS_STATES = {
     "complete",
     "sample_only",
 }
+JOURNEY_LIFECYCLE_POLICIES = {
+    "campaign_required",
+    "sample_only",
+    "post_activation",
+    "in_product_only",
+}
 
 CONDITION_KEYS = {
     "always",
@@ -445,6 +451,11 @@ def _validate_journeys(config: dict) -> None:
             if tour_anchor and tour_anchor not in anchors:
                 raise _config_error(
                     f"{step_path}.tour_anchor references unknown tour anchor."
+                )
+            lifecycle_policy = _optional_text(step, "lifecycle_policy", step_path)
+            if lifecycle_policy and lifecycle_policy not in JOURNEY_LIFECYCLE_POLICIES:
+                raise _config_error(
+                    f"{step_path}.lifecycle_policy references unknown policy."
                 )
             for copy_key in ("label", "description"):
                 value = _required_text(step, copy_key, step_path)

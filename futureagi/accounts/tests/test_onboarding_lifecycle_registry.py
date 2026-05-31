@@ -5,6 +5,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from accounts.services.onboarding.constants import ONBOARDING_ACTIVATION_EVENTS
+from accounts.services.onboarding.flow_config import get_activation_flow_config
 from accounts.services.onboarding.lifecycle_registry import (
     _validate_config,
     get_lifecycle_registry_config,
@@ -148,6 +149,33 @@ def test_lifecycle_registry_rejects_entry_stage_outside_path_journey():
 
     with pytest.raises(ImproperlyConfigured):
         _validate_config(config)
+
+
+def test_lifecycle_registry_requires_campaign_coverage_for_real_journey_steps():
+    config = _valid_lifecycle_config()
+    config["campaigns"] = [
+        campaign
+        for campaign in config["campaigns"]
+        if campaign["campaign_key"] != "prompt_run_first_test"
+    ]
+
+    with pytest.raises(ImproperlyConfigured):
+        _validate_config(config)
+
+
+def test_lifecycle_registry_allows_explicit_no_recovery_journey_policies():
+    config = get_activation_flow_config()
+    policies_by_step = {
+        step["id"]: step.get("lifecycle_policy")
+        for journey in config["journeys"].values()
+        for step in journey["steps"]
+    }
+
+    assert policies_by_step["open_sample_project"] == "sample_only"
+    assert policies_by_step["review_sample_signal"] == "sample_only"
+    assert policies_by_step["connect_real_data"] == "sample_only"
+    assert policies_by_step["voice_monitor_calls"] == "post_activation"
+    assert lifecycle_campaigns()
 
 
 def test_lifecycle_registry_rejects_target_action_outside_entry_stage():
