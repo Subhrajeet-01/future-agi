@@ -1128,11 +1128,18 @@ describe("OnboardingHomeView", () => {
     expect(
       screen.getByRole("heading", {
         level: 3,
-        name: "Continue with observability setup",
+        name: "Connect your agent",
       }),
     ).toBeVisible();
+    const panel = screen.getByTestId("observe-setup-panel");
+    expect(
+      within(panel).getByText("Connect one observe project"),
+    ).toBeVisible();
+    expect(within(panel).getByText("Create observe project")).toBeVisible();
+    expect(within(panel).getByText("Send one trace")).toBeVisible();
+    expect(within(panel).getByText("Review the signal")).toBeVisible();
     const setupLink = screen.getByRole("link", {
-      name: /connect observability/i,
+      name: /create observe project/i,
     });
     const setupUrl = new URL(
       setupLink.getAttribute("href"),
@@ -1152,6 +1159,48 @@ describe("OnboardingHomeView", () => {
       },
     });
     expect(screen.queryByTestId("sample-project-panel")).toBeNull();
+    expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
+    expect(screen.queryByTestId("onboarding-product-loop-stepper")).toBeNull();
+    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
+  });
+
+  it("shows the selected setup checklist when saved state points at another path", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeNoSetup"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView(
+      setupQuickStartRoute({
+        goal: "improve_prompts",
+        id: "prompt",
+        primaryPath: "prompt",
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        level: 3,
+        name: "Test prompts or agent prompts",
+      }),
+    ).toBeVisible();
+    const panel = screen.getByTestId("path-focus-panel-prompt");
+    expect(
+      within(screen.getByTestId("path-focus-step-start_prompt")).getByText(
+        "Create prompt",
+      ),
+    ).toBeVisible();
+    expect(within(panel).getByText("Run test")).toBeVisible();
+    expect(
+      within(panel).getByRole("link", { name: /create prompt/i }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/workbench/all?source=onboarding&action=create-prompt&tour_anchor=prompt_create_button&journey_step=start_prompt&quick_start_goal=improve_prompts&quick_start_id=prompt&quick_start_primary_path=prompt",
+    );
     expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
     expect(screen.queryByTestId("onboarding-product-loop-stepper")).toBeNull();
     expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
@@ -2258,10 +2307,10 @@ describe("OnboardingHomeView", () => {
     {
       goal: "monitor_production_ai_app",
       id: "observe",
-      label: "Connect observability",
+      label: "Create Observe project",
       pathname: "/dashboard/observe",
       primaryPath: "observe",
-      title: "Continue with observability setup",
+      title: "Connect your agent",
       routeParams: {
         setup: "true",
         source: "onboarding",
@@ -2275,7 +2324,7 @@ describe("OnboardingHomeView", () => {
       label: "Create prompt",
       pathname: "/dashboard/workbench/all",
       primaryPath: "prompt",
-      title: "Continue with prompt setup",
+      title: "Test prompts or agent prompts",
       routeParams: {
         source: "onboarding",
         action: "create-prompt",
@@ -2289,7 +2338,7 @@ describe("OnboardingHomeView", () => {
       label: "Create agent",
       pathname: "/dashboard/agents",
       primaryPath: "agent",
-      title: "Continue with agent setup",
+      title: "Prototype agent",
       routeParams: {
         onboarding: "create",
         tour_anchor: "agent_create_button",
@@ -2302,7 +2351,7 @@ describe("OnboardingHomeView", () => {
       label: "Add provider",
       pathname: "/dashboard/gateway/providers",
       primaryPath: "gateway",
-      title: "Continue with gateway setup",
+      title: "Setup gateway",
       routeParams: {
         source: "onboarding",
         tour_anchor: "gateway_provider_button",
@@ -2315,7 +2364,7 @@ describe("OnboardingHomeView", () => {
       label: "Create dataset",
       pathname: "/dashboard/evaluations/create",
       primaryPath: "evals",
-      title: "Continue with eval setup",
+      title: "Test AI using simulation",
       routeParams: {
         source: "onboarding",
         step: "dataset",
@@ -2330,7 +2379,7 @@ describe("OnboardingHomeView", () => {
       pathname:
         "/dashboard/simulate/agent-definitions/create-new-agent-definition",
       primaryPath: "voice",
-      title: "Continue with voice setup",
+      title: "Connect voice agent",
       routeParams: {
         source: "onboarding",
         onboarding: "create-voice-agent",

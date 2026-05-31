@@ -120,39 +120,35 @@ const actionWithSetupQuickStartAttribution = (action, context) => {
 
 const SETUP_QUICK_START_ERROR_FALLBACKS = {
   agent: {
-    description:
-      "Your setup was saved. Continue directly to the first agent action.",
+    description: "Create one agent, run a scenario, and review the result.",
     href: "/dashboard/agents?onboarding=create&tour_anchor=agent_create_button&journey_step=create_agent",
     label: "Create agent",
-    title: "Continue with agent setup",
+    title: "Prototype agent",
   },
   evals: {
-    description:
-      "Your setup was saved. Continue directly to the first eval action.",
+    description: "Create a small eval or simulation and review failures.",
     href: "/dashboard/evaluations/create?source=onboarding&step=dataset&tour_anchor=eval_dataset_button&journey_step=create_eval_dataset",
     label: "Create dataset",
-    title: "Continue with eval setup",
+    title: "Test AI using simulation",
   },
   gateway: {
-    description:
-      "Your setup was saved. Continue directly to the first gateway action.",
+    description: "Add a provider, create a key, and send one gateway request.",
     href: "/dashboard/gateway/providers?source=onboarding&tour_anchor=gateway_provider_button&journey_step=configure_gateway_provider",
     label: "Add provider",
-    title: "Continue with gateway setup",
+    title: "Setup gateway",
   },
   observe: {
     description:
-      "Your setup was saved. Continue directly to observability setup.",
+      "Create an Observe project, send one trace, and review the first signal.",
     href: "/dashboard/observe?setup=true&source=onboarding&tour_anchor=observe_create_project_button&journey_step=connect_observability",
-    label: "Connect observability",
-    title: "Continue with observability setup",
+    label: "Create Observe project",
+    title: "Connect your agent",
   },
   prompt: {
-    description:
-      "Your setup was saved. Continue directly to the first prompt action.",
+    description: "Create one prompt, run a test, and compare the next version.",
     href: "/dashboard/workbench/all?source=onboarding&action=create-prompt&tour_anchor=prompt_create_button&journey_step=start_prompt",
     label: "Create prompt",
-    title: "Continue with prompt setup",
+    title: "Test prompts or agent prompts",
   },
   sample_preview: {
     description:
@@ -162,13 +158,24 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
     title: "Continue with real setup",
   },
   voice: {
-    description:
-      "Your setup was saved. Continue directly to the first voice action.",
+    description: "Create or connect one voice agent and run a test call.",
     href: "/dashboard/simulate/agent-definitions/create-new-agent-definition?source=onboarding&onboarding=create-voice-agent&tour_anchor=voice_agent_button&journey_step=create_voice_agent",
     label: "Create agent",
-    title: "Continue with voice setup",
+    title: "Connect voice agent",
   },
 };
+
+const SETUP_QUICK_START_FIRST_STAGE_BY_PATH = {
+  agent: "create_agent",
+  evals: "create_eval_dataset",
+  gateway: "configure_gateway_provider",
+  observe: "connect_observability",
+  prompt: "start_prompt",
+  voice: "create_voice_agent",
+};
+
+const setupQuickStartFirstStage = (primaryPath) =>
+  SETUP_QUICK_START_FIRST_STAGE_BY_PATH[primaryPath] || null;
 
 const setupQuickStartErrorFallbackAction = (searchContext = {}) => {
   if (searchContext.source !== "setup_org") return null;
@@ -641,6 +648,9 @@ export default function OnboardingHomeView() {
         setupQuickStartErrorFallback,
         searchContext,
       )
+    : null;
+  const quickStartFallbackStage = quickStartMismatchAction
+    ? setupQuickStartFirstStage(searchContext.quickStartPrimaryPath)
     : null;
   const showContextPanels =
     !isFirstRunQuickStartFocus && !quickStartMismatchAction;
@@ -1116,6 +1126,30 @@ export default function OnboardingHomeView() {
       />
     ) : null;
 
+  const quickStartFallbackPanel =
+    quickStartMismatchAction && !isSampleQuickStart ? (
+      searchContext.quickStartPrimaryPath === "observe" ? (
+        <ObserveSetupPanel
+          {...observePanelProps}
+          action={quickStartMismatchAction}
+          fallbackAction={null}
+          journeyPlan={null}
+          singleActionFocus={false}
+          stage={quickStartFallbackStage || "connect_observability"}
+        />
+      ) : hasPathFocusPlan(searchContext.quickStartPrimaryPath) ? (
+        <PathFocusPanel
+          {...observePanelProps}
+          action={quickStartMismatchAction}
+          fallbackAction={null}
+          journeyPlan={null}
+          primaryPath={searchContext.quickStartPrimaryPath}
+          singleActionFocus={false}
+          stage={quickStartFallbackStage}
+        />
+      ) : null
+    ) : null;
+
   const samplePanel = showSamplePanel ? (
     <SampleProjectPanel
       sampleProject={sampleProject}
@@ -1186,20 +1220,22 @@ export default function OnboardingHomeView() {
         ) : null}
 
         {quickStartMismatchAction ? (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) 1fr" },
-              gap: 2,
-              alignItems: "stretch",
-            }}
-          >
-            <RecommendedActionCard
-              action={quickStartMismatchAction}
-              label="Next step"
-              onActionClick={handleActionClick}
-            />
-          </Box>
+          quickStartFallbackPanel || (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) 1fr" },
+                gap: 2,
+                alignItems: "stretch",
+              }}
+            >
+              <RecommendedActionCard
+                action={quickStartMismatchAction}
+                label="Next step"
+                onActionClick={handleActionClick}
+              />
+            </Box>
+          )
         ) : showGoalPicker ? (
           <Box
             sx={{
