@@ -8,6 +8,8 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from accounts.utils import BUSINESS_EMAIL_REQUIRED_MESSAGE
+
 
 def assert_unknown_field(response, field_name):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -158,6 +160,27 @@ class TestSignupAPI:
         assert body["access"]
         assert body["refresh"]
         assert body.get("requires_org_setup") is not True
+
+    def test_signup_rejects_free_email_with_actionable_message(
+        self, api_client, db, monkeypatch
+    ):
+        monkeypatch.setenv("ALLOW_ANY_EMAIL", "false")
+
+        response = api_client.post(
+            "/accounts/signup/",
+            {
+                "email": "first-time-user@gmail.com",
+                "full_name": "First Time User",
+                "password": "SecurePass123!",
+                "allow_email": True,
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body = response.json()
+        assert body["message"] == BUSINESS_EMAIL_REQUIRED_MESSAGE
+        assert body["message"] != "An error occurred during signup."
 
     def test_signup_rejects_weak_user_created_password(self, api_client, db):
         response = api_client.post(

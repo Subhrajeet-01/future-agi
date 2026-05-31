@@ -48,7 +48,7 @@ from accounts.serializers.contracts import (
     UserIdsRequestSerializer,
 )
 from accounts.serializers.user import UpdateUserSerializer
-from accounts.utils import first_signup
+from accounts.utils import SignupValidationError, first_signup
 from accounts.views.workspace_management import clear_user_redis_cache
 from analytics.utils import (
     MixpanelEvents,
@@ -193,6 +193,13 @@ def user_signup(request):
 
         return _gm.success_response({"message": message})
 
+    except SignupValidationError as exc:
+        logger.info(
+            "signup_rejected",
+            reason=getattr(exc, "code", "signup_validation_error"),
+            email=email if "email" in locals() else None,
+        )
+        return _gm.bad_request(str(exc))
     except Exception:
         logger.exception("Error during signup")
         return _gm.bad_request("An error occurred during signup.")
