@@ -39,6 +39,11 @@ from accounts.services.onboarding.lifecycle_preview_approval import (
     APPROVAL_METADATA_KEY,
     PREVIEW_APPROVAL_MISSING_REASON,
 )
+from accounts.services.onboarding.lifecycle_send_policy import (
+    lifecycle_preference_group_field,
+    send_frequency_caps,
+    send_non_cloud_suppression_reason,
+)
 from accounts.services.onboarding.lifecycle_send_reports import (
     DRY_RUN_REPORT_METADATA_KEY,
     DRY_RUN_REPORT_MISSING_REASON,
@@ -68,8 +73,6 @@ COMPLETABLE_SEND_STATUSES = {
     OnboardingLifecycleSendLog.STATUS_SENT,
     OnboardingLifecycleSendLog.STATUS_CLICKED,
 }
-
-_NON_CLOUD_SUPPRESSION_REASON = "cloud_deployment_required"
 
 
 @dataclass(frozen=True)
@@ -556,19 +559,9 @@ def _preference_suppression(evaluation_log, now, campaign):
             return "unsubscribed"
         if preference.snoozed_until and preference.snoozed_until > now:
             return "snoozed"
-        group_field = {
-            "welcome": "first_action_recovery_enabled",
-            "recovery": "first_action_recovery_enabled",
-            "sample": "sample_bridge_enabled",
-            "first_signal": "first_action_recovery_enabled",
-            "prompt": "first_action_recovery_enabled",
-            "agent": "first_action_recovery_enabled",
-            "gateway": "first_action_recovery_enabled",
-            "eval": "first_action_recovery_enabled",
-            "voice": "first_action_recovery_enabled",
-            "next_loop": "next_loop_enabled",
-            "activation_success": "daily_digest_enabled",
-        }.get(campaign.get("campaign_group") if campaign else None)
+        group_field = lifecycle_preference_group_field(
+            campaign.get("campaign_group") if campaign else None
+        )
         if group_field and not getattr(preference, group_field):
             return "unsubscribed"
     family = _notification_family_for_campaign(
@@ -594,24 +587,28 @@ def _send_log_frequency_suppression(evaluation_log, now, campaign):
         user=evaluation_log.user,
         status__in=SUCCESS_SEND_STATUSES,
     )
-    if successful.filter(created_at__gte=now - timedelta(hours=24)).exists():
-        return "frequency_capped"
-    if successful.filter(
-        campaign_group=campaign["campaign_group"],
-        created_at__gte=now - timedelta(hours=72),
-    ).exists():
-        return "frequency_capped"
-    if (
-        campaign.get("frequency_cap_key") == "daily_digest"
-        and successful.filter(
-            campaign_group=campaign["campaign_group"],
-            created_at__gte=now - timedelta(hours=24),
-        ).exists()
-    ):
-        return "frequency_capped"
-    if campaign["campaign_group"] in {"recovery", "first_signal", "next_loop"}:
-        if successful.filter(campaign_group=campaign["campaign_group"]).count() >= 2:
-            return "frequency_capped"
+    for cap in send_frequency_caps():
+        campaign_groups = cap.get("campaign_groups") or ()
+        if campaign_groups and campaign.get("campaign_group") not in campaign_groups:
+            continue
+        frequency_cap_keys = cap.get("frequency_cap_keys") or ()
+        if (
+            frequency_cap_keys
+            and campaign.get("frequency_cap_key") not in frequency_cap_keys
+        ):
+            continue
+
+        capped_logs = successful
+        if cap["scope"] == "campaign_group":
+            capped_logs = capped_logs.filter(campaign_group=campaign["campaign_group"])
+        elif cap["scope"] != "user":
+            continue
+        if cap.get("window_hours") is not None:
+            capped_logs = capped_logs.filter(
+                created_at__gte=now - timedelta(hours=cap["window_hours"])
+            )
+        if capped_logs.count() >= cap["limit"]:
+            return cap["reason"]
     return None
 
 
@@ -972,7 +969,7 @@ def send_onboarding_lifecycle_email(send_log, *, now=None):
     send_log.click_url = context["primary_action_url"]
     send_log.save(update_fields=["click_url", "updated_at"])
     if not _cloud_lifecycle_delivery_enabled():
-        return _mark_suppressed(send_log, _NON_CLOUD_SUPPRESSION_REASON, now)
+        return _mark_suppressed(send_log, send_non_cloud_suppression_reason(), now)
     try:
         email_helper(
             context["email_subject"],

@@ -11,6 +11,10 @@ from accounts.models import (
 from accounts.services.onboarding.lifecycle_digest_review import (
     safe_digest_preview_from_metadata,
 )
+from accounts.services.onboarding.lifecycle_send_policy import (
+    external_lifecycle_delivery_campaign_groups,
+    external_lifecycle_delivery_channels,
+)
 from accounts.services.onboarding.notification_preferences import (
     notification_channel_delivery_config,
     notification_channels_for_delivery,
@@ -19,10 +23,6 @@ from accounts.services.onboarding.notification_preferences import (
 )
 from accounts.services.onboarding.notification_registry import family_for_campaign_group
 
-EXTERNAL_LIFECYCLE_CHANNELS = (
-    NotificationPreference.CHANNEL_SLACK,
-    NotificationPreference.CHANNEL_WEBHOOK,
-)
 EXTERNAL_DELIVERY_TIMEOUT_SECONDS = 5
 
 
@@ -156,17 +156,17 @@ def _delivery_log(
 
 def deliver_onboarding_lifecycle_external_channels(send_log, *, now=None):
     now = now or timezone.now()
-    if (
-        family_for_campaign_group(send_log.campaign_group)
-        != NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST
-    ):
+    if send_log.campaign_group not in external_lifecycle_delivery_campaign_groups():
+        return []
+    family = family_for_campaign_group(send_log.campaign_group)
+    if family != NotificationPreference.FAMILY_DAILY_QUALITY_DIGEST:
         return []
     payload = _daily_quality_payload(send_log)
     if not payload:
         return []
 
     logs = []
-    for delivery_channel in EXTERNAL_LIFECYCLE_CHANNELS:
+    for delivery_channel in external_lifecycle_delivery_channels():
         channels = notification_channels_for_delivery(
             organization=send_log.organization,
             workspace=send_log.workspace,

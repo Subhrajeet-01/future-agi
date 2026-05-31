@@ -18,6 +18,9 @@ from accounts.services.onboarding.lifecycle_digest_preview import (
 )
 from accounts.services.onboarding.lifecycle_frequency import frequency_cap_suppression
 from accounts.services.onboarding.lifecycle_registry import lifecycle_campaigns
+from accounts.services.onboarding.lifecycle_send_policy import (
+    lifecycle_preference_group_field,
+)
 from tracer.models.project import Project
 from tracer.models.trace import Trace
 
@@ -808,19 +811,7 @@ def apply_lifecycle_suppressions(
                 "snoozed_until": preference.snoozed_until.isoformat()
             }
         if campaign:
-            group_field = {
-                "welcome": "first_action_recovery_enabled",
-                "recovery": "first_action_recovery_enabled",
-                "sample": "sample_bridge_enabled",
-                "first_signal": "first_action_recovery_enabled",
-                "prompt": "first_action_recovery_enabled",
-                "agent": "first_action_recovery_enabled",
-                "gateway": "first_action_recovery_enabled",
-                "eval": "first_action_recovery_enabled",
-                "voice": "first_action_recovery_enabled",
-                "next_loop": "next_loop_enabled",
-                "activation_success": "daily_digest_enabled",
-            }.get(campaign["campaign_group"])
+            group_field = lifecycle_preference_group_field(campaign["campaign_group"])
             if group_field and not getattr(preference, group_field):
                 return "user_unsubscribed", {"preference_id": str(preference.id)}
 
