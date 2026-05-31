@@ -41,6 +41,10 @@ from collections.abc import Iterable
 import structlog
 
 from tracer.services.clickhouse.v2 import get_v2_config
+from tracer.services.clickhouse.v2.id_remap_sql import (
+    remap_left_join,
+    resolved_id_expr,
+)
 
 log = structlog.get_logger("ch25.end_user_dict_reader")
 
@@ -114,14 +118,26 @@ def resolve_user_ids(end_user_ids: Iterable[object]) -> dict[str, str | None]:
         return {}
 
     client = _get_client()
+    resolved = resolved_id_expr("ids.eid")
+    remap_join = remap_left_join("ids.eid", "end_user_id_remap")
     try:
         # arrayJoin over the literal id list resolves the whole batch in ONE
         # round-trip. dictGetOrNull keeps the missing-key → NULL semantics.
+        #
+        # P3b step1.5 (DESIGN §3 / id_remap_sql): a NEW (deterministic) span id is
+        # NOT a key in end_users_dict (the dict is OLD-keyed). LEFT JOIN
+        # end_user_id_remap to resolve the lookup id new→old, then dictGet on the
+        # RESOLVED id. The returned KEY is the ORIGINAL input id (`eid`) — callers
+        # key their result by the id they passed (a span's stored end_user_id),
+        # so a new-id span looks up its label by its new id and still gets the
+        # curated label. Pre-flip NO id matches a `new_id`, so the resolved id ==
+        # the input id and this is byte-identical (gate B).
         result = client.query(
             (
-                f"SELECT toString(eid), "
-                f"dictGetOrNull('{_DICT_NAME}', '{_LABEL_ATTR}', eid) "
-                f"FROM (SELECT arrayJoin(%(ids)s::Array(UUID)) AS eid)"
+                f"SELECT toString(ids.eid), "
+                f"dictGetOrNull('{_DICT_NAME}', '{_LABEL_ATTR}', {resolved}) "
+                f"FROM (SELECT arrayJoin(%(ids)s::Array(UUID)) AS eid) AS ids "
+                f"{remap_join}"
             ),
             parameters={"ids": list(ids)},
         )
@@ -170,17 +186,26 @@ def resolve_end_user_fields(
         return {}
 
     client = _get_client()
+    resolved = resolved_id_expr("ids.eid")
+    remap_join = remap_left_join("ids.eid", "end_user_id_remap")
     try:
         # arrayJoin over the literal id list resolves the whole batch in ONE
         # round-trip. dictGetOrNull keeps the missing-key → NULL semantics for
         # every attribute.
+        #
+        # P3b step1.5 (DESIGN §3 / id_remap_sql): resolve the lookup id new→old
+        # through end_user_id_remap, then dictGet every attribute on the RESOLVED
+        # id (a new-id span is not a key in the OLD-keyed dict). The returned KEY
+        # stays the ORIGINAL input id (`eid`) so callers key by the id they
+        # passed. Pre-flip a no-op (no id matches a `new_id`) → gate B.
         result = client.query(
             (
-                f"SELECT toString(eid), "
-                f"dictGetOrNull('{_DICT_NAME}', '{_LABEL_ATTR}', eid), "
-                f"dictGetOrNull('{_DICT_NAME}', '{_TYPE_ATTR}', eid), "
-                f"dictGetOrNull('{_DICT_NAME}', '{_HASH_ATTR}', eid) "
-                f"FROM (SELECT arrayJoin(%(ids)s::Array(UUID)) AS eid)"
+                f"SELECT toString(ids.eid), "
+                f"dictGetOrNull('{_DICT_NAME}', '{_LABEL_ATTR}', {resolved}), "
+                f"dictGetOrNull('{_DICT_NAME}', '{_TYPE_ATTR}', {resolved}), "
+                f"dictGetOrNull('{_DICT_NAME}', '{_HASH_ATTR}', {resolved}) "
+                f"FROM (SELECT arrayJoin(%(ids)s::Array(UUID)) AS eid) AS ids "
+                f"{remap_join}"
             ),
             parameters={"ids": list(ids)},
         )

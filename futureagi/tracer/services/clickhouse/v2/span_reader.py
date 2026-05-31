@@ -28,14 +28,20 @@ CRITICAL non-goal: write back. Eval results (EvalLogger rows) still go to
 PG until that's also migrated to CH (separate task). This reader is
 read-only.
 """
+
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable, Optional
+from typing import Any
 
 import clickhouse_connect
+
+from tracer.services.clickhouse.v2.id_remap_sql import (
+    remap_left_join,
+    resolved_id_expr,
+)
 
 
 # Field list that the eval runner actually reads off of an ObservationSpan.
@@ -54,7 +60,7 @@ class CHSpan:
     operation_name: str
 
     start_time: datetime
-    end_time: Optional[datetime]
+    end_time: datetime | None
     latency_ms: int
 
     model: str
@@ -67,13 +73,13 @@ class CHSpan:
     status: str
     status_message: str
 
-    org_id: Optional[str]
-    project_version_id: Optional[str]
-    end_user_id: Optional[str]
-    trace_session_id: Optional[str]
-    prompt_version_id: Optional[str]
-    prompt_label_id: Optional[str]
-    custom_eval_config_id: Optional[str]
+    org_id: str | None
+    project_version_id: str | None
+    end_user_id: str | None
+    trace_session_id: str | None
+    prompt_version_id: str | None
+    prompt_label_id: str | None
+    custom_eval_config_id: str | None
 
     # Inputs / outputs come back as raw JSON-strings from CH; the eval runner
     # currently calls json.loads on them where needed. Keep the shape identical
@@ -82,9 +88,9 @@ class CHSpan:
     output: str
     tags: str
     span_events: str
-    metadata: str                                                   # JSON string from CH typed JSON column
-    resource_attrs: str                                             # JSON string
-    attributes_extra: str                                           # JSON string
+    metadata: str  # JSON string from CH typed JSON column
+    resource_attrs: str  # JSON string
+    attributes_extra: str  # JSON string
 
     # Typed Map columns. Maps to Python dicts.
     attrs_string: dict[str, str] = field(default_factory=dict)
@@ -95,10 +101,10 @@ class CHSpan:
     llm_request_model: str = ""
     llm_response_model: str = ""
     embedding_model: str = ""
-    streaming: Optional[int] = None
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
-    max_tokens: Optional[int] = None
+    streaming: int | None = None
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
 
     eval_status: str = ""
     semconv_source: str = ""
@@ -109,24 +115,51 @@ class CHSpan:
 # so clickhouse-connect can decode them (it cannot yet handle the typed JSON
 # column type in result rows — see DECISIONS #015, #018 of the migration).
 _READ_COLUMNS: tuple[str, ...] = (
-    "id", "toString(project_id) AS project_id", "trace_id", "parent_span_id",
-    "name", "observation_type", "operation_name",
-    "start_time", "end_time", "latency_ms",
-    "model", "provider", "prompt_tokens", "completion_tokens", "total_tokens", "cost",
-    "status", "status_message",
-    "toString(org_id) AS org_id", "toString(project_version_id) AS project_version_id",
-    "toString(end_user_id) AS end_user_id", "toString(trace_session_id) AS trace_session_id",
+    "id",
+    "toString(project_id) AS project_id",
+    "trace_id",
+    "parent_span_id",
+    "name",
+    "observation_type",
+    "operation_name",
+    "start_time",
+    "end_time",
+    "latency_ms",
+    "model",
+    "provider",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost",
+    "status",
+    "status_message",
+    "toString(org_id) AS org_id",
+    "toString(project_version_id) AS project_version_id",
+    "toString(end_user_id) AS end_user_id",
+    "toString(trace_session_id) AS trace_session_id",
     "toString(prompt_version_id) AS prompt_version_id",
     "toString(prompt_label_id) AS prompt_label_id",
     "toString(custom_eval_config_id) AS custom_eval_config_id",
-    "input", "output", "tags", "span_events",
+    "input",
+    "output",
+    "tags",
+    "span_events",
     "toJSONString(metadata) AS metadata",
     "toJSONString(resource_attrs) AS resource_attrs",
     "toJSONString(attributes_extra) AS attributes_extra",
-    "attrs_string", "attrs_number", "attrs_bool",
-    "llm_request_model", "llm_response_model", "embedding_model",
-    "streaming", "temperature", "top_p", "max_tokens",
-    "eval_status", "semconv_source", "is_deleted",
+    "attrs_string",
+    "attrs_number",
+    "attrs_bool",
+    "llm_request_model",
+    "llm_response_model",
+    "embedding_model",
+    "streaming",
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "eval_status",
+    "semconv_source",
+    "is_deleted",
 )
 
 _SELECT_SQL = ", ".join(_READ_COLUMNS)
@@ -134,28 +167,67 @@ _SELECT_SQL = ", ".join(_READ_COLUMNS)
 # Order in which result_rows columns arrive — bare names (no `AS` aliases) for the
 # row→dataclass mapping below.
 _DATA_KEYS: tuple[str, ...] = (
-    "id", "project_id", "trace_id", "parent_span_id",
-    "name", "observation_type", "operation_name",
-    "start_time", "end_time", "latency_ms",
-    "model", "provider", "prompt_tokens", "completion_tokens", "total_tokens", "cost",
-    "status", "status_message",
-    "org_id", "project_version_id", "end_user_id", "trace_session_id",
-    "prompt_version_id", "prompt_label_id", "custom_eval_config_id",
-    "input", "output", "tags", "span_events",
-    "metadata", "resource_attrs", "attributes_extra",
-    "attrs_string", "attrs_number", "attrs_bool",
-    "llm_request_model", "llm_response_model", "embedding_model",
-    "streaming", "temperature", "top_p", "max_tokens",
-    "eval_status", "semconv_source", "is_deleted",
+    "id",
+    "project_id",
+    "trace_id",
+    "parent_span_id",
+    "name",
+    "observation_type",
+    "operation_name",
+    "start_time",
+    "end_time",
+    "latency_ms",
+    "model",
+    "provider",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost",
+    "status",
+    "status_message",
+    "org_id",
+    "project_version_id",
+    "end_user_id",
+    "trace_session_id",
+    "prompt_version_id",
+    "prompt_label_id",
+    "custom_eval_config_id",
+    "input",
+    "output",
+    "tags",
+    "span_events",
+    "metadata",
+    "resource_attrs",
+    "attributes_extra",
+    "attrs_string",
+    "attrs_number",
+    "attrs_bool",
+    "llm_request_model",
+    "llm_response_model",
+    "embedding_model",
+    "streaming",
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "eval_status",
+    "semconv_source",
+    "is_deleted",
 )
 
 
 def _row_to_chspan(row: tuple) -> CHSpan:
-    d = dict(zip(_DATA_KEYS, row))
+    d = dict(zip(_DATA_KEYS, row, strict=False))
     # CH returns the toString() forms with literal 'NULL' for missing UUIDs in
     # some 25.x patch versions; normalize either case to None.
-    for k in ("org_id", "project_version_id", "end_user_id", "trace_session_id",
-              "prompt_version_id", "prompt_label_id", "custom_eval_config_id"):
+    for k in (
+        "org_id",
+        "project_version_id",
+        "end_user_id",
+        "trace_session_id",
+        "prompt_version_id",
+        "prompt_label_id",
+        "custom_eval_config_id",
+    ):
         v = d.get(k)
         d[k] = None if v in (None, "", "00000000-0000-0000-0000-000000000000") else v
     return CHSpan(**d)
@@ -180,8 +252,12 @@ class CHSpanReader:
         timeout_sec: int = 30,
     ):
         self._client = clickhouse_connect.get_client(
-            host=host, port=port, username=username, password=password,
-            database=database, send_receive_timeout=timeout_sec,
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            database=database,
+            send_receive_timeout=timeout_sec,
         )
 
     def close(self) -> None:
@@ -194,7 +270,7 @@ class CHSpanReader:
         self.close()
 
     # ─── Single-row by id ────────────────────────────────────────────────────
-    def get(self, span_id: str) -> Optional[CHSpan]:
+    def get(self, span_id: str) -> CHSpan | None:
         """Equivalent to ObservationSpan.objects.get(id=span_id), returns None
         if absent (matches the pattern most callers wrap with try/except)."""
         rows = self._client.query(
@@ -250,7 +326,9 @@ class CHSpanReader:
         return [_row_to_chspan(r) for r in rows]
 
     # ─── Children of a parent span ────────────────────────────────────────────
-    def list_by_parent(self, parent_span_id: str, *, limit: Optional[int] = None) -> list[CHSpan]:
+    def list_by_parent(
+        self, parent_span_id: str, *, limit: int | None = None
+    ) -> list[CHSpan]:
         """Equivalent to ObservationSpan.objects.filter(parent_span_id=, deleted=False)
         ordered by start_time, id. `limit` caps the result for display-list paths
         (e.g. `[:20]` slices that the AI-tools `get_span` does)."""
@@ -291,8 +369,13 @@ class CHSpanReader:
         loop or extend this method later if a real call site needs it.
         """
         if not trace_ids:
-            return {"span_count": 0, "prompt_tokens": 0, "completion_tokens": 0,
-                    "total_tokens": 0, "cost": 0.0}
+            return {
+                "span_count": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "cost": 0.0,
+            }
         rows = self._client.query(
             "SELECT count() AS n, "
             "sum(prompt_tokens) AS pt, sum(completion_tokens) AS ct, "
@@ -302,8 +385,13 @@ class CHSpanReader:
             parameters={"trace_ids": tuple(trace_ids)},
         ).result_rows
         if not rows:
-            return {"span_count": 0, "prompt_tokens": 0, "completion_tokens": 0,
-                    "total_tokens": 0, "cost": 0.0}
+            return {
+                "span_count": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "cost": 0.0,
+            }
         n, pt, ct, tt, c = rows[0]
         return {
             "span_count": int(n or 0),
@@ -345,9 +433,9 @@ class CHSpanReader:
         self,
         project_id: str,
         *,
-        observation_type: Optional[str] = None,
-        project_version_id: Optional[str] = None,
-        limit: Optional[int] = None,
+        observation_type: str | None = None,
+        project_version_id: str | None = None,
+        limit: int | None = None,
     ) -> list[CHSpan]:
         """Equivalent to ObservationSpan.objects.filter(project_id=, ...).
 
@@ -376,8 +464,8 @@ class CHSpanReader:
         self,
         project_id: str,
         *,
-        observation_type: Optional[str] = None,
-        project_version_id: Optional[str] = None,
+        observation_type: str | None = None,
+        project_version_id: str | None = None,
     ) -> int:
         """Count of spans matching the project + optional filters. Equivalent
         to ObservationSpan.objects.filter(project_id=, ...).count()."""
@@ -390,7 +478,7 @@ class CHSpanReader:
             where.append("project_version_id = %(pvid)s")
             params["pvid"] = project_version_id
         rows = self._client.query(
-            "SELECT count() FROM spans FINAL " f"WHERE {' AND '.join(where)}",
+            f"SELECT count() FROM spans FINAL WHERE {' AND '.join(where)}",
             parameters=params,
         ).result_rows
         return int(rows[0][0]) if rows else 0
@@ -452,7 +540,7 @@ class CHSpanReader:
     # ─── Root-span start_time per trace (replay_session ordering helper) ─────
     def per_trace_root_span_start_times(
         self, trace_ids: list[str]
-    ) -> dict[str, Optional[datetime]]:
+    ) -> dict[str, datetime | None]:
         """Equivalent to:
             Subquery(ObservationSpan.objects.filter(trace_id=OuterRef("id"),
                                                      parent_span_id__isnull=True)
@@ -475,7 +563,7 @@ class CHSpanReader:
             "GROUP BY toString(trace_id)",
             parameters={"tids": tuple(trace_ids)},
         ).result_rows
-        result: dict[str, Optional[datetime]] = {tid: None for tid in trace_ids}
+        result: dict[str, datetime | None] = dict.fromkeys(trace_ids)
         for tid, st in rows:
             result[tid] = st
         return result
@@ -495,12 +583,23 @@ class CHSpanReader:
         """
         if not trace_ids:
             return {}
+        # P3b step1.5 (DESIGN §3 / id_remap_sql): resolve each span's end_user_id
+        # new→old through end_user_id_remap BEFORE the per-trace DISTINCT, so a
+        # straddler's old + new spans collapse to ONE (the OLD curated) id per
+        # trace. Pre-flip NO span matches a `new_id`, so the resolved id == the
+        # span's own id and the distinct set is unchanged (gate B).
+        remap_join = remap_left_join("rs.end_user_id", "end_user_id_remap")
+        resolved_eu = resolved_id_expr("rs.end_user_id")
         rows = self._client.query(
-            "SELECT toString(trace_id) AS tid, toString(end_user_id) AS uid "
-            "FROM spans FINAL "
-            "WHERE trace_id IN %(tids)s AND is_deleted = 0 "
-            "  AND end_user_id IS NOT NULL "
-            "GROUP BY toString(trace_id), toString(end_user_id)",
+            "SELECT toString(trace_id) AS tid, "
+            f"toString({resolved_eu}) AS uid "
+            "FROM ("
+            "  SELECT trace_id, end_user_id FROM spans FINAL "
+            "  WHERE trace_id IN %(tids)s AND is_deleted = 0 "
+            "    AND end_user_id IS NOT NULL "
+            ") AS rs "
+            f"{remap_join} "
+            f"GROUP BY toString(trace_id), toString({resolved_eu})",
             parameters={"tids": tuple(trace_ids)},
         ).result_rows
         out: dict[str, set[str]] = {tid: set() for tid in trace_ids}
@@ -514,9 +613,9 @@ class CHSpanReader:
         self,
         end_user_id: str,
         *,
-        project_id: Optional[str] = None,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
+        project_id: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> dict[str, Any]:
         """User-scoped roll-up used by session.py background tasks. Equivalent to:
             ObservationSpan.objects.filter(end_user=user[, optional ...])
@@ -525,18 +624,30 @@ class CHSpanReader:
 
         Plus distinct trace_count via COUNT(DISTINCT trace_id) in one CH pass.
         Returns zeros + None timestamps if no spans match (rather than {}).
+
+        P3b step1.5 (DESIGN §3 / id_remap_sql): ``end_user_id`` here is the OLD
+        curated id (callers pass ``str(EndUser.id)`` from PG). A cross-cutover
+        straddler's NEW (deterministic-id) spans carry ``end_user_id = new_id``,
+        so we resolve each span new→old through ``end_user_id_remap`` and match
+        the OLD id on the RESOLVED value — old + new spans roll up as ONE user.
+        Pre-flip NO span matches a ``new_id`` (every span is old-id), so the
+        resolved id == the span's own id and this is a no-op (gate B). The non-
+        user predicates (project / time / soft-delete) stay on the inner scan;
+        only the identity match moves to the resolved layer.
         """
-        where = ["is_deleted = 0", "end_user_id = %(uid)s"]
+        inner_where = ["is_deleted = 0", "isNotNull(end_user_id)"]
         params: dict[str, Any] = {"uid": end_user_id}
         if project_id:
-            where.append("project_id = %(pid)s")
+            inner_where.append("project_id = %(pid)s")
             params["pid"] = project_id
         if since:
-            where.append("start_time >= %(since)s")
+            inner_where.append("start_time >= %(since)s")
             params["since"] = since
         if until:
-            where.append("start_time <  %(until)s")
+            inner_where.append("start_time <  %(until)s")
             params["until"] = until
+        remap_join = remap_left_join("rs.end_user_id", "end_user_id_remap")
+        resolved_eu = resolved_id_expr("rs.end_user_id")
         rows = self._client.query(
             "SELECT count() AS n, "
             "uniqExact(trace_id) AS traces, "
@@ -544,14 +655,34 @@ class CHSpanReader:
             "sum(prompt_tokens) AS pt, sum(completion_tokens) AS ct, "
             "sum(total_tokens) AS tt, sum(cost) AS cost, "
             "min(start_time) AS first_seen, max(end_time) AS last_seen "
-            f"FROM spans FINAL WHERE {' AND '.join(where)}",
+            "FROM ("
+            "  SELECT "
+            f"    {resolved_eu} AS end_user_id, "
+            "    rs.trace_id AS trace_id, rs.trace_session_id AS trace_session_id, "
+            "    rs.prompt_tokens AS prompt_tokens, "
+            "    rs.completion_tokens AS completion_tokens, "
+            "    rs.total_tokens AS total_tokens, rs.cost AS cost, "
+            "    rs.start_time AS start_time, rs.end_time AS end_time "
+            "  FROM ("
+            "    SELECT end_user_id, trace_id, trace_session_id, prompt_tokens, "
+            "           completion_tokens, total_tokens, cost, start_time, end_time "
+            f"    FROM spans FINAL WHERE {' AND '.join(inner_where)}"
+            "  ) AS rs "
+            f"  {remap_join}"
+            ") WHERE end_user_id = %(uid)s",
             parameters=params,
         ).result_rows
         if not rows:
             return {
-                "span_count": 0, "trace_count": 0, "session_count": 0,
-                "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
-                "cost": 0.0, "first_seen": None, "last_seen": None,
+                "span_count": 0,
+                "trace_count": 0,
+                "session_count": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "cost": 0.0,
+                "first_seen": None,
+                "last_seen": None,
             }
         n, traces, sessions, pt, ct, tt, c, fs, ls = rows[0]
         return {
@@ -574,7 +705,7 @@ class CHSpanReader:
         interval: str = "hour",
         since: datetime,
         until: datetime,
-        observation_type: Optional[str] = None,
+        observation_type: str | None = None,
     ) -> list[dict[str, Any]]:
         """Equivalent to:
             ObservationSpan.objects.filter(project_id=, start_time__range=...)
@@ -591,9 +722,9 @@ class CHSpanReader:
         # uses `toMonday`). `toStartOfWeek` defaults to Sunday in CH 25.x;
         # inconsistent with the rest of the codebase.
         bucket_fn = {
-            "hour":  "toStartOfHour",
-            "day":   "toStartOfDay",
-            "week":  "toMonday",
+            "hour": "toStartOfHour",
+            "day": "toStartOfDay",
+            "week": "toMonday",
             "month": "toStartOfMonth",
         }.get(interval)
         if bucket_fn is None:
@@ -634,12 +765,12 @@ class CHSpanReader:
     def count_with_filters(
         self,
         *,
-        project_id: Optional[str] = None,
-        trace_ids: Optional[list[str]] = None,
-        observation_type: Optional[list[str] | str] = None,
-        session_id: Optional[str] = None,
-        created_at_gte: Optional[datetime] = None,
-        created_at_range: Optional[tuple[datetime, datetime]] = None,
+        project_id: str | None = None,
+        trace_ids: list[str] | None = None,
+        observation_type: list[str] | str | None = None,
+        session_id: str | None = None,
+        created_at_gte: datetime | None = None,
+        created_at_range: tuple[datetime, datetime] | None = None,
     ) -> int:
         """Replaces ObservationSpan.objects.filter(<Q-object>).count() for
         the specific filter set produced by parsing_evaltask_filters().
@@ -690,7 +821,7 @@ class CHSpanReader:
             where.append("created_at BETWEEN %(cr_s)s AND %(cr_e)s")
             params["cr_s"], params["cr_e"] = created_at_range
         rows = self._client.query(
-            "SELECT count() FROM spans FINAL " f"WHERE {' AND '.join(where)}",
+            f"SELECT count() FROM spans FINAL WHERE {' AND '.join(where)}",
             parameters=params,
         ).result_rows
         return int(rows[0][0]) if rows else 0
@@ -700,10 +831,10 @@ class CHSpanReader:
         self,
         project_id: str,
         *,
-        observation_type: Optional[str] = None,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
-        status_filter: Optional[str] = None,
+        observation_type: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        status_filter: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Equivalent to:
@@ -770,16 +901,16 @@ class CHSpanReader:
         out: dict[str, Any] = {}
         if not filters:
             return out
-        if (otype := filters.get("observation_type")):
+        if otype := filters.get("observation_type"):
             out["observation_type"] = otype
-        if (sid := filters.get("session_id")):
+        if sid := filters.get("session_id"):
             out["session_id"] = str(sid)
-        if (dr := filters.get("date_range")):
+        if dr := filters.get("date_range"):
             if isinstance(dr, (list, tuple)) and len(dr) == 2:
                 out["created_at_range"] = (dr[0], dr[1])
-        if (cag := filters.get("created_at")):
+        if cag := filters.get("created_at"):
             out["created_at_gte"] = cag
-        if (pid := filters.get("project_id")):
+        if pid := filters.get("project_id"):
             out["project_id"] = str(pid)
         # `trace_ids` derived from `session_id` (Trace lookup) is the
         # caller's responsibility; this helper stays narrow.
@@ -793,11 +924,11 @@ class CHSpanReader:
         interval: str,
         since: datetime,
         until: datetime,
-        project_id: Optional[str] = None,
-        trace_ids: Optional[list[str]] = None,
-        observation_type: Optional[list[str] | str] = None,
-        session_id: Optional[str] = None,
-        status_filter: Optional[str] = None,
+        project_id: str | None = None,
+        trace_ids: list[str] | None = None,
+        observation_type: list[str] | str | None = None,
+        session_id: str | None = None,
+        status_filter: str | None = None,
     ) -> list[dict[str, Any]]:
         """Bucketed aggregation with the full eval-task filter shape PLUS
         error_count. Equivalent to:
@@ -813,8 +944,10 @@ class CHSpanReader:
         per-provider error rates).
         """
         bucket_fn = {
-            "hour":  "toStartOfHour", "day":   "toStartOfDay",
-            "week":  "toMonday",      "month": "toStartOfMonth",
+            "hour": "toStartOfHour",
+            "day": "toStartOfDay",
+            "week": "toMonday",
+            "month": "toStartOfMonth",
         }.get(interval)
         if bucket_fn is None:
             raise ValueError(
@@ -875,11 +1008,11 @@ class CHSpanReader:
         *,
         since: datetime,
         until: datetime,
-        project_id: Optional[str] = None,
-        trace_ids: Optional[list[str]] = None,
-        observation_type: Optional[list[str] | str] = None,
-        session_id: Optional[str] = None,
-        status_filter: Optional[str] = None,
+        project_id: str | None = None,
+        trace_ids: list[str] | None = None,
+        observation_type: list[str] | str | None = None,
+        session_id: str | None = None,
+        status_filter: str | None = None,
     ) -> dict[str, Any]:
         """Single-bucket variant of time_bucket_aggregate_with_filters. Used
         by monitor._get_metric_value paths that want one window-wide number.
@@ -891,8 +1024,13 @@ class CHSpanReader:
             params["pid"] = project_id
         if trace_ids is not None:
             if len(trace_ids) == 0:
-                return {"span_count": 0, "error_count": 0, "tokens": 0,
-                        "cost": 0.0, "latency_ms": 0.0}
+                return {
+                    "span_count": 0,
+                    "error_count": 0,
+                    "tokens": 0,
+                    "cost": 0.0,
+                    "latency_ms": 0.0,
+                }
             where.append("trace_id IN %(tids)s")
             params["tids"] = tuple(trace_ids)
         if observation_type is not None:
@@ -900,8 +1038,11 @@ class CHSpanReader:
                 # Codex wave-3 P2: empty list = match nothing.
                 if len(observation_type) == 0:
                     return {
-                        "span_count": 0, "error_count": 0, "tokens": 0,
-                        "cost": 0.0, "latency_ms": 0.0,
+                        "span_count": 0,
+                        "error_count": 0,
+                        "tokens": 0,
+                        "cost": 0.0,
+                        "latency_ms": 0.0,
                     }
                 where.append("observation_type IN %(otypes)s")
                 params["otypes"] = tuple(observation_type)
@@ -934,7 +1075,7 @@ class CHSpanReader:
         self,
         trace_ids: list[str],
         *,
-        observation_type: Optional[str] = None,
+        observation_type: str | None = None,
     ) -> dict[str, CHSpan]:
         """For each trace_id, return the root span (parent_span_id = '').
         Picks the earliest by (start_time, id) on ties. Returns a dict so
@@ -952,7 +1093,9 @@ class CHSpanReader:
         if not trace_ids:
             return {}
         where = [
-            "is_deleted = 0", "trace_id IN %(tids)s", "parent_span_id = ''",
+            "is_deleted = 0",
+            "trace_id IN %(tids)s",
+            "parent_span_id = ''",
         ]
         params: dict[str, Any] = {"tids": tuple(trace_ids)}
         if observation_type:
@@ -977,7 +1120,7 @@ class CHSpanReader:
         self,
         session_ids: list[str],
         *,
-        project_id: Optional[str] = None,
+        project_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Per-session rollup across many sessions in one CH query.
 
@@ -989,7 +1132,8 @@ class CHSpanReader:
         if not session_ids:
             return {}
         where = [
-            "is_deleted = 0", "trace_session_id IN %(sids)s",
+            "is_deleted = 0",
+            "trace_session_id IN %(sids)s",
         ]
         params: dict[str, Any] = {"sids": tuple(session_ids)}
         if project_id:
@@ -1017,9 +1161,7 @@ class CHSpanReader:
             for (sid, sc, tc, toks, c, st, et) in rows
         }
 
-    def has_root_spans_of_type(
-        self, project_id: str, observation_type: str
-    ) -> bool:
+    def has_root_spans_of_type(self, project_id: str, observation_type: str) -> bool:
         """Equivalent to:
             ObservationSpan.objects.filter(project_id=, observation_type=,
                                             parent_span_id__isnull=True,
@@ -1041,7 +1183,7 @@ class CHSpanReader:
         self,
         project_version_ids: list[str],
         *,
-        observation_type: Optional[str] = None,
+        observation_type: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Per-project-version rollups across many versions in one query.
 
@@ -1141,9 +1283,9 @@ class CHSpanReader:
         *,
         project_id: str,
         span_id: str,
-        project_version_id: Optional[str] = None,
-        observation_type: Optional[str] = None,
-    ) -> tuple[Optional[str], Optional[str]]:
+        project_version_id: str | None = None,
+        observation_type: str | None = None,
+    ) -> tuple[str | None, str | None]:
         """Return (prev_span_id, next_span_id) by start_time ordering within
         the project (and optionally project_version + observation_type) scope.
         None for boundary cases.
@@ -1172,8 +1314,11 @@ class CHSpanReader:
             return (None, None)
         anchor_st, anchor_id = anchor_rows[0]
         where_base = ["is_deleted = 0", "project_id = %(pid)s"]
-        params: dict[str, Any] = {"pid": project_id, "anchor_st": anchor_st,
-                                  "anchor_id": anchor_id}
+        params: dict[str, Any] = {
+            "pid": project_id,
+            "anchor_st": anchor_st,
+            "anchor_id": anchor_id,
+        }
         if project_version_id:
             where_base.append("project_version_id = %(pvid)s")
             params["pvid"] = project_version_id
@@ -1203,8 +1348,8 @@ class CHSpanReader:
         *,
         project_id: str,
         trace_id: str,
-        project_version_id: Optional[str] = None,
-    ) -> tuple[Optional[str], Optional[str]]:
+        project_version_id: str | None = None,
+    ) -> tuple[str | None, str | None]:
         """Return (prev_trace_id, next_trace_id) ordered by the trace's
         root-span start_time. Mirrors prev_next_span_by_start_time but at
         the trace level. Used by experiment-mode trace navigation.
@@ -1231,10 +1376,15 @@ class CHSpanReader:
             return (None, None)
         anchor_st = anchor_rows[0][0]
         where_base = [
-            "is_deleted = 0", "project_id = %(pid)s", "parent_span_id = ''",
+            "is_deleted = 0",
+            "project_id = %(pid)s",
+            "parent_span_id = ''",
         ]
-        params: dict[str, Any] = {"pid": project_id, "anchor_st": anchor_st,
-                                  "anchor_tid": trace_id}
+        params: dict[str, Any] = {
+            "pid": project_id,
+            "anchor_st": anchor_st,
+            "anchor_tid": trace_id,
+        }
         if project_version_id:
             where_base.append("project_version_id = %(pvid)s")
             params["pvid"] = project_version_id
@@ -1348,7 +1498,9 @@ class CHSpanReader:
         except json.JSONDecodeError:
             tags_parsed = []
         try:
-            span_events_parsed = json.loads(span.span_events) if span.span_events else []
+            span_events_parsed = (
+                json.loads(span.span_events) if span.span_events else []
+            )
         except json.JSONDecodeError:
             span_events_parsed = []
         return {
@@ -1364,15 +1516,15 @@ class CHSpanReader:
             "input": _maybe_json(span.input),
             "output": _maybe_json(span.output),
             "model": span.model,
-            "model_parameters": None,                                   # not on CH spans yet — see docstring
+            "model_parameters": None,  # not on CH spans yet — see docstring
             "latency_ms": span.latency_ms,
             "org_id": span.org_id,
-            "org_user_id": None,                                        # not on CH spans yet
+            "org_user_id": None,  # not on CH spans yet
             "prompt_tokens": span.prompt_tokens,
             "completion_tokens": span.completion_tokens,
             "total_tokens": span.total_tokens,
-            "response_time": None,                                      # not on CH spans yet
-            "eval_id": None,                                            # not on CH spans yet
+            "response_time": None,  # not on CH spans yet
+            "eval_id": None,  # not on CH spans yet
             "cost": span.cost,
             "status": span.status,
             "status_message": span.status_message,

@@ -4,6 +4,10 @@ from typing import Any
 
 from tracer.services.clickhouse.query_builders.base import BaseQueryBuilder
 from tracer.services.clickhouse.query_builders.filters import ClickHouseFilterBuilder
+from tracer.services.clickhouse.v2.id_remap_sql import (
+    remap_left_join,
+    resolved_id_expr,
+)
 
 
 class UserListQueryBuilder(BaseQueryBuilder):
@@ -154,6 +158,11 @@ class UserListQueryBuilder(BaseQueryBuilder):
             else ""
         )
 
+        # P3b step1.5 id-remap resolution (see id_remap_sql / DESIGN §3): map a
+        # NEW-id span back to its OLD curated id so a straddler reads as ONE user.
+        remap_join = remap_left_join("rs.end_user_id", "end_user_id_remap")
+        resolved_eu = resolved_id_expr("rs.end_user_id")
+
         query = f"""
         WITH
         filtered_end_users AS (
@@ -173,7 +182,7 @@ class UserListQueryBuilder(BaseQueryBuilder):
               {search_filter}
               {end_user_filter}
         ),
-        filtered_spans AS (
+        raw_spans AS (
             SELECT
                 id,
                 trace_id,
@@ -191,12 +200,51 @@ class UserListQueryBuilder(BaseQueryBuilder):
                 completion_tokens
             FROM spans
             WHERE is_deleted = 0
-              AND end_user_id IN (SELECT end_user_id FROM filtered_end_users)
               AND isNotNull(end_user_id)
               AND start_time >= %(start_date)s
               AND start_time < %(end_date)s
               {project_filter}
               {span_extra}
+        ),
+        filtered_spans AS (
+            -- P3b step1.5 (DESIGN §3 / §10.1): resolve each span's `end_user_id`
+            -- through the id-remap BEFORE the enduser-set membership check and
+            -- BEFORE grouping, so a cross-cutover straddler (old-id spans + new
+            -- deterministic-id spans for the SAME identity) reads as ONE user.
+            -- The map is keyed `old_id → new_id`; the resolve direction is
+            -- new→old, so LEFT JOIN on `raw_spans.end_user_id = id_remap.new_id`
+            -- and fall back to `old_id` (the curated key, still primary) via the
+            -- zero-uuid-guarded `resolved_id_expr` (see id_remap_sql for why a
+            -- bare COALESCE breaks: CH fills an unmatched LEFT JOIN side with the
+            -- column DEFAULT — the zero-uuid — NOT NULL). An OLD-id span's id is
+            -- in `old_id` (NOT `new_id`) → no join match → resolves to itself
+            -- (unchanged). A NEW-id span (post-flip) matches `new_id` → its
+            -- `old_id`. Pre-flip the map has NO span matching any `new_id`, so the
+            -- join adds nothing and this is a byte-identical no-op (gate B). The
+            -- resolved id is projected AS `end_user_id`, so the
+            -- `IN (filtered_end_users)` check and every downstream CTE group on
+            -- the UNIFIED id with no further change. The raw scan above keeps the
+            -- committed `{project_filter}`/`{span_extra}` predicates on the bare
+            -- `spans` columns intact (the remap join is a thin outer layer).
+            SELECT
+                rs.id AS id,
+                rs.trace_id AS trace_id,
+                rs.project_id AS project_id,
+                {resolved_eu} AS end_user_id,
+                rs.trace_session_id AS trace_session_id,
+                rs.observation_type AS observation_type,
+                rs.status AS status,
+                rs.start_time AS start_time,
+                rs.end_time AS end_time,
+                rs.latency_ms AS latency_ms,
+                rs.cost AS cost,
+                rs.total_tokens AS total_tokens,
+                rs.prompt_tokens AS prompt_tokens,
+                rs.completion_tokens AS completion_tokens
+            FROM raw_spans AS rs
+            {remap_join}
+            WHERE {resolved_eu}
+                  IN (SELECT end_user_id FROM filtered_end_users)
         ),
         aggregated_usage AS (
             SELECT
