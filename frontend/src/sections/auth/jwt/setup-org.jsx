@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { Helmet } from "react-helmet-async";
 import {
   Box,
   Stack,
@@ -24,7 +25,6 @@ import { FormSearchSelectFieldState } from "src/components/FromSearchSelectField
 import RightSectionAuth from "./RightSectionAuth";
 import { Controller, useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FormCheckboxField } from "src/components/FormCheckboxField";
 import { useAuthContext } from "src/auth/hooks";
 import { DEFAULT_ROLES, GOALS_LIST, ROLE_OPTIONS } from "./constants";
 import { organizationSchema, userDataSchema } from "./zodSchema";
@@ -293,7 +293,8 @@ const SetupOrganization = ({ getStarted = false }) => {
   const quickStartOptionRef = useRef(null);
   const quickStartsViewedRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeStep = parseInt(searchParams.get("step") || "0", 10);
+  const rawActiveStep = parseInt(searchParams.get("step") || "0", 10);
+  const activeStep = rawActiveStep === 2 ? 2 : 0;
   const finishSetup = useCallback((quickStartOption) => {
     const completionHref = resolveSetupCompletionHref(quickStartOption);
     localStorage.setItem("initial-render", "done");
@@ -437,26 +438,6 @@ const SetupOrganization = ({ getStarted = false }) => {
   });
   const customRoleValue = userForm.watch("customRole");
   const roleValue = userForm.watch("role");
-  const goalsValue = userForm.watch("goals");
-  const hasSelectedGoal = Array.isArray(goalsValue) && goalsValue.some(Boolean);
-  const handleSelectedGoalsContinue = useCallback(() => {
-    if (isSavingUserData || !hasSelectedGoal) {
-      return;
-    }
-    saveUserData({
-      role: customRoleValue || roleValue || QUICK_START_ROLE,
-      goals: GOALS_LIST.filter((_, index) => goalsValue?.[index]).map(
-        (goal) => goal?.label,
-      ),
-    });
-  }, [
-    customRoleValue,
-    goalsValue,
-    hasSelectedGoal,
-    isSavingUserData,
-    roleValue,
-    saveUserData,
-  ]);
   useEffect(() => {
     if (activeStep !== 0 || quickStartsViewedRef.current) {
       return;
@@ -580,8 +561,8 @@ const SetupOrganization = ({ getStarted = false }) => {
           <Typography variant="subtitle2">Preview sample data</Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary">
-          Optional: inspect preloaded data if you want to see the screens before
-          connecting your workspace.
+          Optional preview only. Real setup still starts from one of the product
+          workflows above.
         </Typography>
         <LoadingButton
           fullWidth
@@ -616,8 +597,8 @@ const SetupOrganization = ({ getStarted = false }) => {
         <Stack spacing={0.5}>
           <Typography variant="subtitle2">Product workflows</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick one workflow. You will see the setup steps before opening the
-            product screen.
+            Pick the workflow you want working first. The next screen keeps you
+            on that setup path.
           </Typography>
         </Stack>
 
@@ -636,58 +617,6 @@ const SetupOrganization = ({ getStarted = false }) => {
       </Stack>
     );
   };
-
-  const handleObserveQuickStart = useCallback(() => {
-    const observeOption = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
-      (option) => option.id === "observe",
-    );
-    if (!observeOption) {
-      return;
-    }
-    handleProductLoopQuickStart(observeOption);
-  }, [handleProductLoopQuickStart]);
-  const handleSamplePreviewQuickStart = useCallback(() => {
-    const sampleOption = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
-      (option) => option.id === "sample_preview",
-    );
-    if (!sampleOption) {
-      return;
-    }
-    handleProductLoopQuickStart(sampleOption);
-  }, [handleProductLoopQuickStart]);
-  const handleObserveQuickStartPointerUp = useCallback(
-    (event) => {
-      if (event.pointerType === "mouse" && event.button !== 0) {
-        return;
-      }
-      handleObserveQuickStart();
-    },
-    [handleObserveQuickStart],
-  );
-  const handleSamplePreviewQuickStartPointerUp = useCallback(
-    (event) => {
-      if (event.pointerType === "mouse" && event.button !== 0) {
-        return;
-      }
-      handleSamplePreviewQuickStart();
-    },
-    [handleSamplePreviewQuickStart],
-  );
-
-  const renderSamplePreviewQuickStartButton = () => (
-    <LoadingButton
-      fullWidth
-      sx={{ borderRadius: 0.5 }}
-      variant="outlined"
-      loading={isSavingUserData}
-      disabled={isSavingUserData}
-      onClick={handleSamplePreviewQuickStart}
-      onPointerUp={handleSamplePreviewQuickStartPointerUp}
-      color="primary"
-    >
-      Open sample data
-    </LoadingButton>
-  );
 
   const orgForm = useForm({
     resolver: zodResolver(organizationSchema),
@@ -1048,7 +977,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Choose your first setup
+                What do you want to set up first?
               </Typography>
               <Typography
                 fontWeight={"fontWeightSemiBold"}
@@ -1059,78 +988,11 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Start with the workflow you want working first
+                Choose one workflow and keep moving on that path
               </Typography>
             </Box>
 
             {renderProductLoopQuickStarts()}
-          </Stack>
-        );
-
-      case 1:
-        return (
-          <Stack spacing={2} sx={{ width: { xs: "100%", sm: 520 } }}>
-            <Box>
-              <Typography
-                fontWeight={"fontWeightSemiBold"}
-                sx={{
-                  fontSize: "28px",
-                  color: "text.primary",
-                  fontFamily: "Inter",
-                  lineHeight: "36px",
-                }}
-              >
-                Let&apos;s get started
-              </Typography>
-              <Typography
-                fontWeight={"fontWeightSemiBold"}
-                sx={{
-                  fontSize: "28px",
-                  color: "text.secondary",
-                  fontFamily: "Inter",
-                  lineHeight: "36px",
-                }}
-              >
-                Tell us about your goals
-              </Typography>
-            </Box>
-
-            <Stack spacing={1}>
-              {GOALS_LIST.map((goal, index) => (
-                <FormCheckboxField
-                  key={goal.id}
-                  isCustom={true}
-                  labelPlacement="end"
-                  control={userForm.control}
-                  fieldName={`goals.${index}`}
-                  label={goal.label}
-                  helperText={goal.description}
-                />
-              ))}
-            </Stack>
-
-            {renderSamplePreviewQuickStartButton()}
-            <Button
-              sx={{ borderRadius: 0.5 }}
-              variant="outlined"
-              disabled={isSavingUserData}
-              onClick={handleObserveQuickStart}
-              onPointerUp={handleObserveQuickStartPointerUp}
-              color="primary"
-            >
-              Connect your agent
-            </Button>
-
-            <LoadingButton
-              sx={{ borderRadius: 0.5 }}
-              variant="outlined"
-              loading={isSavingUserData}
-              disabled={isSavingUserData || !hasSelectedGoal}
-              onClick={handleSelectedGoalsContinue}
-              color="primary"
-            >
-              Continue with selected goals
-            </LoadingButton>
           </Stack>
         );
 
@@ -1208,53 +1070,58 @@ const SetupOrganization = ({ getStarted = false }) => {
   }
 
   return (
-    <Box sx={{ width: "100%", minHeight: "100dvh", display: "flex" }}>
-      <Box
-        sx={{
-          width: { xs: "100%", md: "50%" },
-          minHeight: "100dvh",
-          bgcolor: "background.paper",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          overflowY: "auto",
-        }}
-      >
+    <>
+      <Helmet>
+        <title>Choose first setup | FutureAGI</title>
+      </Helmet>
+      <Box sx={{ width: "100%", minHeight: "100dvh", display: "flex" }}>
         <Box
           sx={{
-            maxWidth: "640px",
-            width: "100%",
-            px: { xs: 3, sm: 6, md: 10 },
-            py: { xs: 4, md: "100px" },
+            width: { xs: "100%", md: "50%" },
+            minHeight: "100dvh",
+            bgcolor: "background.paper",
             display: "flex",
             flexDirection: "column",
-            gap: 2,
-            height: "fit-content",
+            alignItems: "center",
+            overflowY: "auto",
           }}
         >
-          {activeStep > 0 ? (
-            <DotsStepper
-              variant="dots"
-              steps={isOwner ? 3 : 2}
-              position="static"
-              activeStep={activeStep}
-            />
-          ) : null}
-          {renderContent()}
+          <Box
+            sx={{
+              maxWidth: "640px",
+              width: "100%",
+              px: { xs: 3, sm: 6, md: 10 },
+              py: { xs: 4, md: "100px" },
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              height: "fit-content",
+            }}
+          >
+            {activeStep > 0 ? (
+              <DotsStepper
+                variant="dots"
+                steps={isOwner ? 3 : 2}
+                position="static"
+                activeStep={activeStep}
+              />
+            ) : null}
+            {renderContent()}
+          </Box>
+        </Box>
+
+        <Box
+          sx={{
+            width: "50%",
+            minHeight: "100dvh",
+            display: { xs: "none", md: "block" },
+            backgroundColor: "background.neutral",
+          }}
+        >
+          <RightSectionAuth />
         </Box>
       </Box>
-
-      <Box
-        sx={{
-          width: "50%",
-          minHeight: "100dvh",
-          display: { xs: "none", md: "block" },
-          backgroundColor: "background.neutral",
-        }}
-      >
-        <RightSectionAuth />
-      </Box>
-    </Box>
+    </>
   );
 };
 

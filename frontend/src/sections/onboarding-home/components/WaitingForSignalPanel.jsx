@@ -8,6 +8,7 @@ import {
   ObservePanelActions,
   ObservePanelHeader,
 } from "./observe-panel-utils";
+import { observeFallbackJourneyPlan } from "./observe-fallback-journey-plan";
 import { journeyCurrentStep } from "./journey-guide-utils";
 
 export default function WaitingForSignalPanel({
@@ -22,7 +23,8 @@ export default function WaitingForSignalPanel({
   isChecking = false,
   singleActionFocus = false,
 }) {
-  const currentStep = journeyCurrentStep(journeyPlan, stage);
+  const effectiveJourneyPlan = journeyPlan || observeFallbackJourneyPlan(stage);
+  const currentStep = journeyCurrentStep(effectiveJourneyPlan, stage);
 
   return (
     <Box
@@ -43,7 +45,7 @@ export default function WaitingForSignalPanel({
           chips={["observe", "waiting"]}
         />
         <ObserveJourneyProgress
-          journeyPlan={journeyPlan}
+          journeyPlan={effectiveJourneyPlan}
           singleActionFocus={singleActionFocus}
           stage={stage}
         />

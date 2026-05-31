@@ -19,6 +19,7 @@ import {
   normalizeSetupQuickStartAttribution,
   persistSetupQuickStartAttribution,
   readPersistedSetupQuickStartAttribution,
+  SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS,
 } from "src/sections/auth/jwt/setup-org-quick-starts";
 import { shouldShowSampleAsPrimary } from "./activation-state-utils";
 import { useActivationState } from "./hooks/useActivationState";
@@ -626,9 +627,31 @@ export default function OnboardingHomeView() {
     renderedState?.featureFlags?.onboarding_goal_picker !== false;
   const isSetupQuickStart =
     searchContext.source === "setup_org" && Boolean(searchContext.quickStartId);
+  const selectedSetupQuickStart = isSetupQuickStart
+    ? SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
+        (option) => option.id === searchContext.quickStartId,
+      )
+    : null;
   const isSampleQuickStart =
     searchContext.quickStartPrimaryPath === "sample" ||
     searchContext.quickStartId === "sample_preview";
+  const setupQuickStartHandoffCopy = isSetupQuickStart
+    ? isSampleQuickStart
+      ? {
+          title: "Sample data is a preview",
+          description:
+            "Use it to inspect screens. Real setup still starts from a product workflow.",
+        }
+      : {
+          title: `Selected setup: ${
+            selectedSetupQuickStart?.buttonLabel ||
+            selectedSetupQuickStart?.label ||
+            "First workflow"
+          }`,
+          description:
+            "Complete the checklist below with real workspace data. Sample data stays optional.",
+        }
+    : null;
   const isFirstRunQuickStartFocus =
     Boolean(renderedState) &&
     isSetupQuickStart &&
@@ -1195,6 +1218,20 @@ export default function OnboardingHomeView() {
             <Typography variant="body2" color="text.secondary">
               Workspace: {currentWorkspaceDisplayName}
             </Typography>
+          ) : null}
+          {setupQuickStartHandoffCopy ? (
+            <Alert
+              severity="info"
+              data-testid="setup-quick-start-handoff-alert"
+              sx={{ borderRadius: 1, mt: 1, maxWidth: 760 }}
+            >
+              <Typography variant="subtitle2" component="div">
+                {setupQuickStartHandoffCopy.title}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.25 }}>
+                {setupQuickStartHandoffCopy.description}
+              </Typography>
+            </Alert>
           ) : null}
         </Stack>
 

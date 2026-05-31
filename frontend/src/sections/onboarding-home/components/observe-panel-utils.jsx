@@ -97,7 +97,7 @@ export function CurrentStepGuide({ step, stage }) {
       }}
     >
       <Stack spacing={0.75}>
-        <Typography variant="subtitle2">Current step</Typography>
+        <Typography variant="subtitle2">Do this now</Typography>
         <Typography variant="body2" color="text.primary">
           {step.label}
         </Typography>

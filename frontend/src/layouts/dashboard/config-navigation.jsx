@@ -264,17 +264,17 @@ export function useNavData() {
       // },
     ];
 
-    sections.unshift({
-      items: [
-        {
-          title: "Falcon AI",
-          path: paths.dashboard.falconAI,
-          icon: ICONS.falconAI,
-          disabled: isOSS,
-          disabledTooltip: "Not available on self-hosted",
-        },
-      ],
-    });
+    if (!isOSS) {
+      sections.unshift({
+        items: [
+          {
+            title: "Falcon AI",
+            path: paths.dashboard.falconAI,
+            icon: ICONS.falconAI,
+          },
+        ],
+      });
+    }
 
     return sections;
   }, [isOwner, isAdmin, isOSS]);
@@ -704,8 +704,8 @@ export function useNavDashBoardData() {
     const arrayData = [];
     if (!getStartedCompleted) {
       arrayData.push({
-        title: "Get started",
-        path: paths.dashboard.getstarted,
+        title: "Home",
+        path: paths.dashboard.home,
         icon: ICONS.getStarted,
       });
     }

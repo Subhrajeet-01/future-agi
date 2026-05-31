@@ -521,7 +521,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
     expect(screen.getByRole("link", { name: /review trace/i })).toHaveAttribute(
       "href",
-      "/dashboard/observe/observe-1/trace/trace-1",
+      "/dashboard/observe/observe-1/trace/trace-1?tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
     );
   });
 
@@ -540,6 +540,12 @@ describe("OnboardingHomeView", () => {
     expect(screen.getByTestId("observe-setup-panel")).toBeVisible();
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
     expect(screen.getByText("Connect one observe project")).toBeVisible();
+    expect(screen.getByText("Do this now")).toBeVisible();
+    expect(
+      screen.getAllByText("Create Observe project").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Send first trace")).toBeVisible();
+    expect(screen.getByText("Review first signal")).toBeVisible();
   });
 
   it("renders sampleTraceReady as the primary sample project panel", async () => {
@@ -1085,7 +1091,14 @@ describe("OnboardingHomeView", () => {
         },
       });
       if (quickStartPrimaryPath === "observe") {
-        expect(within(panel).getByText("Create observe project")).toBeVisible();
+        expect(
+          within(panel).getAllByText("Create Observe project").length,
+        ).toBeGreaterThan(0);
+        expect(
+          within(
+            screen.getByTestId("observe-journey-step-connect_observability"),
+          ).getByText("Now"),
+        ).toBeVisible();
       } else {
         expect(screen.getByTestId(`path-focus-step-${stage}`)).toBeVisible();
       }
@@ -1135,9 +1148,11 @@ describe("OnboardingHomeView", () => {
     expect(
       within(panel).getByText("Connect one observe project"),
     ).toBeVisible();
-    expect(within(panel).getByText("Create observe project")).toBeVisible();
-    expect(within(panel).getByText("Send one trace")).toBeVisible();
-    expect(within(panel).getByText("Review the signal")).toBeVisible();
+    expect(
+      within(panel).getAllByText("Create Observe project").length,
+    ).toBeGreaterThan(0);
+    expect(within(panel).getByText("Send first trace")).toBeVisible();
+    expect(within(panel).getByText("Review first signal")).toBeVisible();
     const setupLink = screen.getByRole("link", {
       name: /create observe project/i,
     });
@@ -1882,7 +1897,10 @@ describe("OnboardingHomeView", () => {
     expect(within(panel).getByText("Not reviewed")).toBeVisible();
     expect(
       within(panel).getByRole("link", { name: /review trace/i }),
-    ).toHaveAttribute("href", "/dashboard/observe/observe-1/trace/trace-1");
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/observe/observe-1/trace/trace-1?tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
+    );
   });
 
   it("renders backend observe journey progress on the first signal panel", () => {
