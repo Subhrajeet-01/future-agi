@@ -167,6 +167,55 @@ const pathState = ({
   };
 };
 
+const setupQuickStartRoute = ({ goal, id, primaryPath }) =>
+  `/dashboard/home?source=setup_org&quick_start_id=${id}&quick_start_goal=${goal}&quick_start_primary_path=${primaryPath}`;
+
+const expectRouteParams = ({ params, values }) => {
+  Object.entries(values).forEach(([key, value]) => {
+    expect(params.get(key)).toBe(value);
+  });
+};
+
+const expectCurrentRoute = ({ pathname, params }) => {
+  expect(window.location.pathname).toBe(pathname);
+  expectRouteParams({
+    params: new URLSearchParams(window.location.search),
+    values: params,
+  });
+};
+
+const expectAutoHandoffEvent = async ({
+  actionId,
+  pathname,
+  quickStartGoal,
+  quickStartId,
+  quickStartPrimaryPath,
+  routeParams,
+}) => {
+  await waitFor(() =>
+    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+      "onboarding_setup_quick_start_auto_handoff",
+      expect.objectContaining({
+        source: "setup_org",
+        quick_start_goal: quickStartGoal,
+        quick_start_id: quickStartId,
+        quick_start_primary_path: quickStartPrimaryPath,
+        recommended_action_id: actionId,
+        action_id: actionId,
+      }),
+    ),
+  );
+
+  const [, payload] = mocks.trackOnboardingHomeEvent.mock.calls.find(
+    ([eventName, eventPayload]) =>
+      eventName === "onboarding_setup_quick_start_auto_handoff" &&
+      eventPayload.quick_start_id === quickStartId,
+  );
+  const route = new URL(payload.route, "https://futureagi.test");
+  expect(route.pathname).toBe(pathname);
+  expectRouteParams({ params: route.searchParams, values: routeParams });
+};
+
 const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
   const steps = [
     {
@@ -625,9 +674,9 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("keeps setup quick-start attribution on prompt path actions", () => {
+  it("keeps setup quick-start attribution on prompt path actions after first setup", () => {
     mocks.useActivationState.mockReturnValue({
-      state: normalizedFixture("promptNoPrompt"),
+      state: normalizedFixture("promptCreatedNoRun"),
       isLoading: false,
       isRefetching: false,
       isError: false,
@@ -641,19 +690,19 @@ describe("OnboardingHomeView", () => {
 
     const panel = screen.getByTestId("path-focus-panel-prompt");
     const href = within(panel)
-      .getByRole("link", { name: /create prompt/i })
+      .getByRole("link", { name: /run test/i })
       .getAttribute("href");
     const params = new URLSearchParams(href.split("?")[1]);
 
-    expect(href).toContain("/dashboard/workbench/all?");
+    expect(href).toContain("/dashboard/workbench/create/prompt-1?");
     expect(params.get("quick_start_goal")).toBe("improve_prompts");
     expect(params.get("quick_start_id")).toBe("prompt");
     expect(params.get("quick_start_primary_path")).toBe("prompt");
-    expect(params.get("tour_anchor")).toBe("prompt_create_button");
-    expect(params.get("journey_step")).toBe("start_prompt");
-    expect(within(panel).getByText("Step 1 of 6")).toBeVisible();
+    expect(params.get("tour_anchor")).toBe("prompt_run_test_button");
+    expect(params.get("journey_step")).toBe("run_prompt_test");
+    expect(within(panel).getByText("Step 2 of 6")).toBeVisible();
     expect(
-      screen.queryByTestId("path-focus-step-start_prompt"),
+      screen.queryByTestId("path-focus-step-run_prompt_test"),
     ).not.toBeInTheDocument();
     expect(
       within(panel).queryByRole("link", { name: /open workbench/i }),
@@ -850,9 +899,253 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("routes setup observe quick-start directly to trace setup", async () => {
+  it.each([
+    {
+      actionId: "create_observe_project",
+      fixture: () => normalizedFixture("observeNoSetup"),
+      quickStartGoal: "monitor_production_ai_app",
+      quickStartId: "observe",
+      quickStartPrimaryPath: "observe",
+      pathname: "/dashboard/observe",
+      stage: "connect_observability",
+      routeParams: {
+        setup: "true",
+        source: "onboarding",
+        tour_anchor: "observe_create_project_button",
+        journey_step: "connect_observability",
+      },
+    },
+    {
+      actionId: "create_prompt",
+      fixture: () => normalizedFixture("promptNoPrompt"),
+      quickStartGoal: "improve_prompts",
+      quickStartId: "prompt",
+      quickStartPrimaryPath: "prompt",
+      pathname: "/dashboard/workbench/all",
+      stage: "start_prompt",
+      routeParams: {
+        source: "onboarding",
+        action: "create-prompt",
+        tour_anchor: "prompt_create_button",
+        journey_step: "start_prompt",
+      },
+    },
+    {
+      actionId: "create_agent",
+      fixture: () => normalizedFixture("agentNoAgent"),
+      quickStartGoal: "build_ai_agent",
+      quickStartId: "agent",
+      quickStartPrimaryPath: "agent",
+      pathname: "/dashboard/agents",
+      stage: "create_agent",
+      routeParams: {
+        onboarding: "create",
+        tour_anchor: "agent_create_button",
+        journey_step: "create_agent",
+      },
+    },
+    {
+      actionId: "gateway_add_provider",
+      fixture: () => normalizedFixture("gatewayNoProvider"),
+      quickStartGoal: "control_model_traffic",
+      quickStartId: "gateway",
+      quickStartPrimaryPath: "gateway",
+      pathname: "/dashboard/gateway/providers",
+      stage: "configure_gateway_provider",
+      routeParams: {
+        source: "onboarding",
+        tour_anchor: "gateway_provider_button",
+        journey_step: "configure_gateway_provider",
+      },
+    },
+    {
+      actionId: "create_eval_dataset",
+      fixture: () =>
+        pathState({
+          action: pathAction({
+            id: "create_eval_dataset",
+            title: "Create eval source",
+            description: "Add the first dataset or trace source.",
+            href: "/dashboard/evaluations/create?source=onboarding&step=data",
+            ctaLabel: "Add source",
+            completionEvent: "eval_dataset_created",
+            targetPath: "evals",
+          }),
+          goal: "evaluate_quality",
+          pathDescription: "Create a small eval and review the first failure.",
+          pathLabel: "Evaluate quality",
+          primaryPath: "evals",
+          stage: "create_eval_dataset",
+        }),
+      quickStartGoal: "evaluate_quality",
+      quickStartId: "evals",
+      quickStartPrimaryPath: "evals",
+      pathname: "/dashboard/evaluations/create",
+      stage: "create_eval_dataset",
+      routeParams: {
+        source: "onboarding",
+        step: "data",
+        tour_anchor: "eval_dataset_button",
+        journey_step: "create_eval_dataset",
+      },
+    },
+    {
+      actionId: "create_voice_agent",
+      fixture: () =>
+        pathState({
+          action: pathAction({
+            id: "create_voice_agent",
+            title: "Create voice agent",
+            description: "Create or connect one voice agent.",
+            href: "/dashboard/simulate/agent-definitions/create-new-agent-definition?source=onboarding&onboarding=create-voice-agent",
+            ctaLabel: "Create agent",
+            completionEvent: "voice_agent_created",
+            targetPath: "voice",
+          }),
+          goal: "connect_voice_ai_agent",
+          pathDescription: "Run or review a call with clear success criteria.",
+          pathLabel: "Connect a voice AI agent",
+          primaryPath: "voice",
+          stage: "create_voice_agent",
+        }),
+      quickStartGoal: "connect_voice_ai_agent",
+      quickStartId: "voice",
+      quickStartPrimaryPath: "voice",
+      pathname:
+        "/dashboard/simulate/agent-definitions/create-new-agent-definition",
+      stage: "create_voice_agent",
+      routeParams: {
+        source: "onboarding",
+        onboarding: "create-voice-agent",
+        tour_anchor: "voice_agent_button",
+        journey_step: "create_voice_agent",
+      },
+    },
+  ])(
+    "routes setup $quickStartId quick-start directly to its first action",
+    async ({
+      actionId,
+      fixture,
+      pathname,
+      quickStartGoal,
+      quickStartId,
+      quickStartPrimaryPath,
+      routeParams,
+      stage,
+    }) => {
+      mocks.useActivationState.mockReturnValue({
+        state: fixture(),
+        isLoading: false,
+        isRefetching: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      renderView(
+        setupQuickStartRoute({
+          goal: quickStartGoal,
+          id: quickStartId,
+          primaryPath: quickStartPrimaryPath,
+        }),
+      );
+
+      expect(mocks.useActivationState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "setup_org",
+          quickStartGoal,
+          quickStartId,
+          quickStartPrimaryPath,
+        }),
+      );
+      await waitFor(() =>
+        expectCurrentRoute({
+          pathname,
+          params: {
+            ...routeParams,
+            quick_start_goal: quickStartGoal,
+            quick_start_id: quickStartId,
+            quick_start_primary_path: quickStartPrimaryPath,
+          },
+        }),
+      );
+      await expectAutoHandoffEvent({
+        actionId,
+        pathname,
+        quickStartGoal,
+        quickStartId,
+        quickStartPrimaryPath,
+        routeParams: {
+          ...routeParams,
+          quick_start_goal: quickStartGoal,
+          quick_start_id: quickStartId,
+          quick_start_primary_path: quickStartPrimaryPath,
+        },
+      });
+      await waitFor(() =>
+        expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+          "onboarding_home_viewed",
+          expect.objectContaining({
+            source: "setup_org",
+            quick_start_goal: quickStartGoal,
+            quick_start_id: quickStartId,
+            quick_start_primary_path: quickStartPrimaryPath,
+            workspace_id: "wrk_onboarding",
+            organization_id: "org_onboarding",
+            user_id: "usr_onboarding",
+            activation_stage: stage,
+            primary_path: quickStartPrimaryPath,
+            is_sample: false,
+            permission_limited: false,
+          }),
+        ),
+      );
+      expect(readPersistedSetupQuickStartAttribution()).toEqual({
+        quickStartGoal,
+        quickStartId,
+        quickStartPrimaryPath,
+      });
+    },
+  );
+
+  it.each([
+    {
+      label: "stage has moved past the first setup action",
+      state: () => normalizedFixture("promptCreatedNoRun"),
+    },
+    {
+      label: "first action route is unavailable",
+      state: () => ({
+        ...normalizedFixture("promptNoPrompt"),
+        recommendedAction: {
+          ...normalizedFixture("promptNoPrompt").recommendedAction,
+          routeAvailable: false,
+        },
+      }),
+    },
+    {
+      label: "first action is blocked",
+      state: () => ({
+        ...normalizedFixture("promptNoPrompt"),
+        recommendedAction: {
+          ...normalizedFixture("promptNoPrompt").recommendedAction,
+          blocked: true,
+        },
+      }),
+    },
+    {
+      label: "workspace permissions are limited",
+      state: () => ({
+        ...normalizedFixture("promptNoPrompt"),
+        permissions: {
+          ...normalizedFixture("promptNoPrompt").permissions,
+          permissionLimited: true,
+        },
+      }),
+    },
+  ])("keeps setup quick-start on Home when $label", async ({ state }) => {
     mocks.useActivationState.mockReturnValue({
-      state: normalizedFixture("observeNoSetup"),
+      state: state(),
       isLoading: false,
       isRefetching: false,
       isError: false,
@@ -861,64 +1154,29 @@ describe("OnboardingHomeView", () => {
     });
 
     renderView(
-      "/dashboard/home?source=setup_org&quick_start_id=observe&quick_start_goal=monitor_production_ai_app&quick_start_primary_path=observe",
-    );
-
-    expect(mocks.useActivationState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        source: "setup_org",
-        quickStartGoal: "monitor_production_ai_app",
-        quickStartId: "observe",
-        quickStartPrimaryPath: "observe",
+      setupQuickStartRoute({
+        goal: "improve_prompts",
+        id: "prompt",
+        primaryPath: "prompt",
       }),
     );
-    await waitFor(() => {
-      expect(window.location.pathname).toBe("/dashboard/observe");
-      const params = new URLSearchParams(window.location.search);
-      expect(params.get("setup")).toBe("true");
-      expect(params.get("source")).toBe("onboarding");
-      expect(params.get("quick_start_goal")).toBe("monitor_production_ai_app");
-      expect(params.get("quick_start_id")).toBe("observe");
-      expect(params.get("quick_start_primary_path")).toBe("observe");
-    });
-    await waitFor(() =>
-      expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
-        "onboarding_setup_quick_start_auto_handoff",
-        expect.objectContaining({
-          source: "setup_org",
-          quick_start_goal: "monitor_production_ai_app",
-          quick_start_id: "observe",
-          quick_start_primary_path: "observe",
-          recommended_action_id: "create_observe_project",
-          action_id: "create_observe_project",
-          route:
-            "/dashboard/observe?setup=true&source=onboarding&quick_start_goal=monitor_production_ai_app&quick_start_id=observe&quick_start_primary_path=observe",
-        }),
-      ),
-    );
+
     await waitFor(() =>
       expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
         "onboarding_home_viewed",
         expect.objectContaining({
           source: "setup_org",
-          quick_start_goal: "monitor_production_ai_app",
-          quick_start_id: "observe",
-          quick_start_primary_path: "observe",
-          workspace_id: "wrk_onboarding",
-          organization_id: "org_onboarding",
-          user_id: "usr_onboarding",
-          activation_stage: "connect_observability",
-          primary_path: "observe",
-          is_sample: false,
-          permission_limited: false,
+          quick_start_goal: "improve_prompts",
+          quick_start_id: "prompt",
+          quick_start_primary_path: "prompt",
         }),
       ),
     );
-    expect(readPersistedSetupQuickStartAttribution()).toEqual({
-      quickStartGoal: "monitor_production_ai_app",
-      quickStartId: "observe",
-      quickStartPrimaryPath: "observe",
-    });
+    expect(window.location.pathname).toBe("/dashboard/home");
+    expect(mocks.trackOnboardingHomeEvent).not.toHaveBeenCalledWith(
+      "onboarding_setup_quick_start_auto_handoff",
+      expect.anything(),
+    );
   });
 
   it("lets users focus another product loop from path cards", async () => {
@@ -1573,9 +1831,9 @@ describe("OnboardingHomeView", () => {
     expect(screen.getAllByText("agent").length).toBeGreaterThan(0);
   });
 
-  it("keeps setup quick-start attribution on the agent primary action", () => {
+  it("keeps setup quick-start attribution on the agent primary action after first setup", () => {
     mocks.useActivationState.mockReturnValue({
-      state: normalizedFixture("agentNoAgent"),
+      state: normalizedFixture("agentCreatedNoRun"),
       isLoading: false,
       isRefetching: false,
       isError: false,
@@ -1589,10 +1847,10 @@ describe("OnboardingHomeView", () => {
 
     const panel = screen.getByTestId("path-focus-panel-agent");
     expect(
-      within(panel).getByRole("link", { name: /create agent/i }),
+      within(panel).getByRole("link", { name: /run scenario/i }),
     ).toHaveAttribute(
       "href",
-      "/dashboard/agents?onboarding=create&quick_start_goal=build_ai_agent&quick_start_id=agent&quick_start_primary_path=agent&tour_anchor=agent_create_button&journey_step=create_agent",
+      "/dashboard/agents/playground/agent-1/build?onboarding=run-scenario&quick_start_goal=build_ai_agent&quick_start_id=agent&quick_start_primary_path=agent&tour_anchor=agent_run_scenario_button&journey_step=run_agent_scenario",
     );
   });
 
@@ -1758,23 +2016,24 @@ describe("OnboardingHomeView", () => {
     expect(cta).not.toHaveAttribute("href");
   });
 
-  it("keeps setup quick-start attribution on the voice primary action", () => {
+  it("keeps setup quick-start attribution on the voice primary action after first setup", () => {
     mocks.useActivationState.mockReturnValue({
       state: pathState({
         action: pathAction({
-          id: "create_voice_agent",
+          id: "run_voice_test_call",
           kind: "setup",
-          title: "Create voice agent",
-          description: "Create or connect one voice agent.",
-          href: "/dashboard/simulate/agent-definitions/create-new-agent-definition?source=onboarding&onboarding=create-voice-agent",
-          ctaLabel: "Create agent",
+          title: "Run test call",
+          description: "Run a safe call or simulation.",
+          href: "/dashboard/simulate/test?from=onboarding&onboarding=create-test-call&agent_definition_id=agent-1",
+          ctaLabel: "Run call",
+          completionEvent: "voice_test_call_completed",
           targetPath: "voice",
         }),
         goal: "connect_voice_ai_agent",
         pathDescription: "Run or review a call with clear success criteria.",
         pathLabel: "Connect a voice AI agent",
         primaryPath: "voice",
-        stage: "create_voice_agent",
+        stage: "run_voice_test_call",
       }),
       isLoading: false,
       isRefetching: false,
@@ -1789,10 +2048,10 @@ describe("OnboardingHomeView", () => {
 
     const panel = screen.getByTestId("path-focus-panel-voice");
     expect(
-      within(panel).getByRole("link", { name: /create agent/i }),
+      within(panel).getByRole("link", { name: /run call/i }),
     ).toHaveAttribute(
       "href",
-      "/dashboard/simulate/agent-definitions/create-new-agent-definition?source=onboarding&onboarding=create-voice-agent&quick_start_goal=connect_voice_ai_agent&quick_start_id=voice&quick_start_primary_path=voice&tour_anchor=voice_agent_button&journey_step=create_voice_agent",
+      "/dashboard/simulate/test?from=onboarding&onboarding=create-test-call&agent_definition_id=agent-1&quick_start_goal=connect_voice_ai_agent&quick_start_id=voice&quick_start_primary_path=voice&tour_anchor=voice_test_call_button&journey_step=run_voice_test_call",
     );
   });
 

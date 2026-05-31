@@ -44,7 +44,14 @@ import OnboardingHomeError from "./components/OnboardingHomeError";
 import OnboardingHomeSkeleton from "./components/OnboardingHomeSkeleton";
 import PathCardGrid from "./components/PathCardGrid";
 import PathFocusPanel from "./components/PathFocusPanel";
-import { hasPathFocusPlan } from "./components/path-focus-plan";
+import {
+  hrefWithJourneyGuide,
+  journeyCurrentStep,
+} from "./components/journey-guide-utils";
+import {
+  PATH_FOCUS_PLANS,
+  hasPathFocusPlan,
+} from "./components/path-focus-plan";
 import ProductLoopStepper from "./components/ProductLoopStepper";
 import RecommendedActionCard from "./components/RecommendedActionCard";
 import SampleProjectPanel from "./components/SampleProjectPanel";
@@ -118,11 +125,51 @@ const actionWithSetupQuickStartAttribution = (action, context) => {
 };
 
 const SETUP_QUICK_START_DIRECT_HANDOFFS = {
+  agent: {
+    actionId: "create_agent",
+    primaryPath: "agent",
+    stage: "create_agent",
+  },
+  evals: {
+    actionId: "create_eval_dataset",
+    primaryPath: "evals",
+    stage: "create_eval_dataset",
+  },
+  gateway: {
+    actionId: "gateway_add_provider",
+    primaryPath: "gateway",
+    stage: "configure_gateway_provider",
+  },
   observe: {
     actionId: "create_observe_project",
+    journeyStep: {
+      id: "connect_observability",
+      stage: "connect_observability",
+      tourAnchor: "observe_create_project_button",
+    },
     primaryPath: "observe",
     stage: "connect_observability",
   },
+  prompt: {
+    actionId: "create_prompt",
+    primaryPath: "prompt",
+    stage: "start_prompt",
+  },
+  voice: {
+    actionId: "create_voice_agent",
+    primaryPath: "voice",
+    stage: "create_voice_agent",
+  },
+};
+
+const setupQuickStartHandoffStep = ({ handoff, state }) => {
+  const planStep = journeyCurrentStep(state.journeyPlan, state.stage);
+  if (planStep?.stage === state.stage) return planStep;
+
+  const fallbackStep = PATH_FOCUS_PLANS[state.primaryPath]?.steps?.find(
+    (step) => step.stage === state.stage,
+  );
+  return fallbackStep || handoff.journeyStep || null;
 };
 
 const setupQuickStartDirectHandoffHref = ({ searchContext, state }) => {
@@ -134,6 +181,7 @@ const setupQuickStartDirectHandoffHref = ({ searchContext, state }) => {
   const action = state?.recommendedAction;
   if (!handoff || !action?.href) return null;
   if (state.isActivated || state.permissions?.permissionLimited) return null;
+  if (searchContext.quickStartPrimaryPath !== handoff.primaryPath) return null;
   if (
     state.stage !== handoff.stage ||
     state.primaryPath !== handoff.primaryPath
@@ -148,7 +196,13 @@ const setupQuickStartDirectHandoffHref = ({ searchContext, state }) => {
     return null;
   }
 
-  return appendSetupQuickStartAttributionToHref(action.href, searchContext);
+  return appendSetupQuickStartAttributionToHref(
+    hrefWithJourneyGuide(
+      action.href,
+      setupQuickStartHandoffStep({ handoff, state }),
+    ),
+    searchContext,
+  );
 };
 
 const OBSERVE_PANEL_STAGES = new Set([
