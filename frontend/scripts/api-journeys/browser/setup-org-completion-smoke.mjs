@@ -27,27 +27,18 @@ const SAMPLE_QUICK_START_METADATA = {
 
 const QUICK_STARTS = {
   observe: {
-    buttonText: "Connect real observability",
+    buttonText: "Connect your agent",
+    expectedActionText: "Create Observe project",
     expectedAttribution: {
       quick_start_goal: "monitor_production_ai_app",
       quick_start_id: "observe",
       quick_start_primary_path: "observe",
     },
-    expectedGoal: "Monitor a production AI app",
-    expectedDirectHandoff: {
-      pathname: "/dashboard/observe",
-      params: {
-        setup: "true",
-        source: "onboarding",
-        tour_anchor: "observe_create_project_button",
-        journey_step: "connect_observability",
-      },
-    },
+    expectedGoal: "Connect your agent",
     fixture: "newWorkspaceNoGoal",
   },
   sample_preview: {
-    buttonText: "Preview sample trace first",
-    directSampleTrace: true,
+    buttonText: "Open sample data",
     expectedAttribution: {
       quick_start_goal: "explore_sample_data",
       quick_start_id: "sample_preview",
@@ -57,98 +48,59 @@ const QUICK_STARTS = {
     fixture: "sampleFirstRunStart",
   },
   prompt: {
-    buttonText: "Test prompts",
+    buttonText: "Test prompts or agent prompts",
+    expectedActionText: "Create prompt",
     expectedAttribution: {
       quick_start_goal: "improve_prompts",
       quick_start_id: "prompt",
       quick_start_primary_path: "prompt",
     },
     expectedGoal: "Test and improve prompts",
-    expectedDirectHandoff: {
-      pathname: "/dashboard/workbench/all",
-      params: {
-        source: "onboarding",
-        action: "create-prompt",
-        tour_anchor: "prompt_create_button",
-        journey_step: "start_prompt",
-      },
-    },
     fixture: "promptNoPrompt",
   },
   agent: {
     buttonText: "Prototype agent",
+    expectedActionText: "Create agent",
     expectedAttribution: {
       quick_start_goal: "build_ai_agent",
       quick_start_id: "agent",
       quick_start_primary_path: "agent",
     },
     expectedGoal: "Build or prototype an AI agent",
-    expectedDirectHandoff: {
-      pathname: "/dashboard/agents",
-      params: {
-        onboarding: "create",
-        tour_anchor: "agent_create_button",
-        journey_step: "create_agent",
-      },
-    },
     fixture: "agentNoAgent",
   },
   gateway: {
-    buttonText: "Route gateway",
+    buttonText: "Setup gateway",
+    expectedActionText: "Add provider",
     expectedAttribution: {
       quick_start_goal: "control_model_traffic",
       quick_start_id: "gateway",
       quick_start_primary_path: "gateway",
     },
     expectedGoal: "Route LLM traffic safely",
-    expectedDirectHandoff: {
-      pathname: "/dashboard/gateway/providers",
-      params: {
-        source: "onboarding",
-        tour_anchor: "gateway_provider_button",
-        journey_step: "configure_gateway_provider",
-      },
-    },
     fixture: "gatewayNoProvider",
   },
   evals: {
-    buttonText: "Run eval",
+    buttonText: "Test AI using simulation",
+    expectedActionText: "Create dataset",
     expectedAttribution: {
       quick_start_goal: "evaluate_quality",
       quick_start_id: "evals",
       quick_start_primary_path: "evals",
     },
-    expectedGoal: "Evaluate quality on data or traces",
-    expectedDirectHandoff: {
-      pathname: "/dashboard/evaluations/create",
-      params: {
-        source: "onboarding",
-        step: "dataset",
-        tour_anchor: "eval_dataset_button",
-        journey_step: "create_eval_dataset",
-      },
-    },
+    expectedGoal: "Test AI using simulation",
     activationState: pathFocusActivationState,
     primaryPath: "evals",
   },
   voice: {
-    buttonText: "Connect voice",
+    buttonText: "Connect voice agent",
+    expectedActionText: "Create agent",
     expectedAttribution: {
       quick_start_goal: "connect_voice_ai_agent",
       quick_start_id: "voice",
       quick_start_primary_path: "voice",
     },
     expectedGoal: "Connect a voice AI agent",
-    expectedDirectHandoff: {
-      pathname:
-        "/dashboard/simulate/agent-definitions/create-new-agent-definition",
-      params: {
-        source: "onboarding",
-        onboarding: "create-voice-agent",
-        tour_anchor: "voice_agent_button",
-        journey_step: "create_voice_agent",
-      },
-    },
     activationState: pathFocusActivationState,
     primaryPath: "voice",
   },
@@ -249,35 +201,43 @@ async function main() {
     await page.goto(`${APP_BASE}/auth/jwt/setup-org?step=0`, {
       waitUntil: "domcontentloaded",
     });
-    await expectVisibleText(page, "Start with your first quality loop");
+    await expectVisibleText(page, "What do you want to set up first?");
     await expectVisibleText(
       page,
-      "See trace context, one quality issue, and the evaluator step before connecting your app.",
+      "Choose one workflow. We will show the exact checklist next.",
     );
     const quickStartInitiallyVisible = await isVisibleButtonText(
       page,
       QUICK_START.buttonText,
     );
     assert(
-      QUICK_START.directSampleTrace
-        ? quickStartInitiallyVisible
-        : !quickStartInitiallyVisible,
-      QUICK_START.directSampleTrace
-        ? "Expected sample preview to be the visible primary setup action."
-        : `Expected ${QUICK_START.buttonText} to stay hidden until alternatives expand.`,
+      quickStartInitiallyVisible,
+      `Expected ${QUICK_START.buttonText} to be visible on setup-org.`,
     );
     await page.evaluate(() => {
       localStorage.setItem("redirectUrl", "/dashboard/observe?project=stale");
     });
-    if (!QUICK_START.directSampleTrace) {
-      await clickVisibleButtonText(page, "Choose a different first loop");
-    }
     await clickVisibleButtonText(page, QUICK_START.buttonText);
     let homeParams = null;
-    let handoffParams = null;
-    let handoffUrl = null;
+    let setupOrgHomeUrl = null;
     let sampleTraceUrl = null;
-    if (QUICK_START.directSampleTrace) {
+    setupOrgHomeUrl = await waitForSetupOrgHomeRoute(
+      page,
+      QUICK_START.expectedAttribution,
+      { timeout: 30000 },
+    );
+    homeParams = paramsObject(setupOrgHomeUrl);
+    assertExpectedAttribution(homeParams, {
+      ...QUICK_START.expectedAttribution,
+      source: "setup_org",
+    });
+
+    await expectVisibleTestId(page, "onboarding-home-view");
+    if (QUICK_START_KEY === "sample_preview") {
+      await expectVisibleText(page, "Preview sample data", { exact: true });
+      await expectVisibleText(page, "Sample data is a preview");
+      await expectVisibleText(page, "Open sample trace");
+      await clickVisibleButtonText(page, "Open sample trace");
       await waitForSampleTraceRoute(page, { timeout: 30000 });
       sampleTraceUrl = relativeUrl(page.url());
       assert(
@@ -288,17 +248,16 @@ async function main() {
       await expectVisibleText(page, "Sample trace review");
       await expectVisibleText(page, "Connect your app", { exact: true });
     } else {
-      handoffUrl = await waitForDirectHandoffRoute(
-        page,
-        QUICK_START.expectedDirectHandoff,
-      );
-      handoffParams = paramsObject(handoffUrl);
-      assertExpectedRoute(handoffUrl, QUICK_START.expectedDirectHandoff);
-      assertExpectedAttribution(handoffParams, QUICK_START.expectedAttribution);
-      assert(
-        new URL(handoffUrl, APP_BASE).pathname !== "/dashboard/home",
-        `Expected setup quick-start to hand off directly, got ${handoffUrl}`,
-      );
+      await expectVisibleText(page, `Set up: ${QUICK_START.buttonText}`, {
+        exact: true,
+      });
+      await expectVisibleText(page, `You chose ${QUICK_START.buttonText}`);
+      await expectVisibleText(page, "Do this now");
+      await expectVisibleText(page, QUICK_START.expectedActionText, {
+        exact: true,
+      });
+      await expectVisibleText(page, "Show full path", { exact: true });
+      await expectNoSelector(page, '[data-testid="sample-project-panel"]');
 
       await waitForCondition(
         () => activationStateRequests.length === 1,
@@ -338,7 +297,7 @@ async function main() {
       setupPosts.length === 0,
       "Expected no setup organization POST on product-loop quick start.",
     );
-    if (QUICK_START.directSampleTrace) {
+    if (QUICK_START_KEY === "sample_preview") {
       await waitForCondition(
         () => sampleProjectPosts.length === 1,
         "Expected one setup-org sample-project POST.",
@@ -412,8 +371,6 @@ async function main() {
             browser_state: browserState,
             console_messages: consoleMessages,
             home_params: homeParams,
-            direct_handoff_params: handoffParams,
-            direct_handoff_url: handoffUrl,
             onboarding_post: onboardingPosts[0],
             request_failures: requestFailures,
             sample_project_post: sampleProjectPosts[0],
@@ -421,17 +378,19 @@ async function main() {
             sample_trace_activation_event: activationEventPosts.find(
               (payload) => payload?.event_name === "sample_trace_detail_opened",
             ),
-            sample_trace_entry: QUICK_START.directSampleTrace
-              ? {
-                  clicks_after_quick_start: 0,
-                  quick_start_goal: "explore_sample_data",
-                  quick_start_id: "sample_preview",
-                  quick_start_primary_path: "sample",
-                  source: "setup_org",
-                }
-              : null,
+            sample_trace_entry:
+              QUICK_START_KEY === "sample_preview"
+                ? {
+                    clicks_after_quick_start: 1,
+                    quick_start_goal: "explore_sample_data",
+                    quick_start_id: "sample_preview",
+                    quick_start_primary_path: "sample",
+                    source: "setup_org",
+                  }
+                : null,
             sample_trace_url: sampleTraceUrl,
             screenshot: SCREENSHOT_PATH,
+            setup_org_home_url: setupOrgHomeUrl,
             setup_posts: setupPosts,
             setup_quick_start: QUICK_START_KEY,
             trace_detail_requests: traceDetailRequests,
@@ -483,19 +442,6 @@ function assertExpectedAttribution(actual, expected) {
       )}`,
     );
   }
-}
-
-function assertExpectedRoute(value, expected) {
-  const url = safeUrl(value);
-  assert(url, `Expected valid route URL, got ${value}`);
-  assert(
-    url.pathname === expected.pathname,
-    `Expected route ${expected.pathname}, got ${url.pathname}`,
-  );
-  assertExpectedAttribution(
-    Object.fromEntries(url.searchParams),
-    expected.params,
-  );
 }
 
 async function installRuntime(
@@ -1022,25 +968,41 @@ async function waitForSampleTraceRoute(page, { timeout = 30000 } = {}) {
   );
 }
 
-async function waitForDirectHandoffRoute(
+async function waitForSetupOrgHomeRoute(
   page,
-  { pathname, params },
+  expectedParams,
   { timeout = 30000 } = {},
 ) {
   const handle = await page.waitForFunction(
     (expected) => {
-      if (window.location.pathname !== expected.pathname) return false;
+      if (window.location.pathname !== "/dashboard/home") return false;
       const searchParams = new URLSearchParams(window.location.search);
-      const matched = Object.entries(expected.params).every(
+      if (searchParams.get("source") !== "setup_org") return false;
+      const matched = Object.entries(expected).every(
         ([key, value]) => searchParams.get(key) === value,
       );
       if (!matched) return false;
       return `${window.location.pathname}${window.location.search}${window.location.hash}`;
     },
     { timeout },
-    { pathname, params },
+    expectedParams,
   );
   return handle.jsonValue();
+}
+
+async function expectVisibleTestId(page, testId, timeout = 30000) {
+  await page.waitForSelector(`[data-testid="${testId}"]`, {
+    visible: true,
+    timeout,
+  });
+}
+
+async function expectNoSelector(page, selector, timeout = 30000) {
+  await page.waitForFunction(
+    (targetSelector) => !document.querySelector(targetSelector),
+    { timeout },
+    selector,
+  );
 }
 
 async function expectVisibleText(

@@ -22,7 +22,6 @@ import { LoadingButton } from "@mui/lab";
 import axios, { endpoints } from "src/utils/axios";
 import PropTypes from "prop-types";
 import { FormSearchSelectFieldState } from "src/components/FromSearchSelectField";
-import RightSectionAuth from "./RightSectionAuth";
 import { Controller, useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuthContext } from "src/auth/hooks";
@@ -51,6 +50,24 @@ import {
 } from "./setup-org-quick-starts";
 
 const QUICK_START_ROLE = "AI Builder";
+
+const SETUP_SIDE_PANEL_STEPS = [
+  {
+    icon: "mdi:cursor-default-click-outline",
+    label: "Pick one setup path",
+    description: "Choose the workflow you want working first.",
+  },
+  {
+    icon: "mdi:clipboard-check-outline",
+    label: "Complete the checklist",
+    description: "The next screen keeps you on that selected path.",
+  },
+  {
+    icon: "mdi:database-eye-outline",
+    label: "Use real workspace data",
+    description: "Sample data stays optional and never completes setup.",
+  },
+];
 
 const normalizeGoalValue = (value) =>
   String(value || "")
@@ -207,6 +224,95 @@ MemberRow.propTypes = {
   control: PropTypes.object,
   onRemove: PropTypes.func,
 };
+
+const SetupOrgSidePanel = () => (
+  <Box
+    sx={{
+      width: "100%",
+      height: "100%",
+      minHeight: "100dvh",
+      p: 4,
+      bgcolor: "background.neutral",
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
+    <Stack direction="row" gap={0.75} alignItems="center">
+      <Box
+        component="img"
+        sx={{ height: 44, width: 44 }}
+        src="/favicon/logo.svg"
+        alt="FutureAGI"
+      />
+
+      <SvgColor
+        src="/logo/future_agi_text.svg"
+        sx={{ height: 20, width: 128, color: "text.primary" }}
+      />
+    </Stack>
+
+    <Stack
+      spacing={3}
+      sx={{
+        maxWidth: 520,
+        width: "100%",
+        mx: "auto",
+        my: "auto",
+      }}
+    >
+      <Stack spacing={1}>
+        <Typography variant="overline" color="text.secondary">
+          First setup
+        </Typography>
+        <Typography variant="h4">One path at a time</Typography>
+        <Typography variant="body1" color="text.secondary">
+          Choose the workflow to set up now. FutureAGI will keep the next screen
+          focused on that checklist.
+        </Typography>
+      </Stack>
+
+      <Stack spacing={1.25}>
+        {SETUP_SIDE_PANEL_STEPS.map((step) => (
+          <Stack
+            key={step.label}
+            direction="row"
+            spacing={1.25}
+            alignItems="flex-start"
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1,
+              bgcolor: "background.paper",
+              p: 1.5,
+            }}
+          >
+            <Box
+              sx={{
+                width: 34,
+                height: 34,
+                borderRadius: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+                flexShrink: 0,
+              }}
+            >
+              <Iconify icon={step.icon} width={18} />
+            </Box>
+            <Stack spacing={0.25}>
+              <Typography variant="subtitle2">{step.label}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {step.description}
+              </Typography>
+            </Stack>
+          </Stack>
+        ))}
+      </Stack>
+    </Stack>
+  </Box>
+);
 
 const useOrganizationInitialData = (isOwner, user) => {
   const { enqueueSnackbar } = useSnackbar();
@@ -597,8 +703,12 @@ const SetupOrganization = ({ getStarted = false }) => {
         <Stack spacing={0.5}>
           <Typography variant="subtitle2">Product workflows</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick the workflow you want working first. The next screen keeps you
-            on that setup path.
+            Pick the workflow you want working first. The next screen shows the
+            setup checklist for that path.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            We will save this as your first goal and you can invite teammates
+            later.
           </Typography>
         </Stack>
 
@@ -988,7 +1098,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Choose one workflow and keep moving on that path
+                Choose one workflow. We will show the exact checklist next.
               </Typography>
             </Box>
 
@@ -1118,7 +1228,7 @@ const SetupOrganization = ({ getStarted = false }) => {
             backgroundColor: "background.neutral",
           }}
         >
-          <RightSectionAuth />
+          <SetupOrgSidePanel />
         </Box>
       </Box>
     </>

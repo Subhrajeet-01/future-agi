@@ -322,18 +322,40 @@ async function main() {
     );
     await clickVisibleButtonText(page, "Create account and continue");
 
-    await expectVisibleText(page, "Start with your first quality loop", {
+    await expectVisibleText(page, "What do you want to set up first?", {
       timeout: 90000,
     });
+    await expectVisibleText(
+      page,
+      "Choose one workflow. We will show the exact checklist next.",
+      { timeout: 90000 },
+    );
     await waitForBrowserFrame();
     await clickVisibleButtonText(
       page,
-      SAMPLE_ONLY ? "Preview sample trace first" : "Connect real observability",
+      SAMPLE_ONLY ? "Open sample data" : "Connect your agent",
     );
 
-    const setupOrgHomeUrl = null;
+    let setupOrgHomeUrl = null;
     let setupOrgEntryUrl = null;
+    await page.waitForFunction(
+      () =>
+        window.location.pathname === "/dashboard/home" &&
+        new URLSearchParams(window.location.search).get("source") ===
+          "setup_org",
+      { timeout: 45000 },
+    );
+    setupOrgHomeUrl = relativeUrl(page.url());
     if (SAMPLE_ONLY) {
+      assert(
+        hasSampleQuickStartParams(setupOrgHomeUrl),
+        `Expected setup-org sample Home URL quick-start attribution, got ${setupOrgHomeUrl}`,
+      );
+      await expectVisibleText(page, "Preview sample data", {
+        exact: true,
+        timeout: 45000,
+      });
+      await clickVisibleButtonText(page, "Open sample trace", 45000);
       await waitForSampleTraceRoute(page, { timeout: 45000 });
       setupOrgEntryUrl = relativeUrl(page.url());
       assert(
@@ -341,6 +363,19 @@ async function main() {
         `Expected sample trace URL quick-start attribution, got ${setupOrgEntryUrl}`,
       );
     } else {
+      assert(
+        hasObserveQuickStartParams(setupOrgHomeUrl),
+        `Expected setup-org Home URL quick-start attribution, got ${setupOrgHomeUrl}`,
+      );
+      await expectVisibleText(page, "Set up: Connect your agent", {
+        exact: true,
+        timeout: 45000,
+      });
+      await expectVisibleText(page, "You chose Connect your agent", {
+        timeout: 45000,
+      });
+      await expectVisibleText(page, "Do this now", { timeout: 45000 });
+      await clickVisibleButtonText(page, "Create Observe project", 45000);
       await page.waitForFunction(
         () => {
           const params = new URLSearchParams(window.location.search);
@@ -360,11 +395,7 @@ async function main() {
       setupOrgEntryUrl = relativeUrl(page.url());
       assert(
         hasObserveDirectHandoffParams(setupOrgEntryUrl),
-        `Expected setup-org direct handoff URL, got ${setupOrgEntryUrl}`,
-      );
-      assert(
-        new URL(page.url()).pathname !== "/dashboard/home",
-        `Expected setup quick-start to hand off directly, got ${page.url()}`,
+        `Expected observe setup URL quick-start attribution, got ${setupOrgEntryUrl}`,
       );
       await expectNoVisibleText(page, "Invite your team later", {
         timeout: 1000,
@@ -1193,10 +1224,10 @@ async function main() {
     await expectVisibleTestId(page, "first-loop-complete-panel", {
       timeout: 45000,
     });
-    await expectVisibleText(page, "Aha moment reached", {
+    await expectVisibleText(page, "First setup complete", {
       timeout: 60000,
     });
-    await expectVisibleText(page, "Your first quality loop is live", {
+    await expectVisibleText(page, "Your first workflow is live", {
       timeout: 60000,
     });
     const dailyQualityCtaHref = EXPECT_DAILY_QUALITY
@@ -1852,13 +1883,15 @@ async function clickVisibleButtonText(page, text, timeout = 30000) {
           !element.disabled
         );
       };
-      const button = Array.from(document.querySelectorAll("button")).find(
+      const action = Array.from(
+        document.querySelectorAll("a, button, [role='button']"),
+      ).find(
         (element) =>
           isVisible(element) &&
           (normalized(element.getAttribute("aria-label")) === expectedText ||
             normalized(element.textContent) === expectedText),
       );
-      return button || false;
+      return action || false;
     },
     { timeout },
     text,

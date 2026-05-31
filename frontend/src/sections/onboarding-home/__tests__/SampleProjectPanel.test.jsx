@@ -37,6 +37,9 @@ describe("SampleProjectPanel", () => {
     expect(screen.getByTestId("sample-project-aha-preview")).toBeVisible();
     expect(screen.getByText("Issue to review")).toBeVisible();
     expect(screen.getByText("Turn it into an evaluator")).toBeVisible();
+    const controls = Array.from(
+      screen.getByTestId("sample-project-panel").querySelectorAll("a, button"),
+    ).map((control) => control.textContent);
     const openSampleButton = screen.getByRole("button", {
       name: /open sample trace/i,
     });
@@ -44,9 +47,13 @@ describe("SampleProjectPanel", () => {
       "data-tour-anchor",
       "sample_project_button",
     );
+    expect(controls.slice(0, 2)).toEqual([
+      "Open sample trace",
+      "Connect your agent",
+    ]);
     await userEvent.click(openSampleButton);
     await userEvent.click(
-      screen.getByRole("link", { name: /connect real observability/i }),
+      screen.getByRole("link", { name: /connect your agent/i }),
     );
 
     expect(onOpenSample).toHaveBeenCalledTimes(1);
@@ -75,19 +82,19 @@ describe("SampleProjectPanel", () => {
       screen.getByText("Connect the same workflow to real data"),
     ).toBeVisible();
     expect(
-      within(panel).getByRole("link", { name: /connect real observability/i }),
+      within(panel).getByRole("link", { name: /connect your agent/i }),
     ).toHaveAttribute(
       "href",
       "/dashboard/observe?setup=true&source=sample_trace_review&tour_anchor=sample_connect_real_data_button&journey_step=connect_real_data",
     );
     expect(
-      within(panel).getByRole("link", { name: /connect real observability/i }),
+      within(panel).getByRole("link", { name: /connect your agent/i }),
     ).toHaveAttribute("data-tour-anchor", "sample_connect_real_data_button");
     expect(
       within(panel).getByRole("button", { name: /open sample trace/i }),
     ).toHaveAttribute("data-tour-anchor", "sample_trace_link");
     expect(controls.slice(0, 2)).toEqual([
-      "Connect real observability",
+      "Connect your agent",
       "Open sample trace",
     ]);
   });

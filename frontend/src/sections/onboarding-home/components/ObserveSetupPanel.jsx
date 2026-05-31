@@ -45,10 +45,13 @@ export default function ObserveSetupPanel({
     >
       <Stack spacing={2}>
         <ObservePanelHeader
-          eyebrow="Observe setup"
-          title="Connect one observe project"
-          description="Create the project, send one trace, then return here for the first review."
-          chips={["observe", "setup"]}
+          eyebrow={effectiveJourneyPlan.eyebrow || "Observe setup"}
+          title={effectiveJourneyPlan.title || "Connect your agent"}
+          description={
+            effectiveJourneyPlan.description ||
+            "Create the project, send one trace, then return here for the first review."
+          }
+          chips={effectiveJourneyPlan.chips || ["observe", "setup"]}
         />
         <ObserveJourneyProgress
           journeyPlan={effectiveJourneyPlan}

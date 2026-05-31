@@ -199,8 +199,8 @@ async function main() {
       );
 
       await expectSelector(page, '[data-testid="first-loop-complete-panel"]');
-      await expectVisibleText(page, "Aha moment reached", { exact: true });
-      await expectVisibleText(page, "Your first quality loop is live", {
+      await expectVisibleText(page, "First setup complete", { exact: true });
+      await expectVisibleText(page, "Your first workflow is live", {
         exact: true,
       });
       await expectVisibleText(
@@ -351,17 +351,13 @@ async function main() {
 
     await expectSelector(page, '[data-testid="observe-setup-panel"]');
     await expectSelector(page, '[data-testid="sample-project-panel"]');
-    await expectVisibleText(page, "Fastest path to Aha", { exact: true });
-    await expectVisibleText(page, "Preview the quality loop first", {
-      exact: true,
-    });
-    await expectVisibleText(page, "Quality issue", { exact: true });
-    await expectVisibleText(page, "Connect one observe project", {
-      exact: true,
-    });
-    await expectVisibleText(page, "Create observe project", { exact: true });
-    await expectVisibleText(page, "Send one trace", { exact: true });
-    await expectVisibleText(page, "Review the signal", { exact: true });
+    await expectVisibleText(page, "Connect observability", { exact: true });
+    await expectVisibleText(page, "Preview sample data", { exact: true });
+    await expectVisibleText(page, "Connect your agent", { exact: true });
+    await expectVisibleText(page, "Create Observe project", { exact: true });
+    await expectVisibleText(page, "Send first trace", { exact: true });
+    await expectVisibleText(page, "Review first signal", { exact: true });
+    await expectVisibleText(page, "Add quality check", { exact: true });
     await page.screenshot({ path: HOME_SCREENSHOT_PATH, fullPage: true });
     evidence.home_screenshot = HOME_SCREENSHOT_PATH;
 

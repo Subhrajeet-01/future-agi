@@ -48,8 +48,8 @@ export default function SampleProjectPanel({
     ? "Connect the same workflow to real data"
     : "Preview sample data";
   const description = isRealDataStep
-    ? "Use the sample trace as a reference, then connect real observability so the same workflow runs on production data."
-    : "Optional preview data is ready if you want to inspect the screens. Continue with real observability to finish setup.";
+    ? "Use the sample trace as a reference, then connect your agent so the same workflow runs on production data."
+    : "Optional preview data is ready if you want to inspect the screens. Connect your agent to finish setup.";
   const openSampleTourAnchor =
     activationStage === "review_sample_signal" || isRealDataStep
       ? "sample_trace_link"
@@ -68,6 +68,33 @@ export default function SampleProjectPanel({
       value: "Turn it into an evaluator",
     },
   ];
+  const openSampleButton = (
+    <Button
+      variant={isRealDataStep ? "outlined" : "contained"}
+      onClick={onOpenSample}
+      disabled={!canOpen || isOpening}
+      data-tour-anchor={openSampleTourAnchor}
+      startIcon={<Iconify icon="mdi:flask-outline" width={18} />}
+      sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+    >
+      {isOpening ? "Opening..." : "Open sample trace"}
+    </Button>
+  );
+  const realSetupButton = (
+    <Button
+      variant={isRealDataStep ? "contained" : "outlined"}
+      component={RouterLink}
+      href={realSetupHref}
+      onClick={onConnectRealData}
+      data-tour-anchor={
+        isRealDataStep ? "sample_connect_real_data_button" : undefined
+      }
+      startIcon={<Iconify icon="mdi:connection" width={18} />}
+      sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+    >
+      Connect your agent
+    </Button>
+  );
 
   return (
     <Box
@@ -136,35 +163,13 @@ export default function SampleProjectPanel({
 
         {sampleProject.status === "partially_ready" && !hasRoute ? (
           <Typography variant="body2" color="text.secondary">
-            The sample trace is not ready. Connect real observability to
-            continue.
+            The sample trace is not ready. Connect your agent to continue.
           </Typography>
         ) : null}
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-          <Button
-            variant="contained"
-            component={RouterLink}
-            href={realSetupHref}
-            onClick={onConnectRealData}
-            data-tour-anchor={
-              isRealDataStep ? "sample_connect_real_data_button" : undefined
-            }
-            startIcon={<Iconify icon="mdi:connection" width={18} />}
-            sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
-          >
-            Connect real observability
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={onOpenSample}
-            disabled={!canOpen || isOpening}
-            data-tour-anchor={openSampleTourAnchor}
-            startIcon={<Iconify icon="mdi:flask-outline" width={18} />}
-            sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
-          >
-            {isOpening ? "Opening..." : "Open sample trace"}
-          </Button>
+          {isRealDataStep ? realSetupButton : openSampleButton}
+          {isRealDataStep ? openSampleButton : realSetupButton}
           <Button
             variant="text"
             color="inherit"

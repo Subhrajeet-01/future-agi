@@ -8,6 +8,7 @@ import OnboardingHomeView from "../OnboardingHomeView";
 import {
   persistSetupQuickStartAttribution,
   readPersistedSetupQuickStartAttribution,
+  SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS,
 } from "src/sections/auth/jwt/setup-org-quick-starts";
 
 const mocks = vi.hoisted(() => ({
@@ -349,7 +350,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
     expect(observeSetupPanel).toBeVisible();
     expect(
-      within(observeSetupPanel).getByText("Connect one observe project"),
+      within(observeSetupPanel).getByText("Connect your agent"),
     ).toBeVisible();
     expect(panelOrder).toEqual([observeSetupPanel, samplePanel]);
     expect(
@@ -385,6 +386,12 @@ describe("OnboardingHomeView", () => {
     const currentStep = within(panel).getByTestId(
       "observe-journey-step-connect_observability",
     );
+    expect(within(panel).getByText("Connect your agent")).toBeVisible();
+    expect(
+      within(panel).getByText(
+        "Connect traces, review the first signal, then turn it into a check.",
+      ),
+    ).toBeVisible();
     expect(within(panel).getByTestId("observe-journey-progress")).toBeVisible();
     expect(
       within(currentStep).getByText("Create project from manifest"),
@@ -539,7 +546,7 @@ describe("OnboardingHomeView", () => {
 
     expect(screen.getByTestId("observe-setup-panel")).toBeVisible();
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
-    expect(screen.getByText("Connect one observe project")).toBeVisible();
+    expect(screen.getAllByText("Connect your agent").length).toBeGreaterThan(0);
     expect(screen.getByText("Do this now")).toBeVisible();
     expect(
       screen.getAllByText("Create Observe project").length,
@@ -583,7 +590,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
     expect(
       within(samplePanel).getByRole("link", {
-        name: /connect real observability/i,
+        name: /connect your agent/i,
       }),
     ).toHaveAttribute("href", "/dashboard/observe");
     expect(screen.queryByTestId("observe-setup-panel")).not.toBeInTheDocument();
@@ -646,7 +653,7 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("keeps setup quick-start attribution on prompt path actions after first setup", () => {
+  it("keeps setup quick-start attribution on prompt path actions after first setup", async () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("promptCreatedNoRun"),
       isLoading: false,
@@ -672,6 +679,12 @@ describe("OnboardingHomeView", () => {
     expect(params.get("quick_start_primary_path")).toBe("prompt");
     expect(params.get("tour_anchor")).toBe("prompt_run_test_button");
     expect(params.get("journey_step")).toBe("run_prompt_test");
+    expect(within(panel).getByText("Step 2 of 6")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Run one focused example before saving.",
+    );
+    expect(screen.queryByTestId("path-focus-step-run_prompt_test")).toBeNull();
+    await userEvent.click(within(panel).getByText("Show full path"));
     expect(
       within(screen.getByTestId("path-focus-step-run_prompt_test")).getByText(
         "Now",
@@ -1073,6 +1086,25 @@ describe("OnboardingHomeView", () => {
         quickStartPrimaryPath === "observe"
           ? screen.getByTestId("observe-setup-panel")
           : screen.getByTestId(`path-focus-panel-${quickStartPrimaryPath}`);
+      const quickStartOption = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
+        (option) => option.id === quickStartId,
+      );
+      expect(
+        screen.getByRole("heading", {
+          level: 3,
+          name: `Set up: ${quickStartOption.buttonLabel}`,
+        }),
+      ).toBeVisible();
+      expect(
+        screen.getByTestId("setup-quick-start-handoff-alert"),
+      ).toHaveTextContent(`You chose ${quickStartOption.buttonLabel}`);
+      expect(
+        screen.getByTestId("setup-quick-start-handoff-alert"),
+      ).toHaveTextContent("Sample data stays optional");
+      expect(screen.queryByTestId("sample-project-panel")).toBeNull();
+      expect(screen.getByText("Do this now")).toBeVisible();
+      expect(within(panel).getByText(/^Step 1 of /)).toBeVisible();
+      expect(within(panel).getByText("Show full path")).toBeVisible();
       const primaryLink = within(panel).getByRole("link", {
         name: new RegExp(activationState.recommendedAction.ctaLabel, "i"),
       });
@@ -1094,6 +1126,14 @@ describe("OnboardingHomeView", () => {
         expect(
           within(panel).getAllByText("Create Observe project").length,
         ).toBeGreaterThan(0);
+        expect(
+          screen.queryByTestId("observe-journey-step-connect_observability"),
+        ).not.toBeInTheDocument();
+      } else {
+        expect(screen.queryByTestId(`path-focus-step-${stage}`)).toBeNull();
+      }
+      await userEvent.click(within(panel).getByText("Show full path"));
+      if (quickStartPrimaryPath === "observe") {
         expect(
           within(
             screen.getByTestId("observe-journey-step-connect_observability"),
@@ -1141,18 +1181,18 @@ describe("OnboardingHomeView", () => {
     expect(
       screen.getByRole("heading", {
         level: 3,
-        name: "Connect your agent",
+        name: "Set up: Connect your agent",
       }),
     ).toBeVisible();
     const panel = screen.getByTestId("observe-setup-panel");
-    expect(
-      within(panel).getByText("Connect one observe project"),
-    ).toBeVisible();
+    expect(within(panel).getByText("Connect your agent")).toBeVisible();
     expect(
       within(panel).getAllByText("Create Observe project").length,
     ).toBeGreaterThan(0);
-    expect(within(panel).getByText("Send first trace")).toBeVisible();
-    expect(within(panel).getByText("Review first signal")).toBeVisible();
+    expect(within(panel).getByText("Step 1 of 4")).toBeVisible();
+    expect(within(panel).getByText("Show full path")).toBeVisible();
+    expect(within(panel).queryByText("Send first trace")).toBeNull();
+    expect(within(panel).queryByText("Review first signal")).toBeNull();
     const setupLink = screen.getByRole("link", {
       name: /create observe project/i,
     });
@@ -1200,16 +1240,16 @@ describe("OnboardingHomeView", () => {
     expect(
       screen.getByRole("heading", {
         level: 3,
-        name: "Test prompts or agent prompts",
+        name: "Set up: Test prompts or agent prompts",
       }),
     ).toBeVisible();
     const panel = screen.getByTestId("path-focus-panel-prompt");
-    expect(
-      within(screen.getByTestId("path-focus-step-start_prompt")).getByText(
-        "Create prompt",
-      ),
-    ).toBeVisible();
-    expect(within(panel).getByText("Run test")).toBeVisible();
+    expect(screen.queryByTestId("path-focus-step-start_prompt")).toBeNull();
+    expect(within(panel).getByText("Step 1 of 6")).toBeVisible();
+    expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
+      "Create prompt",
+    );
+    expect(within(panel).queryByText("Run test")).toBeNull();
     expect(
       within(panel).getByRole("link", { name: /create prompt/i }),
     ).toHaveAttribute(
@@ -1412,6 +1452,13 @@ describe("OnboardingHomeView", () => {
     expect(
       screen.queryByTestId("onboarding-path-card-grid"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("setup-quick-start-handoff-alert"),
+    ).toHaveTextContent("Sample data is a preview");
+    expect(mutateAsync).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(samplePanel).getByRole("button", { name: /open sample trace/i }),
+    );
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1438,7 +1485,7 @@ describe("OnboardingHomeView", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the sample preview fallback visible when auto-open fails", async () => {
+  it("keeps the sample preview fallback visible when opening the sample fails", async () => {
     const mutateAsync = vi.fn().mockRejectedValue(new Error("sample failed"));
     mocks.useSampleProject.mockReturnValue({
       openSampleProject: {
@@ -1466,6 +1513,10 @@ describe("OnboardingHomeView", () => {
     );
 
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
+    expect(mutateAsync).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: /open sample trace/i }),
+    );
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
     expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
@@ -1515,7 +1566,7 @@ describe("OnboardingHomeView", () => {
 
     const samplePanel = screen.getByTestId("sample-project-panel");
     const realSetupLink = within(samplePanel).getByRole("link", {
-      name: /connect real observability/i,
+      name: /connect your agent/i,
     });
     const params = new URLSearchParams(
       realSetupLink.getAttribute("href").split("?")[1],
@@ -1712,7 +1763,7 @@ describe("OnboardingHomeView", () => {
     expect(
       screen.getByTestId("daily-quality-primary-action"),
     ).toHaveTextContent("Create alert");
-    expect(screen.queryByText("Connect one observe project")).toBeNull();
+    expect(screen.queryByTestId("observe-setup-panel")).toBeNull();
     await waitFor(() =>
       expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
         "daily_quality_empty_state_viewed",
@@ -2077,8 +2128,14 @@ describe("OnboardingHomeView", () => {
     );
 
     const panel = screen.getByTestId("path-focus-panel-gateway");
-    expect(screen.getByText("Run a gateway request")).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        level: 3,
+        name: "Set up: Setup gateway",
+      }),
+    ).toBeVisible();
     expect(within(panel).getByText("Route one request safely")).toBeVisible();
+    expect(screen.queryByText("Run a gateway request")).toBeNull();
     expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
       "Send one request through the gateway.",
     );

@@ -119,13 +119,20 @@ export function ObserveJourneyProgress({
   singleActionFocus = false,
   stage,
 }) {
+  const [showFullJourney, setShowFullJourney] =
+    React.useState(!singleActionFocus);
   const steps = journeyPlan?.steps || [];
+
+  React.useEffect(() => {
+    setShowFullJourney(!singleActionFocus);
+  }, [singleActionFocus, stage, journeyPlan?.id]);
+
   if (!steps.length) return null;
 
   const currentStep = journeyCurrentStep(journeyPlan, stage);
   const currentIndex = Math.max(steps.indexOf(currentStep), 0);
 
-  if (singleActionFocus) {
+  if (singleActionFocus && !showFullJourney) {
     return (
       <Stack spacing={1.25} data-testid="observe-journey-progress">
         <Chip
@@ -135,6 +142,14 @@ export function ObserveJourneyProgress({
           sx={{ alignSelf: "flex-start" }}
         />
         <CurrentStepGuide step={currentStep} stage={stage} />
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => setShowFullJourney(true)}
+          sx={{ alignSelf: "flex-start" }}
+        >
+          Show full path
+        </Button>
       </Stack>
     );
   }

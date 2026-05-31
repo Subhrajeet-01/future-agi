@@ -234,11 +234,6 @@ const SAMPLE_PRIMARY_STAGES = new Set([
   "connect_real_data",
 ]);
 
-const SAMPLE_PREVIEW_AUTO_OPEN_STAGES = new Set([
-  "open_sample_project",
-  "review_sample_signal",
-]);
-
 const SAMPLE_CONNECT_REAL_DATA_STEP = {
   id: "connect_real_data",
   stage: "connect_real_data",
@@ -319,7 +314,6 @@ export default function OnboardingHomeView() {
   const [selectedGoal, setSelectedGoal] = useState(null);
   const activationEmailContextRef = useRef({});
   const ahaMomentTrackedRef = useRef(new Set());
-  const samplePreviewAutoOpenRef = useRef(false);
 
   const searchContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -643,13 +637,13 @@ export default function OnboardingHomeView() {
             "Use it to inspect screens. Real setup still starts from a product workflow.",
         }
       : {
-          title: `Selected setup: ${
+          title: `You chose ${
             selectedSetupQuickStart?.buttonLabel ||
             selectedSetupQuickStart?.label ||
-            "First workflow"
+            "this setup"
           }`,
           description:
-            "Complete the checklist below with real workspace data. Sample data stays optional.",
+            "Use the highlighted action below. Sample data stays optional and does not finish this setup.",
         }
     : null;
   const isFirstRunQuickStartFocus =
@@ -691,7 +685,8 @@ export default function OnboardingHomeView() {
       SAMPLE_PRIMARY_STAGES.has(renderedStage),
   );
   const showSamplePanel = Boolean(
-    !quickStartPathMismatch &&
+    !(isFirstRunQuickStartFocus && !isSampleQuickStart) &&
+      !quickStartPathMismatch &&
       sampleProject?.available &&
       !sampleProject?.isHidden &&
       !renderedState?.isActivated &&
@@ -702,8 +697,6 @@ export default function OnboardingHomeView() {
           "waiting_for_first_trace_sample_available",
         ].includes(renderedStage)),
   );
-  const canAutoOpenSamplePreview =
-    SAMPLE_PREVIEW_AUTO_OPEN_STAGES.has(renderedStage);
   const sampleRealSetupHref = useMemo(() => {
     if (!sampleProject || !renderedStage) return null;
     const baseHref =
@@ -770,33 +763,6 @@ export default function OnboardingHomeView() {
     ],
   );
 
-  useEffect(() => {
-    if (
-      !isFirstRunQuickStartFocus ||
-      !isSampleQuickStart ||
-      !showSamplePanel ||
-      !canAutoOpenSamplePreview ||
-      mutationPending(sampleProjectActions.openSampleProject) ||
-      samplePreviewAutoOpenRef.current
-    ) {
-      return;
-    }
-
-    samplePreviewAutoOpenRef.current = true;
-    handleOpenSample({
-      source: "setup_org",
-      reason: searchContext.quickStartId || "sample_preview",
-    });
-  }, [
-    handleOpenSample,
-    canAutoOpenSamplePreview,
-    isFirstRunQuickStartFocus,
-    isSampleQuickStart,
-    sampleProjectActions.openSampleProject,
-    searchContext.quickStartId,
-    showSamplePanel,
-  ]);
-
   if (isLoading || waitingForWorkspace || (!renderedState && !isError)) {
     return <OnboardingHomeSkeleton />;
   }
@@ -811,13 +777,28 @@ export default function OnboardingHomeView() {
     );
   }
 
-  const copy = quickStartMismatchAction
-    ? {
-        eyebrow: "Setup",
-        title: quickStartMismatchAction.title,
-        description: quickStartMismatchAction.description,
-      }
-    : getStageCopy(renderedState);
+  const copy =
+    isFirstRunQuickStartFocus && selectedSetupQuickStart
+      ? isSampleQuickStart
+        ? {
+            eyebrow: "Sample preview",
+            title: "Preview sample data",
+            description:
+              "Open the sample trace to inspect screens. Real setup still starts from a product workflow.",
+          }
+        : {
+            eyebrow: "First setup",
+            title: `Set up: ${selectedSetupQuickStart.buttonLabel}`,
+            description:
+              "Start with the highlighted action below. When it is done, return here and FutureAGI will show the next step.",
+          }
+      : quickStartMismatchAction
+        ? {
+            eyebrow: "Setup",
+            title: quickStartMismatchAction.title,
+            description: quickStartMismatchAction.description,
+          }
+        : getStageCopy(renderedState);
   const isSavingGoal = mutationPending(saveGoal);
   const emailRecoveryCopy = emailContextRecoveryCopy(
     renderedState.emailContext,
@@ -1081,6 +1062,7 @@ export default function OnboardingHomeView() {
     onFallbackClick: handleActionClick,
     onCheckAgain: refetch,
     isChecking: Boolean(isRefetching),
+    singleActionFocus: isFirstRunQuickStartFocus,
   };
 
   const firstLoopCompletePanel = ["activated", "daily_review"].includes(
@@ -1145,6 +1127,7 @@ export default function OnboardingHomeView() {
         {...observePanelProps}
         journeyPlan={renderedState.journeyPlan}
         primaryPath={renderedState.primaryPath}
+        singleActionFocus={isFirstRunQuickStartFocus}
         stage={renderedState.stage}
       />
     ) : null;
@@ -1157,7 +1140,7 @@ export default function OnboardingHomeView() {
           action={quickStartMismatchAction}
           fallbackAction={null}
           journeyPlan={null}
-          singleActionFocus={false}
+          singleActionFocus
           stage={quickStartFallbackStage || "connect_observability"}
         />
       ) : hasPathFocusPlan(searchContext.quickStartPrimaryPath) ? (
@@ -1167,7 +1150,7 @@ export default function OnboardingHomeView() {
           fallbackAction={null}
           journeyPlan={null}
           primaryPath={searchContext.quickStartPrimaryPath}
-          singleActionFocus={false}
+          singleActionFocus
           stage={quickStartFallbackStage}
         />
       ) : null
@@ -1179,7 +1162,15 @@ export default function OnboardingHomeView() {
       activationStage={renderedState.stage}
       selectedGoal={renderedState.goal}
       realSetupHref={sampleRealSetupHref}
-      onOpenSample={handleOpenSample}
+      onOpenSample={
+        isFirstRunQuickStartFocus && isSampleQuickStart
+          ? () =>
+              handleOpenSample({
+                source: "setup_org",
+                reason: searchContext.quickStartId || "sample_preview",
+              })
+          : handleOpenSample
+      }
       onHideSample={handleHideSample}
       onConnectRealData={handleConnectRealData}
       isOpening={mutationPending(sampleProjectActions.openSampleProject)}
