@@ -1,7 +1,8 @@
 import { Box, Button, Divider, Typography } from "@mui/material";
 import { AgGridReact } from "ag-grid-react";
 import { format } from "date-fns";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import FormSearchField from "src/components/FormSearchField/FormSearchField";
 import { ShowComponent } from "src/components/show";
 import { useDebounce } from "src/hooks/use-debounce";
@@ -29,6 +30,17 @@ const ApiKeysLandingPage = () => {
   const gridRef = useRef(null);
   const debouncedSearchQuery = useDebounce(searchQuery.trim(), 500);
   const [openCreateApiKey, setOpenCreateApiKey] = useState(false);
+  const [searchParams] = useSearchParams();
+  const shouldAutoOpenCreateApiKey =
+    searchParams.get("source") === "onboarding" &&
+    searchParams.get("target") === "observe_first_trace" &&
+    searchParams.get("action") === "create";
+
+  useEffect(() => {
+    if (shouldAutoOpenCreateApiKey) {
+      setOpenCreateApiKey(true);
+    }
+  }, [shouldAutoOpenCreateApiKey]);
 
   const dataSource = useMemo(
     () => ({

@@ -33,7 +33,7 @@ const CODE_SECTION_ALIASES = {
   projectAddCode: "project_add_code",
 };
 
-const API_KEYS_ONBOARDING_HREF = `${paths.dashboard.settings.apiKeys}?source=onboarding&target=observe_first_trace`;
+const API_KEYS_ONBOARDING_HREF = `${paths.dashboard.settings.apiKeys}?source=onboarding&target=observe_first_trace&action=create`;
 
 const FIRST_TRACE_STEPS = [
   {
@@ -235,7 +235,7 @@ const FirstTraceSetupGuide = ({
                 startIcon={<Iconify icon="mdi:key-outline" width={16} />}
                 sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
               >
-                Open API keys
+                Create API key
               </Button>
             </Stack>
             <Typography variant="caption" color="text.secondary">

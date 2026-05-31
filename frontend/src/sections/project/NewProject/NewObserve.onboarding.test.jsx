@@ -102,12 +102,12 @@ describe("NewObserve onboarding setup", () => {
       ),
     ).toBeVisible();
     const apiKeysLink = within(guide).getByRole("link", {
-      name: /Open API keys/i,
+      name: /Create API key/i,
     });
     expect(apiKeysLink).toBeVisible();
     expect(apiKeysLink).toHaveAttribute(
       "href",
-      "/dashboard/settings/api_keys?source=onboarding&target=observe_first_trace",
+      "/dashboard/settings/api_keys?source=onboarding&target=observe_first_trace&action=create",
     );
     expect(
       within(guide).getByText("from futureagi import trace"),
