@@ -26,8 +26,10 @@ import {
   buildVoiceReviewCallHref,
   getVoiceOnboardingParams,
   voiceSetupQuickStartAttributionFromSearch,
+  voiceCallIdFromExecution,
   VOICE_ONBOARDING_MODES,
 } from "../onboardingVoiceRouteEvents";
+import useVoiceOnboardingRunCompletion from "../hooks/useVoiceOnboardingRunCompletion";
 import { useTestRunsGridStore } from "../states";
 import { useTestRunsSearchStoreShallow } from "./states";
 
@@ -418,6 +420,13 @@ const TestRunsGrid = ({ agentType, simulationType }) => {
 
   const items = useMemo(() => data?.results ?? [], [data]);
   const total = data?.count ?? 0;
+  useVoiceOnboardingRunCompletion({
+    agentType,
+    executions: items,
+    quickStartAttribution: voiceQuickStartAttribution,
+    testId,
+    voiceParams,
+  });
 
   // ── Selection: store is the single source of truth ──
   // DataTable's local rowSelection map is derived from the zustand store's
@@ -465,14 +474,7 @@ const TestRunsGrid = ({ agentType, simulationType }) => {
         (agentType ?? AGENT_TYPES.VOICE) === AGENT_TYPES.VOICE
           ? buildVoiceReviewCallHref({
               agentDefinitionId: voiceParams.agentDefinitionId,
-              callId:
-                row.call_id ||
-                row.callId ||
-                row.call_execution_id ||
-                row.callExecutionId ||
-                row.trace_id ||
-                row.traceId ||
-                row.id,
+              callId: voiceCallIdFromExecution(row),
               executionId: row.id,
               quickStartAttribution: voiceQuickStartAttribution,
               testId,

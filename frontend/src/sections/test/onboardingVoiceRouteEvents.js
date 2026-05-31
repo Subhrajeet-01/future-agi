@@ -234,6 +234,47 @@ export const buildVoiceCallReviewedPayload = ({
   ...setupQuickStartAttributionParams(quickStartAttribution),
 });
 
+export const voiceCallIdFromExecution = (execution = {}) =>
+  execution.call_id ||
+  execution.callId ||
+  execution.call_execution_id ||
+  execution.callExecutionId ||
+  execution.trace_id ||
+  execution.traceId ||
+  execution.id ||
+  "";
+
+export const buildVoiceTestCallCompletedPayload = ({
+  agentDefinitionId,
+  testId,
+  executionId,
+  callId,
+  status,
+  quickStartAttribution,
+}) => ({
+  eventName: "voice_test_call_completed",
+  primaryPath: "voice",
+  stage: "run_voice_test_call",
+  source: "voice_simulation_runs",
+  artifactType: "voice_call",
+  artifactId: String(callId || executionId),
+  metadata: compactMetadata({
+    test_id: testId,
+    execution_id: executionId,
+    call_execution_id: callId,
+    agent_definition_id: agentDefinitionId,
+    status,
+  }),
+  idempotencyKey: [
+    "voice_test_call_completed",
+    testId,
+    executionId,
+    callId || "call",
+  ].join(":"),
+  isSample: false,
+  ...setupQuickStartAttributionParams(quickStartAttribution),
+});
+
 export const buildVoiceSuccessCriteriaAddedPayload = ({
   testId,
   callId,

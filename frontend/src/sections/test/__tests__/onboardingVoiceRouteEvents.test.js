@@ -10,7 +10,9 @@ import {
   buildVoiceRouteFocusPayload,
   buildVoiceRunTestHref,
   buildVoiceSuccessCriteriaAddedPayload,
+  buildVoiceTestCallCompletedPayload,
   getVoiceOnboardingParams,
+  voiceCallIdFromExecution,
   voiceSetupQuickStartAttributionFromSearch,
   VOICE_ONBOARDING_MODES,
 } from "../onboardingVoiceRouteEvents";
@@ -202,6 +204,22 @@ describe("onboardingVoiceRouteEvents", () => {
       quick_start_id: "voice",
       quick_start_primary_path: "voice",
     });
+
+    expect(
+      buildVoiceTestCallCompletedPayload({
+        agentDefinitionId: "agent-1",
+        testId: "test-1",
+        executionId: "execution-1",
+        callId: "call-1",
+        status: "Completed",
+        quickStartAttribution: attribution,
+      }),
+    ).toMatchObject({
+      eventName: "voice_test_call_completed",
+      quick_start_goal: "connect_voice_ai_agent",
+      quick_start_id: "voice",
+      quick_start_primary_path: "voice",
+    });
   });
 
   it("builds the canonical voice review event", () => {
@@ -226,6 +244,43 @@ describe("onboardingVoiceRouteEvents", () => {
       idempotencyKey: "voice_call_reviewed:test-1:execution-1:call-1",
       isSample: false,
     });
+  });
+
+  it("builds the canonical voice test-call completion event", () => {
+    expect(
+      buildVoiceTestCallCompletedPayload({
+        agentDefinitionId: "agent-1",
+        testId: "test-1",
+        executionId: "execution-1",
+        callId: "call-1",
+        status: "Completed",
+      }),
+    ).toEqual({
+      eventName: "voice_test_call_completed",
+      primaryPath: "voice",
+      stage: "run_voice_test_call",
+      source: "voice_simulation_runs",
+      artifactType: "voice_call",
+      artifactId: "call-1",
+      metadata: {
+        test_id: "test-1",
+        execution_id: "execution-1",
+        call_execution_id: "call-1",
+        agent_definition_id: "agent-1",
+        status: "Completed",
+      },
+      idempotencyKey: "voice_test_call_completed:test-1:execution-1:call-1",
+      isSample: false,
+    });
+  });
+
+  it("extracts voice call IDs from supported execution shapes", () => {
+    expect(voiceCallIdFromExecution({ call_id: "call-1" })).toBe("call-1");
+    expect(voiceCallIdFromExecution({ callExecutionId: "call-2" })).toBe(
+      "call-2",
+    );
+    expect(voiceCallIdFromExecution({ traceId: "trace-1" })).toBe("trace-1");
+    expect(voiceCallIdFromExecution({ id: "execution-1" })).toBe("execution-1");
   });
 
   it("builds the success criteria event after an eval is saved", () => {
