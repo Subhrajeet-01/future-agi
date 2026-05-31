@@ -1059,6 +1059,8 @@ def send_limited_onboarding_lifecycle_batch(
         raise ImproperlyConfigured(
             "Lifecycle send dry-run report review is required for sends."
         )
+    if not dry_run and not launch_packet:
+        raise ImproperlyConfigured("Lifecycle launch packet is required for sends.")
     run_id = uuid.uuid4()
     queryset = OnboardingLifecycleEvaluationLog.no_workspace_objects.filter(
         status=OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE,

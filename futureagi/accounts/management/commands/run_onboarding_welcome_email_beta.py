@@ -90,6 +90,8 @@ class Command(BaseCommand):
                 raise CommandError(
                     "--dry-run-report-review-record is required for sends."
                 )
+            if not options.get("launch_packet"):
+                raise CommandError("--launch-packet is required for sends.")
             try:
                 dry_run_report_review = load_lifecycle_send_dry_run_report_review(
                     report_path=options["dry_run_report"],
@@ -107,7 +109,7 @@ class Command(BaseCommand):
             except ImproperlyConfigured as exc:
                 raise CommandError(str(exc)) from exc
         launch_packet = None
-        if options["send"] and options.get("launch_packet"):
+        if options["send"]:
             try:
                 launch_packet = load_lifecycle_launch_packet(
                     options["launch_packet"],

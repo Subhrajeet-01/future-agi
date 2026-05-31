@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from io import StringIO
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -25,7 +26,6 @@ from accounts.services.onboarding.lifecycle_launch_packets import (
 )
 from accounts.services.onboarding.lifecycle_preview_approval import (
     APPROVAL_METADATA_KEY,
-    PREVIEW_APPROVAL_MISSING_REASON,
     write_lifecycle_preview_approval_record,
 )
 from accounts.services.onboarding.lifecycle_preview_snapshots import (
@@ -646,6 +646,13 @@ def test_send_command_respects_limit_and_sends_allowlisted(
         approval_manifest=approval_manifest,
         approval_record=approval_record,
     )
+    launch_packet = _launch_packet_path(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+        dry_run_report=dry_run_report,
+        dry_run_report_review=dry_run_report_review,
+    )
     output = StringIO()
 
     with patch("accounts.services.onboarding.lifecycle_sender.email_helper"):
@@ -663,6 +670,8 @@ def test_send_command_respects_limit_and_sends_allowlisted(
             str(dry_run_report),
             "--dry-run-report-review-record",
             str(dry_run_report_review),
+            "--launch-packet",
+            str(launch_packet),
             stdout=output,
         )
 
@@ -671,6 +680,7 @@ def test_send_command_respects_limit_and_sends_allowlisted(
     assert "approval_record_sha256=" in value
     assert "dry_run_report_sha256=" in value
     assert "dry_run_report_review_record_sha256=" in value
+    assert "launch_packet_sha256=" in value
     assert "sent=1" in value
     send_log = OnboardingLifecycleSendLog.no_workspace_objects.get(
         status=OnboardingLifecycleSendLog.STATUS_SENT
@@ -691,6 +701,7 @@ def test_send_command_respects_limit_and_sends_allowlisted(
         len(send_log.metadata[DRY_RUN_REPORT_METADATA_KEY]["review_record_sha256"])
         == 64
     )
+    assert send_log.metadata[LAUNCH_PACKET_METADATA_KEY]["path"] == str(launch_packet)
 
 
 @pytest.mark.django_db
@@ -933,6 +944,88 @@ def test_send_command_requires_dry_run_report_review_for_real_send(
     assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
 
 
+def test_lifecycle_send_command_requires_launch_packet_before_report_load(
+    monkeypatch,
+):
+    from accounts.management.commands import (
+        run_onboarding_lifecycle_send as lifecycle_send_command,
+    )
+
+    monkeypatch.setattr(
+        lifecycle_send_command,
+        "load_lifecycle_preview_approval",
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest_sha256="a" * 64,
+            approval_record_sha256="b" * 64,
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle_send_command,
+        "load_lifecycle_send_dry_run_report_review",
+        lambda **kwargs: pytest.fail("dry-run report should not load"),
+    )
+
+    with pytest.raises(CommandError, match="--launch-packet is required"):
+        call_command(
+            "run_onboarding_lifecycle_send",
+            "--cohort",
+            "internal",
+            "--limit",
+            "1",
+            "--approval-manifest",
+            "/tmp/manifest.json",
+            "--approval-record",
+            "/tmp/approval-record.json",
+            "--dry-run-report",
+            "/tmp/dry-run.json",
+            "--dry-run-report-review-record",
+            "/tmp/dry-run-review.json",
+            stdout=StringIO(),
+        )
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_send_command_requires_launch_packet_for_real_send(
+    organization,
+    workspace,
+    user,
+    tmp_path,
+):
+    _eligible_log(user, organization, workspace)
+    approval_manifest, approval_record = _approval_paths(tmp_path)
+    OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
+        scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
+        scope_value=str(user.id),
+        environment="local",
+    )
+    dry_run_report, dry_run_report_review = _reviewed_lifecycle_send_report_paths(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+    )
+
+    with pytest.raises(CommandError, match="--launch-packet is required"):
+        call_command(
+            "run_onboarding_lifecycle_send",
+            "--cohort",
+            "internal",
+            "--limit",
+            "1",
+            "--approval-manifest",
+            str(approval_manifest),
+            "--approval-record",
+            str(approval_record),
+            "--dry-run-report",
+            str(dry_run_report),
+            "--dry-run-report-review-record",
+            str(dry_run_report_review),
+            stdout=StringIO(),
+        )
+
+    assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
+
+
 @pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
 def test_send_command_rejects_report_output_for_real_send(
@@ -1050,6 +1143,13 @@ def test_send_command_rejects_mismatched_dry_run_report(
         approval_manifest=approval_manifest,
         approval_record=approval_record,
     )
+    launch_packet = _launch_packet_path(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+        dry_run_report=dry_run_report,
+        dry_run_report_review=dry_run_report_review,
+    )
     report = json.loads(dry_run_report.read_text())
     report["parameters"]["cohort"] = "beta"
     dry_run_report.write_text(json.dumps(report), encoding="utf-8")
@@ -1070,6 +1170,8 @@ def test_send_command_rejects_mismatched_dry_run_report(
             str(dry_run_report),
             "--dry-run-report-review-record",
             str(dry_run_report_review),
+            "--launch-packet",
+            str(launch_packet),
             stdout=output,
         )
 
@@ -1078,7 +1180,7 @@ def test_send_command_rejects_mismatched_dry_run_report(
 
 @pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
-def test_send_command_suppresses_campaign_missing_from_approval_record(
+def test_launch_packet_rejects_campaign_missing_from_approval_record(
     organization,
     workspace,
     user,
@@ -1104,15 +1206,11 @@ def test_send_command_suppresses_campaign_missing_from_approval_record(
         approval_manifest=approval_manifest,
         approval_record=approval_record,
     )
-    output = StringIO()
+    packet_path = tmp_path / "missing-approval-launch-packet.json"
 
-    with patch("accounts.services.onboarding.lifecycle_sender.email_helper") as helper:
+    with pytest.raises(CommandError, match="dry-run report has no sendable candidates"):
         call_command(
-            "run_onboarding_lifecycle_send",
-            "--cohort",
-            "internal",
-            "--limit",
-            "1",
+            "generate_onboarding_lifecycle_launch_packet",
             "--approval-manifest",
             str(approval_manifest),
             "--approval-record",
@@ -1121,18 +1219,14 @@ def test_send_command_suppresses_campaign_missing_from_approval_record(
             str(dry_run_report),
             "--dry-run-report-review-record",
             str(dry_run_report_review),
-            stdout=output,
+            "--output",
+            str(packet_path),
+            "--require-sendable-candidate",
+            stdout=StringIO(),
         )
 
-    value = output.getvalue()
-    assert "sent=0" in value
-    assert "suppressed=1" in value
-    assert PREVIEW_APPROVAL_MISSING_REASON in value
-    helper.assert_not_called()
-    assert OnboardingLifecycleSendLog.no_workspace_objects.filter(
-        status=OnboardingLifecycleSendLog.STATUS_SUPPRESSED,
-        suppression_reason=PREVIEW_APPROVAL_MISSING_REASON,
-    ).exists()
+    assert not packet_path.exists()
+    assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
 
 
 @pytest.mark.django_db
@@ -1154,6 +1248,13 @@ def test_send_command_suppresses_real_send_when_not_cloud(
         tmp_path,
         approval_manifest=approval_manifest,
         approval_record=approval_record,
+    )
+    launch_packet = _launch_packet_path(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+        dry_run_report=dry_run_report,
+        dry_run_report_review=dry_run_report_review,
     )
     output = StringIO()
 
@@ -1178,6 +1279,8 @@ def test_send_command_suppresses_real_send_when_not_cloud(
             str(dry_run_report),
             "--dry-run-report-review-record",
             str(dry_run_report_review),
+            "--launch-packet",
+            str(launch_packet),
             stdout=output,
         )
 
@@ -1334,6 +1437,85 @@ def test_welcome_email_beta_send_requires_dry_run_report_review(
     assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
 
 
+def test_welcome_email_beta_requires_launch_packet_before_report_load(monkeypatch):
+    from accounts.management.commands import (
+        run_onboarding_welcome_email_beta as welcome_command,
+    )
+
+    monkeypatch.setattr(
+        welcome_command,
+        "load_lifecycle_preview_approval",
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest_sha256="a" * 64,
+            approval_record_sha256="b" * 64,
+        ),
+    )
+    monkeypatch.setattr(
+        welcome_command,
+        "load_lifecycle_send_dry_run_report_review",
+        lambda **kwargs: pytest.fail("dry-run report should not load"),
+    )
+
+    with pytest.raises(CommandError, match="--launch-packet is required"):
+        call_command(
+            "run_onboarding_welcome_email_beta",
+            "--send",
+            "--limit",
+            "1",
+            "--approval-manifest",
+            "/tmp/manifest.json",
+            "--approval-record",
+            "/tmp/approval-record.json",
+            "--dry-run-report",
+            "/tmp/dry-run.json",
+            "--dry-run-report-review-record",
+            "/tmp/dry-run-review.json",
+            stdout=StringIO(),
+        )
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_welcome_email_beta_send_requires_launch_packet(
+    organization,
+    workspace,
+    user,
+    tmp_path,
+):
+    _eligible_campaign_log(user, organization, workspace, "welcome_resume_goal")
+    approval_manifest, approval_record = _approval_paths(tmp_path)
+    OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
+        scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
+        scope_value=str(user.id),
+        environment="local",
+        campaign_group="welcome",
+    )
+    dry_run_report, dry_run_report_review = _reviewed_welcome_send_report_paths(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+    )
+
+    with pytest.raises(CommandError, match="--launch-packet is required"):
+        call_command(
+            "run_onboarding_welcome_email_beta",
+            "--send",
+            "--limit",
+            "1",
+            "--approval-manifest",
+            str(approval_manifest),
+            "--approval-record",
+            str(approval_record),
+            "--dry-run-report",
+            str(dry_run_report),
+            "--dry-run-report-review-record",
+            str(dry_run_report_review),
+            stdout=StringIO(),
+        )
+
+    assert not OnboardingLifecycleSendLog.no_workspace_objects.exists()
+
+
 @pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
 def test_welcome_email_beta_send_requires_explicit_flag_and_allowlist(
@@ -1355,6 +1537,13 @@ def test_welcome_email_beta_send_requires_explicit_flag_and_allowlist(
         approval_manifest=approval_manifest,
         approval_record=approval_record,
     )
+    launch_packet = _launch_packet_path(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+        dry_run_report=dry_run_report,
+        dry_run_report_review=dry_run_report_review,
+    )
     output = StringIO()
 
     with patch("accounts.services.onboarding.lifecycle_sender.email_helper"):
@@ -1371,6 +1560,8 @@ def test_welcome_email_beta_send_requires_explicit_flag_and_allowlist(
             str(dry_run_report),
             "--dry-run-report-review-record",
             str(dry_run_report_review),
+            "--launch-packet",
+            str(launch_packet),
             stdout=output,
         )
 
@@ -1379,6 +1570,7 @@ def test_welcome_email_beta_send_requires_explicit_flag_and_allowlist(
     assert "cohort=beta" in value
     assert "dry_run_report_sha256=" in value
     assert "dry_run_report_review_record_sha256=" in value
+    assert "launch_packet_sha256=" in value
     assert "sent=1" in value
     send_log = OnboardingLifecycleSendLog.no_workspace_objects.get(
         campaign_group="welcome",
@@ -1461,15 +1653,29 @@ def test_welcome_email_beta_requires_welcome_specific_allowlist(
 ):
     _eligible_campaign_log(user, organization, workspace, "welcome_resume_goal")
     approval_manifest, approval_record = _approval_paths(tmp_path)
-    OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
+    allowlist = OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
         scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
         scope_value=str(user.id),
         environment="local",
+        campaign_group="welcome",
     )
     dry_run_report, dry_run_report_review = _reviewed_welcome_send_report_paths(
         tmp_path,
         approval_manifest=approval_manifest,
         approval_record=approval_record,
+    )
+    launch_packet = _launch_packet_path(
+        tmp_path,
+        approval_manifest=approval_manifest,
+        approval_record=approval_record,
+        dry_run_report=dry_run_report,
+        dry_run_report_review=dry_run_report_review,
+    )
+    allowlist.delete()
+    OnboardingLifecycleSendAllowlist.no_workspace_objects.create(
+        scope_type=OnboardingLifecycleSendAllowlist.SCOPE_USER,
+        scope_value=str(user.id),
+        environment="local",
     )
     output = StringIO()
 
@@ -1487,6 +1693,8 @@ def test_welcome_email_beta_requires_welcome_specific_allowlist(
             str(dry_run_report),
             "--dry-run-report-review-record",
             str(dry_run_report_review),
+            "--launch-packet",
+            str(launch_packet),
             stdout=output,
         )
 

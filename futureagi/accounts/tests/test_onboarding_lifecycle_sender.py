@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -638,6 +639,49 @@ def test_batch_real_send_requires_dry_run_report_review(
             cohort="internal",
             limit=1,
             preview_approval=preview_approval,
+        )
+
+
+def test_batch_real_send_requires_launch_packet_before_querying():
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="launch packet is required",
+    ):
+        send_limited_onboarding_lifecycle_batch(
+            cohort="internal",
+            limit=1,
+            preview_approval=SimpleNamespace(approval_record_sha256="b" * 64),
+            dry_run_report_review=SimpleNamespace(),
+        )
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS=_flags())
+def test_batch_real_send_requires_launch_packet(
+    organization,
+    workspace,
+    user,
+):
+    _allow_user(user)
+    _eligible_log(user, organization, workspace)
+    preview_approval = type(
+        "PreviewApproval",
+        (),
+        {
+            "approval_record_sha256": "b" * 64,
+        },
+    )()
+    dry_run_report_review = type("DryRunReportReview", (), {})()
+
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="launch packet is required",
+    ):
+        send_limited_onboarding_lifecycle_batch(
+            cohort="internal",
+            limit=1,
+            preview_approval=preview_approval,
+            dry_run_report_review=dry_run_report_review,
         )
 
 
