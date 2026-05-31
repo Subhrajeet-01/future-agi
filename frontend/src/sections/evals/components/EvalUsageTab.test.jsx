@@ -253,6 +253,8 @@ describe("EvalUsageTab onboarding review run recovery", () => {
             eval_log_id: "usage-log-1",
             review_outcome: "failure_reviewed",
             run_id: "run-1",
+            source_id: "project-1",
+            source_type: "trace_project",
           }),
         }),
       ),

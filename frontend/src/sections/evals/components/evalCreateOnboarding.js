@@ -1133,6 +1133,8 @@ export const buildEvalFailuresReviewedPayload = ({
   reviewSurface = "usage_log_detail",
   rowSource,
   runId,
+  sourceId,
+  sourceType,
 } = {}) => {
   const artifactId = safeKeyPart(
     runId || evalLogId || evalId,
@@ -1153,6 +1155,8 @@ export const buildEvalFailuresReviewedPayload = ({
       review_surface: reviewSurface,
       row_source: rowSource,
       run_id: runId,
+      source_id: sourceId,
+      source_type: sourceType,
       step: EVAL_REVIEW_STEP,
       tab: "usage",
     }),

@@ -310,6 +310,8 @@ def resolve_route_availability(*, context, flags, signals, sample_project=None):
                 "source": "onboarding",
                 "step": "review",
                 "run_id": eval_run_id,
+                "source_type": eval_source_type,
+                "source_id": eval_source_id,
             }
         )
     eval_review_href = _with_query(eval_review_base, eval_review_params)

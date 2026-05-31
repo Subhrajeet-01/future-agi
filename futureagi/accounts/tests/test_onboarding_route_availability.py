@@ -205,6 +205,39 @@ def test_eval_source_fix_route_uses_trace_project_context():
     }
 
 
+def test_eval_review_route_preserves_source_context_for_fix_loop():
+    dataset_id = uuid4()
+    eval_id = uuid4()
+    run_id = uuid4()
+    routes = resolve_route_availability(
+        context=_context(),
+        flags={
+            "onboarding_eval_path": True,
+            "onboarding_eval_route_modes": True,
+            "onboarding_sample_project": False,
+            "onboarding_daily_quality_home": False,
+        },
+        signals=OnboardingSignals(
+            first_checks={},
+            eval_has_completed_run=True,
+            eval_run_id=str(run_id),
+            eval_scorer_template_id=str(eval_id),
+            eval_source_id=str(dataset_id),
+            eval_source_type="dataset",
+        ),
+    )
+
+    assert routes["eval_review_failures"] == {
+        "href": (
+            f"/dashboard/evaluations/{eval_id}?"
+            f"tab=usage&source=onboarding&step=review&run_id={run_id}"
+            f"&source_type=dataset&source_id={dataset_id}"
+        ),
+        "is_available": True,
+        "reason": None,
+    }
+
+
 def test_write_route_is_unavailable_for_read_only_user():
     routes = resolve_route_availability(
         context=_context(can_write=False),

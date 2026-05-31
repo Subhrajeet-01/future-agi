@@ -698,6 +698,8 @@ const EvalUsageTab = ({
         reviewOutcome,
         rowSource: detailRow.source,
         runId: failureActionOnboardingParams.runId,
+        sourceId: failureActionOnboardingParams.sourceId,
+        sourceType: failureActionOnboardingParams.sourceType,
       }),
     );
     if (failureActionOnboardingParams.rerunFrom) {

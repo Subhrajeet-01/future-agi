@@ -1078,6 +1078,8 @@ describe("evalCreateOnboarding", () => {
         reviewOutcome: "failure_reviewed",
         rowSource: "eval_playground",
         runId: "run-1",
+        sourceId: "project-1",
+        sourceType: "trace_project",
       }),
     ).toMatchObject({
       eventName: "eval_failures_reviewed",
@@ -1093,6 +1095,8 @@ describe("evalCreateOnboarding", () => {
         review_surface: "usage_log_detail",
         row_source: "eval_playground",
         run_id: "run-1",
+        source_id: "project-1",
+        source_type: "trace_project",
         step: "review",
         tab: "usage",
       },
