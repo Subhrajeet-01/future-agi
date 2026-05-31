@@ -30,13 +30,21 @@ describe("DestinationTourAnchor", () => {
       </>,
       {
         route:
-          "/dashboard/gateway?tour_anchor=gateway_request_button&journey_step=run_gateway_request",
+          "/dashboard/gateway?tour_anchor=gateway_request_button&journey_step=run_gateway_request&quick_start_goal=control_model_traffic&quick_start_id=gateway&quick_start_primary_path=gateway",
       },
     );
 
     const target = screen.getByRole("button", { name: /send test request/i });
     expect(await screen.findByTestId("destination-tour-anchor")).toBeVisible();
+    expect(screen.getByText("Step 3 of 6")).toBeVisible();
+    expect(
+      screen.getByText(/Route one request safely - Next: Review log/i),
+    ).toBeVisible();
     expect(screen.getByText("Send request")).toBeVisible();
+    expect(screen.getByRole("link", { name: /view plan/i })).toHaveAttribute(
+      "href",
+      "/dashboard/home?source=destination_tour_plan&journey_step=run_gateway_request&tour_anchor=gateway_request_button&quick_start_goal=control_model_traffic&quick_start_id=gateway&quick_start_primary_path=gateway",
+    );
     expect(target).toHaveAttribute("data-onboarding-tour-active", "true");
     expect(scrollIntoView).toHaveBeenCalledWith({
       block: "center",
@@ -118,17 +126,19 @@ describe("DestinationTourAnchor", () => {
   it("shows recovery guidance when the destination action is missing", async () => {
     renderWithRouter(<DestinationTourAnchor maxAttempts={1} />, {
       route:
-        "/dashboard/gateway?tour_anchor=gateway_request_button&journey_step=run_gateway_request",
+        "/dashboard/gateway?tour_anchor=gateway_request_button&journey_step=run_gateway_request&quick_start_goal=control_model_traffic&quick_start_id=gateway&quick_start_primary_path=gateway",
     });
 
     const recovery = await screen.findByTestId(
       "destination-tour-missing-anchor",
     );
     expect(recovery).toBeVisible();
+    expect(screen.getByText("Step 3 of 6")).toBeVisible();
+    expect(screen.getByText("Route one request safely")).toBeVisible();
     expect(screen.getByText("Send request")).toBeVisible();
     expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute(
       "href",
-      "/dashboard/home?source=destination_tour_fallback&journey_step=run_gateway_request&tour_anchor=gateway_request_button",
+      "/dashboard/home?source=destination_tour_fallback&journey_step=run_gateway_request&tour_anchor=gateway_request_button&quick_start_goal=control_model_traffic&quick_start_id=gateway&quick_start_primary_path=gateway",
     );
 
     await userEvent.click(screen.getByRole("button", { name: /dismiss/i }));

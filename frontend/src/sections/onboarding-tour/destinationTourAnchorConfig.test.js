@@ -6,6 +6,7 @@ import { parse } from "yaml";
 import {
   DESTINATION_TOUR_ANCHORS,
   DESTINATION_TOUR_STEP_COPY,
+  destinationTourProgressForStep,
 } from "./destinationTourAnchorConfig";
 
 const activationFlowPath = path.resolve(
@@ -42,5 +43,32 @@ describe("destinationTourAnchorConfig", () => {
 
     expect(missingAnchors).toEqual([]);
     expect(staleAnchors).toEqual([]);
+  });
+
+  it("derives loop progress from journey step or destination anchor", () => {
+    expect(
+      destinationTourProgressForStep({
+        journeyStep: "run_gateway_request",
+        tourAnchor: "gateway_request_button",
+      }),
+    ).toEqual({
+      currentLabel: "Send request",
+      nextLabel: "Review log",
+      planTitle: "Route one request safely",
+      stepCount: 6,
+      stepNumber: 3,
+    });
+
+    expect(
+      destinationTourProgressForStep({
+        tourAnchor: "sample_trace_link",
+      }),
+    ).toMatchObject({
+      currentLabel: "Review issue",
+      nextLabel: "Connect real data",
+      planTitle: "Sample loop",
+      stepCount: 3,
+      stepNumber: 2,
+    });
   });
 });

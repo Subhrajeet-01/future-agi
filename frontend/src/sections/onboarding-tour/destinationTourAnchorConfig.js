@@ -1,3 +1,5 @@
+import { PATH_FOCUS_PLANS } from "src/sections/onboarding-home/components/path-focus-plan";
+
 export const DESTINATION_TOUR_ANCHORS = [
   "observe_create_project_button",
   "observe_send_trace_button",
@@ -207,3 +209,78 @@ export const DEFAULT_DESTINATION_TOUR_COPY = {
 
 export const destinationTourCopyForStep = (journeyStep) =>
   DESTINATION_TOUR_STEP_COPY[journeyStep] || DEFAULT_DESTINATION_TOUR_COPY;
+
+const DESTINATION_TOUR_PROGRESS_PLANS = {
+  observe: {
+    title: "Observe loop",
+    steps: [
+      {
+        stage: "connect_observability",
+        label: "Connect observability",
+        tourAnchor: "observe_create_project_button",
+      },
+      {
+        stage: "send_first_trace",
+        label: "Send trace",
+        tourAnchor: "observe_send_trace_button",
+      },
+      {
+        stage: "review_first_trace",
+        label: "Review signal",
+        tourAnchor: "observe_trace_review_link",
+      },
+      {
+        stage: "create_trace_evaluator",
+        label: "Create check",
+        tourAnchor: "observe_evaluator_button",
+      },
+    ],
+  },
+  sample: {
+    title: "Sample loop",
+    steps: [
+      {
+        stage: "open_sample_project",
+        label: "Open sample",
+        tourAnchor: "sample_project_button",
+      },
+      {
+        stage: "review_sample_signal",
+        label: "Review issue",
+        tourAnchor: "sample_trace_link",
+      },
+      {
+        stage: "connect_real_data",
+        label: "Connect real data",
+        tourAnchor: "sample_connect_real_data_button",
+      },
+    ],
+  },
+  ...PATH_FOCUS_PLANS,
+};
+
+export const destinationTourProgressForStep = ({
+  journeyStep,
+  tourAnchor,
+} = {}) => {
+  const plan = Object.values(DESTINATION_TOUR_PROGRESS_PLANS).find(
+    (candidate) =>
+      candidate.steps?.some(
+        (step) => step.stage === journeyStep || step.tourAnchor === tourAnchor,
+      ),
+  );
+  if (!plan) return null;
+
+  const currentIndex = plan.steps.findIndex(
+    (step) => step.stage === journeyStep || step.tourAnchor === tourAnchor,
+  );
+  if (currentIndex < 0) return null;
+
+  return {
+    currentLabel: plan.steps[currentIndex].label,
+    nextLabel: plan.steps[currentIndex + 1]?.label || null,
+    planTitle: plan.title,
+    stepCount: plan.steps.length,
+    stepNumber: currentIndex + 1,
+  };
+};

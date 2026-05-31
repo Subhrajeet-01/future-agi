@@ -19,7 +19,10 @@ import {
   readDestinationTourDismissals,
   resetDestinationTourAnchorDismissal,
 } from "./destinationTourDismissal";
-import { destinationTourCopyForStep } from "./destinationTourAnchorConfig";
+import {
+  destinationTourCopyForStep,
+  destinationTourProgressForStep,
+} from "./destinationTourAnchorConfig";
 
 const findTourTarget = (anchor) => {
   if (!anchor) return null;
@@ -34,6 +37,21 @@ const findTourTarget = (anchor) => {
   if (byTestId) return byTestId;
 
   return document.getElementById(anchor);
+};
+
+const tourHomeHref = ({ journeyStep, searchParams, source, tourAnchor }) => {
+  const homeParams = new URLSearchParams({ source });
+  if (journeyStep) homeParams.set("journey_step", journeyStep);
+  if (tourAnchor) homeParams.set("tour_anchor", tourAnchor);
+
+  ["quick_start_goal", "quick_start_id", "quick_start_primary_path"].forEach(
+    (key) => {
+      const value = searchParams.get(key);
+      if (value) homeParams.set(key, value);
+    },
+  );
+
+  return `/dashboard/home?${homeParams.toString()}`;
 };
 
 export default function DestinationTourAnchor({ maxAttempts = 12 }) {
@@ -52,6 +70,20 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
   const copy = useMemo(
     () => destinationTourCopyForStep(journeyStep),
     [journeyStep],
+  );
+  const progress = useMemo(
+    () => destinationTourProgressForStep({ journeyStep, tourAnchor }),
+    [journeyStep, tourAnchor],
+  );
+  const homeHref = useMemo(
+    () =>
+      tourHomeHref({
+        journeyStep,
+        searchParams,
+        source: "destination_tour_plan",
+        tourAnchor,
+      }),
+    [journeyStep, searchParams, tourAnchor],
   );
   const hidden = !tourAnchor || (!isReplay && dismissedAnchors.has(tourAnchor));
 
@@ -112,10 +144,12 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
   }
 
   if (!targetEl && targetMissing) {
-    const homeParams = new URLSearchParams();
-    homeParams.set("source", "destination_tour_fallback");
-    if (journeyStep) homeParams.set("journey_step", journeyStep);
-    if (tourAnchor) homeParams.set("tour_anchor", tourAnchor);
+    const fallbackHref = tourHomeHref({
+      journeyStep,
+      searchParams,
+      source: "destination_tour_fallback",
+      tourAnchor,
+    });
 
     return (
       <Paper
@@ -135,9 +169,22 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
       >
         <Stack spacing={1}>
           <Stack direction="row" spacing={0.75} alignItems="center">
-            <Chip size="small" color="primary" label="Current step" />
+            <Chip
+              size="small"
+              color="primary"
+              label={
+                progress
+                  ? `Step ${progress.stepNumber} of ${progress.stepCount}`
+                  : "Current step"
+              }
+            />
             <Typography variant="subtitle2">{copy.label}</Typography>
           </Stack>
+          {progress ? (
+            <Typography variant="caption" color="text.secondary">
+              {progress.planTitle}
+            </Typography>
+          ) : null}
           <Typography variant="body2" color="text.secondary">
             {copy.description}
           </Typography>
@@ -150,7 +197,7 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
               size="small"
               variant="contained"
               component={RouterLink}
-              href={`/dashboard/home?${homeParams.toString()}`}
+              href={fallbackHref}
               startIcon={<Iconify icon="mdi:home-outline" width={16} />}
             >
               Back to Home
@@ -224,28 +271,53 @@ export default function DestinationTourAnchor({ maxAttempts = 12 }) {
         >
           <Stack spacing={1}>
             <Stack direction="row" spacing={0.75} alignItems="center">
-              <Chip size="small" color="primary" label="Current step" />
+              <Chip
+                size="small"
+                color="primary"
+                label={
+                  progress
+                    ? `Step ${progress.stepNumber} of ${progress.stepCount}`
+                    : "Current step"
+                }
+              />
               <Typography variant="subtitle2">{copy.label}</Typography>
             </Stack>
+            {progress ? (
+              <Typography variant="caption" color="text.secondary">
+                {progress.planTitle}
+                {progress.nextLabel ? ` - Next: ${progress.nextLabel}` : ""}
+              </Typography>
+            ) : null}
             <Typography variant="body2" color="text.secondary">
               {copy.description}
             </Typography>
             <Box>
-              <Button
-                size="small"
-                variant="text"
-                onClick={() =>
-                  setDismissedAnchors(
-                    dismissDestinationTourAnchor({
-                      anchor: tourAnchor,
-                      identity: storageIdentity,
-                    }),
-                  )
-                }
-                startIcon={<Iconify icon="mdi:check" width={16} />}
-              >
-                Got it
-              </Button>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() =>
+                    setDismissedAnchors(
+                      dismissDestinationTourAnchor({
+                        anchor: tourAnchor,
+                        identity: storageIdentity,
+                      }),
+                    )
+                  }
+                  startIcon={<Iconify icon="mdi:check" width={16} />}
+                >
+                  Got it
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  component={RouterLink}
+                  href={homeHref}
+                  startIcon={<Iconify icon="mdi:map-outline" width={16} />}
+                >
+                  View plan
+                </Button>
+              </Stack>
             </Box>
           </Stack>
         </Paper>
