@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
 
 const APP_BASE = process.env.APP_BASE || "http://127.0.0.1:3032";
+const START_FROM_HOME = process.env.PROMPT_FIRST_RUN_START_FROM_HOME === "1";
 const PROMPT_ID = "00000000-0000-4000-8000-000000000421";
 const USER_ID = "00000000-0000-4000-8000-000000000101";
 const ORGANIZATION_ID = "00000000-0000-4000-8000-000000000201";
@@ -19,6 +20,9 @@ const EVAL_CONFIG_ID = "00000000-0000-4000-8000-000000000523";
 const SCREENSHOT_PATH =
   process.env.PROMPT_FIRST_RUN_CONTROLLED_SCREENSHOT ||
   "/tmp/prompt-first-run-controlled-smoke.png";
+const HOME_SCREENSHOT_PATH =
+  process.env.PROMPT_HOME_CONTROLLED_SCREENSHOT ||
+  "/tmp/prompt-home-start-controlled-smoke.png";
 const FAILURE_SCREENSHOT_PATH =
   "/tmp/prompt-first-run-controlled-smoke-failure.png";
 const SETUP_QUICK_START_ATTRIBUTION_STORAGE_KEY =
@@ -98,10 +102,34 @@ async function main() {
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   try {
-    await page.goto(
-      `${APP_BASE}/dashboard/workbench/all?source=onboarding&action=create-prompt&${PROMPT_QUICK_START_QUERY}`,
-      { waitUntil: "domcontentloaded" },
-    );
+    if (START_FROM_HOME) {
+      await page.goto(
+        `${APP_BASE}/dashboard/home?source=setup_org&${PROMPT_QUICK_START_QUERY}`,
+        { waitUntil: "domcontentloaded" },
+      );
+      await waitForVisibleText(page, "Set up your first workflow", {
+        exact: true,
+      });
+      await waitForVisibleText(page, "You chose Test prompts or agent prompts");
+      await waitForVisibleText(page, "Step 1 of 6", { exact: true });
+      await waitForVisibleText(page, "What happens next", { exact: true });
+      await waitForVisibleText(page, "Create prompt", { exact: true });
+      evidence.home_route = await currentRelativeUrl(page);
+      assertPromptQuickStartParams(evidence.home_route, "Home route");
+      evidence.home_cta_href = await visibleLinkHref(page, "Create prompt", {
+        exact: true,
+      });
+      assertPromptQuickStartParams(evidence.home_cta_href, "Home CTA");
+      assertHomePromptCta(evidence.home_cta_href);
+      await page.screenshot({ path: HOME_SCREENSHOT_PATH, fullPage: true });
+      evidence.home_screenshot = HOME_SCREENSHOT_PATH;
+      await clickVisibleButtonText(page, "Create prompt", { exact: true });
+    } else {
+      await page.goto(
+        `${APP_BASE}/dashboard/workbench/all?source=onboarding&action=create-prompt&${PROMPT_QUICK_START_QUERY}`,
+        { waitUntil: "domcontentloaded" },
+      );
+    }
     await waitForVisibleText(page, "Create prompt", { exact: true });
     if (
       !(await visibleTextExists(page, "Create a new prompt", { exact: true }))
@@ -311,16 +339,16 @@ async function main() {
       activationEventNames.includes("first_quality_loop_completed"),
       "Prompt first quality loop completion event was not recorded.",
     );
-    const promptAhaEvents = activationEventPosts.filter((payload) =>
+    const promptActivationEvents = activationEventPosts.filter((payload) =>
       ["prompt_comparison_completed", "first_quality_loop_completed"].includes(
         payload?.event_name,
       ),
     );
     assert(
-      promptAhaEvents.length === 2,
-      `Expected two prompt Aha activation events, got ${promptAhaEvents.length}.`,
+      promptActivationEvents.length === 2,
+      `Expected two prompt activation events, got ${promptActivationEvents.length}.`,
     );
-    promptAhaEvents.forEach((payload) => {
+    promptActivationEvents.forEach((payload) => {
       assertPromptQuickStartMetadata(payload, payload?.event_name);
     });
     assert(apiFailures.length === 0, `API failures: ${apiFailures.join("; ")}`);
@@ -337,11 +365,12 @@ async function main() {
           app_base: APP_BASE,
           mode: "controlled",
           organization_id: ORGANIZATION_ID,
+          start_from_home: START_FROM_HOME,
           workspace_id: WORKSPACE_ID,
           evidence: {
             ...evidence,
             activation_event_names: activationEventNames,
-            prompt_aha_events: promptAhaEvents.map((payload) => ({
+            prompt_activation_events: promptActivationEvents.map((payload) => ({
               event_name: payload.event_name,
               quick_start_goal: payload.metadata?.quick_start_goal,
               quick_start_id: payload.metadata?.quick_start_id,
@@ -486,9 +515,15 @@ async function installRuntime(
     }
 
     if (normalizedPath === "/accounts/activation-state/") {
+      const fixtureName =
+        START_FROM_HOME &&
+        url.searchParams.get("source") === "setup_org" &&
+        url.searchParams.get("quick_start_id") === "prompt"
+          ? "promptNoPrompt"
+          : "promptComparisonComplete";
       await respondJson(request, {
         status: true,
-        result: stubbedActivationState(auth, "promptComparisonComplete"),
+        result: stubbedActivationState(auth, fixtureName),
       });
       return;
     }
@@ -1343,6 +1378,48 @@ async function currentRelativeUrl(page) {
   return page.evaluate(
     () => `${window.location.pathname}${window.location.search}`,
   );
+}
+
+async function visibleLinkHref(page, text, { exact = false } = {}) {
+  await waitForVisibleText(page, text, { exact });
+  const href = await page.evaluate(
+    ({ expectedText, exactMatch }) => {
+      const elements = window.visibleElements().filter((element) => {
+        const textContent = window.normalizeText(element.textContent);
+        return exactMatch
+          ? textContent === expectedText
+          : textContent.includes(expectedText);
+      });
+      const link = elements
+        .map((element) => element.closest("a"))
+        .find(Boolean);
+      return link?.getAttribute("href") || "";
+    },
+    { expectedText: text, exactMatch: exact },
+  );
+  assert(href, `Could not find visible link href for text: ${text}`);
+  return href;
+}
+
+function assertHomePromptCta(href) {
+  const url = new URL(href, APP_BASE);
+  assert(
+    url.pathname === "/dashboard/workbench/all",
+    `Expected Home prompt CTA to open workbench, got ${url.pathname}`,
+  );
+  const expectedParams = {
+    action: "create-prompt",
+    journey_step: "start_prompt",
+    source: "onboarding",
+    tour_anchor: "prompt_create_button",
+  };
+  Object.entries(expectedParams).forEach(([key, expected]) => {
+    const actual = url.searchParams.get(key);
+    assert(
+      actual === expected,
+      `Expected Home prompt CTA ${key}=${expected}, got ${actual}`,
+    );
+  });
 }
 
 function assertPromptQuickStartParams(route, label) {

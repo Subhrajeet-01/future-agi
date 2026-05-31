@@ -260,6 +260,20 @@ const SMOKES = [
       "Stubbed proof for prompt create, first run, second version, compare, and failure capture.",
   },
   {
+    id: "prompt-home-to-first-run-controlled",
+    mode: "controlled",
+    file: "prompt-first-run-controlled-smoke.mjs",
+    description:
+      "Stubbed proof from first-run Home prompt CTA through the prompt quality loop.",
+    env: {
+      PROMPT_FIRST_RUN_CONTROLLED_SCREENSHOT:
+        "/tmp/prompt-home-to-first-run-controlled-smoke.png",
+      PROMPT_FIRST_RUN_START_FROM_HOME: "1",
+      PROMPT_HOME_CONTROLLED_SCREENSHOT:
+        "/tmp/prompt-home-start-controlled-smoke.png",
+    },
+  },
+  {
     id: "onboarding-first-signup-aha-coverage-controlled",
     mode: "controlled",
     suite: true,
