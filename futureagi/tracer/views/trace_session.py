@@ -13,7 +13,7 @@ except ImportError:
 
 import pandas as pd
 import structlog
-from django.db import models
+from django.db import models, transaction
 from django.db.models import (
     Avg,
     Case,
@@ -224,6 +224,49 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
             queryset = queryset.filter(project_id=project_id)
 
         return queryset
+
+    def perform_update(self, serializer):
+        """Persist a TraceSession update AND mirror the UI overlay (slice 2b).
+
+        ``bookmarked`` and ``name`` are the user-writable fields on
+        ``TraceSessionSerializer`` (the bookmark / rename UI write path). The
+        legacy ``TraceSession.bookmarked``/``name`` write is kept UNCHANGED here
+        (the PG-fallback read and legacy callers still read it during the
+        dual-source window; it retires at contract / P4). On top of that we now
+        ALSO upsert the PG ``TraceSessionOverlay`` so slice 2a's overlay-backed
+        reads — ``_build_bookmark_filter`` (bookmarked → ids) and
+        ``_fetch_session_names`` (``COALESCE(overlay.display_name, …)``) — stay
+        fresh (DESIGN §5 / §5.1, the user overlay + the rename-bug separation).
+
+        ATOMICITY: the overlay lives in the SAME PG database as ``TraceSession``,
+        so the ``save()`` and the overlay ``update_or_create`` are wrapped in ONE
+        ``transaction.atomic()`` and commit both-or-neither. This is a PG↔PG
+        write that MUST stay consistent — deliberately NOT the best-effort CH
+        dual-write pattern (which tolerates a failed mirror).
+
+        The overlay fields are read from the POST-SAVE instance, never from
+        ``validated_data``: a partial PATCH (e.g. only ``{"bookmarked": true}``)
+        carries no ``name``, so sourcing ``display_name`` from ``validated_data``
+        would clobber an existing rename (and a name-only PATCH would clobber
+        ``bookmarked``). ``instance`` always reflects the full current state.
+
+        ``display_name`` mirrors the current ``name``: for a never-renamed
+        session it equals the external session id (harmless — slice 2a's COALESCE
+        would surface the same value), and for a rename it is the new label,
+        which is exactly the overlay's purpose.
+        """
+        from tracer.models.trace_session import TraceSessionOverlay
+
+        with transaction.atomic():
+            instance = serializer.save()
+            TraceSessionOverlay.objects.update_or_create(
+                trace_session_id=instance.id,
+                defaults={
+                    "project_id": instance.project_id,
+                    "bookmarked": instance.bookmarked,
+                    "display_name": instance.name,
+                },
+            )
 
     def perform_destroy(self, instance):
         _soft_delete_trace_session_tree([instance])
