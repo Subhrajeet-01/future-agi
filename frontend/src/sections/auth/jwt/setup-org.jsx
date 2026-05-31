@@ -24,15 +24,9 @@ import { FormSearchSelectFieldState } from "src/components/FromSearchSelectField
 import RightSectionAuth from "./RightSectionAuth";
 import { Controller, useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import RadioField from "src/components/RadioField/RadioField";
 import { FormCheckboxField } from "src/components/FormCheckboxField";
 import { useAuthContext } from "src/auth/hooks";
-import {
-  AVAILABLE_ROLES,
-  DEFAULT_ROLES,
-  GOALS_LIST,
-  ROLE_OPTIONS,
-} from "./constants";
+import { DEFAULT_ROLES, GOALS_LIST, ROLE_OPTIONS } from "./constants";
 import { organizationSchema, userDataSchema } from "./zodSchema";
 import { generateNameFromEmail } from "./common";
 import FormTextFieldV2 from "src/components/FormTextField/FormTextFieldV2";
@@ -298,7 +292,6 @@ const SetupOrganization = ({ getStarted = false }) => {
   const queryClient = useQueryClient();
   const quickStartOptionRef = useRef(null);
   const quickStartsViewedRef = useRef(false);
-  const [showRoleQuestions, setShowRoleQuestions] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeStep = parseInt(searchParams.get("step") || "0", 10);
   const finishSetup = useCallback((quickStartOption) => {
@@ -430,6 +423,9 @@ const SetupOrganization = ({ getStarted = false }) => {
         updateUserData({
           role: variables?.role,
           goals: variables?.goals || [],
+          onboarding_completed: Boolean(
+            variables?.role && variables?.goals?.length,
+          ),
         });
         finishSetup(quickStartOption);
         return;
@@ -439,27 +435,28 @@ const SetupOrganization = ({ getStarted = false }) => {
       });
     },
   });
-  const { handleSubmit: handleSubmitUserData } = userForm;
-  const onSubmitUserData = (data, isSkipped = false) => {
-    if (isSavingUserData) {
-      return;
-    }
-    const payload = {
-      role: data?.customRole || data?.role,
-      goals: isSkipped
-        ? []
-        : GOALS_LIST.filter((_, index) => data?.goals[index]).map(
-            (goal) => goal?.label,
-          ),
-    };
-
-    saveUserData(payload);
-  };
-
   const customRoleValue = userForm.watch("customRole");
   const roleValue = userForm.watch("role");
   const goalsValue = userForm.watch("goals");
   const hasSelectedGoal = Array.isArray(goalsValue) && goalsValue.some(Boolean);
+  const handleSelectedGoalsContinue = useCallback(() => {
+    if (isSavingUserData || !hasSelectedGoal) {
+      return;
+    }
+    saveUserData({
+      role: customRoleValue || roleValue || QUICK_START_ROLE,
+      goals: GOALS_LIST.filter((_, index) => goalsValue?.[index]).map(
+        (goal) => goal?.label,
+      ),
+    });
+  }, [
+    customRoleValue,
+    goalsValue,
+    hasSelectedGoal,
+    isSavingUserData,
+    roleValue,
+    saveUserData,
+  ]);
   useEffect(() => {
     if (activeStep !== 0 || quickStartsViewedRef.current) {
       return;
@@ -565,23 +562,23 @@ const SetupOrganization = ({ getStarted = false }) => {
 
   const renderSampleQuickStart = (option) => (
     <Box
-      data-testid="setup-org-primary-quick-start"
+      data-testid="setup-org-sample-quick-start"
       sx={{
         border: "1px solid",
-        borderColor: "primary.main",
+        borderColor: "divider",
         borderRadius: 1,
         p: 1.5,
-        bgcolor: "action.hover",
+        bgcolor: "background.paper",
       }}
     >
       <Stack spacing={1.25}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Iconify icon={option.icon} width={20} />
-          <Typography variant="subtitle2">Sample data is ready</Typography>
+          <Typography variant="subtitle2">Preview sample data</Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary">
-          Use preloaded data to understand the screens. Continue with a setup
-          path when you are ready to connect your workspace.
+          Optional: inspect preloaded data if you want to see the screens before
+          connecting your workspace.
         </Typography>
         <LoadingButton
           fullWidth
@@ -614,10 +611,10 @@ const SetupOrganization = ({ getStarted = false }) => {
     return (
       <Stack spacing={1.5}>
         <Stack spacing={0.5}>
-          <Typography variant="subtitle2">Choose a setup path</Typography>
+          <Typography variant="subtitle2">Start with one workflow</Typography>
           <Typography variant="body2" color="text.secondary">
-            Pick the workflow closest to what you want to set up. The next page
-            will show the setup checklist for that workflow.
+            Pick the product workflow you want to set up now. The next screen
+            will open the matching setup steps.
           </Typography>
         </Stack>
 
@@ -1051,7 +1048,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Choose what to set up first
+                What are you setting up today?
               </Typography>
               <Typography
                 fontWeight={"fontWeightSemiBold"}
@@ -1062,67 +1059,11 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Start from the workflow you already recognize
+                Choose one workflow and continue
               </Typography>
             </Box>
 
             {renderProductLoopQuickStarts()}
-
-            {!showRoleQuestions ? (
-              <Button
-                variant="outlined"
-                onClick={() => setShowRoleQuestions(true)}
-                color="primary"
-              >
-                Add role details
-              </Button>
-            ) : (
-              <>
-                <RadioField
-                  custom
-                  control={userForm.control}
-                  fieldName="role"
-                  optionColor="text.primary"
-                  labelColor="text.primary"
-                  label={undefined}
-                  groupSx={{ padding: 0, marginLeft: -1 }}
-                  options={AVAILABLE_ROLES}
-                />
-
-                <Typography variant="M3" fontWeight={"fontWeightMedium"}>
-                  Don&apos;t see your role?
-                </Typography>
-
-                <Controller
-                  name="customRole"
-                  control={userForm.control}
-                  render={({ field, fieldState: { error } }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      size="small"
-                      placeholder="Tell us about your role"
-                      variant="outlined"
-                      error={!!error}
-                      helperText={error?.message}
-                      sx={{
-                        backgroundColor: "background.neutral",
-                        borderRadius: 0.5,
-                      }}
-                    />
-                  )}
-                />
-
-                <Button
-                  variant="outlined"
-                  disabled={!roleValue && !customRoleValue}
-                  onClick={() => setActiveStep(1)}
-                  color="primary"
-                >
-                  Continue with role
-                </Button>
-              </>
-            )}
           </Stack>
         );
 
@@ -1184,14 +1125,8 @@ const SetupOrganization = ({ getStarted = false }) => {
               sx={{ borderRadius: 0.5 }}
               variant="outlined"
               loading={isSavingUserData}
-              disabled={
-                isSavingUserData ||
-                (!roleValue && !customRoleValue) ||
-                !hasSelectedGoal
-              }
-              onClick={handleSubmitUserData((data) =>
-                onSubmitUserData(data, false),
-              )}
+              disabled={isSavingUserData || !hasSelectedGoal}
+              onClick={handleSelectedGoalsContinue}
               color="primary"
             >
               Continue with selected goals
@@ -1297,12 +1232,14 @@ const SetupOrganization = ({ getStarted = false }) => {
             height: "fit-content",
           }}
         >
-          <DotsStepper
-            variant="dots"
-            steps={isOwner ? 3 : 2}
-            position="static"
-            activeStep={activeStep}
-          />
+          {activeStep > 0 ? (
+            <DotsStepper
+              variant="dots"
+              steps={isOwner ? 3 : 2}
+              position="static"
+              activeStep={activeStep}
+            />
+          ) : null}
           {renderContent()}
         </Box>
       </Box>

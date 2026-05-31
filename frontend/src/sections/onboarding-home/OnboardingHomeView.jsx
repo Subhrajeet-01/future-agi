@@ -170,6 +170,15 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
   },
 };
 
+const SETUP_QUICK_START_FIRST_STAGES = {
+  agent: "create_agent",
+  evals: "create_eval_dataset",
+  gateway: "configure_gateway_provider",
+  observe: "connect_observability",
+  prompt: "start_prompt",
+  voice: "create_voice_agent",
+};
+
 const setupQuickStartErrorFallbackAction = (searchContext = {}) => {
   if (searchContext.source !== "setup_org") return null;
   const attribution = normalizeSetupQuickStartAttribution(searchContext);
@@ -178,6 +187,35 @@ const setupQuickStartErrorFallbackAction = (searchContext = {}) => {
   return {
     ...fallback,
     href: appendSetupQuickStartAttributionToHref(fallback.href, attribution),
+  };
+};
+
+const setupQuickStartFallbackRecommendedAction = (
+  fallback,
+  searchContext = {},
+) => {
+  if (!fallback) return null;
+  return {
+    id: `setup_quick_start_${searchContext.quickStartId || "fallback"}`,
+    kind: "setup",
+    title: fallback.title,
+    description: fallback.description,
+    href: fallback.href,
+    ctaLabel: fallback.label,
+    estimatedMinutes: null,
+    priority: 100,
+    blocked: false,
+    blockedReason: null,
+    requiresPermission: null,
+    completionEvent: null,
+    isSample: false,
+    routeAvailable: true,
+    fallbackHref: fallback.href,
+    analytics: {
+      eventName: "onboarding_recommended_action_clicked",
+      source: "setup_org",
+      targetPath: searchContext.quickStartPrimaryPath || null,
+    },
   };
 };
 
@@ -286,6 +324,7 @@ export default function OnboardingHomeView() {
 
   const searchContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
+    const source = params.get("source") || "home";
     const hasQuickStartQuery =
       params.has("quick_start_goal") ||
       params.has("quick_start_id") ||
@@ -298,10 +337,12 @@ export default function OnboardingHomeView() {
     const quickStartAttribution =
       queryQuickStartAttribution.quickStartId || hasQuickStartQuery
         ? queryQuickStartAttribution
-        : readPersistedSetupQuickStartAttribution();
+        : source === "setup_org"
+          ? {}
+          : readPersistedSetupQuickStartAttribution();
 
     return {
-      source: params.get("source") || "home",
+      source,
       campaignKey: params.get("campaign_key"),
       emailKey: params.get("email_key"),
       targetStage: params.get("target_stage"),
@@ -599,19 +640,29 @@ export default function OnboardingHomeView() {
     !["feature_disabled", "activated", "daily_review"].includes(
       renderedState.stage,
     );
-  const suppressCompetingSamplePanel =
-    isFirstRunQuickStartFocus &&
+  const quickStartPathMismatch =
+    Boolean(renderedState) &&
+    isSetupQuickStart &&
     !isSampleQuickStart &&
-    renderedState?.primaryPath === "observe" &&
-    renderedState?.stage === "connect_observability";
+    Boolean(searchContext.quickStartPrimaryPath) &&
+    renderedState.primaryPath !== searchContext.quickStartPrimaryPath;
+  const quickStartMismatchAction = quickStartPathMismatch
+    ? setupQuickStartFallbackRecommendedAction(
+        setupQuickStartErrorFallback,
+        searchContext,
+      )
+    : null;
+  const showContextPanels =
+    !isFirstRunQuickStartFocus && !quickStartMismatchAction;
   const sampleProject = renderedState?.sampleProject;
   const renderedStage = renderedState?.stage;
   const showSampleAsPrimary = Boolean(
-    shouldShowSampleAsPrimary(renderedState) &&
+    !quickStartPathMismatch &&
+      shouldShowSampleAsPrimary(renderedState) &&
       SAMPLE_PRIMARY_STAGES.has(renderedStage),
   );
   const showSamplePanel = Boolean(
-    !suppressCompetingSamplePanel &&
+    !quickStartPathMismatch &&
       sampleProject?.available &&
       !sampleProject?.isHidden &&
       !renderedState?.isActivated &&
@@ -632,6 +683,42 @@ export default function OnboardingHomeView() {
         : sampleProject.realSetupHref;
     return appendSetupQuickStartAttributionToHref(baseHref, trackContext);
   }, [renderedStage, sampleProject, trackContext]);
+  const setupQuickStartDirectHandoffHref = useMemo(() => {
+    if (
+      !renderedState ||
+      !isSetupQuickStart ||
+      isSampleQuickStart ||
+      showGoalPicker ||
+      quickStartPathMismatch ||
+      renderedState.isActivated ||
+      renderedState.permissions?.permissionLimited
+    ) {
+      return null;
+    }
+
+    const expectedStage =
+      SETUP_QUICK_START_FIRST_STAGES[searchContext.quickStartId];
+    const action = renderedState.recommendedAction;
+    if (
+      !expectedStage ||
+      renderedState.stage !== expectedStage ||
+      renderedState.primaryPath !== searchContext.quickStartPrimaryPath ||
+      !action?.href ||
+      action.blocked ||
+      !action.routeAvailable
+    ) {
+      return null;
+    }
+
+    return appendSetupQuickStartAttributionToHref(action.href, searchContext);
+  }, [
+    isSampleQuickStart,
+    isSetupQuickStart,
+    quickStartPathMismatch,
+    renderedState,
+    searchContext,
+    showGoalPicker,
+  ]);
 
   const handleOpenSample = useCallback(
     async (options = {}) => {
@@ -692,6 +779,11 @@ export default function OnboardingHomeView() {
   );
 
   useEffect(() => {
+    if (!setupQuickStartDirectHandoffHref) return;
+    navigate(setupQuickStartDirectHandoffHref, { replace: true });
+  }, [navigate, setupQuickStartDirectHandoffHref]);
+
+  useEffect(() => {
     if (
       !isFirstRunQuickStartFocus ||
       !isSampleQuickStart ||
@@ -732,7 +824,13 @@ export default function OnboardingHomeView() {
     );
   }
 
-  const copy = getStageCopy(renderedState);
+  const copy = quickStartMismatchAction
+    ? {
+        eyebrow: "Setup",
+        title: quickStartMismatchAction.title,
+        description: quickStartMismatchAction.description,
+      }
+    : getStageCopy(renderedState);
   const isSavingGoal = mutationPending(saveGoal);
   const emailRecoveryCopy = emailContextRecoveryCopy(
     renderedState.emailContext,
@@ -1137,7 +1235,22 @@ export default function OnboardingHomeView() {
           </Alert>
         ) : null}
 
-        {showGoalPicker ? (
+        {quickStartMismatchAction ? (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) 1fr" },
+              gap: 2,
+              alignItems: "stretch",
+            }}
+          >
+            <RecommendedActionCard
+              action={quickStartMismatchAction}
+              label="Next step"
+              onActionClick={handleActionClick}
+            />
+          </Box>
+        ) : showGoalPicker ? (
           <Box
             sx={{
               display: "grid",
@@ -1202,7 +1315,7 @@ export default function OnboardingHomeView() {
           </Box>
         )}
 
-        {!isFirstRunQuickStartFocus ? (
+        {showContextPanels ? (
           <Box
             data-testid="onboarding-state-summary"
             sx={{
@@ -1247,7 +1360,7 @@ export default function OnboardingHomeView() {
           </Box>
         ) : null}
 
-        {!isFirstRunQuickStartFocus ? (
+        {showContextPanels ? (
           <ProductLoopStepper
             fallbackAction={renderedState.fallbackAction}
             goal={renderedState.goal}
@@ -1258,19 +1371,17 @@ export default function OnboardingHomeView() {
             stage={renderedState.stage}
           />
         ) : null}
-        {!isFirstRunQuickStartFocus && observePanel ? (
+        {showContextPanels && observePanel ? (
           <ObserveDiagnosticsPanel signals={renderedState.signals} />
         ) : null}
-        {!isFirstRunQuickStartFocus ? (
+        {showContextPanels ? (
           <PathCardGrid
             isChangingPath={isSavingGoal}
             paths={renderedState.availablePaths}
             onPathClick={handlePathClick}
           />
         ) : null}
-        {!isFirstRunQuickStartFocus ? (
-          <Diagnostics state={renderedState} />
-        ) : null}
+        {showContextPanels ? <Diagnostics state={renderedState} /> : null}
       </Stack>
     </Box>
   );

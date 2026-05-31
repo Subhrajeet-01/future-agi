@@ -343,7 +343,7 @@ describe("OnboardingHomeView", () => {
 
     expect(samplePanel).toBeVisible();
     expect(within(samplePanel).getByText("Sample data")).toBeVisible();
-    expect(within(samplePanel).getByText("Explore sample data")).toBeVisible();
+    expect(within(samplePanel).getByText("Preview sample data")).toBeVisible();
     expect(
       within(samplePanel).getByRole("button", { name: /open sample trace/i }),
     ).toBeVisible();
@@ -992,7 +992,7 @@ describe("OnboardingHomeView", () => {
       },
     },
   ])(
-    "keeps setup $quickStartId quick-start on Home with setup context visible",
+    "hands setup $quickStartId quick-start off to its selected first action",
     async ({
       actionId,
       fixture,
@@ -1001,8 +1001,9 @@ describe("OnboardingHomeView", () => {
       quickStartPrimaryPath,
       stage,
     }) => {
+      const activationState = fixture();
       mocks.useActivationState.mockReturnValue({
-        state: fixture(),
+        state: activationState,
         isLoading: false,
         isRefetching: false,
         isError: false,
@@ -1026,15 +1027,6 @@ describe("OnboardingHomeView", () => {
           quickStartPrimaryPath,
         }),
       );
-      expectCurrentRoute({
-        pathname: "/dashboard/home",
-        params: {
-          source: "setup_org",
-          quick_start_goal: quickStartGoal,
-          quick_start_id: quickStartId,
-          quick_start_primary_path: quickStartPrimaryPath,
-        },
-      });
       await waitFor(() =>
         expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
           "onboarding_home_viewed",
@@ -1061,15 +1053,21 @@ describe("OnboardingHomeView", () => {
           quick_start_id: quickStartId,
         }),
       );
-      expect(mocks.trackOnboardingHomeEvent).not.toHaveBeenCalledWith(
-        "onboarding_setup_quick_start_auto_handoff",
-        expect.anything(),
+      const expectedUrl = new URL(
+        activationState.recommendedAction.href,
+        "https://futureagi.test",
       );
-      expect(screen.getByTestId("onboarding-state-summary")).toBeVisible();
-      expect(
-        screen.getByTestId("onboarding-product-loop-stepper"),
-      ).toBeVisible();
-      expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
+      await waitFor(() =>
+        expectCurrentRoute({
+          pathname: expectedUrl.pathname,
+          params: {
+            ...Object.fromEntries(expectedUrl.searchParams.entries()),
+            quick_start_goal: quickStartGoal,
+            quick_start_id: quickStartId,
+            quick_start_primary_path: quickStartPrimaryPath,
+          },
+        }),
+      );
       expect(readPersistedSetupQuickStartAttribution()).toEqual({
         quickStartGoal,
         quickStartId,
@@ -1077,6 +1075,56 @@ describe("OnboardingHomeView", () => {
       });
     },
   );
+
+  it("keeps stale sample state from hijacking a real setup quick-start", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("sampleTraceReady"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView(
+      setupQuickStartRoute({
+        goal: "monitor_production_ai_app",
+        id: "observe",
+        primaryPath: "observe",
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        level: 3,
+        name: "Continue with observability setup",
+      }),
+    ).toBeVisible();
+    const setupLink = screen.getByRole("link", {
+      name: /connect observability/i,
+    });
+    const setupUrl = new URL(
+      setupLink.getAttribute("href"),
+      "https://futureagi.test",
+    );
+    expect(setupUrl.pathname).toBe("/dashboard/observe");
+    expectRouteParams({
+      params: setupUrl.searchParams,
+      values: {
+        setup: "true",
+        source: "onboarding",
+        tour_anchor: "observe_create_project_button",
+        journey_step: "connect_observability",
+        quick_start_goal: "monitor_production_ai_app",
+        quick_start_id: "observe",
+        quick_start_primary_path: "observe",
+      },
+    });
+    expect(screen.queryByTestId("sample-project-panel")).toBeNull();
+    expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
+    expect(screen.queryByTestId("onboarding-product-loop-stepper")).toBeNull();
+    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
+  });
 
   it.each([
     {
@@ -1427,6 +1475,35 @@ describe("OnboardingHomeView", () => {
         }),
       ),
     );
+    expect(readPersistedSetupQuickStartAttribution()).toEqual({});
+  });
+
+  it("does not reuse persisted quick-start context on a fresh setup-org URL", async () => {
+    persistSetupQuickStartAttribution({
+      quickStartGoal: "explore_sample_data",
+      quickStartId: "sample_preview",
+      quickStartPrimaryPath: "sample",
+    });
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeNoSetup"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView("/dashboard/home?source=setup_org");
+
+    await waitFor(() =>
+      expect(mocks.useActivationState).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "setup_org" }),
+      ),
+    );
+    const activationStateParams = mocks.useActivationState.mock.calls[0][0];
+    expect(activationStateParams).not.toHaveProperty("quickStartGoal");
+    expect(activationStateParams).not.toHaveProperty("quickStartId");
+    expect(activationStateParams).not.toHaveProperty("quickStartPrimaryPath");
     expect(readPersistedSetupQuickStartAttribution()).toEqual({});
   });
 

@@ -284,10 +284,14 @@ def resolve_onboarding_context(request):
     elif organization_role:
         workspace_role = str(RoleMapping.get_workspace_role(organization_role))
     workspace_level = _workspace_level(workspace_role, ws_membership)
+    source = request.query_params.get("source") or "direct"
     goal_context = resolve_goal_for_context(
         user=user,
         organization=organization,
         workspace=workspace,
+        requested_goal=request.query_params.get("quick_start_goal"),
+        requested_primary_path=request.query_params.get("quick_start_primary_path"),
+        source=source,
     )
 
     return OnboardingContext(
@@ -301,7 +305,7 @@ def resolve_onboarding_context(request):
         selected_goal=goal_context["goal"],
         primary_path=goal_context["primary_path"],
         persona=_persona(user),
-        source=request.query_params.get("source") or "direct",
+        source=source,
         email_context=_email_context(request.query_params),
         permissions=_build_permissions(
             organization_role=organization_role,

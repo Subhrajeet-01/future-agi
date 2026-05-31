@@ -33,7 +33,7 @@ describe("SampleProjectPanel", () => {
 
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
     expect(screen.getByText("Sample data")).toBeVisible();
-    expect(screen.getByText("Explore sample data")).toBeVisible();
+    expect(screen.getByText("Preview sample data")).toBeVisible();
     expect(screen.getByTestId("sample-project-aha-preview")).toBeVisible();
     expect(screen.getByText("Issue to review")).toBeVisible();
     expect(screen.getByText("Turn it into an evaluator")).toBeVisible();

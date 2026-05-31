@@ -56,6 +56,7 @@ describe("setup org product-loop quick starts", () => {
     });
     expect(observeQuickStart).toMatchObject({
       buttonLabel: "Connect your agent",
+      featured: true,
       primaryPath: "observe",
     });
     expect(observeQuickStart.sample).toBeUndefined();

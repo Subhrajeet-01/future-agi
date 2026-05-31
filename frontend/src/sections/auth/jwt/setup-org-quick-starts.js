@@ -31,6 +31,7 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     goal: "monitor_production_ai_app",
     buttonLabel: "Connect your agent",
     shortDescription: "Connect an AI app or agent and send the first trace.",
+    featured: true,
     icon: "mdi:connection",
   }),
   quickStart("test_and_improve_prompts", {

@@ -46,10 +46,10 @@ export default function SampleProjectPanel({
   const isRealDataStep = activationStage === "connect_real_data";
   const title = isRealDataStep
     ? "Connect the same workflow to real data"
-    : "Explore sample data";
+    : "Preview sample data";
   const description = isRealDataStep
     ? "Use the sample trace as a reference, then connect real observability so the same workflow runs on production data."
-    : "Open a seeded trace to see how the screens work, then connect real observability for your workspace.";
+    : "Optional preview data is ready if you want to inspect the screens. Continue with real observability to finish setup.";
   const openSampleTourAnchor =
     activationStage === "review_sample_signal" || isRealDataStep
       ? "sample_trace_link"
@@ -74,10 +74,10 @@ export default function SampleProjectPanel({
       data-testid="sample-project-panel"
       sx={{
         border: "1px solid",
-        borderColor: "primary.main",
+        borderColor: "divider",
         borderRadius: 1,
         p: 2,
-        bgcolor: "action.hover",
+        bgcolor: "background.paper",
       }}
     >
       <Stack spacing={1.5}>
@@ -88,7 +88,7 @@ export default function SampleProjectPanel({
           justifyContent="space-between"
         >
           <Stack direction="row" spacing={0.75} alignItems="center">
-            <Chip size="small" color="primary" label="Sample data" />
+            <Chip size="small" variant="outlined" label="Sample data" />
             <Chip size="small" label={sampleProject.label || "Sample"} />
             <Chip size="small" variant="outlined" label={statusLabel} />
           </Stack>
@@ -142,20 +142,8 @@ export default function SampleProjectPanel({
         ) : null}
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-          {!isRealDataStep ? (
-            <Button
-              variant="contained"
-              onClick={onOpenSample}
-              disabled={!canOpen || isOpening}
-              data-tour-anchor={openSampleTourAnchor}
-              startIcon={<Iconify icon="mdi:flask-outline" width={18} />}
-              sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
-            >
-              {isOpening ? "Opening..." : "Open sample trace"}
-            </Button>
-          ) : null}
           <Button
-            variant={isRealDataStep ? "contained" : "text"}
+            variant="contained"
             component={RouterLink}
             href={realSetupHref}
             onClick={onConnectRealData}
@@ -167,18 +155,16 @@ export default function SampleProjectPanel({
           >
             Connect real observability
           </Button>
-          {isRealDataStep ? (
-            <Button
-              variant="outlined"
-              onClick={onOpenSample}
-              disabled={!canOpen || isOpening}
-              data-tour-anchor={openSampleTourAnchor}
-              startIcon={<Iconify icon="mdi:flask-outline" width={18} />}
-              sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
-            >
-              {isOpening ? "Opening..." : "Open sample trace"}
-            </Button>
-          ) : null}
+          <Button
+            variant="outlined"
+            onClick={onOpenSample}
+            disabled={!canOpen || isOpening}
+            data-tour-anchor={openSampleTourAnchor}
+            startIcon={<Iconify icon="mdi:flask-outline" width={18} />}
+            sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+          >
+            {isOpening ? "Opening..." : "Open sample trace"}
+          </Button>
           <Button
             variant="text"
             color="inherit"

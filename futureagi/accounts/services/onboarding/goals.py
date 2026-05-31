@@ -131,7 +131,43 @@ def _legacy_goal_for_user(user, *, use_default=True):
     }
 
 
-def resolve_goal_for_context(*, user, organization, workspace):
+def _requested_goal_context(
+    *,
+    requested_goal=None,
+    requested_primary_path=None,
+    source=None,
+):
+    if source != "setup_org" or not requested_goal or not requested_primary_path:
+        return None
+    try:
+        goal, primary_path = _validate_goal_path(requested_goal, requested_primary_path)
+    except ValidationError:
+        return None
+    return {
+        "goal": goal,
+        "primary_path": primary_path,
+        "goal_id": None,
+        "source": "setup_quick_start",
+    }
+
+
+def resolve_goal_for_context(
+    *,
+    user,
+    organization,
+    workspace,
+    requested_goal=None,
+    requested_primary_path=None,
+    source=None,
+):
+    requested_context = _requested_goal_context(
+        requested_goal=requested_goal,
+        requested_primary_path=requested_primary_path,
+        source=source,
+    )
+    if requested_context:
+        return requested_context
+
     active_goal = get_active_goal(organization=organization, workspace=workspace)
     if active_goal:
         return {

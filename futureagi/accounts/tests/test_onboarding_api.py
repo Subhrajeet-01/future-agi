@@ -275,6 +275,59 @@ def test_activation_state_accepts_setup_quick_start_context(auth_client, user):
 
 @pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
+def test_activation_state_setup_quick_start_overrides_previous_sample_goal(
+    auth_client,
+    organization,
+    workspace,
+    user,
+):
+    save_onboarding_goal(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        goal="explore_sample_data",
+        primary_path="sample",
+        source="test",
+    )
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="onboarding_sample_project_opened",
+        source="test",
+        product_path="sample",
+        activation_stage="open_sample_project",
+        is_sample=True,
+    )
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="sample_trace_available",
+        source="test",
+        product_path="sample",
+        activation_stage="open_sample_project",
+        is_sample=True,
+    )
+
+    response = auth_client.get(
+        "/accounts/activation-state/"
+        "?source=setup_org"
+        "&quick_start_id=observe"
+        "&quick_start_goal=monitor_production_ai_app"
+        "&quick_start_primary_path=observe"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()["result"]
+    assert payload["goal"] == "monitor_production_ai_app"
+    assert payload["primary_path"] == "observe"
+    assert payload["stage"] == "connect_observability"
+    assert payload["recommended_action"]["id"] == "create_observe_project"
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
 def test_activation_state_stale_email_query_reflects_current_state(auth_client, user):
     user.goals = ["monitor_production_ai_app"]
     user.save(update_fields=["goals"])
