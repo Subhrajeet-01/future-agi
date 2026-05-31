@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import { createRequire } from "node:module";
 import process from "node:process";
 import { assert } from "../lib/api-client.mjs";
+import { getActivationStateFixture } from "../../../src/sections/onboarding-home/fixtures/activation-state.fixtures.js";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -12,6 +13,9 @@ const PROMPT_ID = "00000000-0000-4000-8000-000000000421";
 const USER_ID = "00000000-0000-4000-8000-000000000101";
 const ORGANIZATION_ID = "00000000-0000-4000-8000-000000000201";
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000301";
+const EVAL_TEMPLATE_ID = "00000000-0000-4000-8000-000000000521";
+const EVAL_VERSION_ID = "00000000-0000-4000-8000-000000000522";
+const EVAL_CONFIG_ID = "00000000-0000-4000-8000-000000000523";
 const SCREENSHOT_PATH =
   process.env.PROMPT_FIRST_RUN_CONTROLLED_SCREENSHOT ||
   "/tmp/prompt-first-run-controlled-smoke.png";
@@ -21,6 +25,7 @@ const FAILURE_SCREENSHOT_PATH =
 const state = {
   promptName: "Prompt onboarding smoke",
   defaultVersion: null,
+  evaluationConfigs: [],
   versions: {
     v1: newPromptVersion({
       version: "v1",
@@ -46,6 +51,7 @@ async function main() {
   const pageErrors = [];
   const requestFailures = [];
   const activationEventPosts = [];
+  const evalConfigPosts = [];
   const promptRequests = [];
   const stubbedApiRequests = [];
   const evidence = {
@@ -57,6 +63,7 @@ async function main() {
   await installBrowserState(page, auth);
   await installRuntime(page, auth, {
     activationEventPosts,
+    evalConfigPosts,
     promptRequests,
     stubbedApiRequests,
   });
@@ -178,6 +185,78 @@ async function main() {
     );
     evidence.failure_capture_route = await currentRelativeUrl(page);
 
+    await clickSelector(
+      page,
+      '[data-testid="prompt-failure-capture-focus"] button',
+    );
+    await waitForVisibleText(page, "All Evaluations", { exact: true });
+    await waitForVisibleText(page, "No evaluations added", { exact: true });
+    await clickVisibleButtonText(page, "Add Evaluations", {
+      exact: true,
+      rootSelector: ".MuiDrawer-paper",
+    });
+    await waitForVisibleText(page, "Select Evaluation", { exact: true });
+    await waitForVisibleText(page, "Failure detector", { exact: true });
+    await clickVisibleButtonText(page, "Add", {
+      exact: true,
+      rootSelector: ".MuiDrawer-paper",
+    });
+    await waitForVisibleText(page, "Variable Mapping");
+    await waitForVisibleText(page, "model_output", { exact: true });
+    await clickVisibleButtonText(page, "Add Evaluation", {
+      exact: true,
+      occurrence: "last",
+      rootSelector: ".MuiDrawer-paper",
+    });
+    await waitForSearchParam(page, "onboarding", "metrics");
+    await waitForSearchParam(page, "tab", "Metrics");
+    await expectSelector(
+      page,
+      '[data-testid="prompt-metrics-onboarding-focus"]',
+    );
+    await waitForVisibleText(page, "Review the prompt quality signal", {
+      exact: true,
+    });
+    evidence.metrics_route = await currentRelativeUrl(page);
+
+    assert(evalConfigPosts.length === 1, "Evaluation config POST missing.");
+    const evalConfigPayload = evalConfigPosts[0];
+    assert(
+      evalConfigPayload.id === EVAL_TEMPLATE_ID,
+      "Evaluation config POST used the wrong eval template.",
+    );
+    assert(
+      evalConfigPayload.name?.startsWith("failure_detector_workbench_"),
+      "Evaluation config POST used the wrong eval name.",
+    );
+    assert(
+      evalConfigPayload.mapping?.model_output === "output_prompt",
+      "Evaluation config POST did not map model_output to prompt output.",
+    );
+    assert(
+      evalConfigPayload.is_run === true,
+      "Evaluation config POST did not request an immediate run.",
+    );
+    assert(
+      Array.isArray(evalConfigPayload.version_to_run) &&
+        evalConfigPayload.version_to_run.includes("v1") &&
+        evalConfigPayload.version_to_run.includes("v2"),
+      "Evaluation config POST did not run against both compared prompt versions.",
+    );
+
+    await clickVisibleButtonText(page, "Finish loop", {
+      exact: true,
+      rootSelector: '[data-testid="prompt-metrics-onboarding-focus"]',
+    });
+    await waitForPath(page, "/dashboard/home");
+    await waitForSearchParam(page, "mode", "daily-quality");
+    await waitForSearchParam(
+      page,
+      "target_event",
+      "first_quality_loop_completed",
+    );
+    evidence.finish_loop_route = await currentRelativeUrl(page);
+
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
     evidence.screenshot = SCREENSHOT_PATH;
 
@@ -187,6 +266,10 @@ async function main() {
     assert(
       activationEventNames.includes("prompt_comparison_completed"),
       "Prompt comparison completion event was not recorded.",
+    );
+    assert(
+      activationEventNames.includes("first_quality_loop_completed"),
+      "Prompt first quality loop completion event was not recorded.",
     );
     assert(apiFailures.length === 0, `API failures: ${apiFailures.join("; ")}`);
     assert(pageErrors.length === 0, `Page errors: ${pageErrors.join("; ")}`);
@@ -259,7 +342,7 @@ async function commitCurrentOnboardingVersion(page, { message }) {
 async function installRuntime(
   page,
   auth,
-  { activationEventPosts, promptRequests, stubbedApiRequests },
+  { activationEventPosts, evalConfigPosts, promptRequests, stubbedApiRequests },
 ) {
   await page.setRequestInterception(true);
   page.on("request", async (request) => {
@@ -328,18 +411,26 @@ async function installRuntime(
     if (normalizedPath === "/accounts/activation-events/") {
       const payload = parseJsonPostData(request.postData());
       activationEventPosts.push(payload);
+      const fixtureName =
+        payload?.event_name === "first_quality_loop_completed"
+          ? "promptActivated"
+          : "promptComparisonComplete";
       await respondJson(request, {
         status: true,
         result: {
           event_id: "00000000-0000-4000-8000-000000000188",
           event_name: payload?.event_name || "onboarding_home_viewed",
+          activation_state: stubbedActivationState(auth, fixtureName),
         },
       });
       return;
     }
 
     if (normalizedPath === "/accounts/activation-state/") {
-      await respondJson(request, { status: true, result: {} });
+      await respondJson(request, {
+        status: true,
+        result: stubbedActivationState(auth, "promptComparisonComplete"),
+      });
       return;
     }
 
@@ -447,7 +538,99 @@ async function installRuntime(
       normalizedPath ===
       `/model-hub/prompt-templates/${PROMPT_ID}/evaluation-configs/`
     ) {
-      await respondJson(request, { status: true, result: [] });
+      await respondJson(request, {
+        status: true,
+        result: {
+          evaluationConfigs: state.evaluationConfigs,
+          template_id: PROMPT_ID,
+          template_name: state.promptName,
+        },
+      });
+      return;
+    }
+
+    if (
+      normalizedPath === `/model-hub/develops/${PROMPT_ID}/get_evals_list/` &&
+      request.method() === "GET"
+    ) {
+      await respondJson(request, {
+        status: true,
+        result: {
+          eval_recommendations: [],
+          evalRecommendations: [],
+          evals: [evalTemplateCatalogRow()],
+        },
+      });
+      return;
+    }
+
+    if (
+      normalizedPath ===
+        `/model-hub/eval-templates/${EVAL_TEMPLATE_ID}/detail/` &&
+      request.method() === "GET"
+    ) {
+      await respondJson(request, {
+        status: true,
+        result: evalTemplateDetail(),
+      });
+      return;
+    }
+
+    if (
+      normalizedPath ===
+        `/model-hub/eval-templates/${EVAL_TEMPLATE_ID}/versions/` &&
+      request.method() === "GET"
+    ) {
+      await respondJson(request, {
+        status: true,
+        result: {
+          template_id: EVAL_TEMPLATE_ID,
+          total: 1,
+          versions: [
+            {
+              id: EVAL_VERSION_ID,
+              is_default: true,
+              model: "turing_large",
+              version_number: 1,
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (
+      normalizedPath ===
+        `/model-hub/prompt-templates/${PROMPT_ID}/update-evaluation-configs/` &&
+      request.method() === "POST"
+    ) {
+      const payload = parseJsonPostData(request.postData());
+      evalConfigPosts.push(payload);
+      state.evaluationConfigs = [
+        {
+          config: payload.config || {},
+          eval_required_keys: ["model_output"],
+          eval_template_id: payload.id,
+          eval_type: "llm",
+          error_localizer: payload.error_localizer || false,
+          id: EVAL_CONFIG_ID,
+          mapping: payload.mapping || {},
+          name: payload.name,
+          output_type: "pass_fail",
+          status: "running",
+          template_id: payload.id,
+          version_to_run: payload.version_to_run || [],
+        },
+      ];
+      await respondJson(request, {
+        status: true,
+        result: {
+          message:
+            "Evaluation configuration updated successfully and evaluation started",
+          prompt_eval_config_id: EVAL_CONFIG_ID,
+          versions: payload.version_to_run || [],
+        },
+      });
       return;
     }
 
@@ -804,6 +987,56 @@ function evaluationGridData(url) {
   );
 }
 
+function evalTemplateCatalogRow() {
+  return {
+    created_by_name: "System",
+    description: "Checks whether the saved prompt output captures the failure.",
+    eval_required_keys: ["model_output"],
+    eval_template_name: "Failure detector",
+    eval_type: "llm",
+    id: EVAL_TEMPLATE_ID,
+    is_model_required: true,
+    model: "turing_large",
+    name: "Failure detector",
+    output_type: "pass_fail",
+    owner: "system",
+    template_type: "single",
+    type: "futureagi_built",
+  };
+}
+
+function evalTemplateDetail() {
+  return {
+    check_internet: false,
+    config: {
+      required_keys: ["model_output"],
+    },
+    description: "Checks whether the saved prompt output captures the failure.",
+    error_localizer_enabled: false,
+    eval_type: "llm",
+    id: EVAL_TEMPLATE_ID,
+    instructions: "Return Passed or Failed for {{model_output}}.",
+    model: "turing_large",
+    name: "Failure detector",
+    output_type: "pass_fail",
+    owner: "system",
+    pass_threshold: 0.5,
+    required_keys: ["model_output"],
+    template_type: "single",
+  };
+}
+
+function stubbedActivationState(auth, fixtureName) {
+  const activationState = getActivationStateFixture(fixtureName);
+  return {
+    ...activationState,
+    request_id: "prompt_first_run_controlled_smoke",
+    organization_id: auth.organizationId,
+    workspace_id: auth.workspaceId,
+    user_id: auth.user.id,
+  };
+}
+
 function fallbackModelHubResponse(path) {
   if (path.includes("list") || path.includes("labels")) {
     return { count: 0, next: null, current_page: 1, results: [] };
@@ -838,6 +1071,92 @@ async function typeIntoPromptEditor(page, index, text) {
 async function clickSelector(page, selector, timeout = 30000) {
   await page.waitForSelector(selector, { visible: true, timeout });
   await page.click(selector);
+}
+
+async function clickVisibleButtonText(
+  page,
+  text,
+  {
+    exact = false,
+    occurrence = "first",
+    rootSelector = "body",
+    timeout = 30000,
+  } = {},
+) {
+  await page.waitForFunction(
+    ({ expectedText, exactMatch, root }) => {
+      const rootElements = Array.from(document.querySelectorAll(root));
+      if (rootElements.length === 0) return false;
+      return window.visibleElements("*").some((element) => {
+        if (
+          !rootElements.some((rootElement) => rootElement.contains(element))
+        ) {
+          return false;
+        }
+        const textContent = window.normalizeText(element.textContent);
+        const matches = exactMatch
+          ? textContent === expectedText
+          : textContent.includes(expectedText);
+        const clickable = element.closest(
+          "button,a,[role='button'],[role='menuitem'],.MuiMenuItem-root",
+        );
+        return matches && clickable && !clickable.disabled;
+      });
+    },
+    { timeout },
+    { expectedText: text, exactMatch: exact, root: rootSelector },
+  );
+  const clicked = await page.evaluate(
+    ({ expectedText, exactMatch, occurrenceName, root }) => {
+      const rootElements = Array.from(document.querySelectorAll(root));
+      if (rootElements.length === 0) return false;
+      const candidates = window
+        .visibleElements("*")
+        .filter((element) => {
+          if (
+            !rootElements.some((rootElement) => rootElement.contains(element))
+          ) {
+            return false;
+          }
+          const textContent = window.normalizeText(element.textContent);
+          const matches = exactMatch
+            ? textContent === expectedText
+            : textContent.includes(expectedText);
+          const clickable = element.closest(
+            "button,a,[role='button'],[role='menuitem'],.MuiMenuItem-root",
+          );
+          return matches && clickable && !clickable.disabled;
+        })
+        .map((element) =>
+          element.closest(
+            "button,a,[role='button'],[role='menuitem'],.MuiMenuItem-root",
+          ),
+        );
+      const uniqueCandidates = [...new Set(candidates)];
+      const clickable =
+        occurrenceName === "last"
+          ? uniqueCandidates[uniqueCandidates.length - 1]
+          : uniqueCandidates[0];
+      if (!clickable) return false;
+      clickable.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+      );
+      clickable.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
+      );
+      clickable.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+      return true;
+    },
+    {
+      expectedText: text,
+      exactMatch: exact,
+      occurrenceName: occurrence,
+      root: rootSelector,
+    },
+  );
+  assert(clicked, `Could not click visible button text: ${text}`);
 }
 
 async function waitForPath(page, pathname, timeout = 30000) {

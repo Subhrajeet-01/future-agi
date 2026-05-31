@@ -343,6 +343,8 @@ const PromptActions = () => {
     [searchParams],
   );
   const onboardingMode = promptOnboardingParams.mode;
+  const promptOnboardingBlocker =
+    onboardingMode === PROMPT_ONBOARDING_MODES.METRICS ? null : buttonTooltip;
   const onboardingJourneyStep = promptOnboardingParams.journeyStep;
   const onboardingSource = promptOnboardingParams.isOnboarding
     ? "onboarding"
@@ -836,7 +838,7 @@ const PromptActions = () => {
       </Box>
 
       <PromptOnboardingFocusPanel
-        blocker={buttonTooltip}
+        blocker={promptOnboardingBlocker}
         compareNeedsSecondVersion={compareNeedsSecondVersion}
         currentTab={currentTab}
         isRunDisabled={isRunPromptDisabled}
