@@ -20,6 +20,7 @@ const SCREENSHOT_PATH =
 const REQUIRE_REAL_SIGNUP = envFlag("ONBOARDING_REAL_SIGNUP");
 const ALLOW_REMOTE = envFlag("ONBOARDING_REAL_SIGNUP_ALLOW_REMOTE");
 const SAMPLE_ONLY = envFlag("ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY");
+const EXPECT_DAILY_QUALITY = envFlag("ONBOARDING_SMOKE_EXPECT_DAILY_QUALITY");
 const REPORT_OUTPUT = process.env.ONBOARDING_SMOKE_REPORT_OUTPUT || "";
 const OBSERVE_QUICK_START_PARAMS = {
   source: "setup_org",
@@ -72,6 +73,8 @@ async function main() {
     evalUsageResponses: [],
     onboardingPosts: [],
     posthogEvents: [],
+    posthogRequests: [],
+    posthogConsole: [],
     sampleProjectPosts: [],
     sampleProjectResponses: [],
     setupPosts: [],
@@ -105,10 +108,11 @@ async function main() {
     executablePath: browserExecutablePath(),
     headless: process.env.HEADLESS !== "0",
     defaultViewport: VIEWPORT,
-    args: ["--no-sandbox"],
+    args: ["--no-sandbox", "--disable-blink-features=AutomationControlled"],
   });
 
   const page = await browser.newPage();
+  await prepareBrowserLikeSmokeRuntime({ browser, page });
   await page.setViewport(VIEWPORT);
   await page.evaluateOnNewDocument((apiBase) => {
     window.__FUTURE_AGI_CONFIG__ = {
@@ -130,6 +134,9 @@ async function main() {
         body: `window.__FUTURE_AGI_CONFIG__ = { VITE_HOST_API: ${JSON.stringify(API_BASE)} };`,
       });
       return;
+    }
+    if (isPostHogRequest(url)) {
+      evidence.posthogRequests.push(summarizePostHogRequest(url, request));
     }
     if (isPostHogCaptureRequest(url, request.method())) {
       evidence.posthogEvents.push(...postHogEventsFromRequest(request));
@@ -262,6 +269,14 @@ async function main() {
       evidence.evalUsageResponses.push(item);
     }
   });
+  page.on("console", (message) => {
+    const text = message.text();
+    if (!text.includes("PostHog")) return;
+    evidence.posthogConsole.push({
+      type: message.type(),
+      text: text.slice(0, 500),
+    });
+  });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   try {
@@ -305,9 +320,7 @@ async function main() {
     await waitForBrowserFrame();
     await clickVisibleButtonText(
       page,
-      SAMPLE_ONLY
-        ? "Preview sample trace first"
-        : "Connect observability first",
+      SAMPLE_ONLY ? "Preview sample trace first" : "Connect real observability",
     );
 
     const setupOrgHomeUrl = null;
@@ -1177,17 +1190,28 @@ async function main() {
     await expectVisibleText(page, "Your first quality loop is live", {
       timeout: 60000,
     });
-    const dailyQualityCtaHref = await expectVisibleActionHref(
-      page,
-      "Review daily quality",
-      "/dashboard/home?mode=daily-quality",
-      { timeout: 45000 },
-    );
+    const dailyQualityCtaHref = EXPECT_DAILY_QUALITY
+      ? await expectVisibleActionHref(
+          page,
+          "Review daily quality",
+          "/dashboard/home?mode=daily-quality",
+          { timeout: 45000 },
+        )
+      : null;
+    const postAhaCtaHref =
+      dailyQualityCtaHref ||
+      (await expectVisibleActionHref(
+        page,
+        "Open observe",
+        `/dashboard/observe/${realProject.projectId}`,
+        { timeout: 45000 },
+      ));
     await expectVisibleText(page, "Next best step", {
       timeout: 60000,
     });
     const ahaMomentPostHogEvent = await waitForAhaMomentPostHogEvent(
       evidence.posthogEvents,
+      { dailyQualityAvailable: EXPECT_DAILY_QUALITY },
     );
     const evalPostRepairHomeUrl = page.url();
 
@@ -1375,6 +1399,8 @@ async function main() {
         eval_repair_run_id: repairEvalRunId,
         eval_post_repair_home_url: evalPostRepairHomeUrl,
         daily_quality_cta_href: dailyQualityCtaHref,
+        post_aha_cta_href: postAhaCtaHref,
+        expected_daily_quality_available: EXPECT_DAILY_QUALITY,
         aha_moment_posthog_event: ahaMomentPostHogEvent,
         eval_first_quality_loop_completed_event:
           evidence.activationEventPosts.find(
@@ -1713,7 +1739,11 @@ async function expectVisibleActionHref(
           const href = element.getAttribute("href") || element.href;
           if (!href) return false;
           const url = new URL(href, window.location.origin);
-          return `${url.pathname}${url.search}` === expectedHrefPath;
+          const expected = new URL(expectedHrefPath, window.location.origin);
+          if (url.pathname !== expected.pathname) return false;
+          return Array.from(expected.searchParams.entries()).every(
+            ([key, value]) => url.searchParams.get(key) === value,
+          );
         },
       );
       return action?.getAttribute("href") || action?.href || false;
@@ -1753,7 +1783,11 @@ async function clickVisibleActionHref(
           const href = element.getAttribute("href") || element.href;
           if (!href) return false;
           const url = new URL(href, window.location.origin);
-          return `${url.pathname}${url.search}` === expectedHrefPath;
+          const expected = new URL(expectedHrefPath, window.location.origin);
+          if (url.pathname !== expected.pathname) return false;
+          return Array.from(expected.searchParams.entries()).every(
+            ([key, value]) => url.searchParams.get(key) === value,
+          );
         },
       );
     },
@@ -1780,7 +1814,11 @@ async function clickVisibleActionHref(
           const href = element.getAttribute("href") || element.href;
           if (!href) return false;
           const url = new URL(href, window.location.origin);
-          return `${url.pathname}${url.search}` === expectedHrefPath;
+          const expected = new URL(expectedHrefPath, window.location.origin);
+          if (url.pathname !== expected.pathname) return false;
+          return Array.from(expected.searchParams.entries()).every(
+            ([key, value]) => url.searchParams.get(key) === value,
+          );
         },
       );
       action.click();
@@ -1807,7 +1845,8 @@ async function clickVisibleButtonText(page, text, timeout = 30000) {
       const button = Array.from(document.querySelectorAll("button")).find(
         (element) =>
           isVisible(element) &&
-          normalized(element.textContent) === expectedText,
+          (normalized(element.getAttribute("aria-label")) === expectedText ||
+            normalized(element.textContent) === expectedText),
       );
       return button || false;
     },
@@ -1844,12 +1883,34 @@ function parseJsonPostData(requestOrData) {
 
 function isPostHogCaptureRequest(url, method) {
   if (!url || method !== "POST") return false;
-  const hostname = url.hostname.toLowerCase();
+  if (!isPostHogRequest(url)) return false;
   const pathname = slashPath(url.pathname);
-  return (
-    hostname.includes("posthog") &&
-    ["/batch/", "/capture/", "/e/"].includes(pathname)
+  return ["/batch/", "/capture/", "/e/"].some(
+    (eventPath) => pathname === eventPath || pathname.endsWith(eventPath),
   );
+}
+
+function isPostHogRequest(url) {
+  if (!url) return false;
+  const hostname = url.hostname.toLowerCase();
+  return hostname.includes("posthog");
+}
+
+function summarizePostHogRequest(url, request) {
+  const postData = request.postData();
+  const payload = parsePostHogPayload(postData);
+  const events = extractPostHogEvents(payload).map(summarizePostHogEvent);
+  return {
+    method: request.method(),
+    host: url.hostname,
+    path: slashPath(url.pathname),
+    query_keys: Array.from(url.searchParams.keys()).sort(),
+    payload: postData ? (payload ? "parsed" : "unparsed") : "empty",
+    event_count: events.length,
+    event_names: Array.from(
+      new Set(events.map((event) => event.event).filter(Boolean)),
+    ).slice(0, 20),
+  };
 }
 
 function postHogEventsFromRequest(request) {
@@ -1939,11 +2000,16 @@ function summarizePostHogEvent(event = {}) {
   };
 }
 
-async function waitForAhaMomentPostHogEvent(posthogEvents) {
+async function waitForAhaMomentPostHogEvent(
+  posthogEvents,
+  { dailyQualityAvailable } = {},
+) {
   let ahaMomentPostHogEvent = null;
   await waitForCondition(
     () => {
-      ahaMomentPostHogEvent = posthogEvents.find(isAhaMomentPostHogEvent);
+      ahaMomentPostHogEvent = posthogEvents.find((event) =>
+        isAhaMomentPostHogEvent(event, { dailyQualityAvailable }),
+      );
       return Boolean(ahaMomentPostHogEvent);
     },
     "Expected frontend Aha moment PostHog event with observe quick-start attribution.",
@@ -1952,7 +2018,7 @@ async function waitForAhaMomentPostHogEvent(posthogEvents) {
   return ahaMomentPostHogEvent;
 }
 
-function isAhaMomentPostHogEvent(event) {
+function isAhaMomentPostHogEvent(event, { dailyQualityAvailable } = {}) {
   const properties = event?.properties || {};
   return (
     event?.event === "onboarding_aha_moment_reached" &&
@@ -1964,7 +2030,8 @@ function isAhaMomentPostHogEvent(event) {
     properties.activation_stage === "activated" &&
     properties.activation_event_name === "first_quality_loop_completed" &&
     properties.activation_event_path === "evals" &&
-    properties.daily_quality_available === true &&
+    (dailyQualityAvailable === undefined ||
+      properties.daily_quality_available === dailyQualityAvailable) &&
     properties.is_sample !== true
   );
 }
@@ -2349,6 +2416,53 @@ async function safeSignupFormState(page) {
   } catch (error) {
     return { error: error.message };
   }
+}
+
+async function prepareBrowserLikeSmokeRuntime({ browser, page }) {
+  const defaultUserAgent = await browser.userAgent();
+  const userAgent =
+    process.env.ONBOARDING_SMOKE_USER_AGENT ||
+    defaultUserAgent.replace("HeadlessChrome", "Chrome");
+  await page.setUserAgent(userAgent);
+
+  const chromeMajorVersion = userAgent.match(/Chrome\/(\d+)/)?.[1] || "124";
+  await page.evaluateOnNewDocument((version) => {
+    Object.defineProperty(navigator, "webdriver", {
+      configurable: true,
+      get: () => false,
+    });
+
+    if (!("userAgentData" in navigator)) return;
+
+    const brands = [
+      { brand: "Chromium", version },
+      { brand: "Google Chrome", version },
+      { brand: "Not A(Brand", version: "24" },
+    ];
+    Object.defineProperty(navigator, "userAgentData", {
+      configurable: true,
+      get: () => ({
+        brands,
+        mobile: false,
+        platform: "macOS",
+        getHighEntropyValues: async (hints = []) =>
+          hints.reduce(
+            (values, hint) => ({
+              ...values,
+              [hint]:
+                hint === "brands" || hint === "fullVersionList"
+                  ? brands
+                  : hint === "mobile"
+                    ? false
+                    : hint === "platform"
+                      ? "macOS"
+                      : "",
+            }),
+            { brands, mobile: false, platform: "macOS" },
+          ),
+      }),
+    });
+  }, chromeMajorVersion);
 }
 
 function browserExecutablePath() {
