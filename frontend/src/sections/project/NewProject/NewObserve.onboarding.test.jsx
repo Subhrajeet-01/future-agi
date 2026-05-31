@@ -97,6 +97,19 @@ describe("NewObserve onboarding setup", () => {
       within(guide).getByText("export FUTUREAGI_API_KEY=test"),
     ).toBeVisible();
     expect(
+      within(guide).getByText(
+        "Use a real API key and secret key before running the snippet.",
+      ),
+    ).toBeVisible();
+    const apiKeysLink = within(guide).getByRole("link", {
+      name: /Open API keys/i,
+    });
+    expect(apiKeysLink).toBeVisible();
+    expect(apiKeysLink).toHaveAttribute(
+      "href",
+      "/dashboard/settings/api_keys?source=onboarding&target=observe_first_trace",
+    );
+    expect(
       within(guide).getByText("from futureagi import trace"),
     ).toBeVisible();
     expect(within(guide).getByLabelText("Copy install command")).toBeVisible();

@@ -41,6 +41,7 @@ export const paths = {
       mcpServer: `${ROOTS.DASHBOARD}/settings/mcp-server`,
       falconAIConnectors: `${ROOTS.DASHBOARD}/settings/falcon-ai-connectors`,
       orgSettings: `${ROOTS.DASHBOARD}/settings/org-settings`,
+      apiKeys: `${ROOTS.DASHBOARD}/settings/api_keys`,
       usageSummary: `${ROOTS.DASHBOARD}/settings/usage-summary`,
       notifications: `${ROOTS.DASHBOARD}/settings/notifications`,
       billing: `${ROOTS.DASHBOARD}/settings/billing`,

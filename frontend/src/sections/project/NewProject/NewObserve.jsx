@@ -15,6 +15,9 @@ import React, { useMemo, useState } from "react";
 import { Events, handleOnDocsClicked, trackEvent } from "src/utils/Mixpanel";
 import { useQuery } from "@tanstack/react-query";
 import axios, { endpoints } from "src/utils/axios";
+import Iconify from "src/components/iconify";
+import { RouterLink } from "src/routes/components";
+import { paths } from "src/routes/paths";
 
 import InstructionTitle from "./InstructionTitle";
 import InstructionCodeCopy from "./InstructionCodeCopy";
@@ -29,6 +32,8 @@ const CODE_SECTION_ALIASES = {
   installationGuide: "installation_guide",
   projectAddCode: "project_add_code",
 };
+
+const API_KEYS_ONBOARDING_HREF = `${paths.dashboard.settings.apiKeys}?source=onboarding&target=observe_first_trace`;
 
 const FIRST_TRACE_STEPS = [
   {
@@ -215,7 +220,27 @@ const FirstTraceSetupGuide = ({
             />
           </Stack>
           <Stack spacing={1} sx={{ minWidth: 0 }}>
-            <Typography variant="subtitle2">2. Load project keys</Typography>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent="space-between"
+            >
+              <Typography variant="subtitle2">2. Load project keys</Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                component={RouterLink}
+                href={API_KEYS_ONBOARDING_HREF}
+                startIcon={<Iconify icon="mdi:key-outline" width={16} />}
+                sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+              >
+                Open API keys
+              </Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              Use a real API key and secret key before running the snippet.
+            </Typography>
             <InstructionCodeCopy
               ariaLabel="Copy project keys"
               text={getCodeBySection("keys")}
