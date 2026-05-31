@@ -45,11 +45,11 @@ export default function SampleProjectPanel({
       : readableToken(sampleProject.status);
   const isRealDataStep = activationStage === "connect_real_data";
   const title = isRealDataStep
-    ? "Connect the same loop to real data"
-    : "Preview the quality loop first";
+    ? "Connect the same workflow to real data"
+    : "Explore sample data";
   const description = isRealDataStep
-    ? "Use the sample trace as the reference, then connect real observability so the same quality loop runs on production data."
-    : "Open a seeded trace, inspect the quality issue, then connect real observability with the product shape already clear.";
+    ? "Use the sample trace as a reference, then connect real observability so the same workflow runs on production data."
+    : "Open a seeded trace to see how the screens work, then connect real observability for your workspace.";
   const openSampleTourAnchor =
     activationStage === "review_sample_signal" || isRealDataStep
       ? "sample_trace_link"
@@ -60,8 +60,8 @@ export default function SampleProjectPanel({
       value: "Input, output, latency, cost",
     },
     {
-      label: "Quality issue",
-      value: "A reviewable failure signal",
+      label: "Issue to review",
+      value: "A failure signal you can inspect",
     },
     {
       label: "Next action",
@@ -88,7 +88,7 @@ export default function SampleProjectPanel({
           justifyContent="space-between"
         >
           <Stack direction="row" spacing={0.75} alignItems="center">
-            <Chip size="small" color="primary" label="Fastest path to Aha" />
+            <Chip size="small" color="primary" label="Sample data" />
             <Chip size="small" label={sampleProject.label || "Sample"} />
             <Chip size="small" variant="outlined" label={statusLabel} />
           </Stack>

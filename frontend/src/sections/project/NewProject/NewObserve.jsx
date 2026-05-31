@@ -146,7 +146,7 @@ const FirstTraceSetupGuide = ({
         >
           <Stack spacing={0.5}>
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-              <Chip size="small" color="primary" label="Fastest path to Aha" />
+              <Chip size="small" color="primary" label="Setup guide" />
               <Chip size="small" variant="outlined" label={statusLabel} />
             </Stack>
             <Typography variant="h6">Send one trace, then review it</Typography>

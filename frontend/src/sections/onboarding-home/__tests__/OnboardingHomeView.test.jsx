@@ -184,38 +184,6 @@ const expectCurrentRoute = ({ pathname, params }) => {
   });
 };
 
-const expectAutoHandoffEvent = async ({
-  actionId,
-  pathname,
-  quickStartGoal,
-  quickStartId,
-  quickStartPrimaryPath,
-  routeParams,
-}) => {
-  await waitFor(() =>
-    expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
-      "onboarding_setup_quick_start_auto_handoff",
-      expect.objectContaining({
-        source: "setup_org",
-        quick_start_goal: quickStartGoal,
-        quick_start_id: quickStartId,
-        quick_start_primary_path: quickStartPrimaryPath,
-        recommended_action_id: actionId,
-        action_id: actionId,
-      }),
-    ),
-  );
-
-  const [, payload] = mocks.trackOnboardingHomeEvent.mock.calls.find(
-    ([eventName, eventPayload]) =>
-      eventName === "onboarding_setup_quick_start_auto_handoff" &&
-      eventPayload.quick_start_id === quickStartId,
-  );
-  const route = new URL(payload.route, "https://futureagi.test");
-  expect(route.pathname).toBe(pathname);
-  expectRouteParams({ params: route.searchParams, values: routeParams });
-};
-
 const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
   const steps = [
     {
@@ -276,8 +244,8 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
   return {
     id: "observe_first_run",
     primaryPath: "observe",
-    eyebrow: "Observe loop",
-    title: "Start with your first quality loop",
+    eyebrow: "Observe setup",
+    title: "Connect your agent",
     description:
       "Connect traces, review the first signal, then turn it into a check.",
     chips: ["observe", "quality"],
@@ -353,7 +321,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
   });
 
-  it("renders the sample Aha panel before real Observe setup for first-run users", () => {
+  it("renders real Observe setup before sample data for first-run users", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("newWorkspaceNoGoal"),
       isLoading: false,
@@ -374,10 +342,8 @@ describe("OnboardingHomeView", () => {
     );
 
     expect(samplePanel).toBeVisible();
-    expect(within(samplePanel).getByText("Fastest path to Aha")).toBeVisible();
-    expect(
-      within(samplePanel).getByText("Preview the quality loop first"),
-    ).toBeVisible();
+    expect(within(samplePanel).getByText("Sample data")).toBeVisible();
+    expect(within(samplePanel).getByText("Explore sample data")).toBeVisible();
     expect(
       within(samplePanel).getByRole("button", { name: /open sample trace/i }),
     ).toBeVisible();
@@ -385,7 +351,7 @@ describe("OnboardingHomeView", () => {
     expect(
       within(observeSetupPanel).getByText("Connect one observe project"),
     ).toBeVisible();
-    expect(panelOrder).toEqual([samplePanel, observeSetupPanel]);
+    expect(panelOrder).toEqual([observeSetupPanel, samplePanel]);
     expect(
       screen.queryByTestId("onboarding-goal-picker"),
     ).not.toBeInTheDocument();
@@ -605,7 +571,7 @@ describe("OnboardingHomeView", () => {
 
     const samplePanel = screen.getByTestId("sample-project-panel");
     expect(samplePanel).toBeVisible();
-    expect(within(samplePanel).getByText("Fastest path to Aha")).toBeVisible();
+    expect(within(samplePanel).getByText("Sample data")).toBeVisible();
     expect(
       within(samplePanel).getByRole("button", { name: /open sample trace/i }),
     ).toBeVisible();
@@ -659,7 +625,7 @@ describe("OnboardingHomeView", () => {
     expect(panel).toBeVisible();
     expect(screen.queryByTestId("observe-setup-panel")).toBeNull();
     expect(
-      within(panel).getByText("Build a prompt quality loop"),
+      within(panel).getByText("Test prompts and compare versions"),
     ).toBeVisible();
     expect(
       within(panel).getByText(
@@ -700,16 +666,20 @@ describe("OnboardingHomeView", () => {
     expect(params.get("quick_start_primary_path")).toBe("prompt");
     expect(params.get("tour_anchor")).toBe("prompt_run_test_button");
     expect(params.get("journey_step")).toBe("run_prompt_test");
-    expect(within(panel).getByText("Step 2 of 6")).toBeVisible();
     expect(
-      screen.queryByTestId("path-focus-step-run_prompt_test"),
-    ).not.toBeInTheDocument();
+      within(screen.getByTestId("path-focus-step-run_prompt_test")).getByText(
+        "Now",
+      ),
+    ).toBeVisible();
     expect(
-      within(panel).queryByRole("link", { name: /open workbench/i }),
-    ).not.toBeInTheDocument();
+      within(panel).getByRole("link", { name: /open workbench/i }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/workbench/all?source=onboarding&quick_start_goal=improve_prompts&quick_start_id=prompt&quick_start_primary_path=prompt",
+    );
   });
 
-  it("renders the post-aha screen after the first observe quality loop", () => {
+  it("renders the completed setup screen after the first observe workflow", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("observeFirstLoopComplete"),
       isLoading: false,
@@ -723,9 +693,9 @@ describe("OnboardingHomeView", () => {
 
     const panel = screen.getByTestId("first-loop-complete-panel");
     expect(panel).toBeVisible();
-    expect(within(panel).getByText("Aha moment reached")).toBeVisible();
+    expect(within(panel).getByText("First setup complete")).toBeVisible();
     expect(
-      within(panel).getByText("Your first quality loop is live"),
+      within(panel).getByText("Your first workflow is live"),
     ).toBeVisible();
     expect(within(panel).getByText("Next best step")).toBeVisible();
     expect(
@@ -793,7 +763,7 @@ describe("OnboardingHomeView", () => {
     const panel = screen.getByTestId("first-loop-complete-panel");
     expect(panel).toBeVisible();
     expect(
-      within(panel).getByText("Your first quality loop is live"),
+      within(panel).getByText("Your first workflow is live"),
     ).toBeVisible();
     expect(within(panel).getByText("prompt")).toBeVisible();
     expect(
@@ -810,7 +780,7 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("tracks the Aha moment once when the first quality loop is reached", async () => {
+  it("tracks activation once when the first workflow is reached", async () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("observeFirstLoopComplete"),
       isLoading: false,
@@ -854,7 +824,7 @@ describe("OnboardingHomeView", () => {
     expect(ahaCalls()).toHaveLength(1);
   });
 
-  it("keeps setup quick-start attribution on the post-Aha route", async () => {
+  it("keeps setup quick-start attribution on the completed setup route", async () => {
     persistSetupQuickStartAttribution({
       quickStartGoal: "monitor_production_ai_app",
       quickStartId: "observe",
@@ -1022,15 +992,13 @@ describe("OnboardingHomeView", () => {
       },
     },
   ])(
-    "routes setup $quickStartId quick-start directly to its first action",
+    "keeps setup $quickStartId quick-start on Home with setup context visible",
     async ({
       actionId,
       fixture,
-      pathname,
       quickStartGoal,
       quickStartId,
       quickStartPrimaryPath,
-      routeParams,
       stage,
     }) => {
       mocks.useActivationState.mockReturnValue({
@@ -1058,25 +1026,10 @@ describe("OnboardingHomeView", () => {
           quickStartPrimaryPath,
         }),
       );
-      await waitFor(() =>
-        expectCurrentRoute({
-          pathname,
-          params: {
-            ...routeParams,
-            quick_start_goal: quickStartGoal,
-            quick_start_id: quickStartId,
-            quick_start_primary_path: quickStartPrimaryPath,
-          },
-        }),
-      );
-      await expectAutoHandoffEvent({
-        actionId,
-        pathname,
-        quickStartGoal,
-        quickStartId,
-        quickStartPrimaryPath,
-        routeParams: {
-          ...routeParams,
+      expectCurrentRoute({
+        pathname: "/dashboard/home",
+        params: {
+          source: "setup_org",
           quick_start_goal: quickStartGoal,
           quick_start_id: quickStartId,
           quick_start_primary_path: quickStartPrimaryPath,
@@ -1100,6 +1053,23 @@ describe("OnboardingHomeView", () => {
           }),
         ),
       );
+      expect(mocks.trackOnboardingHomeEvent).toHaveBeenCalledWith(
+        "onboarding_recommended_action_viewed",
+        expect.objectContaining({
+          action_id: actionId,
+          source: "setup_org",
+          quick_start_id: quickStartId,
+        }),
+      );
+      expect(mocks.trackOnboardingHomeEvent).not.toHaveBeenCalledWith(
+        "onboarding_setup_quick_start_auto_handoff",
+        expect.anything(),
+      );
+      expect(screen.getByTestId("onboarding-state-summary")).toBeVisible();
+      expect(
+        screen.getByTestId("onboarding-product-loop-stepper"),
+      ).toBeVisible();
+      expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
       expect(readPersistedSetupQuickStartAttribution()).toEqual({
         quickStartGoal,
         quickStartId,
@@ -1255,7 +1225,7 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("opens sample preview quick starts to the sample Aha action", async () => {
+  it("opens sample preview quick starts to the sample data action", async () => {
     const mutateAsync = vi
       .fn()
       .mockResolvedValue(normalizedFixture("sampleTraceReady"));
@@ -1849,7 +1819,7 @@ describe("OnboardingHomeView", () => {
     const panel = screen.getByTestId("path-focus-panel-prompt");
     expect(screen.getByText("Run a prompt test")).toBeVisible();
     expect(
-      within(panel).getByText("Build a prompt quality loop"),
+      within(panel).getByText("Test prompts and compare versions"),
     ).toBeVisible();
     expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
       "Run one focused example before saving.",
@@ -2005,7 +1975,7 @@ describe("OnboardingHomeView", () => {
     expect(
       screen.getByText("Run the eval once so the first result is reviewable."),
     ).toBeVisible();
-    expect(within(panel).getByText("Eval loop")).toBeVisible();
+    expect(within(panel).getByText("Eval setup")).toBeVisible();
     expect(
       within(panel).getByText("Create one eval and review the first failure"),
     ).toBeVisible();
@@ -2062,10 +2032,8 @@ describe("OnboardingHomeView", () => {
         "Inspect the call transcript and find the first quality signal.",
       ),
     ).toBeVisible();
-    expect(within(panel).getByText("Voice loop")).toBeVisible();
-    expect(
-      within(panel).getByText("Connect a voice agent quality loop"),
-    ).toBeVisible();
+    expect(within(panel).getByText("Voice setup")).toBeVisible();
+    expect(within(panel).getByText("Connect a voice agent")).toBeVisible();
     expect(
       within(panel).getByText(
         "Create or connect a voice agent, run one call, review it, and add success criteria.",
@@ -2139,7 +2107,7 @@ describe("OnboardingHomeView", () => {
 
     renderView();
 
-    await userEvent.click(screen.getByLabelText("Monitor a production AI app"));
+    await userEvent.click(screen.getByLabelText("Connect your agent"));
     await userEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     await waitFor(() =>

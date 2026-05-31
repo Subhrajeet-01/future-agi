@@ -123,6 +123,33 @@ def _save_profile_onboarding_goal(request, user, goals):
         return None
 
 
+def _organization_has_completed_profile_setup(organization, *, exclude_user_id=None):
+    if not organization:
+        return False
+
+    from accounts.models.organization_membership import OrganizationMembership
+
+    member_ids = OrganizationMembership.no_workspace_objects.filter(
+        organization=organization,
+        is_active=True,
+    ).values_list("user_id", flat=True)
+    if exclude_user_id:
+        member_ids = member_ids.exclude(user_id=exclude_user_id)
+
+    completed_profile_filter = (Q(role__isnull=False) & ~Q(role="") & ~Q(goals=[])) | Q(
+        config__onboarding__completed=True
+    )
+
+    try:
+        completed_profile_filter |= Q(config__has_key="onboarding_completed_at")
+    except Exception:
+        pass
+
+    return (
+        User.objects.filter(id__in=member_ids).filter(completed_profile_filter).exists()
+    )
+
+
 @swagger_auto_schema(
     method="post",
     request_body=RedisKeyRequestSerializer,
@@ -755,6 +782,17 @@ def get_user_info(request):
         current_membership.role if current_membership else user.organization_role
     )
     data["organization_role"] = current_org_role
+
+    if (
+        is_invited_user
+        and not onboarding_completed
+        and _organization_has_completed_profile_setup(
+            current_org,
+            exclude_user_id=user.id,
+        )
+    ):
+        onboarding_completed = True
+        data["onboarding_completed"] = True
 
     data["ws_enabled"] = current_org.ws_enabled
 

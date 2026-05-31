@@ -108,8 +108,8 @@ describe("activation-state utilities", () => {
       journey_plan: {
         id: "prompt_first_run",
         primary_path: "prompt",
-        eyebrow: "Prompt loop",
-        title: "Build a prompt quality loop",
+        eyebrow: "Prompt setup",
+        title: "Test prompts and compare versions",
         description: "Create one prompt, test it, and compare changes.",
         chips: ["prompt"],
         current_step_id: "run_prompt_test",

@@ -32,10 +32,10 @@ describe("SampleProjectPanel", () => {
     );
 
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
-    expect(screen.getByText("Fastest path to Aha")).toBeVisible();
-    expect(screen.getByText("Preview the quality loop first")).toBeVisible();
+    expect(screen.getByText("Sample data")).toBeVisible();
+    expect(screen.getByText("Explore sample data")).toBeVisible();
     expect(screen.getByTestId("sample-project-aha-preview")).toBeVisible();
-    expect(screen.getByText("Quality issue")).toBeVisible();
+    expect(screen.getByText("Issue to review")).toBeVisible();
     expect(screen.getByText("Turn it into an evaluator")).toBeVisible();
     const openSampleButton = screen.getByRole("button", {
       name: /open sample trace/i,
@@ -72,7 +72,7 @@ describe("SampleProjectPanel", () => {
     );
 
     expect(
-      screen.getByText("Connect the same loop to real data"),
+      screen.getByText("Connect the same workflow to real data"),
     ).toBeVisible();
     expect(
       within(panel).getByRole("link", { name: /connect real observability/i }),

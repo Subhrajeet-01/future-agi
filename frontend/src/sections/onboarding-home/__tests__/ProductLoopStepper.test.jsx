@@ -27,7 +27,7 @@ describe("ProductLoopStepper", () => {
       />,
     );
 
-    expect(screen.getByText("First quality loop")).toBeVisible();
+    expect(screen.getByText("Setup progress")).toBeVisible();
     expect(screen.getByText("1 of 5 complete")).toBeVisible();
     expect(
       within(screen.getByTestId("product-loop-step-build")).getByText("Build"),

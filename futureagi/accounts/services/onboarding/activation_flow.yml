@@ -21,28 +21,28 @@ product_loop_steps:
 goals:
   monitor_production_ai_app:
     primary_path: observe
-    label: Monitor a production AI app
-    description: Connect traces and review the first quality signal.
+    label: Connect your agent
+    description: Connect traces from an AI app or agent.
     estimated_minutes: 5
   improve_prompts:
     primary_path: prompt
-    label: Test and improve prompts
-    description: Create a prompt test loop and compare output changes.
+    label: Test prompts or agent prompts
+    description: Run prompt tests and compare output changes.
     estimated_minutes: 6
   build_ai_agent:
     primary_path: agent
-    label: Build or prototype an AI agent
+    label: Prototype agent
     description: Run a first scenario and inspect the agent trace.
     estimated_minutes: 8
   control_model_traffic:
     primary_path: gateway
-    label: Route LLM traffic safely
-    description: Send a gateway request and review the first log.
+    label: Setup gateway
+    description: Add a provider, create a key, and send a gateway request.
     estimated_minutes: 7
   evaluate_quality:
     primary_path: evals
-    label: Evaluate quality on data or traces
-    description: Create a small eval and review the first failure.
+    label: Test AI using simulation
+    description: Create a small eval or simulation and review failures.
     estimated_minutes: 7
   connect_voice_ai_agent:
     primary_path: voice
@@ -61,11 +61,16 @@ goal_aliases:
   route_llm_traffic_safely: control_model_traffic
   evaluate_quality_on_data_or_traces: evaluate_quality
   Test and improve prompts: improve_prompts
+  Test prompts or agent prompts: improve_prompts
   Build or prototype an AI agent: build_ai_agent
+  Prototype agent: build_ai_agent
   Route LLM traffic safely: control_model_traffic
+  Setup gateway: control_model_traffic
   Evaluate quality on data or traces: evaluate_quality
+  Test AI using simulation: evaluate_quality
   Connect a voice AI agent: connect_voice_ai_agent
   Monitor a production AI app: monitor_production_ai_app
+  Connect your agent: monitor_production_ai_app
   Monitor LLMs and Agents: monitor_production_ai_app
   Analyze System Health: monitor_production_ai_app
   Run Evaluations: evaluate_quality
@@ -81,17 +86,17 @@ paths:
     first_action_id: create_prompt
     requires_permission: prompt:write
   agent:
-    label: Build an AI agent
+    label: Prototype agent
     description: Create an agent and review its first scenario.
     first_action_id: create_agent
     requires_permission: agent:write
   observe:
-    label: Monitor a production AI app
+    label: Connect your agent
     description: Connect traces and inspect quality signals.
     first_action_id: create_observe_project
     requires_permission: observe:write
   gateway:
-    label: Control model traffic
+    label: Setup gateway
     description: Configure model routing and production policies.
     first_action_id: gateway_add_provider
     requires_permission: gateway:write
@@ -101,7 +106,7 @@ paths:
     first_action_id: create_voice_agent
     requires_permission: voice:write
   evals:
-    label: Evaluate quality
+    label: Test AI using simulation
     description: Create datasets, scorers, and failure review loops.
     first_action_id: create_eval_dataset
     requires_permission: evals:write
@@ -169,8 +174,8 @@ tour_anchors:
 journeys:
   observe_first_run:
     primary_path: observe
-    eyebrow: Observe loop
-    title: Start with your first quality loop
+    eyebrow: Observe setup
+    title: Connect your agent
     description: Connect traces, review the first signal, then turn it into a check.
     chips:
       - observe
@@ -208,8 +213,8 @@ journeys:
         description: Turn the reviewed trace into a repeatable evaluator.
   sample_first_run:
     primary_path: sample
-    eyebrow: Sample loop
-    title: Preview a quality signal now
+    eyebrow: Sample data
+    title: Explore sample data
     description: Open a sample trace first, then connect real data when ready.
     chips:
       - sample
@@ -241,8 +246,8 @@ journeys:
         description: Move from sample data to one real signal.
   prompt_first_run:
     primary_path: prompt
-    eyebrow: Prompt loop
-    title: Build a prompt quality loop
+    eyebrow: Prompt setup
+    title: Test prompts and compare versions
     description: Create one prompt, test it, save a baseline, and compare the next version.
     chips:
       - prompt
@@ -292,7 +297,7 @@ journeys:
         description: Turn the result into a reusable example or check.
   agent_first_run:
     primary_path: agent
-    eyebrow: Agent loop
+    eyebrow: Agent setup
     title: Prototype an agent with a quality check
     description: Create an agent, run one scenario, inspect the run, then save coverage.
     chips:
@@ -336,7 +341,7 @@ journeys:
         description: Keep the agent behavior measurable.
   gateway_first_run:
     primary_path: gateway
-    eyebrow: Gateway loop
+    eyebrow: Gateway setup
     title: Route one request safely
     description: Configure a provider, create a key, send one request, and turn the log into control.
     chips:
@@ -387,7 +392,7 @@ journeys:
         description: Create a guardrail for future requests.
   evals_first_run:
     primary_path: evals
-    eyebrow: Eval loop
+    eyebrow: Eval setup
     title: Create one eval and review the first failure
     description: Add a small dataset, attach a scorer, run the eval, and inspect what failed.
     chips:
@@ -431,8 +436,8 @@ journeys:
         description: Turn the failure into the next fix.
   voice_first_run:
     primary_path: voice
-    eyebrow: Voice loop
-    title: Connect a voice agent quality loop
+    eyebrow: Voice setup
+    title: Connect a voice agent
     description: Create or connect a voice agent, run one call, review it, and add success criteria.
     chips:
       - voice
@@ -971,7 +976,7 @@ actions:
   open_observe_dashboard:
     kind: review
     title: Open observe dashboard
-    description: Review the current quality loop.
+    description: Review the current workflow.
     route_key: observe_dashboard
     cta_label: Open observe
     priority: 80
@@ -1120,9 +1125,9 @@ stages:
   activated:
     home_mode: first_run
     copy:
-      eyebrow: Aha moment reached
-      title: Your first quality loop is live
-      description: Review daily quality next and keep improving the loop from real signals.
+      eyebrow: First setup complete
+      title: Your first workflow is live
+      description: Review daily quality next and keep improving the workflow from real signals.
     progress:
       build: complete
       test: available
@@ -1223,7 +1228,7 @@ stages:
   create_trace_evaluator:
     home_mode: first_run
     copy:
-      eyebrow: Quality loop
+      eyebrow: Evaluator
       title: Create an evaluator
       description: Turn the reviewed trace into a repeatable quality check.
     progress:
@@ -1338,8 +1343,8 @@ stages:
     fallback_action: open_prompt_workbench
     requires_write: true
     copy:
-      eyebrow: Prompt loop
-      title: Continue the prompt loop
+      eyebrow: Prompt setup
+      title: Continue prompt setup
       description: Turn the latest comparison into the next improvement.
     next: []
   create_agent:
@@ -1683,8 +1688,8 @@ stages:
     fallback_action: open_eval_usage
     requires_write: true
     copy:
-      eyebrow: Eval loop
-      title: Continue the eval loop
+      eyebrow: Eval setup
+      title: Continue eval setup
       description: Use the failures to drive the next improvement.
     next: []
   open_sample_project:

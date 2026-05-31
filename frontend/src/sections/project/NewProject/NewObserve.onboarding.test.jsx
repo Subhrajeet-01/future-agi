@@ -86,7 +86,7 @@ describe("NewObserve onboarding setup", () => {
 
     const guide = screen.getByTestId("observe-first-trace-guide");
     expect(guide).toBeVisible();
-    expect(within(guide).getByText("Fastest path to Aha")).toBeVisible();
+    expect(within(guide).getByText("Setup guide")).toBeVisible();
     expect(
       within(guide).getByText("Send one trace, then review it"),
     ).toBeVisible();

@@ -23,57 +23,42 @@ describe("setup org product-loop quick starts", () => {
         option.primaryPath,
       ]),
     ).toEqual([
+      ["observe", "monitor_production_ai_app", "Connect your agent", "observe"],
+      ["prompt", "improve_prompts", "Test prompts or agent prompts", "prompt"],
+      ["agent", "build_ai_agent", "Prototype agent", "agent"],
+      ["gateway", "control_model_traffic", "Setup gateway", "gateway"],
+      ["evals", "evaluate_quality", "Test AI using simulation", "evals"],
+      ["voice", "connect_voice_ai_agent", "Connect a voice AI agent", "voice"],
       [
         "sample_preview",
         "explore_sample_data",
         "Explore with sample data",
         "sample",
       ],
-      [
-        "observe",
-        "monitor_production_ai_app",
-        "Monitor a production AI app",
-        "observe",
-      ],
-      ["prompt", "improve_prompts", "Test and improve prompts", "prompt"],
-      ["agent", "build_ai_agent", "Build or prototype an AI agent", "agent"],
-      [
-        "gateway",
-        "control_model_traffic",
-        "Route LLM traffic safely",
-        "gateway",
-      ],
-      [
-        "evals",
-        "evaluate_quality",
-        "Evaluate quality on data or traces",
-        "evals",
-      ],
-      ["voice", "connect_voice_ai_agent", "Connect a voice AI agent", "voice"],
     ]);
   });
 
-  it("keeps sample preview as the only featured fast Aha quick start", () => {
-    const featuredQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
-      (option) => option.featured,
+  it("keeps product setup paths primary and sample data secondary", () => {
+    const sampleQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
+      (option) => option.sample,
     );
     const observeQuickStart = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
       (option) => option.id === "observe",
     );
 
-    expect(featuredQuickStarts.map((option) => option.id)).toEqual([
+    expect(sampleQuickStarts.map((option) => option.id)).toEqual([
       "sample_preview",
     ]);
-    expect(featuredQuickStarts[0]).toMatchObject({
+    expect(sampleQuickStarts[0]).toMatchObject({
       goal: "explore_sample_data",
       primaryPath: "sample",
-      buttonLabel: "Preview sample trace first",
+      buttonLabel: "Open sample data",
     });
     expect(observeQuickStart).toMatchObject({
-      buttonLabel: "Connect real observability",
+      buttonLabel: "Connect your agent",
       primaryPath: "observe",
     });
-    expect(observeQuickStart.featured).toBeUndefined();
+    expect(observeQuickStart.sample).toBeUndefined();
   });
 
   it("normalizes quick-start attribution from known quick-start ids", () => {

@@ -44,14 +44,8 @@ import OnboardingHomeError from "./components/OnboardingHomeError";
 import OnboardingHomeSkeleton from "./components/OnboardingHomeSkeleton";
 import PathCardGrid from "./components/PathCardGrid";
 import PathFocusPanel from "./components/PathFocusPanel";
-import {
-  hrefWithJourneyGuide,
-  journeyCurrentStep,
-} from "./components/journey-guide-utils";
-import {
-  PATH_FOCUS_PLANS,
-  hasPathFocusPlan,
-} from "./components/path-focus-plan";
+import { hrefWithJourneyGuide } from "./components/journey-guide-utils";
+import { hasPathFocusPlan } from "./components/path-focus-plan";
 import ProductLoopStepper from "./components/ProductLoopStepper";
 import RecommendedActionCard from "./components/RecommendedActionCard";
 import SampleProjectPanel from "./components/SampleProjectPanel";
@@ -124,44 +118,6 @@ const actionWithSetupQuickStartAttribution = (action, context) => {
   return href === action.href ? action : { ...action, href };
 };
 
-const SETUP_QUICK_START_DIRECT_HANDOFFS = {
-  agent: {
-    actionId: "create_agent",
-    primaryPath: "agent",
-    stage: "create_agent",
-  },
-  evals: {
-    actionId: "create_eval_dataset",
-    primaryPath: "evals",
-    stage: "create_eval_dataset",
-  },
-  gateway: {
-    actionId: "gateway_add_provider",
-    primaryPath: "gateway",
-    stage: "configure_gateway_provider",
-  },
-  observe: {
-    actionId: "create_observe_project",
-    journeyStep: {
-      id: "connect_observability",
-      stage: "connect_observability",
-      tourAnchor: "observe_create_project_button",
-    },
-    primaryPath: "observe",
-    stage: "connect_observability",
-  },
-  prompt: {
-    actionId: "create_prompt",
-    primaryPath: "prompt",
-    stage: "start_prompt",
-  },
-  voice: {
-    actionId: "create_voice_agent",
-    primaryPath: "voice",
-    stage: "create_voice_agent",
-  },
-};
-
 const SETUP_QUICK_START_ERROR_FALLBACKS = {
   agent: {
     description:
@@ -212,49 +168,6 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
     label: "Create agent",
     title: "Continue with voice setup",
   },
-};
-
-const setupQuickStartHandoffStep = ({ handoff, state }) => {
-  const planStep = journeyCurrentStep(state.journeyPlan, state.stage);
-  if (planStep?.stage === state.stage) return planStep;
-
-  const fallbackStep = PATH_FOCUS_PLANS[state.primaryPath]?.steps?.find(
-    (step) => step.stage === state.stage,
-  );
-  return fallbackStep || handoff.journeyStep || null;
-};
-
-const setupQuickStartDirectHandoffHref = ({ searchContext, state }) => {
-  if (searchContext.source !== "setup_org" || !searchContext.quickStartId) {
-    return null;
-  }
-
-  const handoff = SETUP_QUICK_START_DIRECT_HANDOFFS[searchContext.quickStartId];
-  const action = state?.recommendedAction;
-  if (!handoff || !action?.href) return null;
-  if (state.isActivated || state.permissions?.permissionLimited) return null;
-  if (searchContext.quickStartPrimaryPath !== handoff.primaryPath) return null;
-  if (
-    state.stage !== handoff.stage ||
-    state.primaryPath !== handoff.primaryPath
-  ) {
-    return null;
-  }
-  if (
-    action.id !== handoff.actionId ||
-    action.blocked ||
-    !action.routeAvailable
-  ) {
-    return null;
-  }
-
-  return appendSetupQuickStartAttributionToHref(
-    hrefWithJourneyGuide(
-      action.href,
-      setupQuickStartHandoffStep({ handoff, state }),
-    ),
-    searchContext,
-  );
 };
 
 const setupQuickStartErrorFallbackAction = (searchContext = {}) => {
@@ -370,7 +283,6 @@ export default function OnboardingHomeView() {
   const activationEmailContextRef = useRef({});
   const ahaMomentTrackedRef = useRef(new Set());
   const samplePreviewAutoOpenRef = useRef(false);
-  const setupQuickStartHandoffRef = useRef(new Set());
 
   const searchContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -456,16 +368,6 @@ export default function OnboardingHomeView() {
     });
 
   const renderedState = saveGoal.data || state;
-  const setupQuickStartHandoffHref = useMemo(
-    () =>
-      renderedState
-        ? setupQuickStartDirectHandoffHref({
-            searchContext,
-            state: renderedState,
-          })
-        : null,
-    [renderedState, searchContext],
-  );
   const setupQuickStartErrorFallback = useMemo(
     () => setupQuickStartErrorFallbackAction(searchContext),
     [searchContext],
@@ -606,41 +508,6 @@ export default function OnboardingHomeView() {
   }, [isError, renderedState?.recommendedAction, trackContext]);
 
   useEffect(() => {
-    if (!trackContext || isError || isLoading || !setupQuickStartHandoffHref) {
-      return;
-    }
-
-    const handoffKey = [
-      renderedState?.workspaceId || workspaceId || "workspace",
-      searchContext.quickStartId,
-      setupQuickStartHandoffHref,
-    ].join(":");
-    if (setupQuickStartHandoffRef.current.has(handoffKey)) return;
-
-    setupQuickStartHandoffRef.current.add(handoffKey);
-    trackOnboardingHomeEvent(OnboardingHomeEvents.setupQuickStartAutoHandoff, {
-      ...trackContext,
-      action_id: renderedState?.recommendedAction?.id,
-      action_kind: renderedState?.recommendedAction?.kind,
-      route: setupQuickStartHandoffHref,
-      route_available: renderedState?.recommendedAction?.routeAvailable,
-    });
-    navigate(setupQuickStartHandoffHref, { replace: true });
-  }, [
-    isError,
-    isLoading,
-    navigate,
-    renderedState?.recommendedAction?.id,
-    renderedState?.recommendedAction?.kind,
-    renderedState?.recommendedAction?.routeAvailable,
-    renderedState?.workspaceId,
-    searchContext.quickStartId,
-    setupQuickStartHandoffHref,
-    trackContext,
-    workspaceId,
-  ]);
-
-  useEffect(() => {
     if (!trackContext || isError || !renderedState?.isActivated) return;
 
     const activationEvent = renderedState.lastMeaningfulEvent;
@@ -726,6 +593,7 @@ export default function OnboardingHomeView() {
   const isFirstRunQuickStartFocus =
     Boolean(renderedState) &&
     isSetupQuickStart &&
+    isSampleQuickStart &&
     !renderedState.isActivated &&
     !showGoalPicker &&
     !["feature_disabled", "activated", "daily_review"].includes(
@@ -1200,9 +1068,6 @@ export default function OnboardingHomeView() {
       />
     ) : null;
 
-  const prioritizeSamplePanel =
-    showSamplePanel && renderedState.stage === "connect_observability";
-
   const samplePanel = showSamplePanel ? (
     <SampleProjectPanel
       sampleProject={sampleProject}
@@ -1305,9 +1170,8 @@ export default function OnboardingHomeView() {
           <Stack spacing={2}>{samplePanel}</Stack>
         ) : observePanel ? (
           <Stack spacing={2}>
-            {prioritizeSamplePanel ? samplePanel : null}
             {observePanel}
-            {!prioritizeSamplePanel ? samplePanel : null}
+            {samplePanel}
           </Stack>
         ) : pathFocusPanel ? (
           <Stack spacing={2}>{pathFocusPanel}</Stack>

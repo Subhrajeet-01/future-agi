@@ -1,7 +1,7 @@
 export const PATH_FOCUS_PLANS = {
   prompt: {
-    eyebrow: "Prompt loop",
-    title: "Build a prompt quality loop",
+    eyebrow: "Prompt setup",
+    title: "Test prompts and compare versions",
     description:
       "Create one prompt, test it, save a baseline, and compare the next version.",
     chips: ["prompt", "versioning"],
@@ -45,7 +45,7 @@ export const PATH_FOCUS_PLANS = {
     ],
   },
   agent: {
-    eyebrow: "Agent loop",
+    eyebrow: "Agent setup",
     title: "Prototype an agent with a quality check",
     description:
       "Create an agent, run one scenario, inspect the run, then save coverage.",
@@ -84,7 +84,7 @@ export const PATH_FOCUS_PLANS = {
     ],
   },
   gateway: {
-    eyebrow: "Gateway loop",
+    eyebrow: "Gateway setup",
     title: "Route one request safely",
     description:
       "Configure a provider, create a key, send one request, and turn the log into control.",
@@ -129,7 +129,7 @@ export const PATH_FOCUS_PLANS = {
     ],
   },
   evals: {
-    eyebrow: "Eval loop",
+    eyebrow: "Eval setup",
     title: "Create one eval and review the first failure",
     description:
       "Add a small dataset, attach a scorer, run the eval, and inspect what failed.",
@@ -168,8 +168,8 @@ export const PATH_FOCUS_PLANS = {
     ],
   },
   voice: {
-    eyebrow: "Voice loop",
-    title: "Connect a voice agent quality loop",
+    eyebrow: "Voice setup",
+    title: "Connect a voice agent",
     description:
       "Create or connect a voice agent, run one call, review it, and add success criteria.",
     chips: ["voice", "call"],

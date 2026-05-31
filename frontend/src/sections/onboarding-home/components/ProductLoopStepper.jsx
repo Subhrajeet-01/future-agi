@@ -82,7 +82,7 @@ export default function ProductLoopStepper({
         alignItems={{ xs: "flex-start", md: "center" }}
       >
         <Stack spacing={0.25}>
-          <Typography variant="subtitle2">First quality loop</Typography>
+          <Typography variant="subtitle2">Setup progress</Typography>
           <Typography variant="body2" color="text.secondary">
             {completedCount} of {ONBOARDING_PRODUCT_LOOP_STEPS.length} complete
           </Typography>

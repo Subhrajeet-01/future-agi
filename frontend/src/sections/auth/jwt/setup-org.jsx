@@ -299,8 +299,6 @@ const SetupOrganization = ({ getStarted = false }) => {
   const quickStartOptionRef = useRef(null);
   const quickStartsViewedRef = useRef(false);
   const [showRoleQuestions, setShowRoleQuestions] = useState(false);
-  const [showAlternativeQuickStarts, setShowAlternativeQuickStarts] =
-    useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeStep = parseInt(searchParams.get("step") || "0", 10);
   const finishSetup = useCallback((quickStartOption) => {
@@ -579,16 +577,16 @@ const SetupOrganization = ({ getStarted = false }) => {
       <Stack spacing={1.25}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Iconify icon={option.icon} width={20} />
-          <Typography variant="subtitle2">Fastest path to Aha</Typography>
+          <Typography variant="subtitle2">Sample data is ready</Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary">
-          See trace context, one quality issue, and the evaluator step before
-          connecting your app.
+          Use preloaded data to understand the screens. Continue with a setup
+          path when you are ready to connect your workspace.
         </Typography>
         <LoadingButton
           fullWidth
           sx={{ borderRadius: 0.5, minHeight: 48 }}
-          variant="contained"
+          variant="outlined"
           loading={isSavingUserData}
           disabled={isSavingUserData}
           aria-label={option.buttonLabel}
@@ -606,53 +604,38 @@ const SetupOrganization = ({ getStarted = false }) => {
   );
 
   const renderProductLoopQuickStarts = () => {
-    const primaryQuickStart = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
-      (option) => option.featured,
+    const sampleQuickStart = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
+      (option) => option.sample,
     );
-    const alternativeQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
-      (option) => !option.featured,
+    const productQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
+      (option) => !option.sample,
     );
 
     return (
-      <Stack spacing={1.25}>
-        {primaryQuickStart ? renderSampleQuickStart(primaryQuickStart) : null}
+      <Stack spacing={1.5}>
+        <Stack spacing={0.5}>
+          <Typography variant="subtitle2">Choose a setup path</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Pick the workflow closest to what you want to set up. The next page
+            will show the setup checklist for that workflow.
+          </Typography>
+        </Stack>
 
-        <Button
-          variant="text"
-          color="primary"
-          data-testid="setup-org-alternative-quick-starts-toggle"
-          aria-expanded={showAlternativeQuickStarts}
-          onClick={() => setShowAlternativeQuickStarts((current) => !current)}
-          endIcon={
-            <Iconify
-              icon={
-                showAlternativeQuickStarts
-                  ? "mdi:chevron-up"
-                  : "mdi:chevron-down"
-              }
-              width={18}
-            />
-          }
-          sx={{ alignSelf: "flex-start", px: 0 }}
+        <Box
+          data-testid="setup-org-product-quick-starts"
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, minmax(0, 1fr))",
+            },
+            gap: 1,
+          }}
         >
-          Choose a different first loop
-        </Button>
+          {productQuickStarts.map(renderProductLoopQuickStart)}
+        </Box>
 
-        {showAlternativeQuickStarts ? (
-          <Box
-            data-testid="setup-org-alternative-quick-starts"
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, minmax(0, 1fr))",
-              },
-              gap: 1,
-            }}
-          >
-            {alternativeQuickStarts.map(renderProductLoopQuickStart)}
-          </Box>
-        ) : null}
+        {sampleQuickStart ? renderSampleQuickStart(sampleQuickStart) : null}
       </Stack>
     );
   };
@@ -698,14 +681,14 @@ const SetupOrganization = ({ getStarted = false }) => {
     <LoadingButton
       fullWidth
       sx={{ borderRadius: 0.5 }}
-      variant="contained"
+      variant="outlined"
       loading={isSavingUserData}
       disabled={isSavingUserData}
       onClick={handleSamplePreviewQuickStart}
       onPointerUp={handleSamplePreviewQuickStartPointerUp}
       color="primary"
     >
-      Preview sample trace first
+      Open sample data
     </LoadingButton>
   );
 
@@ -1068,7 +1051,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Start with your first quality loop
+                Choose what to set up first
               </Typography>
               <Typography
                 fontWeight={"fontWeightSemiBold"}
@@ -1079,7 +1062,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   lineHeight: "36px",
                 }}
               >
-                Pick the product loop you want to prove first
+                Start from the workflow you already recognize
               </Typography>
             </Box>
 
@@ -1091,7 +1074,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                 onClick={() => setShowRoleQuestions(true)}
                 color="primary"
               >
-                Personalize setup first
+                Add role details
               </Button>
             ) : (
               <>
@@ -1194,7 +1177,7 @@ const SetupOrganization = ({ getStarted = false }) => {
               onPointerUp={handleObserveQuickStartPointerUp}
               color="primary"
             >
-              Connect real observability
+              Connect your agent
             </Button>
 
             <LoadingButton

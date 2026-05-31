@@ -207,6 +207,57 @@ class TestGetUserInfoAPI:
         data = response.json()
         assert "remember_me" in data
 
+    def test_invited_user_skips_first_run_when_org_is_already_set_up(
+        self, api_client, user, organization, workspace
+    ):
+        """New members should not repeat org-level first-run setup."""
+        from accounts.models import User
+        from accounts.models.organization_membership import OrganizationMembership
+        from accounts.models.workspace import WorkspaceMembership
+        from tfc.constants.levels import Level
+        from tfc.constants.roles import OrganizationRoles
+
+        user.role = "AI Builder"
+        user.goals = ["Connect your agent"]
+        user.save(update_fields=["role", "goals"])
+
+        invitee = User.objects.create_user(
+            email="new-member-onboarding@futureagi.com",
+            password="testpassword123",
+            name="New Member",
+            organization=organization,
+            organization_role=OrganizationRoles.MEMBER,
+            invited_by=user,
+        )
+        org_membership = OrganizationMembership.no_workspace_objects.create(
+            user=invitee,
+            organization=organization,
+            role=OrganizationRoles.MEMBER,
+            level=Level.MEMBER,
+            is_active=True,
+            invited_by=user,
+        )
+        WorkspaceMembership.no_workspace_objects.create(
+            workspace=workspace,
+            user=invitee,
+            role=OrganizationRoles.WORKSPACE_MEMBER,
+            level=Level.WORKSPACE_MEMBER,
+            organization_membership=org_membership,
+            invited_by=user,
+            is_active=True,
+        )
+
+        api_client.force_authenticate(user=invitee)
+        api_client.set_workspace(workspace)
+
+        try:
+            response = api_client.get("/accounts/user-info/")
+        finally:
+            api_client.stop_workspace_injection()
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["onboarding_completed"] is True
+
 
 @pytest.mark.integration
 @pytest.mark.api

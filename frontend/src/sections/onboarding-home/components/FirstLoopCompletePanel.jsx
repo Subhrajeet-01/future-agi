@@ -40,9 +40,9 @@ export default function FirstLoopCompletePanel({
     >
       <Stack spacing={2}>
         <ObservePanelHeader
-          eyebrow="Aha moment reached"
-          title="Your first quality loop is live"
-          description="A product signal is now connected to a repeatable quality check. Keep this loop warm before adding more setup."
+          eyebrow="First setup complete"
+          title="Your first workflow is live"
+          description="A product signal is connected to a repeatable check. Review it before adding more setup."
           chips={[pathLabel, "complete"].filter(Boolean)}
         />
         <Stack spacing={0.5}>

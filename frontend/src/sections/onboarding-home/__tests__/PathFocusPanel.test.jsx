@@ -38,7 +38,7 @@ describe("PathFocusPanel", () => {
     const panel = screen.getByTestId("path-focus-panel-prompt");
     expect(panel).toBeVisible();
     expect(
-      within(panel).getByText("Build a prompt quality loop"),
+      within(panel).getByText("Test prompts and compare versions"),
     ).toBeVisible();
     expect(
       within(panel).getByText(
@@ -78,7 +78,7 @@ describe("PathFocusPanel", () => {
       journeyPlan: {
         id: "prompt_first_run",
         primaryPath: "prompt",
-        eyebrow: "Prompt loop",
+        eyebrow: "Prompt setup",
         title: "Test from manifest",
         description: "Manifest copy wins over bundled fallback copy.",
         chips: ["prompt"],
@@ -179,7 +179,7 @@ describe("PathFocusPanel", () => {
       journeyPlan: {
         id: "prompt_first_run",
         primaryPath: "prompt",
-        eyebrow: "Prompt loop",
+        eyebrow: "Prompt setup",
         title: "Test from manifest",
         description: "Manifest copy wins over bundled fallback copy.",
         chips: ["prompt"],
