@@ -589,18 +589,18 @@ const SetupOrganization = ({ getStarted = false }) => {
     [handleSamplePreviewQuickStart],
   );
 
-  const renderObserveQuickStartButton = () => (
+  const renderSamplePreviewQuickStartButton = () => (
     <LoadingButton
       fullWidth
       sx={{ borderRadius: 0.5 }}
       variant="contained"
       loading={isSavingUserData}
       disabled={isSavingUserData}
-      onClick={handleObserveQuickStart}
-      onPointerUp={handleObserveQuickStartPointerUp}
+      onClick={handleSamplePreviewQuickStart}
+      onPointerUp={handleSamplePreviewQuickStartPointerUp}
       color="primary"
     >
-      Connect observability first
+      Preview sample trace first
     </LoadingButton>
   );
 
@@ -1080,16 +1080,16 @@ const SetupOrganization = ({ getStarted = false }) => {
               ))}
             </Stack>
 
-            {renderObserveQuickStartButton()}
+            {renderSamplePreviewQuickStartButton()}
             <Button
               sx={{ borderRadius: 0.5 }}
-              variant="text"
+              variant="outlined"
               disabled={isSavingUserData}
-              onClick={handleSamplePreviewQuickStart}
-              onPointerUp={handleSamplePreviewQuickStartPointerUp}
+              onClick={handleObserveQuickStart}
+              onPointerUp={handleObserveQuickStartPointerUp}
               color="primary"
             >
-              Preview sample trace first
+              Connect real observability
             </Button>
 
             <LoadingButton

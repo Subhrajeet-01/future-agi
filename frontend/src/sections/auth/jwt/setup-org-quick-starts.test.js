@@ -52,6 +52,29 @@ describe("setup org product-loop quick starts", () => {
     ]);
   });
 
+  it("keeps sample preview as the only featured fast Aha quick start", () => {
+    const featuredQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
+      (option) => option.featured,
+    );
+    const observeQuickStart = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
+      (option) => option.id === "observe",
+    );
+
+    expect(featuredQuickStarts.map((option) => option.id)).toEqual([
+      "sample_preview",
+    ]);
+    expect(featuredQuickStarts[0]).toMatchObject({
+      goal: "explore_sample_data",
+      primaryPath: "sample",
+      buttonLabel: "Preview sample trace first",
+    });
+    expect(observeQuickStart).toMatchObject({
+      buttonLabel: "Connect real observability",
+      primaryPath: "observe",
+    });
+    expect(observeQuickStart.featured).toBeUndefined();
+  });
+
   it("normalizes quick-start attribution from known quick-start ids", () => {
     expect(setupQuickStartAttributionFromId("observe")).toEqual({
       quickStartGoal: "monitor_production_ai_app",

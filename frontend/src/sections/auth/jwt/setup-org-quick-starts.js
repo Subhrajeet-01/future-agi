@@ -37,10 +37,9 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
   quickStart("monitor_production_ai_app", {
     id: "observe",
     goal: "monitor_production_ai_app",
-    buttonLabel: "Connect observability first",
+    buttonLabel: "Connect real observability",
     shortDescription: "Send a trace and review the first signal.",
     icon: "mdi:radar",
-    featured: true,
   }),
   quickStart("test_and_improve_prompts", {
     id: "prompt",
