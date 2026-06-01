@@ -90,6 +90,21 @@ describe("TestOnboardingFocusPanel", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("supports voice setup labeling for shared guided panels", () => {
+    render(
+      <TestOnboardingFocusPanel
+        currentStep="Test call"
+        description="Run one voice test call."
+        eyebrow="Voice setup"
+        primaryAction={{ label: "Run test call", onClick: vi.fn() }}
+        title="Run a voice test call"
+      />,
+    );
+
+    expect(screen.getByText("Voice setup")).toBeVisible();
+    expect(screen.queryByText("Eval setup")).not.toBeInTheDocument();
+  });
+
   it("uses the first incomplete step when current step copy is omitted", () => {
     render(
       <TestOnboardingFocusPanel

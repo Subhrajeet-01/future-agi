@@ -21,6 +21,7 @@ export default function TestOnboardingFocusPanel({
   blocker,
   currentStep,
   description,
+  eyebrow = "Eval setup",
   hidden = false,
   primaryAction,
   secondaryAction,
@@ -57,7 +58,7 @@ export default function TestOnboardingFocusPanel({
       >
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Chip size="small" label="Eval setup" />
+            <Chip size="small" label={eyebrow} />
             {currentStep ? (
               <Chip size="small" variant="outlined" label={currentStep} />
             ) : null}
@@ -136,6 +137,7 @@ TestOnboardingFocusPanel.propTypes = {
   blocker: PropTypes.string,
   currentStep: PropTypes.string,
   description: PropTypes.string.isRequired,
+  eyebrow: PropTypes.string,
   hidden: PropTypes.bool,
   primaryAction: actionShape,
   secondaryAction: actionShape,
