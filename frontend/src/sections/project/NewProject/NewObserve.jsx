@@ -129,8 +129,13 @@ const FIRST_TRACE_STEPS = [
   },
   {
     id: "review",
+    label: "Review trace",
+    description: "Inspect the trace details when Future AGI opens it.",
+  },
+  {
+    id: "evaluator",
     label: "Create evaluator",
-    description: "Review the trace, then create the first evaluator from it.",
+    description: "Turn the reviewed trace into a repeatable evaluator.",
   },
 ];
 
@@ -643,12 +648,12 @@ const CurrentSetupTask = ({
         <Typography variant="subtitle2">
           {setupVerification?.status === "ready"
             ? "Trace detected"
-            : `Run one ${selectedInstrumentLabel} request`}
+            : `Waiting for ${selectedInstrumentLabel} ${selectedLanguageLabel} trace`}
         </Typography>
         <Typography variant="body2">
           {setupVerification?.status === "ready"
             ? "Open the trace review, then create the first evaluator from it."
-            : `Paste the ${selectedLanguageLabel} example into your app or a scratch file, run it once, and keep this page open while Future AGI waits for the trace.`}
+            : `Run one request with the ${selectedInstrumentLabel} code below. Keep this page open; Future AGI checks every few seconds, opens trace review when data arrives, then guides evaluator setup.`}
         </Typography>
       </Stack>
     </Alert>
@@ -874,7 +879,7 @@ const FirstTraceSetupGuide = ({
                 gridTemplateColumns: {
                   xs: "1fr",
                   md: "repeat(2, minmax(0, 1fr))",
-                  xl: "repeat(4, minmax(0, 1fr))",
+                  xl: "repeat(5, minmax(0, 1fr))",
                 },
                 gap: 1,
               }}

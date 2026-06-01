@@ -177,6 +177,7 @@ describe("NewObserve onboarding setup", () => {
     expect(within(guide).getByText("Choose package")).toBeVisible();
     expect(within(guide).getByText("Create keys")).toBeVisible();
     expect(within(guide).getByText("Run one request")).toBeVisible();
+    expect(within(guide).getByText("Review trace")).toBeVisible();
     expect(within(guide).getByText("Create evaluator")).toBeVisible();
     expect(
       within(guide).getByTestId("observe-current-setup-task"),
@@ -380,7 +381,12 @@ describe("NewObserve onboarding setup", () => {
     ).toBeVisible();
     expect(
       within(guide).getByTestId("observe-current-setup-task"),
-    ).toHaveTextContent("Run one OpenAI request");
+    ).toHaveTextContent("Waiting for OpenAI Python trace");
+    expect(
+      within(guide).getByTestId("observe-current-setup-task"),
+    ).toHaveTextContent(
+      "Future AGI checks every few seconds, opens trace review when data arrives, then guides evaluator setup.",
+    );
     expect(
       within(guide).getByRole("link", { name: /Create another key/i }),
     ).toBeVisible();
