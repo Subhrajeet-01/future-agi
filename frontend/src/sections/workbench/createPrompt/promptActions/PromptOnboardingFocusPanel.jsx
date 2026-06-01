@@ -12,6 +12,7 @@ const FOCUS_COPY = {
     title: "Create the first prompt",
     description:
       "Write one focused prompt, pick a model, and run it before saving a baseline.",
+    stepNumber: 1,
     steps: ["Prompt content", "Model", "First run"],
     targetTab: "Playground",
   },
@@ -19,6 +20,7 @@ const FOCUS_COPY = {
     title: "Run one prompt test",
     description:
       "Generate one output from this prompt so the workspace has a real result to inspect.",
+    stepNumber: 2,
     steps: ["Prompt content", "Model", "Run Prompt"],
     targetTab: "Playground",
   },
@@ -26,6 +28,7 @@ const FOCUS_COPY = {
     title: "Save the prompt baseline",
     description:
       "Commit the tested draft so the next edit has a version to compare against.",
+    stepNumber: 3,
     steps: ["Tested draft", "Version note", "Saved baseline"],
     targetTab: "Playground",
   },
@@ -33,6 +36,7 @@ const FOCUS_COPY = {
     title: "Compare prompt versions",
     description:
       "Open version history, select another version, and review the output difference.",
+    stepNumber: 5,
     steps: ["Baseline", "Second version", "Comparison"],
     targetTab: "Playground",
   },
@@ -40,6 +44,7 @@ const FOCUS_COPY = {
     title: "Capture a failure example",
     description:
       "Add a concrete failing case so the next prompt edit is tied to evidence.",
+    stepNumber: 6,
     steps: ["Failure case", "Expected behavior", "Next edit"],
     targetTab: "Evaluation",
   },
@@ -47,10 +52,13 @@ const FOCUS_COPY = {
     title: "Review prompt metrics",
     description:
       "Inspect linked-version metrics and decide what needs to improve next.",
+    stepNumber: 6,
     steps: ["Linked version", "Metric signal", "Next action"],
     targetTab: "Metrics",
   },
 };
+
+const TOTAL_PROMPT_SETUP_STEPS = 6;
 
 const resolveFocusCopy = ({ mode, source }) => {
   if (FOCUS_COPY[mode]) return FOCUS_COPY[mode];
@@ -82,6 +90,7 @@ export default function PromptOnboardingFocusPanel({
           title: "Create a second version",
           description:
             "Edit the prompt, run it, and save one more version before comparing behavior.",
+          stepNumber: 4,
           steps: ["Baseline", "Second run", "Second version"],
           targetTab: "Playground",
         }
@@ -165,8 +174,15 @@ export default function PromptOnboardingFocusPanel({
       >
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Chip size="small" label="Prompt onboarding" />
+            <Chip size="small" label="Prompt setup" />
             <Chip size="small" variant="outlined" label={copy.targetTab} />
+            {copy.stepNumber ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Step ${copy.stepNumber} of ${TOTAL_PROMPT_SETUP_STEPS}`}
+              />
+            ) : null}
             {blocker ? (
               <Chip size="small" color="warning" label={blocker} />
             ) : null}

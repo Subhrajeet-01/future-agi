@@ -79,8 +79,9 @@ const EvaluationActions = () => {
           >
             <Stack spacing={0.75} sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                <Chip size="small" label="Prompt onboarding" />
+                <Chip size="small" label="Prompt setup" />
                 <Chip size="small" variant="outlined" label="Evaluation" />
+                <Chip size="small" variant="outlined" label="Step 6 of 6" />
               </Stack>
               <Box>
                 <Typography variant="subtitle2">

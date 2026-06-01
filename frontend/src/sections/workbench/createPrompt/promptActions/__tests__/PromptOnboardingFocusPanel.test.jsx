@@ -23,6 +23,8 @@ describe("PromptOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Run one prompt test")).toBeVisible();
+    expect(screen.getByText("Prompt setup")).toBeVisible();
+    expect(screen.getByText("Step 2 of 6")).toBeVisible();
     expect(screen.getByRole("button", { name: /run prompt/i })).toHaveAttribute(
       "data-tour-anchor",
       "prompt_run_button",
@@ -86,6 +88,7 @@ describe("PromptOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Create a second version")).toBeVisible();
+    expect(screen.getByText("Step 4 of 6")).toBeVisible();
 
     await userEvent.click(
       screen.getByRole("button", { name: /create second version/i }),

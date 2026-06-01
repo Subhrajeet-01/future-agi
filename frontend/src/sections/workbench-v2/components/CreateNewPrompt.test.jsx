@@ -140,6 +140,14 @@ describe("CreateNewPrompt onboarding routes", () => {
       "/dashboard/workbench/all?source=onboarding&action=create-prompt&tour_anchor=prompt_create_button&journey_step=start_prompt",
     );
 
+    expect(screen.getByText("Create a prompt to test")).toBeVisible();
+    expect(screen.getByTestId("prompt-create-setup-guide")).toHaveTextContent(
+      "1. Create prompt",
+    );
+    expect(screen.getByTestId("prompt-create-setup-guide")).toHaveTextContent(
+      "4. Compare version",
+    );
+    expect(screen.getByText("Recommended")).toBeVisible();
     expect(
       screen
         .getByText("Start from scratch")

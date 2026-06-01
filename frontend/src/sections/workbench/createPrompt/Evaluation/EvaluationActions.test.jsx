@@ -114,6 +114,8 @@ describe("EvaluationActions prompt onboarding", () => {
     );
 
     expect(screen.getByTestId("prompt-failure-capture-focus")).toBeVisible();
+    expect(screen.getByText("Prompt setup")).toBeVisible();
+    expect(screen.getByText("Step 6 of 6")).toBeVisible();
 
     await userEvent.click(
       screen.getByRole("button", { name: /^add evaluation$/i }),

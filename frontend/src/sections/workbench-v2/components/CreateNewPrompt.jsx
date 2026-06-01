@@ -1,5 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Box,
+  Chip,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -27,7 +29,29 @@ import {
   getPromptOnboardingRouteParams,
 } from "src/sections/workbench/createPrompt/promptActions/promptOnboardingRoute";
 
-function PromptItem({ name, desc, icon, onClick, tourAnchor }) {
+const GUIDED_PROMPT_STEPS = [
+  "Create prompt",
+  "Run test",
+  "Save baseline",
+  "Compare version",
+];
+
+const guidedPromptOptionOrder = (option) =>
+  option.id === "start_from_scratch"
+    ? 0
+    : option.id === "start_with_template"
+      ? 1
+      : 2;
+
+function PromptItem({
+  desc,
+  helperLabel,
+  icon,
+  isRecommended = false,
+  name,
+  onClick,
+  tourAnchor,
+}) {
   const theme = useTheme();
   return (
     <Stack
@@ -49,14 +73,19 @@ function PromptItem({ name, desc, icon, onClick, tourAnchor }) {
       justifyContent={"space-between"}
       alignItems={"center"}
     >
-      <Stack>
-        <Typography
-          variant="m3"
-          fontWeight={"fontWeightMedium"}
-          color={"text.primary"}
-        >
-          {name}
-        </Typography>
+      <Stack spacing={0.5}>
+        <Stack direction="row" spacing={0.75} alignItems="center">
+          <Typography
+            variant="m3"
+            fontWeight={"fontWeightMedium"}
+            color={"text.primary"}
+          >
+            {name}
+          </Typography>
+          {isRecommended ? (
+            <Chip size="small" color="primary" label="Recommended" />
+          ) : null}
+        </Stack>
         <Typography
           variant="s2"
           fontWeight={"fontWeightRegular"}
@@ -64,6 +93,15 @@ function PromptItem({ name, desc, icon, onClick, tourAnchor }) {
         >
           {desc}
         </Typography>
+        {helperLabel ? (
+          <Typography
+            variant="caption"
+            fontWeight={"fontWeightRegular"}
+            color="text.secondary"
+          >
+            {helperLabel}
+          </Typography>
+        ) : null}
       </Stack>
       <SvgColor
         src={icon}
@@ -78,9 +116,11 @@ function PromptItem({ name, desc, icon, onClick, tourAnchor }) {
 }
 
 PromptItem.propTypes = {
-  name: PropTypes.string,
   desc: PropTypes.string,
+  helperLabel: PropTypes.string,
   icon: PropTypes.string,
+  isRecommended: PropTypes.bool,
+  name: PropTypes.string,
   onClick: PropTypes.func,
   tourAnchor: PropTypes.string,
 };
@@ -97,6 +137,20 @@ export default function CreateNewPrompt({ open, onClose, isLoading }) {
     () => getPromptOnboardingRouteParams(searchParams),
     [searchParams],
   );
+  const isGuidedPromptCreate = promptOnboardingParams.isOnboarding;
+  const promptOptions = useMemo(() => {
+    const options = CREATE_PROMPT_OPTIONS.filter((option) => {
+      if (option?.id === "start_with_template" && selectTemplateDrawerOpen) {
+        return false;
+      }
+      return true;
+    });
+    if (!isGuidedPromptCreate) return options;
+    return [...options].sort(
+      (left, right) =>
+        guidedPromptOptionOrder(left) - guidedPromptOptionOrder(right),
+    );
+  }, [isGuidedPromptCreate, selectTemplateDrawerOpen]);
 
   const { mutate: createDraft, isPending: isLoadingCreate } = useMutation({
     mutationFn: (body) =>
@@ -179,8 +233,21 @@ export default function CreateNewPrompt({ open, onClose, isLoading }) {
             color={"text.primary"}
             fontWeight={"fontWeightSemiBold"}
           >
-            Create a new prompt
+            {isGuidedPromptCreate
+              ? "Create a prompt to test"
+              : "Create a new prompt"}
           </Typography>
+          {isGuidedPromptCreate ? (
+            <Typography
+              typography="s2"
+              color="text.secondary"
+              fontWeight={"fontWeightRegular"}
+              sx={{ mt: 0.5, maxWidth: 480, lineHeight: 1.4 }}
+            >
+              Start with one prompt, run it with a real example, save the
+              baseline, then compare the next version.
+            </Typography>
+          ) : null}
           <IconButton
             disabled={isLoading}
             onClick={onClose}
@@ -197,19 +264,55 @@ export default function CreateNewPrompt({ open, onClose, isLoading }) {
       </DialogTitle>
       <DialogContent sx={{ padding: 0, lineHeight: 0 }}>
         <Stack direction={"column"} gap={1.5}>
-          {CREATE_PROMPT_OPTIONS.filter((option) => {
-            if (
-              option?.id === "start_with_template" &&
-              selectTemplateDrawerOpen
-            ) {
-              return false;
-            }
-            return true;
-          }).map((option, index) => (
+          {isGuidedPromptCreate ? (
+            <Box
+              data-testid="prompt-create-setup-guide"
+              sx={{
+                border: "1px solid",
+                borderColor: "primary.main",
+                borderRadius: 1,
+                bgcolor: "action.hover",
+                p: 1.25,
+              }}
+            >
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Prompt setup path</Typography>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  flexWrap="wrap"
+                  useFlexGap
+                >
+                  {GUIDED_PROMPT_STEPS.map((step, index) => (
+                    <Chip
+                      key={step}
+                      size="small"
+                      color={index === 0 ? "primary" : "default"}
+                      label={`${index + 1}. ${step}`}
+                      variant={index === 0 ? "filled" : "outlined"}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+            </Box>
+          ) : null}
+          {promptOptions.map((option, index) => (
             <PromptItem
               key={index}
-              desc={option.desc}
+              desc={
+                isGuidedPromptCreate && option.id === "start_from_scratch"
+                  ? "Write one prompt manually, pick a model, and run it."
+                  : option.desc
+              }
+              helperLabel={
+                isGuidedPromptCreate && option.id === "start_from_scratch"
+                  ? "This starts with a prompt you can run and version immediately."
+                  : null
+              }
               icon={option.icon}
+              isRecommended={
+                isGuidedPromptCreate && option.id === "start_from_scratch"
+              }
               name={option.name}
               onClick={() => {
                 if (isLoadingCreate) return;

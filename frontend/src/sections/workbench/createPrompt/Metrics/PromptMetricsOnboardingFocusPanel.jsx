@@ -35,8 +35,9 @@ const PromptMetricsOnboardingFocusPanel = ({
       >
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Chip size="small" label="Prompt onboarding" />
+            <Chip size="small" label="Prompt setup" />
             <Chip size="small" variant="outlined" label="Metrics" />
+            <Chip size="small" variant="outlined" label="Step 6 of 6" />
           </Stack>
           <Box>
             <Typography variant="subtitle2">
@@ -69,7 +70,7 @@ const PromptMetricsOnboardingFocusPanel = ({
             disabled={isCompletingLoop}
             onClick={onCompleteLoop}
           >
-            {isCompletingLoop ? "Finishing..." : "Finish loop"}
+            {isCompletingLoop ? "Finishing..." : "Finish setup"}
           </Button>
         </Stack>
       </Stack>

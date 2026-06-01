@@ -33,6 +33,8 @@ describe("PromptMetricsOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Review the prompt quality signal")).toBeVisible();
+    expect(screen.getByText("Prompt setup")).toBeVisible();
+    expect(screen.getByText("Step 6 of 6")).toBeVisible();
 
     await userEvent.click(
       screen.getByRole("button", { name: /filter weak versions/i }),
@@ -40,7 +42,9 @@ describe("PromptMetricsOnboardingFocusPanel", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /linked traces/i }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /finish loop/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /finish setup/i }),
+    );
 
     expect(onCompleteLoop).toHaveBeenCalledTimes(1);
     expect(onOpenFilters).toHaveBeenCalledTimes(1);
