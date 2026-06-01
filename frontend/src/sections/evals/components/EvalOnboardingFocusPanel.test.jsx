@@ -44,6 +44,7 @@ describe("EvalOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Eval setup")).toBeVisible();
+    expect(screen.getByText("Step 2 of 3")).toBeVisible();
     expect(screen.getByText("Add the eval scorer")).toBeVisible();
     expect(
       screen.getByText("Save one scorer so this source can be evaluated."),
@@ -62,5 +63,21 @@ describe("EvalOnboardingFocusPanel", () => {
       screen.getByRole("button", { name: "Use trace project" }),
     ).toHaveAttribute("data-tour-anchor", "eval_scorer_button");
     expect(onViewed).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the first incomplete step when current step copy is omitted", () => {
+    render(
+      <EvalOnboardingFocusPanel
+        description="Run the saved evaluator."
+        steps={[
+          { label: "Source", complete: true },
+          { label: "Scorer", complete: true },
+          { label: "Run", complete: false },
+        ]}
+        title="Run evaluator"
+      />,
+    );
+
+    expect(screen.getByText("Step 3 of 3")).toBeVisible();
   });
 });

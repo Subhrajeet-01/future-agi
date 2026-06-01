@@ -7,6 +7,16 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 
+const currentStepPosition = ({ currentStep, steps }) => {
+  if (!steps.length) return null;
+
+  const matchingIndex = steps.findIndex((step) => step.label === currentStep);
+  if (matchingIndex >= 0) return matchingIndex + 1;
+
+  const firstIncompleteIndex = steps.findIndex((step) => !step.complete);
+  return (firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0) + 1;
+};
+
 export default function EvalOnboardingFocusPanel({
   currentStep,
   description,
@@ -26,6 +36,8 @@ export default function EvalOnboardingFocusPanel({
 
   if (hidden) return null;
 
+  const stepPosition = currentStepPosition({ currentStep, steps });
+
   return (
     <Box
       data-testid="eval-onboarding-focus"
@@ -44,6 +56,13 @@ export default function EvalOnboardingFocusPanel({
           <Chip size="small" label="Eval setup" />
           {currentStep ? (
             <Chip size="small" variant="outlined" label={currentStep} />
+          ) : null}
+          {stepPosition ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Step ${stepPosition} of ${steps.length}`}
+            />
           ) : null}
         </Stack>
         <Box>

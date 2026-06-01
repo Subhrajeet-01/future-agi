@@ -36,7 +36,8 @@ describe("TestOnboardingFocusPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Eval onboarding")).toBeVisible();
+    expect(screen.getByText("Eval setup")).toBeVisible();
+    expect(screen.getByText("Step 2 of 3")).toBeVisible();
     expect(screen.getByText("Add evaluation coverage")).toBeVisible();
     expect(screen.getByText("Test")).toBeVisible();
     expect(screen.getAllByText("Evaluation").length).toBeGreaterThan(0);
@@ -67,5 +68,21 @@ describe("TestOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Select a run first")).toBeVisible();
+  });
+
+  it("uses the first incomplete step when current step copy is omitted", () => {
+    render(
+      <TestOnboardingFocusPanel
+        description="Run the saved evaluation."
+        steps={[
+          { label: "Test", complete: true },
+          { label: "Evaluation", complete: true },
+          { label: "Run", complete: false },
+        ]}
+        title="Run evaluation"
+      />,
+    );
+
+    expect(screen.getByText("Step 3 of 3")).toBeVisible();
   });
 });

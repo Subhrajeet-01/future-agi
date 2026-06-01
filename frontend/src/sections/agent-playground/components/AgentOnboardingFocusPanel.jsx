@@ -7,6 +7,16 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 
+const currentStepPosition = ({ currentStep, steps }) => {
+  if (!steps.length) return null;
+
+  const matchingIndex = steps.findIndex((step) => step.label === currentStep);
+  if (matchingIndex >= 0) return matchingIndex + 1;
+
+  const firstIncompleteIndex = steps.findIndex((step) => !step.complete);
+  return (firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0) + 1;
+};
+
 export default function AgentOnboardingFocusPanel({
   blocker,
   currentStep,
@@ -22,6 +32,8 @@ export default function AgentOnboardingFocusPanel({
   if (hidden) {
     return null;
   }
+
+  const stepPosition = currentStepPosition({ currentStep, steps });
 
   return (
     <Box
@@ -40,9 +52,16 @@ export default function AgentOnboardingFocusPanel({
       <Stack spacing={1.25}>
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Chip size="small" label="Setup guide" />
+            <Chip size="small" label="Agent setup" />
             {currentStep ? (
               <Chip size="small" variant="outlined" label={currentStep} />
+            ) : null}
+            {stepPosition ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Step ${stepPosition} of ${steps.length}`}
+              />
             ) : null}
             {blocker ? (
               <Chip size="small" color="warning" label={blocker} />

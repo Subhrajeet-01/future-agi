@@ -761,7 +761,7 @@ const RequestDetailDrawer = ({
         >
           <Stack spacing={1.25}>
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-              <Chip size="small" label="Gateway onboarding" />
+              <Chip size="small" label="Gateway setup" />
               <Chip
                 size="small"
                 variant="outlined"

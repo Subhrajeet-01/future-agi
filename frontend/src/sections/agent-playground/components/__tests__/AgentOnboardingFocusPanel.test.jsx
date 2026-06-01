@@ -36,7 +36,8 @@ describe("AgentOnboardingFocusPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Setup guide")).toBeVisible();
+    expect(screen.getByText("Agent setup")).toBeVisible();
+    expect(screen.getByText("Step 2 of 3")).toBeVisible();
     expect(screen.getByText("Run the first agent workflow")).toBeVisible();
     expect(screen.getByText("Agent")).toBeVisible();
     expect(screen.getAllByText("Scenario").length).toBeGreaterThan(0);
@@ -67,5 +68,22 @@ describe("AgentOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Add one node first")).toBeVisible();
+  });
+
+  it("uses the first incomplete step when current step copy is omitted", () => {
+    render(
+      <AgentOnboardingFocusPanel
+        description="Add an eval node for the reviewed behavior."
+        steps={[
+          { label: "Agent", complete: true },
+          { label: "Scenario", complete: true },
+          { label: "Review", complete: true },
+          { label: "Coverage", complete: false },
+        ]}
+        title="Add coverage"
+      />,
+    );
+
+    expect(screen.getByText("Step 4 of 4")).toBeVisible();
   });
 });

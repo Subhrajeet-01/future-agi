@@ -135,6 +135,7 @@ describe("RequestDetailDrawer", () => {
     );
 
     expect(screen.getByTestId("gateway-policy-handoff")).toBeVisible();
+    expect(screen.getByText("Gateway setup")).toBeVisible();
     expect(
       screen.getByText("Turn the reviewed request into a guardrail"),
     ).toBeVisible();

@@ -35,7 +35,8 @@ describe("GatewayOnboardingFocusPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Gateway onboarding")).toBeVisible();
+    expect(screen.getByText("Gateway setup")).toBeVisible();
+    expect(screen.getByText("Step 3 of 3")).toBeVisible();
     expect(screen.getByText("Send the first gateway request")).toBeVisible();
     expect(screen.getByText("Provider")).toBeVisible();
     expect(screen.getByText("API key")).toBeVisible();
@@ -63,5 +64,22 @@ describe("GatewayOnboardingFocusPanel", () => {
     );
 
     expect(screen.getByText("Needs provider")).toBeVisible();
+  });
+
+  it("uses the first incomplete step when current step copy is omitted", () => {
+    render(
+      <GatewayOnboardingFocusPanel
+        description="Add a policy for the reviewed gateway request."
+        steps={[
+          { label: "Provider", complete: true },
+          { label: "API key", complete: true },
+          { label: "Request", complete: true },
+          { label: "Policy", complete: false },
+        ]}
+        title="Add gateway control"
+      />,
+    );
+
+    expect(screen.getByText("Step 4 of 4")).toBeVisible();
   });
 });
