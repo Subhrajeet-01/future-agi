@@ -896,7 +896,7 @@ function TraceGraphView({ traceId, mode }) {
         borderRadius: "8px",
         overflow: "hidden",
         bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "#0a0a0c" : "background.paper",
+          theme.palette.mode === "dark" ? "#111111" : "background.paper",
       }}
     >
       {mode === "path" ? (
@@ -1084,7 +1084,7 @@ function CompareColumn({ title, accentColor, traceShortId, children }) {
           flex: 1,
           minHeight: 0,
           bgcolor: (theme) =>
-            theme.palette.mode === "dark" ? "#0a0a0c" : "background.paper",
+            theme.palette.mode === "dark" ? "#111111" : "background.paper",
         }}
       >
         {children}
