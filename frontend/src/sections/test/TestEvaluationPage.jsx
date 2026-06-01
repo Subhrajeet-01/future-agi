@@ -40,6 +40,13 @@ const TestEvaluationPage = ({
   onClose,
   executionIds = null,
   onboardingMode = null,
+  onboardingAddLabel = null,
+  onboardingCopy = null,
+  onboardingCurrentStep = null,
+  onboardingEyebrow = null,
+  onboardingRunLabel = null,
+  onboardingSecondaryAddLabel = null,
+  onboardingSteps = null,
   tourAnchor = null,
   onSuccessOfAdditionOfEvals = null,
   onAddEvaluation = null,
@@ -183,7 +190,8 @@ const TestEvaluationPage = ({
     ? executionIds?.length > 0
     : selectedCount > 0;
   const evalRouteCopy =
-    onboardingMode === TEST_ONBOARDING_MODES.CREATE_EVAL
+    onboardingCopy ||
+    (onboardingMode === TEST_ONBOARDING_MODES.CREATE_EVAL
       ? {
           title: "Create eval coverage",
           description:
@@ -193,7 +201,7 @@ const TestEvaluationPage = ({
           title: "Save the first evaluation",
           description:
             "Add one evaluation to this test, then run it against selected rows to confirm the signal works.",
-        };
+        });
 
   const handleAddEvaluationClick = () => {
     if (testId) {
@@ -206,22 +214,27 @@ const TestEvaluationPage = ({
 
   const evalRoutePrimaryAction = hasEvals
     ? {
-        label: "Run Evaluation",
+        label: onboardingRunLabel || "Run Evaluation",
         onClick: () => setOpenConfirmRunEvaluations(true),
         disabled: !canEditEvals || !hasSelectedRuns,
       }
     : {
-        label: "Add Evaluation",
+        label: onboardingAddLabel || "Add Evaluation",
         onClick: handleAddEvaluationClick,
         disabled: !canEditEvals,
       };
   const evalRouteSecondaryAction = hasEvals
     ? {
-        label: "Add another evaluation",
+        label: onboardingSecondaryAddLabel || "Add another evaluation",
         onClick: handleAddEvaluationClick,
         disabled: !canEditEvals,
       }
     : null;
+  const evalRouteSteps = onboardingSteps || [
+    { label: "Test", complete: Boolean(testId) },
+    { label: "Evaluation", complete: hasEvals },
+    { label: "Run", complete: hasEvals && hasSelectedRuns },
+  ];
 
   const onToggleToolCallCheck = (e) => {
     const value = e.target.checked;
@@ -295,18 +308,15 @@ const TestEvaluationPage = ({
       <Box sx={{ mb: 2 }} />
 
       <TestOnboardingFocusPanel
-        currentStep="Evaluation"
+        currentStep={onboardingCurrentStep || "Evaluation"}
         description={evalRouteCopy.description}
+        eyebrow={onboardingEyebrow || undefined}
         hidden={!isEvalRouteMode}
         blocker={hasEvals && !hasSelectedRuns ? "Select a run first" : null}
         primaryAction={evalRoutePrimaryAction}
         secondaryAction={evalRouteSecondaryAction}
         singleActionFocus={isEvalRouteMode}
-        steps={[
-          { label: "Test", complete: Boolean(testId) },
-          { label: "Evaluation", complete: hasEvals },
-          { label: "Run", complete: hasEvals && hasSelectedRuns },
-        ]}
+        steps={evalRouteSteps}
         title={evalRouteCopy.title}
         tourAnchor={tourAnchor}
       />
@@ -534,6 +544,21 @@ TestEvaluationPage.propTypes = {
   onClose: PropTypes.func.isRequired,
   executionIds: PropTypes.arrayOf(PropTypes.string),
   onboardingMode: PropTypes.string,
+  onboardingAddLabel: PropTypes.string,
+  onboardingCopy: PropTypes.shape({
+    description: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+  }),
+  onboardingCurrentStep: PropTypes.string,
+  onboardingEyebrow: PropTypes.string,
+  onboardingRunLabel: PropTypes.string,
+  onboardingSecondaryAddLabel: PropTypes.string,
+  onboardingSteps: PropTypes.arrayOf(
+    PropTypes.shape({
+      complete: PropTypes.bool,
+      label: PropTypes.string.isRequired,
+    }),
+  ),
   tourAnchor: PropTypes.string,
   onSuccessOfAdditionOfEvals: PropTypes.func,
   onAddEvaluation: PropTypes.func,
@@ -543,6 +568,13 @@ TestEvaluationPage.propTypes = {
 TestEvaluationPage.defaultProps = {
   executionIds: null,
   onboardingMode: null,
+  onboardingAddLabel: null,
+  onboardingCopy: null,
+  onboardingCurrentStep: null,
+  onboardingEyebrow: null,
+  onboardingRunLabel: null,
+  onboardingSecondaryAddLabel: null,
+  onboardingSteps: null,
   tourAnchor: null,
   onSuccessOfAdditionOfEvals: null,
   onAddEvaluation: null,

@@ -9,6 +9,7 @@ import {
   buildVoiceReviewCallHref,
   buildVoiceRouteFocusPayload,
   buildVoiceRunTestHref,
+  buildVoiceSuccessCriteriaHref,
   buildVoiceSuccessCriteriaAddedPayload,
   buildVoiceTestCallCompletedPayload,
   getVoiceOnboardingParams,
@@ -157,6 +158,16 @@ describe("onboardingVoiceRouteEvents", () => {
       }),
     ).toBe(
       "/dashboard/simulate/test/test-1/execution-1/call-details?from=onboarding&onboarding=review-voice-call&agent_definition_id=agent-1&quick_start_goal=connect_voice_ai_agent&quick_start_id=voice&quick_start_primary_path=voice",
+    );
+    expect(
+      buildVoiceSuccessCriteriaHref({
+        agentDefinitionId: "agent-1",
+        callId: "call-1",
+        search: VOICE_QUICK_START_SEARCH,
+        testId: "test-1",
+      }),
+    ).toBe(
+      "/dashboard/simulate/test/test-1/runs?from=onboarding&onboarding=success-criteria&agent_definition_id=agent-1&call_id=call-1&quick_start_goal=connect_voice_ai_agent&quick_start_id=voice&quick_start_primary_path=voice",
     );
   });
 

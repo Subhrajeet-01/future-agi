@@ -30,6 +30,7 @@ import {
 import {
   buildAgentEvalCoveragePayload,
   isEvalOnboardingMode,
+  TEST_ONBOARDING_MODES,
 } from "./testOnboardingModes";
 import {
   agentSetupQuickStartAttributionFromSearch,
@@ -63,6 +64,9 @@ const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
   const isSuccessCriteriaMode =
     voiceParams.mode === VOICE_ONBOARDING_MODES.SUCCESS_CRITERIA;
   const evalOnboardingMode = isEvalOnboardingMode(routeMode) ? routeMode : null;
+  const drawerOnboardingMode = isSuccessCriteriaMode
+    ? TEST_ONBOARDING_MODES.CREATE_EVAL
+    : evalOnboardingMode;
 
   const runTestDetail = queryClient.getQueryData(["test-runs-detail", testId]);
   const runTestData = runTestDetail?.data;
@@ -265,7 +269,41 @@ const TestEvaluationDrawer = ({ executionIds, onSuccessOfAdditionOfEvals }) => {
         <TestEvaluationPage
           onClose={onCloseHandler}
           executionIds={executionIds}
-          onboardingMode={evalOnboardingMode}
+          onboardingMode={drawerOnboardingMode}
+          onboardingAddLabel={
+            isSuccessCriteriaMode ? "Add success criteria" : undefined
+          }
+          onboardingCopy={
+            isSuccessCriteriaMode
+              ? {
+                  title: "Add voice success criteria",
+                  description:
+                    "Add one success criterion so future voice calls can be scored after each run.",
+                }
+              : undefined
+          }
+          onboardingCurrentStep={
+            isSuccessCriteriaMode ? "Success criteria" : undefined
+          }
+          onboardingEyebrow={isSuccessCriteriaMode ? "Voice setup" : undefined}
+          onboardingRunLabel={
+            isSuccessCriteriaMode ? "Run success criteria" : undefined
+          }
+          onboardingSecondaryAddLabel={
+            isSuccessCriteriaMode ? "Add another criterion" : undefined
+          }
+          onboardingSteps={
+            isSuccessCriteriaMode
+              ? [
+                  { label: "Test call", complete: true },
+                  { label: "Review call", complete: true },
+                  {
+                    label: "Success criteria",
+                    complete: existingEvals.length > 0,
+                  },
+                ]
+              : undefined
+          }
           tourAnchor={voiceParams.tourAnchor}
           onSuccessOfAdditionOfEvals={onSuccessOfAdditionOfEvals}
           onAddEvaluation={() => {

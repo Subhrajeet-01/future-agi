@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "src/utils/test-utils";
+import { render, screen, waitFor } from "src/utils/test-utils";
+import userEvent from "@testing-library/user-event";
 import TestExecutionCallDetail from "../TestExecutionCallDetail";
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
+  navigate: vi.fn(),
   search: "",
 }));
 
@@ -15,6 +17,7 @@ vi.mock("react-router-dom", () => ({
   useLocation: () => ({
     search: mocks.search,
   }),
+  useNavigate: () => mocks.navigate,
   BrowserRouter: ({ children }) => children,
 }));
 
@@ -35,14 +38,21 @@ vi.mock("src/sections/onboarding-home/hooks/useRecordActivationEvent", () => ({
 describe("TestExecutionCallDetail", () => {
   beforeEach(() => {
     mocks.mutate.mockClear();
+    mocks.navigate.mockClear();
     mocks.search = "";
   });
 
   it("records voice call review for voice onboarding links", async () => {
+    const user = userEvent.setup();
     mocks.search =
-      "?from=onboarding&onboarding=review-voice-call&call_id=call-1";
+      "?from=onboarding&onboarding=review-voice-call&agent_definition_id=agent-1&call_id=call-1&quick_start_goal=connect_voice_ai_agent&quick_start_id=voice&quick_start_primary_path=voice";
 
     render(<TestExecutionCallDetail />);
+
+    expect(screen.getByText("Voice setup")).toBeVisible();
+    expect(screen.getByText("Review the voice test call")).toBeVisible();
+    expect(screen.getByText("Success criteria")).toBeVisible();
+    expect(screen.getByTestId("call-details")).toBeVisible();
 
     await waitFor(() =>
       expect(mocks.mutate).toHaveBeenCalledWith(
@@ -55,6 +65,14 @@ describe("TestExecutionCallDetail", () => {
         }),
       ),
     );
+
+    await user.click(
+      screen.getByRole("button", { name: /add success criteria/i }),
+    );
+
+    expect(mocks.navigate).toHaveBeenCalledWith(
+      "/dashboard/simulate/test/test-1/runs?from=onboarding&onboarding=success-criteria&agent_definition_id=agent-1&call_id=call-1&quick_start_goal=connect_voice_ai_agent&quick_start_id=voice&quick_start_primary_path=voice",
+    );
   });
 
   it("preserves agent review behavior for legacy onboarding links", async () => {
@@ -62,6 +80,8 @@ describe("TestExecutionCallDetail", () => {
       "?from=onboarding&quick_start_goal=build_ai_agent&quick_start_id=agent&quick_start_primary_path=agent";
 
     render(<TestExecutionCallDetail />);
+
+    expect(screen.queryByText("Voice setup")).not.toBeInTheDocument();
 
     await waitFor(() =>
       expect(mocks.mutate).toHaveBeenCalledWith(

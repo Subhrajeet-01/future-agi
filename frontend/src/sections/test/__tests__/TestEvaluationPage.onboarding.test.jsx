@@ -201,6 +201,42 @@ describe("TestEvaluationPage onboarding focus", () => {
     expect(mocks.onAddEvaluation).toHaveBeenCalledTimes(1);
   });
 
+  it("can render voice success criteria copy in the shared eval drawer", async () => {
+    render(
+      <TestEvaluationPage
+        onboardingMode={TEST_ONBOARDING_MODES.CREATE_EVAL}
+        onboardingAddLabel="Add success criteria"
+        onboardingCopy={{
+          title: "Add voice success criteria",
+          description:
+            "Add one success criterion so future voice calls can be scored after each run.",
+        }}
+        onboardingCurrentStep="Success criteria"
+        onboardingEyebrow="Voice setup"
+        onboardingSteps={[
+          { label: "Test call", complete: true },
+          { label: "Review call", complete: true },
+          { label: "Success criteria", complete: false },
+        ]}
+        onAddEvaluation={mocks.onAddEvaluation}
+        onClose={mocks.onClose}
+      />,
+    );
+
+    expect(screen.getByText("Voice setup")).toBeVisible();
+    expect(screen.queryByText("Eval setup")).not.toBeInTheDocument();
+    expect(screen.getByText("Add voice success criteria")).toBeVisible();
+    expect(screen.getByText("Step 3 of 3")).toBeVisible();
+    expect(screen.getByText("Test call")).toBeVisible();
+    expect(screen.getByText("Review call")).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /add success criteria/i }),
+    );
+
+    expect(mocks.onAddEvaluation).toHaveBeenCalledTimes(1);
+  });
+
   it("shows one run-evaluation action after an eval exists", async () => {
     mocks.selectedCount = 1;
     mocks.testData = {

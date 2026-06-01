@@ -142,6 +142,26 @@ export const buildVoiceReviewCallHref = ({
   );
 };
 
+export const buildVoiceSuccessCriteriaHref = ({
+  agentDefinitionId,
+  callId,
+  quickStartAttribution,
+  search,
+  testId,
+} = {}) => {
+  if (!testId) return null;
+  const params = new URLSearchParams();
+  params.set("from", "onboarding");
+  params.set("onboarding", VOICE_ONBOARDING_MODES.SUCCESS_CRITERIA);
+  appendVoiceAgentDefinitionParam(params, agentDefinitionId);
+  if (callId) params.set("call_id", callId);
+
+  return appendVoiceOnboardingAttributionToHref(
+    `/dashboard/simulate/test/${testId}/runs?${params.toString()}`,
+    voiceQuickStartAttributionInput({ quickStartAttribution, search }),
+  );
+};
+
 export const isVoiceOnboardingMode = (mode) =>
   Object.values(VOICE_ONBOARDING_MODES).includes(mode);
 
