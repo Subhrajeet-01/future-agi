@@ -22,7 +22,7 @@ describe("setup-org analytics", () => {
   it("builds profile analytics without email or full goal payload", () => {
     expect(
       buildSetupOrgProfileSavedProperties({
-        goals: ["Connect your agent", "Test AI using simulation"],
+        goals: ["Connect your agent", "Test AI with Simulation / Evals"],
         provider: "google",
         quickStartGoal: "monitor_production_ai_app",
         quickStartId: "observe",

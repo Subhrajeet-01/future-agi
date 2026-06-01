@@ -84,7 +84,7 @@ async function main() {
       `${APP_BASE}/dashboard/home?source=setup_org&${EVAL_QUICK_START_QUERY}`,
       { waitUntil: "domcontentloaded" },
     );
-    await waitForVisibleText(page, "Test AI using simulation", {
+    await waitForVisibleText(page, "Test AI with Simulation / Evals", {
       exact: true,
     });
     await waitForVisibleText(
@@ -463,7 +463,7 @@ function evalHomeActivationState(auth) {
     available_paths: [
       {
         id: "evals",
-        label: "Test AI using simulation",
+        label: "Test AI with Simulation / Evals",
         description: "Create a small eval and review the first failure.",
         status: "selected",
         href: "/dashboard/home?path=evals",

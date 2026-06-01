@@ -178,10 +178,10 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
     title: "Prototype agent",
   },
   evals: {
-    description: "Create a small eval or simulation and review failures.",
+    description: "Create an eval or simulation and review the first result.",
     href: "/dashboard/evaluations/create?source=onboarding&step=data&tour_anchor=eval_dataset_button&journey_step=create_eval_dataset",
     label: "Create eval dataset",
-    title: "Test AI using simulation",
+    title: "Test AI with Simulation / Evals",
   },
   gateway: {
     description: "Add a provider, create a key, and send one gateway request.",

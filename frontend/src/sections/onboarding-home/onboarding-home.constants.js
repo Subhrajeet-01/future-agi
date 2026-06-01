@@ -63,8 +63,8 @@ export const ONBOARDING_GOAL_OPTIONS = [
     id: "evaluate_quality",
     goal: "evaluate_quality",
     primaryPath: "evals",
-    label: "Test AI using simulation",
-    description: "Create a small eval or simulation and review failures.",
+    label: "Test AI with Simulation / Evals",
+    description: "Create an eval or simulation and review the first result.",
     estimatedMinutes: 7,
   },
   {
@@ -87,7 +87,7 @@ export const ONBOARDING_GOAL_OPTIONS = [
 
 export const ONBOARDING_PATH_LABELS = {
   agent: "Prototype agent",
-  evals: "Test AI using simulation",
+  evals: "Test AI with Simulation / Evals",
   gateway: "Set up gateway",
   observe: "Connect your agent",
   prompt: "Test prompts or agent prompts",

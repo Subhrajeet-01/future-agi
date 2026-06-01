@@ -96,8 +96,8 @@ const QUICK_STARTS = {
     fixture: "gatewayNoProvider",
   },
   evals: {
-    buttonText: "Test AI using simulation",
-    expectedTitleText: "Test AI using simulation",
+    buttonText: "Test AI with Simulation / Evals",
+    expectedTitleText: "Test AI with Simulation / Evals",
     expectedActionText: "Create eval dataset",
     expectedAttribution: {
       quick_start_goal: "evaluate_quality",

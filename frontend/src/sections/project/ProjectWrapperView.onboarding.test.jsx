@@ -217,24 +217,11 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     });
   });
 
-  it("keeps returned credential users focused on pasting keys and sending a trace", async () => {
-    const user = userEvent.setup();
-
+  it("moves returned credential users directly to trace wait", async () => {
     renderWithRouter(<ProjectWrapperView />, {
       route:
         "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=python",
     });
-
-    expect(screen.getByText("Credentials copied")).toBeVisible();
-    expect(
-      screen.getByText("Waiting for Anthropic Python trace"),
-    ).toBeVisible();
-    expect(
-      screen.getByText(
-        "Paste both copied values into the Anthropic Python setup snippet, then run one request.",
-      ),
-    ).toBeVisible();
-    expect(screen.getByText("Keys")).toBeVisible();
 
     await waitFor(() => {
       expect(mocks.recordActivationEvent).toHaveBeenCalledWith(
@@ -253,12 +240,6 @@ describe("ProjectWrapperView observe setup onboarding", () => {
         }),
       );
     });
-
-    await user.click(
-      screen.getByRole("button", {
-        name: /wait for anthropic python trace/i,
-      }),
-    );
 
     await waitFor(() => {
       expect(window.location.pathname).toBe(
@@ -332,7 +313,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     const focusPanel = screen.getByTestId("observe-onboarding-focus");
     const focusButtons = within(focusPanel).getAllByRole("button");
     expect(focusButtons[0]).toHaveTextContent(/open sample trace/i);
-    expect(focusButtons[1]).toHaveTextContent(/review setup/i);
+    expect(focusButtons[1]).toHaveTextContent(/open openai setup/i);
 
     await user.click(
       screen.getByRole("button", { name: /open sample trace/i }),

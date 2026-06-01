@@ -2682,7 +2682,7 @@ describe("OnboardingHomeView", () => {
       label: "Create eval dataset",
       pathname: "/dashboard/evaluations/create",
       primaryPath: "evals",
-      title: "Test AI using simulation",
+      title: "Test AI with Simulation / Evals",
       routeParams: {
         source: "onboarding",
         step: "data",

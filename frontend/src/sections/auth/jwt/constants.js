@@ -71,13 +71,13 @@ export const GOALS_LIST = [
   },
   {
     id: "evaluate_quality",
-    label: "Test AI using simulation",
+    label: "Test AI with Simulation / Evals",
     aliases: [
       "evaluate_quality_on_data_or_traces",
       "Run Evaluations",
       "Annotate and Improve Data",
     ],
-    description: "Create a small eval and review the first failure.",
+    description: "Create an eval or simulation and review the first result.",
   },
   {
     id: "connect_voice_ai_agent",

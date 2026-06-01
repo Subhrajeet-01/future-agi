@@ -101,9 +101,10 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
   quickStart("evaluate_quality", {
     id: "evals",
     goal: "evaluate_quality",
-    surfaceLabel: "Simulation",
-    buttonLabel: "Test AI using simulation",
-    shortDescription: "Create a small eval or simulation and review failures.",
+    surfaceLabel: "Simulation / Evals",
+    buttonLabel: "Test AI with Simulation / Evals",
+    shortDescription:
+      "Create an eval or simulation and review the first result.",
     firstActionLabel: "Create eval dataset",
     pathPreview: "Add scorer, run eval, review failure, improve.",
     sequencePreview: [

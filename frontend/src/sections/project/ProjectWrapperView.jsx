@@ -73,6 +73,7 @@ const ProjectWrapperView = () => {
   const gridRef = useRef(null);
   const recordedObserveSetupFocusRef = useRef(false);
   const autoOpenedObserveSetupDrawerRef = useRef(false);
+  const autoEnteredTraceWaitRef = useRef(null);
   const sawEmptyObserveSetupRef = useRef(false);
   const currentTab = location.pathname.split("/").pop();
   const { enqueueSnackbar } = useSnackbar();
@@ -243,6 +244,47 @@ const ProjectWrapperView = () => {
     isLoading,
     isProjectCount,
     navigate,
+    observeSetupOnboardingParams.setupLanguage,
+    observeSetupOnboardingParams.setupProvider,
+    showObserveSetupFocus,
+  ]);
+
+  useEffect(() => {
+    if (
+      !showObserveSetupFocus ||
+      isLoading ||
+      !isProjectCount ||
+      !firstObserveProjectId ||
+      !observeSetupOnboardingParams.credentialsCopied
+    ) {
+      return;
+    }
+
+    const waitKey = [
+      firstObserveProjectId,
+      observeSetupOnboardingParams.setupProvider,
+      observeSetupOnboardingParams.setupLanguage,
+      observeSetupOnboardingParams.credentialStep,
+    ].join(":");
+    if (autoEnteredTraceWaitRef.current === waitKey) return;
+    autoEnteredTraceWaitRef.current = waitKey;
+
+    navigate(
+      buildObserveProjectOnboardingHref({
+        observeId: firstObserveProjectId,
+        mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        setupLanguage: observeSetupOnboardingParams.setupLanguage,
+        setupProvider: observeSetupOnboardingParams.setupProvider,
+      }),
+      { replace: true },
+    );
+  }, [
+    firstObserveProjectId,
+    isLoading,
+    isProjectCount,
+    navigate,
+    observeSetupOnboardingParams.credentialStep,
+    observeSetupOnboardingParams.credentialsCopied,
     observeSetupOnboardingParams.setupLanguage,
     observeSetupOnboardingParams.setupProvider,
     showObserveSetupFocus,
