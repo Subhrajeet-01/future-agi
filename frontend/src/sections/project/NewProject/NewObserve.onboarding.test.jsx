@@ -178,7 +178,7 @@ describe("NewObserve onboarding setup", () => {
     expect(within(guide).getByText("Create keys")).toBeVisible();
     expect(within(guide).getByText("Run one request")).toBeVisible();
     expect(within(guide).getByText("Review trace")).toBeVisible();
-    expect(within(guide).getByText("Create evaluator")).toBeVisible();
+    expect(within(guide).getByText("Add quality check")).toBeVisible();
     expect(
       within(guide).getByTestId("observe-current-setup-task"),
     ).toHaveTextContent("Next: create a Future AGI API key");
@@ -385,7 +385,7 @@ describe("NewObserve onboarding setup", () => {
     expect(
       within(guide).getByTestId("observe-current-setup-task"),
     ).toHaveTextContent(
-      "Future AGI checks every few seconds, opens trace review when data arrives, then guides evaluator setup.",
+      "Future AGI checks every few seconds, opens trace review when data arrives, then guides the first quality check.",
     );
     expect(
       within(guide).getByRole("link", { name: /Create another key/i }),

@@ -61,14 +61,14 @@ describe("setup org product-loop quick starts", () => {
       featured: true,
       firstActionLabel: "Choose package",
       pathPreview:
-        "Choose package, copy setup code, send trace, review trace, create evaluator.",
+        "Choose package, copy setup code, send trace, review trace, add quality check.",
       primaryPath: "observe",
       sequencePreview: [
         "Choose package",
         "Copy setup code",
         "Send trace",
         "Review trace",
-        "Create evaluator",
+        "Add quality check",
       ],
     });
     expect(observeQuickStart.sample).toBeUndefined();
@@ -102,7 +102,7 @@ describe("setup org product-loop quick starts", () => {
     expect(
       firstSetupQuickStarts.find((option) => option.id === "observe")
         ?.outcomePreview,
-    ).toBe("A real trace reviewed and an evaluator ready to create.");
+    ).toBe("A real trace reviewed and a quality check ready to add.");
     expect(
       firstSetupQuickStarts.find((option) => option.id === "voice")
         ?.outcomePreview,

@@ -225,8 +225,8 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
       id: "create_trace_evaluator",
       stage: "create_trace_evaluator",
       actionId: "create_trace_evaluator",
-      label: "Create evaluator from manifest",
-      description: "Convert the reviewed trace into repeatable coverage.",
+      label: "Create quality check from manifest",
+      description: "Convert the reviewed trace into a repeatable check.",
       href: "/dashboard/observe/observe-1",
       fallbackHref: "/dashboard/get-started",
       routeAvailable: true,
@@ -249,7 +249,7 @@ const observeJourneyPlan = ({ currentStepIndex = 0 } = {}) => {
     eyebrow: "Observe setup",
     title: "Connect your agent",
     description:
-      "Connect traces, review the first trace, then create an evaluator.",
+      "Connect traces, review the first trace, then create a quality check.",
     chips: ["observe", "quality"],
     currentStepId: currentStep.id,
     currentStepIndex,
@@ -392,7 +392,7 @@ describe("OnboardingHomeView", () => {
     expect(within(panel).getByText("Connect your agent")).toBeVisible();
     expect(
       within(panel).getByText(
-        "Connect traces, review the first trace, then create an evaluator.",
+        "Connect traces, review the first trace, then create a quality check.",
       ),
     ).toBeVisible();
     expect(within(panel).getByTestId("observe-journey-progress")).toBeVisible();
@@ -466,7 +466,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
     expect(
       within(panel).getByText(
-        "The Observe project exists. Keep this page open, run one Anthropic Python request, and we will open the trace when it appears. After review, Home will show evaluator setup.",
+        "The Observe project exists. Keep this page open, run one Anthropic Python request, and we will open the trace when it appears. After review, Home will show the first quality check.",
       ),
     ).toBeVisible();
     expect(
@@ -2264,7 +2264,7 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("keeps the package context when the first trace is ready for evaluator setup", () => {
+  it("keeps the package context when the first trace is ready for a quality check", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("observeNeedsEvaluator"),
       isLoading: false,
@@ -2279,16 +2279,16 @@ describe("OnboardingHomeView", () => {
     const panel = screen.getByTestId("first-signal-panel");
     expect(
       within(panel).getByText(
-        "Create an evaluator from this Anthropic Python trace",
+        "Create a quality check from this Anthropic Python trace",
       ),
     ).toBeVisible();
     expect(
       within(panel).getByText(
-        "The Anthropic Python trace has been reviewed. Create a repeatable evaluator next.",
+        "The Anthropic Python trace has been reviewed. Create a repeatable quality check next.",
       ),
     ).toBeVisible();
     expect(
-      within(panel).getByRole("link", { name: /create evaluator/i }),
+      within(panel).getByRole("link", { name: /create quality check/i }),
     ).toHaveAttribute(
       "href",
       "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&trace_id=trace-1&provider=anthropic&language=python&tour_anchor=observe_evaluator_button&journey_step=create_trace_evaluator",

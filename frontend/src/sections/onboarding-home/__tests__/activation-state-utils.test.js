@@ -320,7 +320,7 @@ describe("activation-state utilities", () => {
       expect.objectContaining({
         goal: "monitor_production_ai_app",
         outcomePreview:
-          "A real trace reviewed and an evaluator ready to create.",
+          "A real trace reviewed and a quality check ready to add.",
         primaryPath: "observe",
       }),
     );

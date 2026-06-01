@@ -130,8 +130,8 @@ const FIRST_TRACE_STEPS = [
   },
   {
     id: "evaluator",
-    label: "Create evaluator",
-    description: "Turn the reviewed trace into a repeatable evaluator.",
+    label: "Add quality check",
+    description: "Turn the reviewed trace into a repeatable check.",
   },
 ];
 
@@ -271,8 +271,8 @@ const CurrentSetupTask = ({
         </Typography>
         <Typography variant="body2">
           {setupVerification?.status === "ready"
-            ? "Open the trace review, then create the first evaluator from it."
-            : `Run one request with the ${selectedInstrumentLabel} code below. Keep this page open; Future AGI checks every few seconds, opens trace review when data arrives, then guides evaluator setup.`}
+            ? "Open the trace review, then create the first quality check from it."
+            : `Run one request with the ${selectedInstrumentLabel} code below. Keep this page open; Future AGI checks every few seconds, opens trace review when data arrives, then guides the first quality check.`}
         </Typography>
       </Stack>
     </Alert>
@@ -351,7 +351,7 @@ const FirstTraceSetupGuide = ({
             </Typography>
             <Typography variant="body2" color="text.secondary" maxWidth={720}>
               {hasSelectedInstrument
-                ? `These snippets match ${selectedInstrumentLabel} in ${selectedLanguageLabel}. Run one request and keep this page open; we move you to trace review when it arrives, then guide you to create the first evaluator.`
+                ? `These snippets match ${selectedInstrumentLabel} in ${selectedLanguageLabel}. Run one request and keep this page open; we move you to trace review when it arrives, then guide you to create the first quality check.`
                 : "Pick the SDK package that makes the model call. We will then show the matching install command, setup code, request example, and trace checks."}
             </Typography>
           </Stack>
@@ -645,7 +645,7 @@ const FirstTraceSetupGuide = ({
                   Use this ready-to-run request if you do not have a local
                   request ready. Keep this page open after it runs; Future AGI
                   waits for the trace, opens review when it arrives, then points
-                  you to evaluator setup.
+                  you to the first quality check.
                 </Typography>
                 <InstructionCodeCopy
                   ariaLabel="Copy package request"

@@ -271,7 +271,7 @@ export const getObserveOnboardingCopy = (
   });
   const setupProviderLabel = getObserveSetupProviderLabel(setupProvider);
   const packageSetupDescription = setupPackageLabel
-    ? `Use the ${setupPackageLabel} setup below, run one request, and keep this page open while we wait for the trace. After review, the next step is evaluator setup.`
+    ? `Use the ${setupPackageLabel} setup below, run one request, and keep this page open while we wait for the trace. After review, the next step is the first quality check.`
     : null;
 
   if (mode === OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE) {
@@ -302,8 +302,8 @@ export const getObserveOnboardingCopy = (
       return {
         currentStep: "Credentials ready",
         description: setupPackageLabel
-          ? `Paste both copied values into the ${setupPackageLabel} setup snippet, then run one request. After the trace arrives, review it and create an evaluator.`
-          : "Paste both copied values into the setup snippet, then run one real or test request. After the trace arrives, review it and create an evaluator.",
+          ? `Paste both copied values into the ${setupPackageLabel} setup snippet, then run one request. After the trace arrives, review it and create the first quality check.`
+          : "Paste both copied values into the setup snippet, then run one real or test request. After the trace arrives, review it and create the first quality check.",
         primaryLabel: setupProviderLabel
           ? `Run ${setupProviderLabel} request`
           : "Paste keys and run trace",
@@ -343,8 +343,8 @@ export const getObserveOnboardingCopy = (
         ? `${setupProviderLabel} trace`
         : "First trace",
       description: setupPackageLabel
-        ? `Keep this page open, run one ${setupPackageLabel} request from your app, and we will open the trace when it appears. After review, Home will show evaluator setup.`
-        : "Keep this page open, run one production or test request, and we will open the trace when it appears. After review, Home will show evaluator setup.",
+        ? `Keep this page open, run one ${setupPackageLabel} request from your app, and we will open the trace when it appears. After review, Home will show the first quality check.`
+        : "Keep this page open, run one production or test request, and we will open the trace when it appears. After review, Home will show the first quality check.",
       primaryLabel: setupProviderLabel
         ? `Refresh ${setupProviderLabel} traces`
         : "Refresh traces",
@@ -362,17 +362,17 @@ export const getObserveOnboardingCopy = (
 
   if (mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR) {
     return {
-      currentStep: "Evaluator",
+      currentStep: "Quality check",
       description:
-        "Turn the reviewed trace into a repeatable evaluator for future runs.",
-      primaryLabel: "Create evaluator",
+        "Turn the reviewed trace into a repeatable quality check for future runs.",
+      primaryLabel: "Create quality check",
       secondaryLabel: "Refresh traces",
       steps: [
         { label: "Project", complete: true },
         { label: "Trace review", complete: true },
-        { label: "Evaluator", complete: false },
+        { label: "Quality check", complete: false },
       ],
-      title: "Create an evaluator",
+      title: "Create a quality check",
     };
   }
 
@@ -380,7 +380,7 @@ export const getObserveOnboardingCopy = (
     return {
       currentStep: "Trace received",
       description:
-        "Review this trace to inspect inputs, outputs, latency, cost, and errors. Next, create an evaluator from it.",
+        "Review this trace to inspect inputs, outputs, latency, cost, and errors. Next, create a quality check from it.",
       primaryLabel: "Review trace",
       secondaryLabel: "Refresh traces",
       steps: [

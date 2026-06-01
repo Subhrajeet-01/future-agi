@@ -64,7 +64,7 @@ export default function WaitingForSignalPanel({
         <ObservePanelHeader
           eyebrow="Waiting for trace"
           title={`Send one ${traceLabel}`}
-          description={`The Observe project exists. Keep this page open, run one ${requestLabel}, and we will open the trace when it appears. After review, Home will show evaluator setup.`}
+          description={`The Observe project exists. Keep this page open, run one ${requestLabel}, and we will open the trace when it appears. After review, Home will show the first quality check.`}
           chips={["observe", "waiting"]}
         />
         <ObserveJourneyProgress
@@ -92,7 +92,8 @@ export default function WaitingForSignalPanel({
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
             Keep this page open after running the request. When the trace
-            arrives, the next step is trace review, followed by evaluator setup.
+            arrives, the next step is trace review, followed by the first
+            quality check.
           </Typography>
         </Box>
         {currentStep ? null : (

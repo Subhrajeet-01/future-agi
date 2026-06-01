@@ -63,7 +63,7 @@ export default function FirstSignalPanel({
           eyebrow={isImprovement ? "First improvement" : "First trace"}
           title={
             isImprovement
-              ? `Create an evaluator from this ${traceLabel}`
+              ? `Create a quality check from this ${traceLabel}`
               : setupPackageLabel
                 ? `${setupPackageLabel} trace received`
                 : "First trace received"
@@ -71,8 +71,8 @@ export default function FirstSignalPanel({
           description={
             isImprovement
               ? setupPackageLabel
-                ? `The ${setupPackageLabel} trace has been reviewed. Create a repeatable evaluator next.`
-                : "The first trace has been reviewed. Create a repeatable evaluator next."
+                ? `The ${setupPackageLabel} trace has been reviewed. Create a repeatable quality check next.`
+                : "The first trace has been reviewed. Create a repeatable quality check next."
               : setupPackageLabel
                 ? `Review the ${setupPackageLabel} trace to inspect inputs, outputs, latency, cost, and errors.`
                 : "Review the trace to inspect inputs, outputs, latency, cost, and errors."

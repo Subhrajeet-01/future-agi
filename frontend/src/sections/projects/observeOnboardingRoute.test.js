@@ -422,18 +422,18 @@ describe("observeOnboardingRoute", () => {
     ).toMatchObject({
       currentStep: "Trace received",
       description:
-        "Review this trace to inspect inputs, outputs, latency, cost, and errors. Next, create an evaluator from it.",
+        "Review this trace to inspect inputs, outputs, latency, cost, and errors. Next, create a quality check from it.",
       primaryLabel: "Review trace",
       title: "First trace received",
     });
     expect(
       getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR),
     ).toMatchObject({
-      currentStep: "Evaluator",
+      currentStep: "Quality check",
       description:
-        "Turn the reviewed trace into a repeatable evaluator for future runs.",
-      primaryLabel: "Create evaluator",
-      title: "Create an evaluator",
+        "Turn the reviewed trace into a repeatable quality check for future runs.",
+      primaryLabel: "Create quality check",
+      title: "Create a quality check",
     });
     expect(
       getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE, {
@@ -491,7 +491,7 @@ describe("observeOnboardingRoute", () => {
     ).toMatchObject({
       currentStep: "Anthropic setup",
       description:
-        "Use the Anthropic TypeScript setup below, run one request, and keep this page open while we wait for the trace. After review, the next step is evaluator setup.",
+        "Use the Anthropic TypeScript setup below, run one request, and keep this page open while we wait for the trace. After review, the next step is the first quality check.",
       primaryLabel: "Open Anthropic setup",
       title: "Connect Anthropic TypeScript",
     });
@@ -504,7 +504,7 @@ describe("observeOnboardingRoute", () => {
     ).toMatchObject({
       currentStep: "Anthropic trace",
       description:
-        "Keep this page open, run one Anthropic TypeScript request from your app, and we will open the trace when it appears. After review, Home will show evaluator setup.",
+        "Keep this page open, run one Anthropic TypeScript request from your app, and we will open the trace when it appears. After review, Home will show the first quality check.",
       primaryLabel: "Refresh Anthropic traces",
       secondaryLabel: "Open Anthropic setup",
       title: "Send the first trace",
@@ -518,7 +518,7 @@ describe("observeOnboardingRoute", () => {
       }),
     ).toMatchObject({
       description:
-        "Paste both copied values into the Anthropic TypeScript setup snippet, then run one request. After the trace arrives, review it and create an evaluator.",
+        "Paste both copied values into the Anthropic TypeScript setup snippet, then run one request. After the trace arrives, review it and create the first quality check.",
       primaryLabel: "Run Anthropic request",
     });
   });

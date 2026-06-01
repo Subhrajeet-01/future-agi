@@ -42,16 +42,16 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     surfaceLabel: "Observe",
     buttonLabel: "Connect your agent",
     shortDescription:
-      "Choose your package, copy matching setup code, and turn one trace into an evaluator.",
+      "Choose your package, copy matching setup code, and turn one trace into a quality check.",
     firstActionLabel: "Choose package",
     pathPreview:
-      "Choose package, copy setup code, send trace, review trace, create evaluator.",
+      "Choose package, copy setup code, send trace, review trace, add quality check.",
     sequencePreview: [
       "Choose package",
       "Copy setup code",
       "Send trace",
       "Review trace",
-      "Create evaluator",
+      "Add quality check",
     ],
     featured: true,
     icon: "mdi:connection",

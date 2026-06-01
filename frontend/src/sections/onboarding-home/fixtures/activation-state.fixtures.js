@@ -611,7 +611,7 @@ const availableGoals = [
     primary_path: "observe",
     label: "Connect your agent",
     description: "Connect traces from an AI app or agent.",
-    outcome_preview: "A real trace reviewed and an evaluator ready to create.",
+    outcome_preview: "A real trace reviewed and a quality check ready to add.",
     estimated_minutes: 5,
     disabled: false,
     disabled_reason: null,
@@ -1303,10 +1303,10 @@ export const activationStateFixtures = {
     recommended_action: action({
       id: "create_trace_evaluator",
       kind: "improve",
-      title: "Create an evaluator",
-      description: "Turn the reviewed trace into a repeatable evaluator.",
+      title: "Create a quality check",
+      description: "Turn the reviewed trace into a repeatable check.",
       href: "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&trace_id=trace-1",
-      cta_label: "Create evaluator",
+      cta_label: "Create quality check",
       completion_event: "first_quality_loop_completed",
     }),
     progress: {

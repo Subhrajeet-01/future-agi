@@ -314,14 +314,14 @@ export default function ObserveSetupPanel({
       ? {
           ...actionStep,
           label: `Open ${selectedSetupLabel} setup`,
-          description: `The next page shows the ${selectedSetupLabel} install command, Future AGI key setup, provider key setup, package setup code, and a ready-to-run request. Keep it open after the request; Future AGI waits for the first trace, then guides trace review and evaluator setup.`,
+          description: `The next page shows the ${selectedSetupLabel} install command, Future AGI key setup, provider key setup, package setup code, and a ready-to-run request. Keep it open after the request; Future AGI waits for the first trace, then guides trace review and the first quality check.`,
         }
       : shouldShowPackagePicker
         ? {
             ...actionStep,
             label: "Choose SDK package",
             description:
-              "Select the SDK package that sends your model call. The next page will show matching install code, setup code, a request example, trace wait, trace review, and evaluator setup.",
+              "Select the SDK package that sends your model call. The next page will show matching install code, setup code, a request example, trace wait, trace review, and the first quality check.",
           }
         : actionStep;
 
@@ -448,7 +448,7 @@ export default function ObserveSetupPanel({
               <Typography variant="body2">
                 Setup opens with package-specific code and stays in the same
                 loop: copy code, run one request, wait for trace, review it,
-                then create an evaluator.
+                then add a quality check.
               </Typography>
             </Stack>
           </Alert>

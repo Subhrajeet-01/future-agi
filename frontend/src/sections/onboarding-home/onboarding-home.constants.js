@@ -33,7 +33,7 @@ export const ONBOARDING_GOAL_OPTIONS = [
     primaryPath: "observe",
     label: "Connect your agent",
     description: "Connect traces from an AI app or agent.",
-    outcomePreview: "A real trace reviewed and an evaluator ready to create.",
+    outcomePreview: "A real trace reviewed and a quality check ready to add.",
     estimatedMinutes: 5,
   },
   {
@@ -333,9 +333,9 @@ export const ONBOARDING_STAGE_COPY = {
       "Review the trace to inspect inputs, outputs, latency, cost, and errors.",
   },
   create_trace_evaluator: {
-    eyebrow: "Evaluator",
-    title: "Create an evaluator",
-    description: "Turn the reviewed trace into a repeatable evaluator.",
+    eyebrow: "Quality check",
+    title: "Create a quality check",
+    description: "Turn the reviewed trace into a repeatable check.",
   },
   activated: {
     eyebrow: "First setup complete",
