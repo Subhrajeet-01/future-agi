@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { renderWithRouter, screen, within } from "src/utils/test-utils";
+import {
+  renderWithRouter,
+  screen,
+  waitFor,
+  within,
+} from "src/utils/test-utils";
 
 import NewObserve from "./NewObserve";
 
@@ -116,18 +121,19 @@ describe("NewObserve onboarding setup", () => {
     expect(guide).toBeVisible();
     expect(within(guide).getByText("Setup guide")).toBeVisible();
     expect(
-      within(guide).getByText("Send one trace, then review it"),
+      within(guide).getByText("Connect your package, then send one trace"),
     ).toBeVisible();
-    expect(within(guide).getByText("Install")).toBeVisible();
-    expect(within(guide).getByText("Instrument")).toBeVisible();
-    expect(within(guide).getByText("Run")).toBeVisible();
+    expect(within(guide).getByText("Pick package")).toBeVisible();
+    expect(within(guide).getByText("Paste setup")).toBeVisible();
+    expect(within(guide).getByText("Run request")).toBeVisible();
+    expect(within(guide).getByText("Review and add eval")).toBeVisible();
     expect(within(guide).getByText("pip install futureagi")).toBeVisible();
     expect(
       within(guide).getByText("export FUTUREAGI_API_KEY=test"),
     ).toBeVisible();
     expect(
       within(guide).getByText(
-        "Use a real API key and secret key before running the snippet.",
+        "Create a Future AGI API key and secret key before running the snippet.",
       ),
     ).toBeVisible();
     const apiKeysLink = within(guide).getByRole("link", {
@@ -205,6 +211,9 @@ describe("NewObserve onboarding setup", () => {
     const guide = screen.getByTestId("observe-first-trace-guide");
     expect(screen.getByTestId("observe-instrument-picker")).toBeVisible();
     expect(
+      within(guide).getByText("Connect Anthropic, then send one trace"),
+    ).toBeVisible();
+    expect(
       within(guide).getByRole("button", { name: /anthropic/i }),
     ).toBeVisible();
     expect(within(guide).getByText("1. Install Anthropic")).toBeVisible();
@@ -246,6 +255,11 @@ describe("NewObserve onboarding setup", () => {
     );
 
     expect(await within(guide).findByText("1. Install OpenAI")).toBeVisible();
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("provider")).toBe("openai");
+      expect(params.get("language")).toBe("typescript");
+    });
     expect(
       within(guide).getByText(
         "npm install @traceai/fi-core @traceai/openai @opentelemetry/instrumentation",

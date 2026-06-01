@@ -53,7 +53,7 @@ export const observeFallbackJourneyPlan = (stage) => {
     eyebrow: "Connect your agent",
     title: "Connect your agent",
     description:
-      "Create the project, send one trace, review the first signal, then add a quality check.",
+      "Create the project, send one trace, review the first trace, then add a quality check.",
     chips: ["setup"],
     currentStepIndex,
     steps: OBSERVE_FALLBACK_STEPS.map((step, index) => ({

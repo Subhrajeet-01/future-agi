@@ -154,7 +154,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     });
 
     await user.click(
-      screen.getByRole("button", { name: /open first trace step/i }),
+      screen.getByRole("button", { name: /wait for first trace/i }),
     );
 
     await waitFor(() => {
@@ -176,7 +176,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
 
     expect(screen.getByText("Connect Observe to your app")).toBeVisible();
     expect(screen.getByText("Observe list")).toBeVisible();
-    expect(screen.queryByText("Observe setup drawer")).toBeNull();
+    expect(screen.getByText("Observe setup drawer")).toBeVisible();
 
     await waitFor(() => {
       expect(mocks.recordActivationEvent).toHaveBeenCalledWith(
@@ -194,7 +194,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     });
 
     await user.click(
-      screen.getByRole("button", { name: /open first trace step/i }),
+      screen.getByRole("button", { name: /wait for first trace/i }),
     );
 
     await waitFor(() => {
@@ -213,7 +213,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
 
     renderWithRouter(<ProjectWrapperView />, {
       route:
-        "/dashboard/observe?setup=true&source=onboarding&credential_step=done",
+        "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=typescript",
     });
 
     expect(screen.getByText("Credentials copied")).toBeVisible();
@@ -232,6 +232,8 @@ describe("ProjectWrapperView observe setup onboarding", () => {
           metadata: {
             credential_step: "done",
             route_mode: "setup-observe",
+            setup_language: "typescript",
+            setup_provider: "anthropic",
             setup: true,
           },
           primaryPath: "observe",
@@ -241,7 +243,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     });
 
     await user.click(
-      screen.getByRole("button", { name: /open first trace step/i }),
+      screen.getByRole("button", { name: /wait for first trace/i }),
     );
 
     await waitFor(() => {
@@ -252,6 +254,8 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       expect(params.get("source")).toBe("onboarding");
       expect(params.get("onboarding")).toBe("send-first-trace");
       expect(params.get("selectedTab")).toBe("trace");
+      expect(params.get("provider")).toBe("anthropic");
+      expect(params.get("language")).toBe("typescript");
     });
   });
 

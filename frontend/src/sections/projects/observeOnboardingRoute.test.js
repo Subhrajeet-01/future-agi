@@ -3,6 +3,7 @@ import {
   buildObserveEvaluatorCreateHref,
   buildObserveProjectOnboardingHref,
   buildObserveRouteFocusPayload,
+  buildObserveSetupHref,
   buildObserveTraceReviewHref,
   getFirstTraceIdFromTraceListResult,
   getObserveFirstTraceReviewTarget,
@@ -24,6 +25,8 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+      setupLanguage: null,
+      setupProvider: null,
       tourAnchor: null,
     });
   });
@@ -36,6 +39,8 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+      setupLanguage: null,
+      setupProvider: null,
       tourAnchor: "observe_send_trace_button",
     });
 
@@ -46,6 +51,8 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR,
+      setupLanguage: null,
+      setupProvider: null,
       tourAnchor: "observe_evaluator_button",
     });
   });
@@ -56,6 +63,22 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: null,
+      setupLanguage: null,
+      setupProvider: null,
+      tourAnchor: null,
+    });
+  });
+
+  it("reads package intent on observe project params", () => {
+    expect(
+      getObserveOnboardingParams(
+        "?source=onboarding&onboarding=send-first-trace&provider=Anthropic&language=TypeScript",
+      ),
+    ).toEqual({
+      isOnboarding: true,
+      mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+      setupLanguage: "typescript",
+      setupProvider: "anthropic",
       tourAnchor: null,
     });
   });
@@ -68,6 +91,8 @@ describe("observeOnboardingRoute", () => {
       credentialsCopied: false,
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+      setupLanguage: null,
+      setupProvider: null,
       source: OBSERVE_ONBOARDING_SOURCES.ONBOARDING,
       tourAnchor: null,
     });
@@ -83,6 +108,8 @@ describe("observeOnboardingRoute", () => {
       credentialsCopied: false,
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+      setupLanguage: null,
+      setupProvider: null,
       source: OBSERVE_ONBOARDING_SOURCES.ONBOARDING,
       tourAnchor: "observe_create_project_button",
     });
@@ -96,8 +123,38 @@ describe("observeOnboardingRoute", () => {
       credentialsCopied: false,
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+      setupLanguage: null,
+      setupProvider: null,
       source: OBSERVE_ONBOARDING_SOURCES.SAMPLE_TRACE_REVIEW,
       tourAnchor: null,
+    });
+  });
+
+  it("reads package intent on observe setup params", () => {
+    expect(
+      getObserveSetupOnboardingParams(
+        "?setup=true&source=onboarding&provider=anthropic&language=typescript",
+      ),
+    ).toEqual({
+      credentialStep: null,
+      credentialsCopied: false,
+      isOnboarding: true,
+      mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+      setupLanguage: "typescript",
+      setupProvider: "anthropic",
+      source: OBSERVE_ONBOARDING_SOURCES.ONBOARDING,
+      tourAnchor: null,
+    });
+  });
+
+  it("drops unsupported package intent on observe setup params", () => {
+    expect(
+      getObserveSetupOnboardingParams(
+        "?setup=true&source=onboarding&provider=unknown&language=ruby",
+      ),
+    ).toMatchObject({
+      setupLanguage: null,
+      setupProvider: null,
     });
   });
 
@@ -111,6 +168,8 @@ describe("observeOnboardingRoute", () => {
       credentialsCopied: true,
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+      setupLanguage: null,
+      setupProvider: null,
       source: OBSERVE_ONBOARDING_SOURCES.ONBOARDING,
       tourAnchor: null,
     });
@@ -124,6 +183,8 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE,
+      setupLanguage: null,
+      setupProvider: null,
       tourAnchor: null,
     });
   });
@@ -136,6 +197,8 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE,
+      setupLanguage: null,
+      setupProvider: null,
       tourAnchor: "observe_trace_review_link",
     });
   });
@@ -148,8 +211,22 @@ describe("observeOnboardingRoute", () => {
     ).toEqual({
       isOnboarding: true,
       mode: null,
+      setupLanguage: null,
+      setupProvider: null,
       tourAnchor: null,
     });
+  });
+
+  it("builds observe setup hrefs with package intent", () => {
+    expect(
+      buildObserveSetupHref({
+        credentialStep: "done",
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
+      }),
+    ).toBe(
+      "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=typescript",
+    );
   });
 
   it("builds observe project route-mode hrefs", () => {
@@ -168,9 +245,11 @@ describe("observeOnboardingRoute", () => {
       buildObserveProjectOnboardingHref({
         observeId: "project-1",
         mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
       }),
     ).toBe(
-      "/dashboard/observe/project-1/llm-tracing?source=onboarding&onboarding=send-first-trace&selectedTab=trace",
+      "/dashboard/observe/project-1/llm-tracing?source=onboarding&onboarding=send-first-trace&selectedTab=trace&provider=anthropic&language=typescript",
     );
   });
 
@@ -178,16 +257,24 @@ describe("observeOnboardingRoute", () => {
     expect(
       buildObserveTraceReviewHref({
         observeId: "project-1",
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
         traceId: "trace-1",
       }),
     ).toBe(
-      "/dashboard/observe/project-1/trace/trace-1?source=onboarding&onboarding=review-first-trace",
+      "/dashboard/observe/project-1/trace/trace-1?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=typescript",
     );
   });
 
   it("builds eval creation hrefs from an observe project", () => {
-    expect(buildObserveEvaluatorCreateHref({ observeId: "project-1" })).toBe(
-      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=project-1",
+    expect(
+      buildObserveEvaluatorCreateHref({
+        observeId: "project-1",
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
+      }),
+    ).toBe(
+      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=project-1&provider=anthropic&language=typescript",
     );
   });
 
@@ -304,6 +391,8 @@ describe("observeOnboardingRoute", () => {
       buildObserveRouteFocusPayload({
         observeId: "project-1",
         mode: OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR,
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
       }),
     ).toMatchObject({
       eventName: "onboarding_observe_route_focus_viewed",
@@ -316,9 +405,11 @@ describe("observeOnboardingRoute", () => {
       metadata: {
         project_id: "project-1",
         route_mode: "create-evaluator",
+        setup_language: "typescript",
+        setup_provider: "anthropic",
       },
       idempotencyKey:
-        "onboarding_observe_route_focus_viewed:create-evaluator:project-1",
+        "onboarding_observe_route_focus_viewed:anthropic:typescript:create-evaluator:project-1",
       isSample: false,
     });
   });
@@ -328,6 +419,8 @@ describe("observeOnboardingRoute", () => {
       buildObserveRouteFocusPayload({
         credentialStep: "done",
         mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
       }),
     ).toMatchObject({
       eventName: "onboarding_observe_route_focus_viewed",
@@ -339,10 +432,12 @@ describe("observeOnboardingRoute", () => {
       metadata: {
         credential_step: "done",
         route_mode: "setup-observe",
+        setup_language: "typescript",
+        setup_provider: "anthropic",
         setup: true,
       },
       idempotencyKey:
-        "onboarding_observe_route_focus_viewed:done:setup-observe:observe-setup",
+        "onboarding_observe_route_focus_viewed:done:anthropic:typescript:setup-observe:observe-setup",
       isSample: false,
     });
   });

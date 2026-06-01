@@ -13,6 +13,13 @@ import {
   OBSERVE_ONBOARDING_MODES,
 } from "src/sections/projects/observeOnboardingRoute";
 
+const compactMetadata = (value = {}) =>
+  Object.fromEntries(
+    Object.entries(value).filter(
+      ([, item]) => item !== undefined && item !== null && item !== "",
+    ),
+  );
+
 export default function TraceFullPage() {
   const { observeId, traceId } = useParams();
   const navigate = useNavigate();
@@ -75,8 +82,19 @@ export default function TraceFullPage() {
   ]);
 
   const handleCreateEvaluator = useCallback(() => {
-    navigate(buildObserveEvaluatorCreateHref({ observeId }));
-  }, [navigate, observeId]);
+    navigate(
+      buildObserveEvaluatorCreateHref({
+        observeId,
+        setupLanguage: traceReviewOnboardingParams.setupLanguage,
+        setupProvider: traceReviewOnboardingParams.setupProvider,
+      }),
+    );
+  }, [
+    navigate,
+    observeId,
+    traceReviewOnboardingParams.setupLanguage,
+    traceReviewOnboardingParams.setupProvider,
+  ]);
 
   const handleClose = useCallback(() => {
     if (window.history.length > 1) {
@@ -107,10 +125,12 @@ export default function TraceFullPage() {
       projectId: observeId,
       isSample: isSampleTrace,
       ...quickStartAttribution,
-      metadata: {
+      metadata: compactMetadata({
         entry: "trace_full_page",
         is_sample_route: isSampleTrace,
-      },
+        setup_language: traceReviewOnboardingParams.setupLanguage,
+        setup_provider: traceReviewOnboardingParams.setupProvider,
+      }),
     });
   }, [
     isSampleTrace,
@@ -118,6 +138,8 @@ export default function TraceFullPage() {
     quickStartAttribution,
     recordActivationEvent,
     traceId,
+    traceReviewOnboardingParams.setupLanguage,
+    traceReviewOnboardingParams.setupProvider,
   ]);
 
   const onboardingBanner = useMemo(() => {

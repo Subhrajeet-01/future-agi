@@ -216,6 +216,48 @@ describe("ObservePage onboarding first-trace handoff", () => {
     );
   });
 
+  it("keeps package intent while waiting for and opening the first trace", async () => {
+    mocks.search =
+      "?source=onboarding&onboarding=send-first-trace&selectedTab=trace&provider=anthropic&language=typescript";
+
+    render(<ObservePage />);
+
+    await waitFor(() =>
+      expect(mocks.recordActivationEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            route_mode: "send-first-trace",
+            setup_language: "typescript",
+            setup_provider: "anthropic",
+          }),
+        }),
+      ),
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(OBSERVE_FIRST_TRACE_LOADED_EVENT, {
+          detail: {
+            projectId: "observe-1",
+            traceId: "trace-2",
+          },
+        }),
+      );
+    });
+
+    await waitFor(() =>
+      expect(mocks.navigate).toHaveBeenCalledWith(
+        buildObserveTraceReviewHref({
+          observeId: "observe-1",
+          setupLanguage: "typescript",
+          setupProvider: "anthropic",
+          traceId: "trace-2",
+        }),
+        { replace: true },
+      ),
+    );
+  });
+
   it("auto-opens trace review when the polling request finds the first trace", async () => {
     mocks.axiosGet.mockResolvedValue({
       data: {

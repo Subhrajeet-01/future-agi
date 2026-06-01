@@ -157,6 +157,32 @@ describe("TraceFullPage", () => {
     );
   });
 
+  it("keeps package intent through trace review and evaluator creation", async () => {
+    mocks.locationSearch =
+      "?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=typescript";
+
+    const { getByRole } = render(<TraceFullPage />);
+
+    await waitFor(() =>
+      expect(mocks.mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: {
+            entry: "trace_full_page",
+            is_sample_route: false,
+            setup_language: "typescript",
+            setup_provider: "anthropic",
+          },
+        }),
+      ),
+    );
+
+    getByRole("button", { name: /create evaluator/i }).click();
+
+    expect(mocks.navigate).toHaveBeenCalledWith(
+      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&provider=anthropic&language=typescript",
+    );
+  });
+
   it("shows trace-review guidance from Home journey-step params", () => {
     mocks.locationSearch =
       "?tour_anchor=observe_trace_review_link&journey_step=review_first_trace";

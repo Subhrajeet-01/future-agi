@@ -54,6 +54,7 @@ import ObserveOnboardingFocusPanel from "./ObserveOnboardingFocusPanel";
 import {
   buildObserveEvaluatorCreateHref,
   buildObserveRouteFocusPayload,
+  buildObserveSetupHref,
   buildObserveTraceReviewHref,
   getFirstTraceIdFromTraceListResult,
   getObserveFirstTraceReviewTarget,
@@ -491,7 +492,12 @@ const ObservePage = React.memo(() => {
       return;
     }
 
-    const recordKey = `${observeId}:${observeOnboardingParams.mode}`;
+    const recordKey = [
+      observeId,
+      observeOnboardingParams.mode,
+      observeOnboardingParams.setupProvider,
+      observeOnboardingParams.setupLanguage,
+    ].join(":");
     if (recordedObserveFocusRef.current === recordKey) return;
     recordedObserveFocusRef.current = recordKey;
 
@@ -499,11 +505,15 @@ const ObservePage = React.memo(() => {
       buildObserveRouteFocusPayload({
         observeId,
         mode: observeOnboardingParams.mode,
+        setupLanguage: observeOnboardingParams.setupLanguage,
+        setupProvider: observeOnboardingParams.setupProvider,
       }),
     );
   }, [
     observeId,
     observeOnboardingParams.mode,
+    observeOnboardingParams.setupLanguage,
+    observeOnboardingParams.setupProvider,
     recordActivationEvent,
     showObserveOnboardingFocus,
   ]);
@@ -603,10 +613,23 @@ const ObservePage = React.memo(() => {
     if (openedFirstTraceReviewRef.current === reviewKey) return;
     openedFirstTraceReviewRef.current = reviewKey;
 
-    navigate(buildObserveTraceReviewHref(firstTraceReviewTarget), {
-      replace: true,
-    });
-  }, [firstTraceReviewTarget, isWaitingForFirstTraceOnboarding, navigate]);
+    navigate(
+      buildObserveTraceReviewHref({
+        ...firstTraceReviewTarget,
+        setupLanguage: observeOnboardingParams.setupLanguage,
+        setupProvider: observeOnboardingParams.setupProvider,
+      }),
+      {
+        replace: true,
+      },
+    );
+  }, [
+    firstTraceReviewTarget,
+    isWaitingForFirstTraceOnboarding,
+    navigate,
+    observeOnboardingParams.setupLanguage,
+    observeOnboardingParams.setupProvider,
+  ]);
 
   useEffect(() => {
     if (!showEvalSourceFixBanner || recordedSourceFixFocusRef.current) return;
@@ -659,14 +682,25 @@ const ObservePage = React.memo(() => {
     if (
       observeOnboardingParams.mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR
     ) {
-      navigate(buildObserveEvaluatorCreateHref({ observeId }));
+      navigate(
+        buildObserveEvaluatorCreateHref({
+          observeId,
+          setupLanguage: observeOnboardingParams.setupLanguage,
+          setupProvider: observeOnboardingParams.setupProvider,
+        }),
+      );
       return;
     }
 
     if (
       observeOnboardingParams.mode === OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE
     ) {
-      navigate("/dashboard/observe?setup=true&source=onboarding");
+      navigate(
+        buildObserveSetupHref({
+          setupLanguage: observeOnboardingParams.setupLanguage,
+          setupProvider: observeOnboardingParams.setupProvider,
+        }),
+      );
       return;
     }
     refreshObserveData?.();
@@ -675,6 +709,8 @@ const ObservePage = React.memo(() => {
     navigate,
     observeId,
     observeOnboardingParams.mode,
+    observeOnboardingParams.setupLanguage,
+    observeOnboardingParams.setupProvider,
     refreshObserveData,
   ]);
 

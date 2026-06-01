@@ -123,7 +123,7 @@ export const ONBOARDING_STAGE_COPY = {
   selected_path_unavailable: {
     eyebrow: "Path unavailable",
     title: "Start with an available path",
-    description: "This selected path is not available in the product yet.",
+    description: "This setup option is not available in the product yet.",
   },
   start_prompt: {
     eyebrow: "Prompt",

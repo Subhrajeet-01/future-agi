@@ -65,7 +65,7 @@ describe("ProjectFtux observe onboarding", () => {
     expect(screen.getByText("Send your first trace")).toBeVisible();
     expect(
       screen.getByText(
-        "Create or open an Observe project, paste the setup, then run one request. We will open the trace when it appears.",
+        "Choose your package, paste the matching setup, then run one request. We will open the trace when it appears.",
       ),
     ).toBeVisible();
     expect(screen.getByText("Install")).toBeVisible();

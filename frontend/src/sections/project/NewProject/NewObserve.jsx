@@ -10,7 +10,13 @@ import {
   useTheme,
 } from "@mui/material";
 import PropTypes from "prop-types";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import { Events, handleOnDocsClicked, trackEvent } from "src/utils/Mixpanel";
 import { useQuery } from "@tanstack/react-query";
@@ -61,20 +67,25 @@ const apiKeysOnboardingHref = ({ instrumentId, language } = {}) => {
 
 const FIRST_TRACE_STEPS = [
   {
-    id: "install",
-    label: "Install",
-    description: "Choose the package your app uses and install its tracer.",
+    id: "package",
+    label: "Pick package",
+    description: "Choose the library that creates the model call.",
   },
   {
-    id: "instrument",
-    label: "Instrument",
+    id: "setup",
+    label: "Paste setup",
     description:
-      "Load keys and register tracing before your app handles a request.",
+      "Install tracing, load Future AGI keys, and register the project.",
   },
   {
     id: "run",
-    label: "Run",
+    label: "Run request",
     description: "Trigger one real or test request and keep this page open.",
+  },
+  {
+    id: "review",
+    label: "Review and add eval",
+    description: "We open the trace, then guide you to create an evaluator.",
   },
 ];
 
@@ -198,6 +209,8 @@ const FirstTraceSetupGuide = ({
       ? "Trace detected"
       : "Checking for trace";
   const selectedInstrumentLabel = selectedInstrument?.name || "your package";
+  const selectedLanguageLabel =
+    selectedInstrumentLanguage === "typescript" ? "TypeScript" : "Python";
 
   return (
     <Box
@@ -222,10 +235,14 @@ const FirstTraceSetupGuide = ({
               <Chip size="small" color="primary" label="Setup guide" />
               <Chip size="small" variant="outlined" label={statusLabel} />
             </Stack>
-            <Typography variant="h6">Send one trace, then review it</Typography>
+            <Typography variant="h6">
+              Connect {selectedInstrumentLabel}, then send one trace
+            </Typography>
             <Typography variant="body2" color="text.secondary" maxWidth={720}>
-              Use the setup below, run one request, and keep this page open. We
-              will check every few seconds and open the trace when it appears.
+              These snippets match {selectedInstrumentLabel} in{" "}
+              {selectedLanguageLabel}. Run one request and keep this page open;
+              we check every few seconds, open the trace when it arrives, and
+              then guide you to create an eval.
             </Typography>
           </Stack>
 
@@ -384,7 +401,8 @@ const FirstTraceSetupGuide = ({
               </Alert>
             ) : (
               <Typography variant="caption" color="text.secondary">
-                Use a real API key and secret key before running the snippet.
+                Create a Future AGI API key and secret key before running the
+                snippet.
               </Typography>
             )}
             <InstructionCodeCopy
@@ -452,7 +470,7 @@ FirstTraceSetupGuide.propTypes = {
 
 const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
   const theme = useTheme();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedLanguage =
     searchParams.get("language") || searchParams.get("lang");
   const initialLanguage = LANGUAGE_VALUES.has(requestedLanguage)
@@ -564,6 +582,29 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
       : tab.disabled,
   }));
 
+  const syncSetupIntentToUrl = useCallback(
+    ({ instrumentId, language } = {}) => {
+      if (!showFirstTraceGuide || !instrumentId) return;
+
+      const nextParams = new URLSearchParams(searchParams);
+      const isSetupRoute =
+        nextParams.get("setup") === "true" ||
+        nextParams.get("source") === "onboarding" ||
+        Boolean(nextParams.get("journey_step"));
+      if (!isSetupRoute) return;
+
+      nextParams.set("provider", instrumentId);
+      if (LANGUAGE_VALUES.has(language)) {
+        nextParams.set("language", language);
+      }
+
+      if (nextParams.toString() !== searchParams.toString()) {
+        setSearchParams(nextParams, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams, showFirstTraceGuide],
+  );
+
   useEffect(() => {
     if (!instrumentOptions.length) return;
     const requestedOption = instrumentOptions.find(
@@ -591,17 +632,35 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
     setLanguageTab(firstInstrumentLanguage(selectedInstrument));
   }, [languageTab, selectedInstrument]);
 
+  useEffect(() => {
+    if (!selectedInstrument) return;
+    syncSetupIntentToUrl({
+      instrumentId: selectedInstrument.id,
+      language: selectedInstrumentLanguage,
+    });
+  }, [selectedInstrument, selectedInstrumentLanguage, syncSetupIntentToUrl]);
+
   const handleInstrumentChange = (instrumentId) => {
     const nextInstrument = instrumentOptions.find(
       (instrument) => instrument.id === instrumentId,
     );
+    const nextLanguage =
+      nextInstrument && !instrumentSupportsLanguage(nextInstrument, languageTab)
+        ? firstInstrumentLanguage(nextInstrument)
+        : languageTab;
     setSelectedInstrumentId(instrumentId);
-    if (
-      nextInstrument &&
-      !instrumentSupportsLanguage(nextInstrument, languageTab)
-    ) {
-      setLanguageTab(firstInstrumentLanguage(nextInstrument));
+    if (nextLanguage !== languageTab) {
+      setLanguageTab(nextLanguage);
     }
+    syncSetupIntentToUrl({ instrumentId, language: nextLanguage });
+  };
+
+  const handleLanguageChange = (nextLanguage) => {
+    setLanguageTab(nextLanguage);
+    syncSetupIntentToUrl({
+      instrumentId: selectedInstrument?.id || selectedInstrumentId,
+      language: nextLanguage,
+    });
   };
 
   return (
@@ -631,7 +690,7 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
               instrumentOptions={instrumentOptions}
               apiKeysHref={apiKeysHref}
               languageTab={languageTab}
-              onLanguageChange={setLanguageTab}
+              onLanguageChange={handleLanguageChange}
               onInstrumentChange={handleInstrumentChange}
               selectedInstrument={selectedInstrument}
               selectedInstrumentLanguage={selectedInstrumentLanguage}

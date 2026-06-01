@@ -148,7 +148,7 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
   },
   observe: {
     description:
-      "Create an Observe project, send one trace, and review the first signal.",
+      "Create an Observe project, send one trace, and review the first trace.",
     href: "/dashboard/observe?setup=true&source=onboarding&tour_anchor=observe_create_project_button&journey_step=connect_observability",
     label: "Create Observe project",
     title: "Connect your agent",

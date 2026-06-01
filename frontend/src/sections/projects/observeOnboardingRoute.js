@@ -18,6 +18,22 @@ export const OBSERVE_ONBOARDING_CREDENTIAL_STEPS = {
   DONE: "done",
 };
 
+const observeSetupProviderSet = new Set([
+  "anthropic",
+  "bedrock",
+  "langchain",
+  "llamaindex",
+  "mcp",
+  "openai",
+  "openai_agents",
+]);
+const observeSetupLanguageSet = new Set(["python", "typescript"]);
+const observeSetupProviderAliases = {
+  "llama-index": "llamaindex",
+  llama_index: "llamaindex",
+  "openai-agents": "openai_agents",
+  openaiagents: "openai_agents",
+};
 const projectModeSet = new Set([
   OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR,
   OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
@@ -47,8 +63,43 @@ const compactMetadata = (value = {}) =>
     ),
   );
 
+const normalizeSetupValue = (value) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const safeSetupProvider = (value) => {
+  const normalizedValue = normalizeSetupValue(value);
+  const canonicalValue =
+    observeSetupProviderAliases[normalizedValue] || normalizedValue;
+  return observeSetupProviderSet.has(canonicalValue) ? canonicalValue : null;
+};
+
+const safeSetupLanguage = (value) =>
+  observeSetupLanguageSet.has(normalizeSetupValue(value))
+    ? normalizeSetupValue(value)
+    : null;
+
+const setupIntentFromParams = (params) => ({
+  setupProvider: safeSetupProvider(
+    params.get("provider") || params.get("package") || params.get("instrument"),
+  ),
+  setupLanguage: safeSetupLanguage(
+    params.get("language") || params.get("lang"),
+  ),
+});
+
+const appendSetupIntentParams = (
+  params,
+  { setupLanguage, setupProvider } = {},
+) => {
+  const safeProvider = safeSetupProvider(setupProvider);
+  const safeLanguage = safeSetupLanguage(setupLanguage);
+  if (safeProvider) params.set("provider", safeProvider);
+  if (safeLanguage) params.set("language", safeLanguage);
+};
+
 export const getObserveOnboardingParams = (search = "") => {
   const params = new URLSearchParams(search);
+  const { setupLanguage, setupProvider } = setupIntentFromParams(params);
   const journeyMode = journeyStepMode[params.get("journey_step")] || null;
   const isOnboarding =
     params.get("source") === OBSERVE_ONBOARDING_SOURCES.ONBOARDING ||
@@ -62,6 +113,8 @@ export const getObserveOnboardingParams = (search = "") => {
   return {
     isOnboarding,
     mode: isOnboarding ? mode : null,
+    setupLanguage: isOnboarding ? setupLanguage : null,
+    setupProvider: isOnboarding ? setupProvider : null,
     tourAnchor: params.get("tour_anchor"),
   };
 };
@@ -70,6 +123,7 @@ export const getObserveSetupOnboardingParams = (search = "") => {
   const params = new URLSearchParams(search);
   const source = params.get("source");
   const credentialStep = params.get("credential_step");
+  const { setupLanguage, setupProvider } = setupIntentFromParams(params);
   const journeyMode = journeyStepMode[params.get("journey_step")] || null;
   const isSetupJourney = journeyMode === OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE;
   const isOnboarding = setupSourceSet.has(source) || isSetupJourney;
@@ -92,12 +146,15 @@ export const getObserveSetupOnboardingParams = (search = "") => {
     credentialsCopied:
       isOnboarding &&
       credentialStep === OBSERVE_ONBOARDING_CREDENTIAL_STEPS.DONE,
+    setupLanguage: isOnboarding ? setupLanguage : null,
+    setupProvider: isOnboarding ? setupProvider : null,
     tourAnchor: params.get("tour_anchor"),
   };
 };
 
 export const getObserveTraceReviewOnboardingParams = (search = "") => {
   const params = new URLSearchParams(search);
+  const { setupLanguage, setupProvider } = setupIntentFromParams(params);
   const journeyMode = journeyStepMode[params.get("journey_step")] || null;
   const isOnboarding =
     params.get("source") === OBSERVE_ONBOARDING_SOURCES.ONBOARDING ||
@@ -112,6 +169,8 @@ export const getObserveTraceReviewOnboardingParams = (search = "") => {
   return {
     isOnboarding,
     mode: isOnboarding ? mode : null,
+    setupLanguage: isOnboarding ? setupLanguage : null,
+    setupProvider: isOnboarding ? setupProvider : null,
     tourAnchor: params.get("tour_anchor"),
   };
 };
@@ -232,7 +291,26 @@ export const getObserveOnboardingCopy = (
   return null;
 };
 
-export const buildObserveProjectOnboardingHref = ({ observeId, mode } = {}) => {
+export const buildObserveSetupHref = ({
+  credentialStep,
+  setupLanguage,
+  setupProvider,
+  source = OBSERVE_ONBOARDING_SOURCES.ONBOARDING,
+} = {}) => {
+  const params = new URLSearchParams();
+  params.set("setup", "true");
+  params.set("source", source);
+  if (credentialStep) params.set("credential_step", credentialStep);
+  appendSetupIntentParams(params, { setupLanguage, setupProvider });
+  return `/dashboard/observe?${params.toString()}`;
+};
+
+export const buildObserveProjectOnboardingHref = ({
+  observeId,
+  mode,
+  setupLanguage,
+  setupProvider,
+} = {}) => {
   if (!observeId) return "/dashboard/observe";
   const params = new URLSearchParams();
   params.set("source", "onboarding");
@@ -240,23 +318,35 @@ export const buildObserveProjectOnboardingHref = ({ observeId, mode } = {}) => {
   if (mode === OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE) {
     params.set("selectedTab", "trace");
   }
+  appendSetupIntentParams(params, { setupLanguage, setupProvider });
   return `/dashboard/observe/${observeId}/llm-tracing?${params.toString()}`;
 };
 
-export const buildObserveTraceReviewHref = ({ observeId, traceId } = {}) => {
+export const buildObserveTraceReviewHref = ({
+  observeId,
+  setupLanguage,
+  setupProvider,
+  traceId,
+} = {}) => {
   if (!observeId || !traceId) return "/dashboard/observe";
   const params = new URLSearchParams();
   params.set("source", "onboarding");
   params.set("onboarding", OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE);
+  appendSetupIntentParams(params, { setupLanguage, setupProvider });
   return `/dashboard/observe/${observeId}/trace/${traceId}?${params.toString()}`;
 };
 
-export const buildObserveEvaluatorCreateHref = ({ observeId } = {}) => {
+export const buildObserveEvaluatorCreateHref = ({
+  observeId,
+  setupLanguage,
+  setupProvider,
+} = {}) => {
   const params = new URLSearchParams();
   params.set("source", "onboarding");
   params.set("step", "data");
   params.set("source_type", "trace_project");
   if (observeId) params.set("source_id", observeId);
+  appendSetupIntentParams(params, { setupLanguage, setupProvider });
   return `/dashboard/evaluations/create?${params.toString()}`;
 };
 
@@ -289,8 +379,12 @@ export const buildObserveRouteFocusPayload = ({
   credentialStep,
   observeId,
   mode,
+  setupLanguage,
+  setupProvider,
   setupSource,
 } = {}) => {
+  const normalizedSetupLanguage = safeSetupLanguage(setupLanguage);
+  const normalizedSetupProvider = safeSetupProvider(setupProvider);
   const normalizedMode = routeFocusModeSet.has(mode)
     ? mode
     : OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE;
@@ -320,6 +414,8 @@ export const buildObserveRouteFocusPayload = ({
       project_id: isSetupMode ? undefined : observeId,
       credential_step: isSetupMode ? credentialStep : undefined,
       route_mode: normalizedMode,
+      setup_language: normalizedSetupLanguage || undefined,
+      setup_provider: normalizedSetupProvider || undefined,
       setup_source: isSampleReviewSetup ? setupSource : undefined,
       setup: isSetupMode ? true : undefined,
     }),
@@ -327,6 +423,8 @@ export const buildObserveRouteFocusPayload = ({
       "onboarding_observe_route_focus_viewed",
       isSampleReviewSetup ? setupSource : undefined,
       isSetupMode ? credentialStep : undefined,
+      normalizedSetupProvider,
+      normalizedSetupLanguage,
       safeKeyPart(normalizedMode, "mode"),
       artifactId,
     ]

@@ -166,17 +166,28 @@ const ProjectWrapperView = () => {
     );
 
   useEffect(() => {
-    if (!showObserveSetupFocus || recordedObserveSetupFocusRef.current) return;
-    recordedObserveSetupFocusRef.current = true;
+    if (!showObserveSetupFocus) return;
+    const recordKey = [
+      observeSetupOnboardingParams.credentialStep,
+      observeSetupOnboardingParams.source,
+      observeSetupOnboardingParams.setupProvider,
+      observeSetupOnboardingParams.setupLanguage,
+    ].join(":");
+    if (recordedObserveSetupFocusRef.current === recordKey) return;
+    recordedObserveSetupFocusRef.current = recordKey;
     recordActivationEvent?.(
       buildObserveRouteFocusPayload({
         credentialStep: observeSetupOnboardingParams.credentialStep,
         mode: OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE,
+        setupLanguage: observeSetupOnboardingParams.setupLanguage,
+        setupProvider: observeSetupOnboardingParams.setupProvider,
         setupSource: observeSetupOnboardingParams.source,
       }),
     );
   }, [
     observeSetupOnboardingParams.credentialStep,
+    observeSetupOnboardingParams.setupLanguage,
+    observeSetupOnboardingParams.setupProvider,
     observeSetupOnboardingParams.source,
     recordActivationEvent,
     showObserveSetupFocus,
@@ -187,14 +198,13 @@ const ProjectWrapperView = () => {
       !showObserveSetupFocus ||
       isLoading ||
       !isProjectCount ||
-      firstObserveProjectId ||
       autoOpenedObserveSetupDrawerRef.current
     ) {
       return;
     }
     autoOpenedObserveSetupDrawerRef.current = true;
     setSetupDrawerOpen(true);
-  }, [firstObserveProjectId, isLoading, isProjectCount, showObserveSetupFocus]);
+  }, [isLoading, isProjectCount, showObserveSetupFocus]);
 
   useEffect(() => {
     if (!showObserveSetupFocus || isLoading) return;
@@ -207,6 +217,8 @@ const ProjectWrapperView = () => {
       buildObserveProjectOnboardingHref({
         observeId: firstObserveProjectId,
         mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+        setupLanguage: observeSetupOnboardingParams.setupLanguage,
+        setupProvider: observeSetupOnboardingParams.setupProvider,
       }),
       { replace: true },
     );
@@ -215,6 +227,8 @@ const ProjectWrapperView = () => {
     isLoading,
     isProjectCount,
     navigate,
+    observeSetupOnboardingParams.setupLanguage,
+    observeSetupOnboardingParams.setupProvider,
     showObserveSetupFocus,
   ]);
 
@@ -224,6 +238,8 @@ const ProjectWrapperView = () => {
         buildObserveProjectOnboardingHref({
           observeId: firstObserveProjectId,
           mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
+          setupLanguage: observeSetupOnboardingParams.setupLanguage,
+          setupProvider: observeSetupOnboardingParams.setupProvider,
         }),
       );
       return;
@@ -236,7 +252,13 @@ const ProjectWrapperView = () => {
     document
       .getElementById("observe-setup-instructions")
       ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, [firstObserveProjectId, isProjectCount, navigate]);
+  }, [
+    firstObserveProjectId,
+    isProjectCount,
+    navigate,
+    observeSetupOnboardingParams.setupLanguage,
+    observeSetupOnboardingParams.setupProvider,
+  ]);
 
   const handleOpenSampleTrace = useCallback(async () => {
     try {
@@ -273,7 +295,7 @@ const ProjectWrapperView = () => {
     if (!observeSetupCopy) return null;
     return {
       label: firstObserveProjectId
-        ? "Open first trace step"
+        ? "Wait for first trace"
         : isProjectCount
           ? "Open setup"
           : observeSetupCopy.primaryLabel,
