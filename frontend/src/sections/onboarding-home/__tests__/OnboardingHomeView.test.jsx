@@ -529,7 +529,7 @@ describe("OnboardingHomeView", () => {
       ),
     ).toBeVisible();
     expect(
-      screen.getByRole("link", { name: /review first signal/i }),
+      screen.getByRole("link", { name: /review first trace/i }),
     ).toHaveAttribute(
       "href",
       "/dashboard/observe/observe-1/trace/trace-1?tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
@@ -556,7 +556,7 @@ describe("OnboardingHomeView", () => {
       screen.getAllByText("Create Observe project").length,
     ).toBeGreaterThan(0);
     expect(screen.getByText("Send first trace")).toBeVisible();
-    expect(screen.getByText("Review first signal")).toBeVisible();
+    expect(screen.getByText("Review first trace")).toBeVisible();
   });
 
   it("renders sampleTraceReady as the primary sample project panel", async () => {
@@ -697,7 +697,7 @@ describe("OnboardingHomeView", () => {
       within(panel).queryByRole("link", { name: /open workbench/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
-    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
+    expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
   });
 
   it("renders the completed setup screen after the first observe workflow", () => {
@@ -1166,7 +1166,7 @@ describe("OnboardingHomeView", () => {
       expect(
         screen.queryByTestId("onboarding-product-loop-stepper"),
       ).toBeNull();
-      expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
+      expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
       expect(readPersistedSetupQuickStartAttribution()).toEqual({
         quickStartGoal,
         quickStartId,
@@ -1210,7 +1210,7 @@ describe("OnboardingHomeView", () => {
     expect(within(panel).getByText("Later steps")).toBeVisible();
     expect(within(panel).queryByText("Show full path")).toBeNull();
     expect(within(panel).getByText("Send first trace")).toBeVisible();
-    expect(within(panel).getByText("Review first signal")).toBeVisible();
+    expect(within(panel).getByText("Review first trace")).toBeVisible();
     const setupLink = screen.getByRole("link", {
       name: /create observe project/i,
     });
@@ -1352,7 +1352,7 @@ describe("OnboardingHomeView", () => {
     );
   });
 
-  it("keeps path switching hidden until the first setup action is done", () => {
+  it("keeps setup path switching visible during first setup", async () => {
     const state = normalizedFixture("observeNoSetup");
     const refetch = vi.fn();
     const mutateAsync = vi.fn().mockResolvedValue({
@@ -1375,8 +1375,8 @@ describe("OnboardingHomeView", () => {
           ...state.availablePaths,
           {
             id: "prompt",
-            label: "Improve prompts",
-            description: "Test and compare prompt versions.",
+            label: "Test prompts or agent prompts",
+            description: "Create, test, and compare prompt versions.",
             status: "available",
             href: "/dashboard/home?path=prompt",
             isAvailable: true,
@@ -1404,10 +1404,19 @@ describe("OnboardingHomeView", () => {
     renderView();
 
     expect(screen.getByTestId("observe-setup-panel")).toBeVisible();
-    expect(screen.queryByTestId("onboarding-path-card-prompt")).toBeNull();
-    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
-    expect(mutateAsync).not.toHaveBeenCalled();
-    expect(refetch).not.toHaveBeenCalled();
+    expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
+    expect(screen.getByTestId("onboarding-path-card-prompt")).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: /choose this/i }));
+
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goal: "improve_prompts",
+        primaryPath: "prompt",
+        source: "path_card",
+      }),
+    );
+    expect(refetch).toHaveBeenCalled();
   });
 
   it("opens sample preview quick starts to the sample data action", async () => {
@@ -1893,7 +1902,7 @@ describe("OnboardingHomeView", () => {
 
     expect(screen.getByTestId("onboarding-daily-quality")).toBeVisible();
     expect(screen.getByTestId("daily-quality-empty-state")).toBeVisible();
-    expect(screen.queryByText("Recommended action")).toBeNull();
+    expect(screen.queryByText("Next setup step")).toBeNull();
     expect(
       screen.getByTestId("daily-quality-primary-action"),
     ).toHaveTextContent("Review prompt metrics");
@@ -1949,7 +1958,7 @@ describe("OnboardingHomeView", () => {
     expect(within(panel).getByText("trace-1")).toBeVisible();
     expect(within(panel).getByText("Not reviewed")).toBeVisible();
     expect(
-      within(panel).getByRole("link", { name: /review first signal/i }),
+      within(panel).getByRole("link", { name: /review first trace/i }),
     ).toHaveAttribute(
       "href",
       "/dashboard/observe/observe-1/trace/trace-1?tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
@@ -2060,7 +2069,7 @@ describe("OnboardingHomeView", () => {
     );
     expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
     expect(screen.queryByTestId("onboarding-product-loop-stepper")).toBeNull();
-    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
+    expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
   });
 
   it("renders agent onboarding as a focused agent path panel", () => {
@@ -2093,7 +2102,7 @@ describe("OnboardingHomeView", () => {
     );
     expect(screen.queryByTestId("onboarding-state-summary")).toBeNull();
     expect(screen.queryByTestId("onboarding-product-loop-stepper")).toBeNull();
-    expect(screen.queryByTestId("onboarding-path-card-grid")).toBeNull();
+    expect(screen.getByTestId("onboarding-path-card-grid")).toBeVisible();
   });
 
   it("keeps setup quick-start attribution on the agent primary action after first setup", () => {
@@ -2353,7 +2362,9 @@ describe("OnboardingHomeView", () => {
     renderView();
 
     await userEvent.click(screen.getByLabelText("Connect your agent"));
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /start selected setup/i }),
+    );
 
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
@@ -2527,7 +2538,7 @@ describe("OnboardingHomeView", () => {
 
     expect(screen.getByText("Continue with real setup")).toBeVisible();
     const fallbackLink = screen.getByRole("link", {
-      name: "Connect observability",
+      name: "Create Observe project",
     });
     const fallbackUrl = new URL(
       fallbackLink.getAttribute("href"),

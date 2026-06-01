@@ -30,7 +30,9 @@ describe("GoalPicker", () => {
       expect.objectContaining({ goal: "test_and_improve_prompts" }),
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /start selected setup/i }),
+    );
     expect(onSaveGoal).toHaveBeenCalledWith(
       expect.objectContaining({ goal: "monitor_production_ai_app" }),
     );
@@ -63,7 +65,9 @@ describe("GoalPicker", () => {
     expect(screen.getByText("path unavailable")).toBeVisible();
     expect(screen.getByLabelText("Connect your agent")).toBeDisabled();
     expect(onSelectGoal).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /start selected setup/i }),
+    ).toBeDisabled();
   });
 
   it("shows save errors without clearing the selected goal", () => {
@@ -87,7 +91,7 @@ describe("GoalPicker", () => {
     });
 
     expect(goals.map((goal) => goal.label)).not.toContain(
-      "Explore with sample data",
+      "Preview sample trace",
     );
     expect(goals.every((goal) => goal.primaryPath !== "sample")).toBe(true);
   });

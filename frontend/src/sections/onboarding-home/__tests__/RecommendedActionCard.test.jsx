@@ -15,20 +15,20 @@ describe("RecommendedActionCard", () => {
     render(
       <RecommendedActionCard
         action={actionFixture()}
-        label="Recommended action"
+        label="Next setup step"
         onActionClick={onActionClick}
       />,
     );
 
     expect(
-      screen.getByRole("link", { name: /connect observability/i }),
+      screen.getByRole("link", { name: /create observe project/i }),
     ).toHaveAttribute(
       "href",
       "/dashboard/observe?setup=true&source=onboarding",
     );
 
     await userEvent.click(
-      screen.getByRole("link", { name: /connect observability/i }),
+      screen.getByRole("link", { name: /create observe project/i }),
     );
     expect(onActionClick).toHaveBeenCalledWith(
       expect.objectContaining({ id: "create_observe_project" }),
@@ -44,13 +44,11 @@ describe("RecommendedActionCard", () => {
       routeAvailable: false,
     };
 
-    render(
-      <RecommendedActionCard action={action} label="Recommended action" />,
-    );
+    render(<RecommendedActionCard action={action} label="Next setup step" />);
 
-    expect(screen.getByText("route not implemented")).toBeVisible();
+    expect(screen.getByText("This setup step is not ready yet.")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: /connect observability/i }),
+      screen.getByRole("button", { name: /create observe project/i }),
     ).toBeDisabled();
   });
 });

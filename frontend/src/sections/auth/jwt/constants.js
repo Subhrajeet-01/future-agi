@@ -40,38 +40,38 @@ export const AVAILABLE_ROLES = [
 export const GOALS_LIST = [
   {
     id: "explore_sample_data",
-    label: "Explore with sample data",
-    aliases: ["sample_project"],
-    description: "Review a sample quality signal before connecting real data.",
+    label: "Preview sample trace",
+    aliases: ["sample_project", "Explore with sample data"],
+    description: "Inspect a sample trace while real setup is pending.",
   },
   {
     id: "monitor_production_ai_app",
-    label: "Monitor a production AI app",
+    label: "Connect your agent",
     aliases: ["Monitor LLMs and Agents", "Analyze System Health"],
     description:
       "Connect traces and review latency, cost, failures, and quality signals.",
   },
   {
     id: "improve_prompts",
-    label: "Test and improve prompts",
+    label: "Test prompts or agent prompts",
     aliases: ["test_and_improve_prompts"],
     description: "Create a prompt test loop and compare output changes.",
   },
   {
     id: "build_ai_agent",
-    label: "Build or prototype an AI agent",
+    label: "Prototype agent",
     aliases: ["build_or_prototype_agent", "Optimize AI Agents"],
     description: "Run a first scenario and inspect the agent trace.",
   },
   {
     id: "control_model_traffic",
-    label: "Route LLM traffic safely",
+    label: "Set up gateway",
     aliases: ["route_llm_traffic_safely"],
     description: "Send a gateway request and review the first log.",
   },
   {
     id: "evaluate_quality",
-    label: "Evaluate quality on data or traces",
+    label: "Test AI using simulation",
     aliases: [
       "evaluate_quality_on_data_or_traces",
       "Run Evaluations",

@@ -23,7 +23,7 @@ describe("ObserveOnboardingFocusPanel", () => {
     render(
       <ObserveOnboardingFocusPanel
         currentStep="First trace"
-        description="Send one trace to unlock review."
+        description="Send one trace so it can be reviewed."
         primaryAction={{ label: "Open setup", onClick: onPrimary }}
         secondaryAction={{ label: "Refresh traces", onClick: onSecondary }}
         steps={[
@@ -40,7 +40,7 @@ describe("ObserveOnboardingFocusPanel", () => {
       "data-tour-anchor",
       "observe_send_trace_button",
     );
-    expect(screen.getByText("Observe onboarding")).toBeVisible();
+    expect(screen.getByText("Observe setup")).toBeVisible();
     expect(screen.getByText("Send the first trace")).toBeVisible();
     expect(screen.getByText("Project")).toBeVisible();
     expect(screen.getAllByText("First trace").length).toBeGreaterThan(0);

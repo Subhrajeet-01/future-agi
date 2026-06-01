@@ -410,8 +410,8 @@ def test_product_onboarding_external_payload_uses_safe_campaign_copy():
     slack_text = slack_payload["text"]
     assert payload["family"] == NotificationPreference.FAMILY_PRODUCT_ONBOARDING
     assert payload["summary"]["title"] == "Continue with your first observe project"
-    assert payload["summary"]["action_label"] == "Connect observability"
-    assert "Connect observability" in slack_text
+    assert payload["summary"]["action_label"] == "Create Observe project"
+    assert "Create Observe project" in slack_text
     assert "secret-value" not in payload_text
     assert "secret-value" not in slack_text
 
@@ -1062,7 +1062,7 @@ def test_product_onboarding_delivers_slack_when_channel_enabled(
     post.assert_called_once()
     payload_text = str(post.call_args.kwargs["json"])
     assert "Continue with your first observe project" in payload_text
-    assert "Connect observability" in payload_text
+    assert "Create Observe project" in payload_text
     assert "Sensitive onboarding context" not in payload_text
     assert "secret-value" not in payload_text
     assert NotificationDeliveryLog.no_workspace_objects.filter(

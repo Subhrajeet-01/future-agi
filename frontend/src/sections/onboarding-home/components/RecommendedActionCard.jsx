@@ -17,6 +17,15 @@ const actionHref = (action) => {
   return action.href;
 };
 
+const blockedReasonLabel = (reason) => {
+  if (reason === "route_not_implemented")
+    return "This setup step is not ready yet.";
+  if (reason === "feature_disabled") return "This setup step is disabled.";
+  if (reason === "permission_limited")
+    return "You need workspace write access.";
+  return readableToken(reason);
+};
+
 export default function RecommendedActionCard({
   action,
   label,
@@ -86,7 +95,7 @@ export default function RecommendedActionCard({
         </Stack>
         {action.blocked ? (
           <Alert severity="info" sx={{ borderRadius: 1 }}>
-            {readableToken(action.blockedReason)}
+            {blockedReasonLabel(action.blockedReason)}
           </Alert>
         ) : null}
         <Button

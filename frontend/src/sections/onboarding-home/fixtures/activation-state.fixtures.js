@@ -242,10 +242,11 @@ const promptRouteAvailability = (overrides = {}) =>
 const action = (overrides = {}) => ({
   id: "create_observe_project",
   kind: "setup",
-  title: "Connect observability",
-  description: "Create an observability project and send one request.",
+  title: "Connect your agent",
+  description:
+    "Choose your package, create an Observe project, and send one request.",
   href: "/dashboard/observe?setup=true&source=onboarding",
-  cta_label: "Connect observability",
+  cta_label: "Create Observe project",
   estimated_minutes: 5,
   priority: 100,
   blocked: false,
@@ -663,8 +664,8 @@ const availableGoals = [
     id: "explore_sample_data",
     goal: "explore_sample_data",
     primary_path: "sample",
-    label: "Explore with sample data",
-    description: "Review sample signals while real data is pending.",
+    label: "Preview sample trace",
+    description: "Inspect a sample trace while real setup is pending.",
     estimated_minutes: 2,
     disabled: false,
     disabled_reason: null,
@@ -936,8 +937,8 @@ const baseState = (overrides = {}) => ({
     },
     {
       id: "sample",
-      label: "Explore with sample data",
-      description: "Use a sample workspace while real data is pending.",
+      label: "Preview sample trace",
+      description: "Inspect a sample trace while real setup is pending.",
       status: "available",
       href: "/dashboard/home?path=sample",
       is_available: true,
@@ -1001,8 +1002,8 @@ const baseState = (overrides = {}) => ({
 const promptAvailablePaths = () => [
   {
     id: "prompt",
-    label: "Improve prompts",
-    description: "Test and compare prompt versions.",
+    label: "Test prompts or agent prompts",
+    description: "Create, test, and compare prompt versions.",
     status: "selected",
     href: "/dashboard/home?path=prompt",
     is_available: true,
@@ -1012,8 +1013,8 @@ const promptAvailablePaths = () => [
   },
   {
     id: "sample",
-    label: "Explore with sample data",
-    description: "Use a sample workspace while real data is pending.",
+    label: "Preview sample trace",
+    description: "Inspect a sample trace while real setup is pending.",
     status: "available",
     href: "/dashboard/home?path=sample",
     is_available: true,
@@ -1026,7 +1027,7 @@ const promptAvailablePaths = () => [
 const agentAvailablePaths = () => [
   {
     id: "agent",
-    label: "Build an AI agent",
+    label: "Prototype agent",
     description: "Create an agent and review its first scenario.",
     status: "selected",
     href: "/dashboard/home?path=agent",
@@ -1037,8 +1038,8 @@ const agentAvailablePaths = () => [
   },
   {
     id: "sample",
-    label: "Explore with sample data",
-    description: "Use a sample workspace while real data is pending.",
+    label: "Preview sample trace",
+    description: "Inspect a sample trace while real setup is pending.",
     status: "available",
     href: "/dashboard/home?path=sample",
     is_available: true,
@@ -1051,7 +1052,7 @@ const agentAvailablePaths = () => [
 const gatewayAvailablePaths = () => [
   {
     id: "gateway",
-    label: "Control model traffic",
+    label: "Set up gateway",
     description: "Configure model routing and production policies.",
     status: "selected",
     href: "/dashboard/home?path=gateway",
@@ -1062,8 +1063,8 @@ const gatewayAvailablePaths = () => [
   },
   {
     id: "sample",
-    label: "Explore with sample data",
-    description: "Use a sample workspace while real data is pending.",
+    label: "Preview sample trace",
+    description: "Inspect a sample trace while real setup is pending.",
     status: "available",
     href: "/dashboard/home?path=sample",
     is_available: true,
@@ -1129,10 +1130,11 @@ export const activationStateFixtures = {
     fallback_action: action({
       id: "create_observe_project",
       kind: "setup",
-      title: "Connect observability",
-      description: "Create an observe project and send one trace.",
+      title: "Connect your agent",
+      description:
+        "Choose your package, create an Observe project, and send one trace.",
       href: "/dashboard/observe?setup=true&source=onboarding",
-      cta_label: "Connect observability",
+      cta_label: "Create Observe project",
       completion_event: "observe_project_created",
       analytics: {
         event_name: "onboarding_recommended_action_clicked",
@@ -1143,8 +1145,8 @@ export const activationStateFixtures = {
     available_paths: [
       {
         id: "sample",
-        label: "Explore with sample data",
-        description: "Use a sample workspace while real data is pending.",
+        label: "Preview sample trace",
+        description: "Inspect a sample trace while real setup is pending.",
         status: "selected",
         href: "/dashboard/home?path=sample",
         is_available: true,
@@ -1215,7 +1217,7 @@ export const activationStateFixtures = {
       id: "send_first_trace",
       kind: "send_signal",
       title: "Send your first trace",
-      description: "Send one production or test trace to unlock review.",
+      description: "Send one production or test trace so it can be reviewed.",
       href: "/dashboard/observe/observe-1",
       cta_label: "Send trace",
       completion_event: "trace_received",
@@ -1240,7 +1242,7 @@ export const activationStateFixtures = {
       id: "send_first_trace",
       kind: "send_signal",
       title: "Send your first trace",
-      description: "Send one production or test trace to unlock review.",
+      description: "Send one production or test trace so it can be reviewed.",
       href: "/dashboard/observe/observe-1",
       cta_label: "Send trace",
       completion_event: "trace_received",

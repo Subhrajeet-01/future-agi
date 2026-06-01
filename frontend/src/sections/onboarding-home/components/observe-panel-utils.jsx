@@ -522,7 +522,7 @@ export function ObservePanelActions({
           disabled={!fallbackHref}
           onClick={() => onFallbackClick?.(fallbackAction)}
         >
-          {fallbackAction.ctaLabel || "Other setup option"}
+          {fallbackAction.ctaLabel || "Alternate setup"}
         </Button>
       ) : null}
       {showCheckAgain ? (

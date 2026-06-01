@@ -128,7 +128,7 @@ def render_lifecycle_email_preview(*, send_log, campaign, target_route, now=None
 def lifecycle_action_label(action_id, campaign_group):
     labels = {
         "choose_onboarding_goal": "Choose setup path",
-        "create_observe_project": "Connect observability",
+        "create_observe_project": "Create Observe project",
         "send_first_trace": "Send first trace",
         "open_sample_trace": "Open sample trace",
         "review_first_trace": "Review trace",

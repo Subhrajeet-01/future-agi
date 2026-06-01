@@ -51,8 +51,8 @@ goals:
     estimated_minutes: 8
   explore_sample_data:
     primary_path: sample
-    label: Explore with sample data
-    description: Review sample signals while real data is pending.
+    label: Preview sample trace
+    description: Inspect a sample trace while real setup is pending.
     estimated_minutes: 2
 
 goal_aliases:
@@ -79,11 +79,12 @@ goal_aliases:
   Annotate and Improve Data: evaluate_quality
   Optimize AI Agents: build_ai_agent
   Explore with sample data: explore_sample_data
+  Preview sample trace: explore_sample_data
 
 paths:
   prompt:
-    label: Improve prompts
-    description: Test and compare prompt versions.
+    label: Test prompts or agent prompts
+    description: Create, test, and compare prompt versions.
     first_action_id: create_prompt
     requires_permission: prompt:write
   agent:
@@ -117,8 +118,8 @@ paths:
     first_action_id:
     requires_permission: dashboards:write
   sample:
-    label: Explore with sample data
-    description: Use a sample workspace while real data is pending.
+    label: Preview sample trace
+    description: Inspect a sample trace while real setup is pending.
     first_action_id: open_sample_trace
     requires_permission:
 
@@ -188,8 +189,8 @@ journeys:
         action_id: create_observe_project
         success_event: observe_project_created
         tour_anchor: observe_create_project_button
-        label: Connect observability
-        description: Create an observe project and send one trace.
+        label: Create Observe project
+        description: Choose your package, create a project, and send one trace.
       - id: send_first_trace
         stage: waiting_for_first_trace
         active_stages:
@@ -949,10 +950,10 @@ actions:
     fallback_route_key: get_started
   create_observe_project:
     kind: setup
-    title: Connect observability
-    description: Create an observability project and send one request.
+    title: Connect your agent
+    description: Choose your package, create an Observe project, and send one request.
     route_key: observe_setup
-    cta_label: Connect observability
+    cta_label: Create Observe project
     priority: 100
     estimated_minutes: 5
     requires_permission: observe:write
@@ -962,7 +963,7 @@ actions:
   send_first_trace:
     kind: send_signal
     title: Send your first trace
-    description: Send one production or test trace to unlock review.
+    description: Send one production or test trace so it can be reviewed.
     route_key: observe_send_first_trace
     cta_label: Send trace
     priority: 100
@@ -1118,9 +1119,9 @@ stages:
   choose_goal:
     home_mode: first_run
     copy:
-      eyebrow: First goal
+      eyebrow: Setup
       title: Choose what to set up first
-      description: Pick the first product job before moving into setup.
+      description: Pick one product area. Home will open the first setup step and keep the next step ready.
     progress:
       build: not_started
       test: available
@@ -1178,8 +1179,8 @@ stages:
     home_mode: first_run
     copy:
       eyebrow: Observe
-      title: Connect observability
-      description: Create an observe project and send one trace.
+      title: Connect your agent
+      description: Choose your package, create an Observe project, and send one trace.
     progress:
       build: selected
       test: available
@@ -1199,7 +1200,7 @@ stages:
     copy:
       eyebrow: Waiting
       title: Waiting for the first trace
-      description: Once a trace lands, the next review action will unlock.
+      description: Keep the trace page open, run one request, and we will open the trace when it appears.
     progress:
       build: selected
       test: available
@@ -1233,9 +1234,9 @@ stages:
   review_first_trace:
     home_mode: first_run
     copy:
-      eyebrow: First signal
+      eyebrow: First trace
       title: First trace received
-      description: Review it now and capture the first quality signal.
+      description: Review it now to understand latency, cost, and quality context.
     progress:
       build: selected
       test: available

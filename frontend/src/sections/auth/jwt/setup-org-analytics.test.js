@@ -22,10 +22,7 @@ describe("setup-org analytics", () => {
   it("builds profile analytics without email or full goal payload", () => {
     expect(
       buildSetupOrgProfileSavedProperties({
-        goals: [
-          "Monitor a production AI app",
-          "Evaluate quality on data or traces",
-        ],
+        goals: ["Connect your agent", "Test AI using simulation"],
         provider: "google",
         quickStartGoal: "monitor_production_ai_app",
         quickStartId: "observe",
@@ -35,7 +32,7 @@ describe("setup-org analytics", () => {
       }),
     ).toEqual({
       role: "AI Builder",
-      primary_goal: "Monitor a production AI app",
+      primary_goal: "Connect your agent",
       goal_count: 2,
       method: "google",
       quick_start_goal: "monitor_production_ai_app",
@@ -156,7 +153,7 @@ describe("setup-org analytics", () => {
       quickStartPrimaryPath: "observe",
     });
     trackSetupOrgProfileSaved({
-      goals: ["Monitor a production AI app"],
+      goals: ["Connect your agent"],
       quickStartGoal: "monitor_production_ai_app",
       quickStartId: "observe",
       quickStartPrimaryPath: "observe",
@@ -199,7 +196,7 @@ describe("setup-org analytics", () => {
       SetupOrgEvents.profileSaved,
       {
         role: "AI Builder",
-        primary_goal: "Monitor a production AI app",
+        primary_goal: "Connect your agent",
         goal_count: 1,
         quick_start_goal: "monitor_production_ai_app",
         quick_start_id: "observe",

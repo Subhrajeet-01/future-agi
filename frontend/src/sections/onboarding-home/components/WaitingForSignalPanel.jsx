@@ -53,7 +53,7 @@ export default function WaitingForSignalPanel({
         <ObservePanelHeader
           eyebrow="Waiting for trace"
           title="Send one real trace"
-          description="The observe project exists. The next step unlocks after the first real trace arrives."
+          description="The Observe project exists. Keep this page open, run one request, and we will open the trace when it appears."
           chips={["observe", "waiting"]}
         />
         <ObserveJourneyProgress

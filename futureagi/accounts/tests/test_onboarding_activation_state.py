@@ -4,6 +4,7 @@ from accounts.models import (
     OnboardingActivationEvent,
     OnboardingLifecycleEvaluationLog,
     OnboardingSampleProject,
+    User,
 )
 from accounts.services.onboarding.activation_events import record_event
 from accounts.services.onboarding.activation_state import resolve_activation_state
@@ -140,7 +141,7 @@ def test_observe_path_no_setup_returns_connect_observability(
     )
 
     assert payload["stage"] == "connect_observability"
-    assert payload["stage_copy"]["title"] == "Connect observability"
+    assert payload["stage_copy"]["title"] == "Connect your agent"
     assert payload["available_goals"][0]["goal"] == "monitor_production_ai_app"
     assert payload["recommended_action"]["id"] == "create_observe_project"
     assert payload["fallback_action"]["id"] == "open_observe_setup_fallback"
@@ -150,6 +151,72 @@ def test_observe_path_no_setup_returns_connect_observability(
     assert payload["journey_plan"]["id"] == "observe_first_run"
     assert payload["journey_plan"]["current_step_id"] == "connect_observability"
     assert payload["journey_plan"]["steps"][0]["status"] == "current"
+
+
+@pytest.mark.django_db
+def test_activation_state_skips_first_run_when_org_has_product_setup(
+    organization,
+    workspace,
+    user,
+):
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="first_quality_loop_completed",
+        source="test",
+        product_path="observe",
+        is_sample=False,
+        allow_observe_loop_completion=True,
+    )
+    member = User.objects.create_user(
+        email="activation-org-member@futureagi.com",
+        password="testpassword123",
+        name="Activation Org Member",
+        organization=organization,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(member, organization, workspace),
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "activated"
+    assert payload["is_activated"] is True
+    assert payload["recommended_action"]["id"] == "open_observe_dashboard"
+
+
+@pytest.mark.django_db
+def test_activation_state_does_not_skip_first_run_for_sample_product_setup(
+    organization,
+    workspace,
+    user,
+):
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="first_quality_loop_completed",
+        source="test",
+        product_path="observe",
+        is_sample=True,
+    )
+    member = User.objects.create_user(
+        email="activation-sample-member@futureagi.com",
+        password="testpassword123",
+        name="Activation Sample Member",
+        organization=organization,
+    )
+
+    payload = resolve_activation_state(
+        context=_context(member, organization, workspace),
+        flags=_flags(),
+        signals=OnboardingSignals(first_checks={}),
+    )
+
+    assert payload["stage"] == "connect_observability"
+    assert payload["recommended_action"]["id"] == "create_observe_project"
 
 
 @pytest.mark.django_db
@@ -611,10 +678,10 @@ def test_evaluator_after_trace_review_activates(organization, workspace, user):
     assert payload["journey_plan"]["current_step_index"] == 3
     assert {step["status"] for step in payload["journey_plan"]["steps"]} == {"complete"}
     assert payload["stage_copy"] == {
-        "eyebrow": "Aha moment reached",
-        "title": "Your first quality loop is live",
+        "eyebrow": "First setup complete",
+        "title": "Your first workflow is live",
         "description": (
-            "Review daily quality next and keep improving the loop from real signals."
+            "Review daily quality next and keep improving the workflow from real signals."
         ),
     }
 

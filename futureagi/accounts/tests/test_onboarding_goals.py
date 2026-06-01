@@ -34,6 +34,7 @@ def test_normalize_legacy_setup_goal_label():
 @pytest.mark.django_db
 def test_normalize_sample_preview_setup_goal_label():
     assert normalize_goal("Explore with sample data") == "explore_sample_data"
+    assert normalize_goal("Preview sample trace") == "explore_sample_data"
 
 
 @pytest.mark.django_db
@@ -41,10 +42,15 @@ def test_normalize_sample_preview_setup_goal_label():
     ("goal_label", "canonical_goal"),
     [
         ("Monitor a production AI app", "monitor_production_ai_app"),
+        ("Connect your agent", "monitor_production_ai_app"),
         ("Test and improve prompts", "improve_prompts"),
+        ("Test prompts or agent prompts", "improve_prompts"),
         ("Build or prototype an AI agent", "build_ai_agent"),
+        ("Prototype agent", "build_ai_agent"),
         ("Route LLM traffic safely", "control_model_traffic"),
+        ("Set up gateway", "control_model_traffic"),
         ("Evaluate quality on data or traces", "evaluate_quality"),
+        ("Test AI using simulation", "evaluate_quality"),
         ("Connect a voice AI agent", "connect_voice_ai_agent"),
     ],
 )

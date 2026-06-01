@@ -7,17 +7,36 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 import { RouterLink } from "src/routes/components";
-import { readableToken } from "../onboarding-home.constants";
+
+const pathStatusLabel = (path, { isPreviewOnly, isSelected }) => {
+  if (isPreviewOnly) return "Preview only";
+  if (isSelected) return "Current setup";
+  if (!path.isAvailable) return "Not available yet";
+  return "Available";
+};
+
+const blockedReasonLabel = (reason) => {
+  if (!reason) return null;
+  if (reason === "route_not_implemented")
+    return "This setup path is not ready yet.";
+  if (reason === "feature_disabled") return "This setup path is disabled.";
+  if (reason === "permission_limited")
+    return "You need workspace write access.";
+  return "This setup path is not available yet.";
+};
 
 const pathButtonLabel = (path) => {
-  if (path.status === "selected") return "Current";
+  if (path.id === "sample") return "Preview only";
+  if (path.status === "selected") return "Current setup";
   if (!path.isAvailable) return "Unavailable";
-  return "Focus";
+  return "Choose this";
 };
 
 export default function PathCardGrid({
+  description = "Switch to another product area if this is not the setup you need.",
   isChangingPath = false,
   paths = [],
+  title = "Change setup path",
   onPathClick,
 }) {
   if (!paths.length) return null;
@@ -33,7 +52,12 @@ export default function PathCardGrid({
       }}
     >
       <Stack spacing={1.25}>
-        <Typography variant="subtitle2">Available paths</Typography>
+        <Stack spacing={0.25}>
+          <Typography variant="subtitle2">{title}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {description}
+          </Typography>
+        </Stack>
         <Box
           sx={{
             display: "grid",
@@ -43,10 +67,16 @@ export default function PathCardGrid({
         >
           {paths.map((path) => {
             const isSelected = path.status === "selected";
+            const isPreviewOnly = path.id === "sample";
             const isDisabled =
-              !path.isAvailable || isSelected || isChangingPath;
+              isPreviewOnly ||
+              !path.isAvailable ||
+              isSelected ||
+              isChangingPath;
             const href =
-              !onPathClick && path.isAvailable && path.href ? path.href : null;
+              !onPathClick && path.isAvailable && !isPreviewOnly && path.href
+                ? path.href
+                : null;
             return (
               <Box
                 key={path.id}
@@ -67,16 +97,18 @@ export default function PathCardGrid({
                     <Typography variant="subtitle2">{path.label}</Typography>
                     <Chip
                       size="small"
-                      label={readableToken(path.status)}
-                      sx={{ textTransform: "capitalize" }}
+                      label={pathStatusLabel(path, {
+                        isPreviewOnly,
+                        isSelected,
+                      })}
                     />
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
                     {path.description}
                   </Typography>
-                  {path.blockedReason ? (
+                  {blockedReasonLabel(path.blockedReason) ? (
                     <Typography variant="caption" color="text.secondary">
-                      {readableToken(path.blockedReason)}
+                      {blockedReasonLabel(path.blockedReason)}
                     </Typography>
                   ) : null}
                   <Box sx={{ flexGrow: 1 }} />
@@ -86,7 +118,9 @@ export default function PathCardGrid({
                     component={href ? RouterLink : "button"}
                     href={href || undefined}
                     disabled={isDisabled}
-                    onClick={() => onPathClick?.(path)}
+                    onClick={() => {
+                      if (!isPreviewOnly) onPathClick?.(path);
+                    }}
                     endIcon={<Iconify icon="mdi:arrow-right" width={16} />}
                     sx={{ alignSelf: "flex-start", px: 0.5 }}
                   >
@@ -103,7 +137,9 @@ export default function PathCardGrid({
 }
 
 PathCardGrid.propTypes = {
+  description: PropTypes.string,
   isChangingPath: PropTypes.bool,
   onPathClick: PropTypes.func,
   paths: PropTypes.array,
+  title: PropTypes.string,
 };

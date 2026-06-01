@@ -29,6 +29,7 @@ import { useSampleProject } from "./hooks/useSampleProject";
 import {
   getGoalOptionsForState,
   getStageCopy,
+  readablePath,
   readableToken,
 } from "./onboarding-home.constants";
 import {
@@ -162,7 +163,7 @@ const SETUP_QUICK_START_ERROR_FALLBACKS = {
     description:
       "The sample preview did not load. Continue with real observability setup.",
     href: "/dashboard/observe?setup=true&source=onboarding&tour_anchor=observe_create_project_button&journey_step=connect_observability",
-    label: "Connect observability",
+    label: "Create Observe project",
     title: "Continue with real setup",
   },
   voice: {
@@ -531,8 +532,28 @@ export default function OnboardingHomeView() {
     trackContext,
   ]);
   useEffect(() => {
-    setSelectedGoal(renderedState?.goal || null);
-  }, [renderedState?.goal]);
+    if (renderedState?.goal) {
+      setSelectedGoal(renderedState.goal);
+      return;
+    }
+
+    if (
+      renderedState?.stage === "choose_goal" &&
+      renderedState?.featureFlags?.onboarding_goal_picker !== false
+    ) {
+      setSelectedGoal(
+        goalOptions.find((goal) => goal.disabled !== true)?.goal || null,
+      );
+      return;
+    }
+
+    setSelectedGoal(null);
+  }, [
+    goalOptions,
+    renderedState?.featureFlags?.onboarding_goal_picker,
+    renderedState?.goal,
+    renderedState?.stage,
+  ]);
 
   useEffect(() => {
     if (!trackContext || isError) return;
@@ -688,6 +709,20 @@ export default function OnboardingHomeView() {
     !quickStartPathMismatch &&
       shouldShowSampleAsPrimary(renderedState) &&
       SAMPLE_PRIMARY_STAGES.has(renderedStage),
+  );
+  const showFirstRunSetupDetails = Boolean(
+    renderedState &&
+      !showGoalPicker &&
+      !quickStartMismatchAction &&
+      !showSampleAsPrimary &&
+      ![
+        "activated",
+        "daily_review",
+        "feature_disabled",
+        "workspace_missing",
+        "permission_limited",
+      ].includes(renderedState.stage) &&
+      renderedState.availablePaths?.length,
   );
   const showSamplePanel = Boolean(
     !(isFirstRunQuickStartFocus && !isSampleQuickStart) &&
@@ -1210,6 +1245,15 @@ export default function OnboardingHomeView() {
       isHiding={mutationPending(sampleProjectActions.hideSampleProject)}
     />
   ) : null;
+  const firstRunSetupDetailsPanel = showFirstRunSetupDetails ? (
+    <PathCardGrid
+      title="Setup details"
+      description="Choose another product area if this is not the setup you need. Sample data stays preview-only."
+      isChangingPath={isSavingGoal}
+      paths={renderedState.availablePaths}
+      onPathClick={handlePathClick}
+    />
+  ) : null;
 
   return (
     <Box
@@ -1316,19 +1360,8 @@ export default function OnboardingHomeView() {
               selectedGoal={selectedGoal}
               onSelectGoal={handleSelectGoal}
               onSaveGoal={handleSaveGoal}
-              skipHref={renderedState.fallbackAction?.href}
-              skipLabel={
-                renderedState.fallbackAction?.ctaLabel ||
-                renderedState.fallbackAction?.title
-              }
               isSaving={isSavingGoal}
               error={saveGoal.error}
-            />
-            <RecommendedActionCard
-              action={renderedState.fallbackAction}
-              label="Other setup option"
-              variant="fallback"
-              onActionClick={handleActionClick}
             />
           </Box>
         ) : showSampleAsPrimary && samplePanel ? (
@@ -1337,9 +1370,13 @@ export default function OnboardingHomeView() {
           <Stack spacing={2}>
             {observePanel}
             {samplePanel}
+            {firstRunSetupDetailsPanel}
           </Stack>
         ) : pathFocusPanel ? (
-          <Stack spacing={2}>{pathFocusPanel}</Stack>
+          <Stack spacing={2}>
+            {pathFocusPanel}
+            {firstRunSetupDetailsPanel}
+          </Stack>
         ) : firstLoopCompletePanel ? (
           <Stack spacing={2}>{firstLoopCompletePanel}</Stack>
         ) : dailyQualityPanel ? (
@@ -1355,12 +1392,12 @@ export default function OnboardingHomeView() {
           >
             <RecommendedActionCard
               action={renderedState.recommendedAction}
-              label="Recommended action"
+              label="Next setup step"
               onActionClick={handleActionClick}
             />
             <RecommendedActionCard
               action={renderedState.fallbackAction}
-              label="Other setup option"
+              label="Alternate setup"
               variant="fallback"
               onActionClick={handleActionClick}
             />
@@ -1379,23 +1416,23 @@ export default function OnboardingHomeView() {
           >
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle2">Current stage</Typography>
+                <Typography variant="subtitle2">Current setup step</Typography>
                 <Typography
                   variant="body2"
                   color="text.secondary"
-                  sx={{ mt: 0.5, textTransform: "capitalize" }}
+                  sx={{ mt: 0.5 }}
                 >
-                  {readableToken(renderedState.stage)}
+                  {getStageCopy(renderedState).title}
                 </Typography>
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle2">Selected path</Typography>
+                <Typography variant="subtitle2">Selected setup</Typography>
                 <Typography
                   variant="body2"
                   color="text.secondary"
-                  sx={{ mt: 0.5, textTransform: "capitalize" }}
+                  sx={{ mt: 0.5 }}
                 >
-                  {readableToken(renderedState.primaryPath)}
+                  {readablePath(renderedState.primaryPath)}
                 </Typography>
               </Box>
               <Box sx={{ flex: 1 }}>

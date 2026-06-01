@@ -79,11 +79,21 @@ export const ONBOARDING_GOAL_OPTIONS = [
     id: "explore_sample_data",
     goal: "explore_sample_data",
     primaryPath: "sample",
-    label: "Explore with sample data",
-    description: "Review sample signals while real data is pending.",
+    label: "Preview sample trace",
+    description: "Inspect a sample trace while real setup is pending.",
     estimatedMinutes: 2,
   },
 ];
+
+export const ONBOARDING_PATH_LABELS = {
+  agent: "Prototype agent",
+  evals: "Test AI using simulation",
+  gateway: "Set up gateway",
+  observe: "Connect your agent",
+  prompt: "Test prompts or agent prompts",
+  sample: "Preview sample trace",
+  voice: "Connect a voice AI agent",
+};
 
 const isPreviewOnlyGoal = (goal) =>
   goal?.primaryPath === "sample" || goal?.goal === "explore_sample_data";
@@ -105,9 +115,10 @@ export const ONBOARDING_STAGE_COPY = {
     description: "This workspace needs write access before setup can continue.",
   },
   choose_goal: {
-    eyebrow: "First goal",
+    eyebrow: "Setup",
     title: "Choose what to set up first",
-    description: "Pick the first product job before moving into setup.",
+    description:
+      "Pick one product area. Home will open the first setup step and keep the next step ready.",
   },
   selected_path_unavailable: {
     eyebrow: "Path unavailable",
@@ -259,13 +270,15 @@ export const ONBOARDING_STAGE_COPY = {
   },
   connect_observability: {
     eyebrow: "Observe",
-    title: "Connect observability",
-    description: "Create an observe project and send one trace.",
+    title: "Connect your agent",
+    description:
+      "Choose your package, create an Observe project, and send one trace.",
   },
   waiting_for_first_trace: {
     eyebrow: "Waiting",
     title: "Waiting for the first trace",
-    description: "Once a trace lands, the next review action will unlock.",
+    description:
+      "Keep the trace page open, run one request, and we will open the trace when it appears.",
   },
   waiting_for_first_trace_sample_available: {
     eyebrow: "Waiting",
@@ -273,9 +286,10 @@ export const ONBOARDING_STAGE_COPY = {
     description: "Use a sample signal while the first real trace is pending.",
   },
   review_first_trace: {
-    eyebrow: "First signal",
+    eyebrow: "First trace",
     title: "First trace received",
-    description: "Review it now and capture the first quality signal.",
+    description:
+      "Review it now to understand latency, cost, and quality context.",
   },
   create_trace_evaluator: {
     eyebrow: "Evaluator",
@@ -311,6 +325,9 @@ export const getStageCopy = (state) =>
 
 export const readableToken = (value) =>
   value ? String(value).replaceAll("_", " ") : "not set";
+
+export const readablePath = (value) =>
+  ONBOARDING_PATH_LABELS[value] || readableToken(value);
 
 const optionFromResponse = (goal) => ({
   id: goal.id || goal.goal,

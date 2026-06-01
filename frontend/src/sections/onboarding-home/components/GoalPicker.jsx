@@ -11,7 +11,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 import { RouterLink } from "src/routes/components";
-import { readableToken } from "../onboarding-home.constants";
+import { readablePath, readableToken } from "../onboarding-home.constants";
 
 export default function GoalPicker({
   goals,
@@ -41,9 +41,10 @@ export default function GoalPicker({
     >
       <Stack spacing={2}>
         <Stack spacing={0.5}>
-          <Typography variant="subtitle2">First goal</Typography>
+          <Typography variant="subtitle2">Choose first setup task</Typography>
           <Typography variant="body2" color="text.secondary">
-            Choose one job. The next step will stay focused on that outcome.
+            Pick one product area. We will open the first product screen and
+            Home will keep the next step ready.
           </Typography>
         </Stack>
 
@@ -110,8 +111,7 @@ export default function GoalPicker({
                     <Stack direction="row" spacing={0.75} flexWrap="wrap">
                       <Chip
                         size="small"
-                        label={readableToken(goal.primaryPath)}
-                        sx={{ textTransform: "capitalize" }}
+                        label={readablePath(goal.primaryPath)}
                       />
                       {goal.estimatedMinutes ? (
                         <Chip
@@ -152,7 +152,7 @@ export default function GoalPicker({
               )
             }
           >
-            Continue
+            Start selected setup
           </Button>
           {skipHref ? (
             <Button

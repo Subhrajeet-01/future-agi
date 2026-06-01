@@ -22,7 +22,7 @@ const OBSERVE_FALLBACK_STEPS = [
   {
     id: "review_first_trace",
     stage: "review_first_trace",
-    label: "Review first signal",
+    label: "Review first trace",
     description: "Inspect latency, cost, input, output, and errors.",
     tourAnchor: "observe_trace_review_link",
   },

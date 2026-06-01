@@ -34,7 +34,7 @@ describe("setup org product-loop quick starts", () => {
       [
         "sample_preview",
         "explore_sample_data",
-        "Explore with sample data",
+        "Preview sample trace",
         "sample",
       ],
     ]);

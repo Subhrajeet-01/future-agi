@@ -185,7 +185,7 @@ export const getObserveOnboardingCopy = (
     return {
       currentStep: "First trace",
       description:
-        "Send one production or test trace to unlock the first review step.",
+        "Keep this page open, run one production or test request, and we will open the trace when it appears.",
       primaryLabel: "Open setup",
       secondaryLabel: "Refresh traces",
       steps: [
@@ -217,7 +217,7 @@ export const getObserveOnboardingCopy = (
     return {
       currentStep: "Trace received",
       description:
-        "Review it now to understand latency, cost, and quality context.",
+        "Review this trace to understand latency, cost, and quality context. Next, create an eval from it.",
       primaryLabel: "Review trace",
       secondaryLabel: "Refresh traces",
       steps: [

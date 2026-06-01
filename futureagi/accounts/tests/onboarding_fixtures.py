@@ -7,10 +7,12 @@ def activation_action(**overrides):
     action = {
         "id": "create_observe_project",
         "kind": "setup",
-        "title": "Connect observability",
-        "description": "Create an observability project and send one request.",
+        "title": "Connect your agent",
+        "description": (
+            "Choose your package, create an Observe project, and send one request."
+        ),
         "href": "/dashboard/observe?setup=true&source=onboarding",
-        "cta_label": "Connect observability",
+        "cta_label": "Create Observe project",
         "estimated_minutes": 5,
         "priority": 100,
         "blocked": False,
@@ -106,7 +108,7 @@ def activation_state_payload(**overrides):
         "available_paths": [
             {
                 "id": "observe",
-                "label": "Monitor a production AI app",
+                "label": "Connect your agent",
                 "description": "Connect traces and inspect quality signals.",
                 "status": "selected",
                 "href": "/dashboard/home?path=observe",
@@ -117,8 +119,8 @@ def activation_state_payload(**overrides):
             },
             {
                 "id": "sample",
-                "label": "Explore with sample data",
-                "description": "Use a sample workspace while real data is pending.",
+                "label": "Preview sample trace",
+                "description": "Inspect a sample trace while real setup is pending.",
                 "status": "available",
                 "href": "/dashboard/home?path=sample",
                 "is_available": True,

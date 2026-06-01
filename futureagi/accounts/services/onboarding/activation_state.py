@@ -24,6 +24,9 @@ from accounts.services.onboarding.lifecycle_eligibility import (
     evaluate_lifecycle_decision,
     lifecycle_preview_from_decision,
 )
+from accounts.services.onboarding.org_completion import (
+    organization_has_completed_product_setup,
+)
 from accounts.services.onboarding.recommendations import (
     WRITE_STAGES,
     resolve_recommended_action,
@@ -64,6 +67,17 @@ def _base_stage(context, flags, signals):
 
 def _stage_for_context(context, flags, signals):
     stage = _base_stage(context, flags, signals)
+    if stage not in {
+        "feature_disabled",
+        "workspace_missing",
+        "activated",
+        "daily_review",
+    } and organization_has_completed_product_setup(
+        context.organization,
+        user=context.user,
+        workspace=context.workspace,
+    ):
+        return "activated"
     if context.permissions["permission_limited"] and stage in WRITE_STAGES:
         return "permission_limited"
     return stage

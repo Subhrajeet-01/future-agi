@@ -8,7 +8,9 @@ import Typography from "@mui/material/Typography";
 import Iconify from "src/components/iconify";
 import { RouterLink } from "src/routes/components";
 import {
+  getStageCopy,
   ONBOARDING_PRODUCT_LOOP_STEPS,
+  readablePath,
   readableToken,
 } from "../onboarding-home.constants";
 
@@ -67,11 +69,12 @@ export default function ProductLoopStepper({
   const fallbackHref = actionHref(fallbackAction);
   const nextAction = primaryHref ? recommendedAction : fallbackAction;
   const nextActionHref = primaryHref || fallbackHref;
-  const nextActionLabel = primaryHref ? "Next step" : "Other setup option";
+  const nextActionLabel = primaryHref ? "Next step" : "Alternate setup";
   const nextActionButtonLabel = primaryHref
     ? "Open next step"
-    : "Open other setup option";
+    : "Open alternate setup";
   const metadata = actionMetadata(nextAction);
+  const stageLabel = stage ? getStageCopy({ stage }).title : null;
 
   return (
     <Stack data-testid="onboarding-product-loop-stepper" spacing={1.5}>
@@ -89,21 +92,12 @@ export default function ProductLoopStepper({
         </Stack>
         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
           {primaryPath ? (
-            <Chip
-              size="small"
-              label={readableToken(primaryPath)}
-              sx={{ textTransform: "capitalize" }}
-            />
+            <Chip size="small" label={readablePath(primaryPath)} />
           ) : null}
           {stage ? (
-            <Chip
-              size="small"
-              variant="outlined"
-              label={readableToken(stage)}
-              sx={{ textTransform: "capitalize" }}
-            />
+            <Chip size="small" variant="outlined" label={stageLabel} />
           ) : null}
-          {goal ? (
+          {goal && !primaryPath ? (
             <Chip
               size="small"
               variant="outlined"

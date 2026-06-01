@@ -59,7 +59,11 @@ describe("ProductLoopStepper", () => {
       ),
     ).toBeVisible();
     expect(screen.getByText("Next step")).toBeVisible();
-    expect(screen.getByText("Connect observability")).toBeVisible();
+    expect(
+      within(screen.getByTestId("product-loop-next-action")).getByText(
+        "Connect your agent",
+      ),
+    ).toBeVisible();
 
     await userEvent.click(
       screen.getByRole("link", { name: /open next step/i }),
@@ -89,10 +93,10 @@ describe("ProductLoopStepper", () => {
       />,
     );
 
-    expect(screen.getByText("Other setup option")).toBeVisible();
+    expect(screen.getByText("Alternate setup")).toBeVisible();
     expect(screen.getByText("Open observe setup")).toBeVisible();
     expect(
-      screen.getByRole("link", { name: /open other setup option/i }),
+      screen.getByRole("link", { name: /open alternate setup/i }),
     ).toHaveAttribute(
       "href",
       "/dashboard/observe?setup=true&source=onboarding",

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { renderWithRouter, screen, within } from "src/utils/test-utils";
 
 import NewObserve from "./NewObserve";
@@ -62,6 +63,33 @@ const codeBlockFixture = {
   instruments: [],
 };
 
+const codeBlockWithInstrumentsFixture = {
+  ...codeBlockFixture,
+  instruments: {
+    anthropic: {
+      name: "Anthropic",
+      Python: {
+        code: "from traceai_anthropic import AnthropicInstrumentor",
+      },
+      TypeScript: {
+        code: 'import { AnthropicInstrumentation } from "@traceai/anthropic";',
+      },
+    },
+    openai: {
+      name: "OpenAI",
+      Python: {
+        code: "from traceai_openai import OpenAIInstrumentor",
+      },
+      TypeScript: {
+        code: 'import { OpenAIInstrumentation } from "@traceai/openai";',
+      },
+    },
+  },
+};
+
+const returnToFromApiKeyHref = (href) =>
+  new URLSearchParams(href.split("?")[1]).get("return_to");
+
 describe("NewObserve onboarding setup", () => {
   it("renders a compact first-trace guide before the full setup reference", () => {
     mocks.useQuery.mockReturnValue({
@@ -110,17 +138,21 @@ describe("NewObserve onboarding setup", () => {
       "href",
       "/dashboard/settings/api_keys?source=onboarding&target=observe_first_trace&action=create&key_name=Observe+first+trace&return_to=%2Fdashboard%2Fobserve%3Fsetup%3Dtrue%26source%3Donboarding%26credential_step%3Ddone",
     );
-    expect(
-      within(guide).getByText("from futureagi import trace"),
-    ).toBeVisible();
     expect(within(guide).getByLabelText("Copy install command")).toBeVisible();
     expect(within(guide).getByLabelText("Copy project keys")).toBeVisible();
-    expect(within(guide).getByLabelText("Copy tracing setup")).toBeVisible();
+    expect(
+      within(guide).getByLabelText("Copy project registration"),
+    ).toBeVisible();
+    expect(
+      within(guide).getByLabelText("Copy package instrumentation"),
+    ).toBeVisible();
     expect(
       within(guide).getByTestId("observe-setup-verification"),
     ).toHaveTextContent("Checking for your first trace");
-    expect(screen.getByText("Full setup reference")).toBeVisible();
-    expect(screen.getByText("Instrumentation options")).toBeVisible();
+    expect(screen.queryByText("Full setup reference")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Instrumentation options"),
+    ).not.toBeInTheDocument();
   });
 
   it("acknowledges copied credentials after returning from key creation", () => {
@@ -154,6 +186,106 @@ describe("NewObserve onboarding setup", () => {
     ).toBeVisible();
     expect(
       within(guide).getByRole("link", { name: /Create another key/i }),
+    ).toBeVisible();
+  });
+
+  it("shows package-specific instrumentation for the selected provider", async () => {
+    mocks.useQuery.mockReturnValue({
+      data: codeBlockWithInstrumentsFixture,
+      error: null,
+      isLoading: false,
+      isSuccess: true,
+    });
+
+    renderWithRouter(<NewObserve showFirstTraceGuide />, {
+      route:
+        "/dashboard/observe?setup=true&source=onboarding&provider=anthropic",
+    });
+
+    const guide = screen.getByTestId("observe-first-trace-guide");
+    expect(screen.getByTestId("observe-instrument-picker")).toBeVisible();
+    expect(
+      within(guide).getByRole("button", { name: /anthropic/i }),
+    ).toBeVisible();
+    expect(within(guide).getByText("1. Install Anthropic")).toBeVisible();
+    expect(
+      within(guide).getByText("pip install traceAI-anthropic"),
+    ).toBeVisible();
+    expect(
+      within(guide).getByText(
+        "from traceai_anthropic import AnthropicInstrumentor",
+      ),
+    ).toBeVisible();
+
+    await userEvent.click(
+      within(guide).getByRole("tab", { name: /typescript/i }),
+    );
+
+    expect(
+      within(guide).getByText(
+        "npm install @traceai/fi-core @traceai/anthropic @opentelemetry/instrumentation",
+      ),
+    ).toBeVisible();
+    expect(
+      within(guide).getByText(
+        'import { AnthropicInstrumentation } from "@traceai/anthropic";',
+      ),
+    ).toBeVisible();
+    expect(
+      returnToFromApiKeyHref(
+        within(guide)
+          .getByRole("link", { name: /Create API key/i })
+          .getAttribute("href"),
+      ),
+    ).toBe(
+      "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=typescript",
+    );
+
+    await userEvent.click(
+      within(guide).getByRole("button", { name: /^openai$/i }),
+    );
+
+    expect(await within(guide).findByText("1. Install OpenAI")).toBeVisible();
+    expect(
+      within(guide).getByText(
+        "npm install @traceai/fi-core @traceai/openai @opentelemetry/instrumentation",
+      ),
+    ).toBeVisible();
+    expect(
+      returnToFromApiKeyHref(
+        within(guide)
+          .getByRole("link", { name: /Create API key/i })
+          .getAttribute("href"),
+      ),
+    ).toBe(
+      "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=openai&language=typescript",
+    );
+  });
+
+  it("restores selected package and language after API key handoff", () => {
+    mocks.useQuery.mockReturnValue({
+      data: codeBlockWithInstrumentsFixture,
+      error: null,
+      isLoading: false,
+      isSuccess: true,
+    });
+
+    renderWithRouter(<NewObserve showFirstTraceGuide />, {
+      route:
+        "/dashboard/observe?setup=true&source=onboarding&provider=anthropic&language=typescript",
+    });
+
+    const guide = screen.getByTestId("observe-first-trace-guide");
+    expect(within(guide).getByText("1. Install Anthropic")).toBeVisible();
+    expect(
+      within(guide).getByText(
+        "npm install @traceai/fi-core @traceai/anthropic @opentelemetry/instrumentation",
+      ),
+    ).toBeVisible();
+    expect(
+      within(guide).getByText(
+        'import { AnthropicInstrumentation } from "@traceai/anthropic";',
+      ),
     ).toBeVisible();
   });
 });

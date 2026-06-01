@@ -29,10 +29,10 @@ export default function ObserveSetupPanel({
   const nextStep = steps[currentStepIndex + 1] || null;
   const actionStep = currentStep || {
     stage,
-    label: action?.title || "Connect observability",
+    label: action?.title || "Connect your agent",
     description:
       action?.description ||
-      "Create the observe project and prepare the first trace.",
+      "Choose your package, create an Observe project, and send one trace.",
     tourAnchor: "observe_create_project_button",
   };
   const actionSlot = (

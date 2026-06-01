@@ -44,7 +44,7 @@ export default function ObserveOnboardingFocusPanel({
       >
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Chip size="small" label="Observe onboarding" />
+            <Chip size="small" label="Observe setup" />
             {currentStep ? (
               <Chip size="small" variant="outlined" label={currentStep} />
             ) : null}

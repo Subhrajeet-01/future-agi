@@ -12,31 +12,55 @@ const pathsFixture = () =>
 describe("PathCardGrid", () => {
   it("renders path options and tracks available path clicks", async () => {
     const onPathClick = vi.fn();
-    render(<PathCardGrid paths={pathsFixture()} onPathClick={onPathClick} />);
+    const promptPath = {
+      id: "prompt",
+      label: "Test prompts or agent prompts",
+      description: "Create, test, and compare prompt versions.",
+      status: "available",
+      href: "/dashboard/home?path=prompt",
+      isAvailable: true,
+      blockedReason: null,
+      requiresPermission: "prompt:write",
+      firstActionId: "create_prompt",
+    };
+
+    render(
+      <PathCardGrid
+        paths={[...pathsFixture(), promptPath]}
+        onPathClick={onPathClick}
+      />,
+    );
 
     expect(screen.getByText("Connect your agent")).toBeVisible();
-    expect(screen.getByRole("button", { name: /current/i })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: /focus/i }));
+    expect(
+      screen.getByRole("button", { name: /current setup/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /preview only/i }),
+    ).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /choose this/i }));
 
     expect(onPathClick).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "sample" }),
+      expect.objectContaining({ id: "prompt" }),
     );
   });
 
   it("disables unavailable paths", () => {
-    render(
-      <PathCardGrid
-        paths={[
-          {
-            ...pathsFixture()[1],
-            isAvailable: false,
-            blockedReason: "route_not_implemented",
-          },
-        ]}
-      />,
-    );
+    const promptPath = {
+      id: "prompt",
+      label: "Test prompts or agent prompts",
+      description: "Create, test, and compare prompt versions.",
+      status: "hidden",
+      href: "/dashboard/home?path=prompt",
+      isAvailable: false,
+      blockedReason: "route_not_implemented",
+      requiresPermission: "prompt:write",
+      firstActionId: "create_prompt",
+    };
 
-    expect(screen.getByText("route not implemented")).toBeVisible();
+    render(<PathCardGrid paths={[promptPath]} />);
+
+    expect(screen.getByText("This setup path is not ready yet.")).toBeVisible();
     expect(screen.getByRole("button", { name: /unavailable/i })).toBeDisabled();
   });
 });

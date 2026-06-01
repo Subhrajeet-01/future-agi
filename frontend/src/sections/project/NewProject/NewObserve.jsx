@@ -4,14 +4,13 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   LinearProgress,
   Stack,
   Typography,
   useTheme,
 } from "@mui/material";
 import PropTypes from "prop-types";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Events, handleOnDocsClicked, trackEvent } from "src/utils/Mixpanel";
 import { useQuery } from "@tanstack/react-query";
@@ -34,28 +33,43 @@ const CODE_SECTION_ALIASES = {
   projectAddCode: "project_add_code",
 };
 
-const OBSERVE_ONBOARDING_SETUP_RETURN_HREF =
-  "/dashboard/observe?setup=true&source=onboarding&credential_step=done";
+const LANGUAGE_VALUES = new Set(["python", "typescript"]);
 
-const API_KEYS_ONBOARDING_PARAMS = new URLSearchParams({
-  source: "onboarding",
-  target: "observe_first_trace",
-  action: "create",
-  key_name: "Observe first trace",
-  return_to: OBSERVE_ONBOARDING_SETUP_RETURN_HREF,
-});
-const API_KEYS_ONBOARDING_HREF = `${paths.dashboard.settings.apiKeys}?${API_KEYS_ONBOARDING_PARAMS.toString()}`;
+const onboardingSetupReturnHref = ({ instrumentId, language } = {}) => {
+  const params = new URLSearchParams({
+    setup: "true",
+    source: "onboarding",
+    credential_step: "done",
+  });
+  if (instrumentId) params.set("provider", instrumentId);
+  if (instrumentId && LANGUAGE_VALUES.has(language)) {
+    params.set("language", language);
+  }
+  return `/dashboard/observe?${params.toString()}`;
+};
+
+const apiKeysOnboardingHref = ({ instrumentId, language } = {}) => {
+  const params = new URLSearchParams({
+    source: "onboarding",
+    target: "observe_first_trace",
+    action: "create",
+    key_name: "Observe first trace",
+    return_to: onboardingSetupReturnHref({ instrumentId, language }),
+  });
+  return `${paths.dashboard.settings.apiKeys}?${params.toString()}`;
+};
 
 const FIRST_TRACE_STEPS = [
   {
     id: "install",
     label: "Install",
-    description: "Add the tracing package to the app you want to inspect.",
+    description: "Choose the package your app uses and install its tracer.",
   },
   {
     id: "instrument",
     label: "Instrument",
-    description: "Load the project keys before your app handles a request.",
+    description:
+      "Load keys and register tracing before your app handles a request.",
   },
   {
     id: "run",
@@ -63,6 +77,57 @@ const FIRST_TRACE_STEPS = [
     description: "Trigger one real or test request and keep this page open.",
   },
 ];
+
+const SETUP_INSTRUMENT_PRIORITY = [
+  "openai",
+  "anthropic",
+  "langchain",
+  "openai_agents",
+  "llamaindex",
+  "bedrock",
+  "mcp",
+];
+
+const INSTRUMENT_INSTALL_COMMANDS = {
+  python: {
+    anthropic: "pip install traceAI-anthropic",
+    bedrock: "pip install traceAI-bedrock",
+    langchain: "pip install traceAI-langchain",
+    mcp: "pip install traceAI-mcp",
+    openai: "pip install traceAI-openai",
+    openai_agents: "pip install traceAI-openai-agents",
+  },
+  typescript: {
+    anthropic:
+      "npm install @traceai/fi-core @traceai/anthropic @opentelemetry/instrumentation",
+    langchain:
+      "npm install @traceai/fi-core @traceai/langchain @opentelemetry/instrumentation",
+    mcp: "npm install @traceai/fi-core @traceai/mcp @opentelemetry/instrumentation",
+    openai:
+      "npm install @traceai/fi-core @traceai/openai @opentelemetry/instrumentation",
+    openai_agents:
+      "npm install @traceai/fi-core @traceai/openai-agents @opentelemetry/instrumentation",
+  },
+};
+
+const languageDataKey = (language) =>
+  language === "typescript" ? "TypeScript" : "Python";
+
+const instrumentSupportsLanguage = (instrument, language) =>
+  Boolean(instrument?.[languageDataKey(language)]?.code);
+
+const availableInstrumentLanguages = (instrument) =>
+  ["python", "typescript"].filter((language) =>
+    instrumentSupportsLanguage(instrument, language),
+  );
+
+const firstInstrumentLanguage = (instrument) =>
+  availableInstrumentLanguages(instrument)[0] || "python";
+
+const instrumentSortRank = (id) => {
+  const index = SETUP_INSTRUMENT_PRIORITY.indexOf(id);
+  return index === -1 ? SETUP_INSTRUMENT_PRIORITY.length : index;
+};
 
 const VerificationAlert = ({ setupVerification }) => {
   if (!setupVerification) return null;
@@ -114,8 +179,15 @@ VerificationAlert.propTypes = {
 const FirstTraceSetupGuide = ({
   credentialsCopied,
   getCodeBySection,
+  instrumentCode,
+  instrumentInstallCode,
+  instrumentOptions,
+  apiKeysHref,
   languageTab,
   onLanguageChange,
+  onInstrumentChange,
+  selectedInstrument,
+  selectedInstrumentLanguage,
   setupVerification,
   tabOptions,
   tabWrapperStyles,
@@ -124,7 +196,8 @@ const FirstTraceSetupGuide = ({
   const statusLabel =
     setupVerification?.status === "ready"
       ? "Trace detected"
-      : "Live check running";
+      : "Checking for trace";
+  const selectedInstrumentLabel = selectedInstrument?.name || "your package";
 
   return (
     <Box
@@ -151,8 +224,8 @@ const FirstTraceSetupGuide = ({
             </Stack>
             <Typography variant="h6">Send one trace, then review it</Typography>
             <Typography variant="body2" color="text.secondary" maxWidth={720}>
-              Use the minimal setup below, run one request, and FutureAGI will
-              move you to trace review when the signal arrives.
+              Use the setup below, run one request, and keep this page open. We
+              will check every few seconds and open the trace when it appears.
             </Typography>
           </Stack>
 
@@ -181,6 +254,54 @@ const FirstTraceSetupGuide = ({
             </CustomTabs>
           </TabWrapper>
         </Stack>
+
+        {instrumentOptions.length ? (
+          <Stack spacing={1}>
+            <Stack spacing={0.25}>
+              <Typography variant="subtitle2">
+                Which package does your app use?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Pick the library that creates the model calls. The code below
+                changes to that package.
+              </Typography>
+            </Stack>
+            <Stack
+              direction="row"
+              spacing={1}
+              flexWrap="wrap"
+              useFlexGap
+              data-testid="observe-instrument-picker"
+            >
+              {instrumentOptions.map((instrument) => {
+                const isSelected = instrument.id === selectedInstrument?.id;
+                return (
+                  <Button
+                    key={instrument.id}
+                    size="small"
+                    variant={isSelected ? "contained" : "outlined"}
+                    color={isSelected ? "primary" : "inherit"}
+                    onClick={() => onInstrumentChange(instrument.id)}
+                    data-testid={`observe-instrument-option-${instrument.id}`}
+                    startIcon={
+                      instrument.logo ? (
+                        <Box
+                          component="img"
+                          src={instrument.logo}
+                          alt=""
+                          sx={{ width: 18, height: 18, objectFit: "contain" }}
+                        />
+                      ) : null
+                    }
+                    sx={{ textTransform: "none" }}
+                  >
+                    {instrument.name}
+                  </Button>
+                );
+              })}
+            </Stack>
+          </Stack>
+        ) : null}
 
         <Box
           data-testid="observe-first-trace-steps"
@@ -224,11 +345,13 @@ const FirstTraceSetupGuide = ({
           }}
         >
           <Stack spacing={1} sx={{ minWidth: 0 }}>
-            <Typography variant="subtitle2">1. Install package</Typography>
+            <Typography variant="subtitle2">
+              1. Install {selectedInstrumentLabel}
+            </Typography>
             <InstructionCodeCopy
               ariaLabel="Copy install command"
-              text={getCodeBySection("installationGuide")}
-              language={languageTab}
+              text={instrumentInstallCode}
+              language={selectedInstrumentLanguage}
             />
           </Stack>
           <Stack spacing={1} sx={{ minWidth: 0 }}>
@@ -238,12 +361,14 @@ const FirstTraceSetupGuide = ({
               alignItems={{ xs: "flex-start", sm: "center" }}
               justifyContent="space-between"
             >
-              <Typography variant="subtitle2">2. Load project keys</Typography>
+              <Typography variant="subtitle2">
+                2. Load keys and register project
+              </Typography>
               <Button
                 size="small"
                 variant="outlined"
                 component={RouterLink}
-                href={API_KEYS_ONBOARDING_HREF}
+                href={apiKeysHref}
                 startIcon={<Iconify icon="mdi:key-outline" width={16} />}
                 sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
               >
@@ -267,15 +392,24 @@ const FirstTraceSetupGuide = ({
               text={getCodeBySection("keys")}
               language={languageTab}
             />
+            <InstructionCodeCopy
+              ariaLabel="Copy project registration"
+              text={getCodeBySection("projectAddCode")}
+              language={languageTab}
+            />
           </Stack>
           <Stack spacing={1} sx={{ minWidth: 0 }}>
             <Typography variant="subtitle2">
-              3. Add tracing before your app runs
+              3. Add {selectedInstrumentLabel} instrumentation
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Add this before importing or creating the client, then run one
+              request in your app.
             </Typography>
             <InstructionCodeCopy
-              ariaLabel="Copy tracing setup"
-              text={getCodeBySection("projectAddCode")}
-              language={languageTab}
+              ariaLabel="Copy package instrumentation"
+              text={instrumentCode}
+              language={selectedInstrumentLanguage}
             />
           </Stack>
         </Box>
@@ -289,8 +423,21 @@ const FirstTraceSetupGuide = ({
 FirstTraceSetupGuide.propTypes = {
   credentialsCopied: PropTypes.bool,
   getCodeBySection: PropTypes.func.isRequired,
+  instrumentCode: PropTypes.string.isRequired,
+  instrumentInstallCode: PropTypes.string.isRequired,
+  instrumentOptions: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      logo: PropTypes.string,
+      name: PropTypes.string.isRequired,
+    }),
+  ).isRequired,
+  apiKeysHref: PropTypes.string.isRequired,
   languageTab: PropTypes.string.isRequired,
   onLanguageChange: PropTypes.func.isRequired,
+  onInstrumentChange: PropTypes.func.isRequired,
+  selectedInstrument: PropTypes.object,
+  selectedInstrumentLanguage: PropTypes.string.isRequired,
   setupVerification: VerificationAlert.propTypes.setupVerification,
   tabOptions: PropTypes.arrayOf(
     PropTypes.shape({
@@ -305,11 +452,24 @@ FirstTraceSetupGuide.propTypes = {
 
 const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
   const theme = useTheme();
-  const [languageTab, setLanguageTab] = useState("python");
   const [searchParams] = useSearchParams();
+  const requestedLanguage =
+    searchParams.get("language") || searchParams.get("lang");
+  const initialLanguage = LANGUAGE_VALUES.has(requestedLanguage)
+    ? requestedLanguage
+    : "python";
+  const [languageTab, setLanguageTab] = useState(initialLanguage);
   const credentialsCopied =
     searchParams.get("credential_step") === "done" &&
     searchParams.get("source") === "onboarding";
+  const requestedInstrumentId =
+    searchParams.get("instrument") ||
+    searchParams.get("package") ||
+    searchParams.get("provider");
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState(
+    requestedInstrumentId || null,
+  );
+  const requestedInstrumentAppliedRef = useRef(null);
   const {
     data: keysData,
     isSuccess,
@@ -328,7 +488,7 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
 
   const tabOptions = [
     { label: "Python", value: "python", disabled: false },
-    { label: "Typescript", value: "typescript", disabled: false },
+    { label: "TypeScript", value: "typescript", disabled: false },
   ];
 
   const tabWrapperStyles = useMemo(
@@ -348,8 +508,100 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
   const getCodeBySection = (section) => {
     const languageKey = languageTab === "python" ? "Python" : "TypeScript";
     const sectionData =
-      keysData[section] || keysData[CODE_SECTION_ALIASES[section]];
+      keysData?.[section] || keysData?.[CODE_SECTION_ALIASES[section]];
     return cleanCode(sectionData?.[languageKey]);
+  };
+
+  const instrumentOptions = useMemo(
+    () =>
+      Object.entries(keysData?.instruments || {})
+        .map(([id, instrument]) => ({
+          id,
+          ...instrument,
+        }))
+        .filter((instrument) => availableInstrumentLanguages(instrument).length)
+        .sort((left, right) => {
+          const rankDiff =
+            instrumentSortRank(left.id) - instrumentSortRank(right.id);
+          if (rankDiff !== 0) return rankDiff;
+          return String(left.name).localeCompare(String(right.name));
+        }),
+    [keysData?.instruments],
+  );
+  const selectedInstrument = useMemo(() => {
+    if (!instrumentOptions.length) return null;
+    return (
+      instrumentOptions.find(
+        (instrument) => instrument.id === selectedInstrumentId,
+      ) || instrumentOptions[0]
+    );
+  }, [instrumentOptions, selectedInstrumentId]);
+  const selectedInstrumentLanguage = instrumentSupportsLanguage(
+    selectedInstrument,
+    languageTab,
+  )
+    ? languageTab
+    : firstInstrumentLanguage(selectedInstrument);
+  const selectedInstrumentLanguageKey = languageDataKey(
+    selectedInstrumentLanguage,
+  );
+  const instrumentCode = cleanCode(
+    selectedInstrument?.[selectedInstrumentLanguageKey]?.code ||
+      getCodeBySection("projectAddCode"),
+  );
+  const instrumentInstallCode =
+    INSTRUMENT_INSTALL_COMMANDS[selectedInstrumentLanguage]?.[
+      selectedInstrument?.id
+    ] || getCodeBySection("installationGuide");
+  const apiKeysHref = apiKeysOnboardingHref({
+    instrumentId: selectedInstrument?.id,
+    language: selectedInstrumentLanguage,
+  });
+  const firstTraceTabOptions = tabOptions.map((tab) => ({
+    ...tab,
+    disabled: selectedInstrument
+      ? !instrumentSupportsLanguage(selectedInstrument, tab.value)
+      : tab.disabled,
+  }));
+
+  useEffect(() => {
+    if (!instrumentOptions.length) return;
+    const requestedOption = instrumentOptions.find(
+      (instrument) => instrument.id === requestedInstrumentId,
+    );
+    const currentOption = instrumentOptions.find(
+      (instrument) => instrument.id === selectedInstrumentId,
+    );
+    if (
+      requestedOption &&
+      requestedInstrumentAppliedRef.current !== requestedInstrumentId
+    ) {
+      requestedInstrumentAppliedRef.current = requestedInstrumentId;
+      setSelectedInstrumentId(requestedOption.id);
+      return;
+    }
+    if (!currentOption) {
+      setSelectedInstrumentId(instrumentOptions[0].id);
+    }
+  }, [instrumentOptions, requestedInstrumentId, selectedInstrumentId]);
+
+  useEffect(() => {
+    if (!selectedInstrument) return;
+    if (instrumentSupportsLanguage(selectedInstrument, languageTab)) return;
+    setLanguageTab(firstInstrumentLanguage(selectedInstrument));
+  }, [languageTab, selectedInstrument]);
+
+  const handleInstrumentChange = (instrumentId) => {
+    const nextInstrument = instrumentOptions.find(
+      (instrument) => instrument.id === instrumentId,
+    );
+    setSelectedInstrumentId(instrumentId);
+    if (
+      nextInstrument &&
+      !instrumentSupportsLanguage(nextInstrument, languageTab)
+    ) {
+      setLanguageTab(firstInstrumentLanguage(nextInstrument));
+    }
   };
 
   return (
@@ -374,140 +626,144 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
             <FirstTraceSetupGuide
               credentialsCopied={credentialsCopied}
               getCodeBySection={getCodeBySection}
+              instrumentCode={instrumentCode}
+              instrumentInstallCode={instrumentInstallCode}
+              instrumentOptions={instrumentOptions}
+              apiKeysHref={apiKeysHref}
               languageTab={languageTab}
               onLanguageChange={setLanguageTab}
+              onInstrumentChange={handleInstrumentChange}
+              selectedInstrument={selectedInstrument}
+              selectedInstrumentLanguage={selectedInstrumentLanguage}
               setupVerification={setupVerification}
-              tabOptions={tabOptions}
+              tabOptions={firstTraceTabOptions}
               tabWrapperStyles={tabWrapperStyles}
               theme={theme}
             />
           ) : null}
 
-          {showFirstTraceGuide ? (
-            <Stack spacing={0.5}>
-              <Divider />
-              <Typography variant="subtitle2">Full setup reference</Typography>
-            </Stack>
+          {!showFirstTraceGuide ? (
+            <>
+              {/* Installation & Keys Section */}
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <InstructionTitle
+                  title="Install Dependencies"
+                  description="For more instructions, checkout our "
+                  url="https://docs.futureagi.com/docs/observe"
+                  urltext="Docs"
+                  onUrlClick={() => handleOnDocsClicked("observe_page")}
+                />
+
+                <InstructionTitle description="Configure your application to send traces to Future AGI" />
+
+                {/* Tab selector for installation */}
+                <TabWrapper sx={tabWrapperStyles}>
+                  <CustomTabs
+                    textColor="primary"
+                    value={languageTab}
+                    onChange={(e, value) => setLanguageTab(value)}
+                    TabIndicatorProps={{
+                      style: {
+                        backgroundColor: theme.palette.primary.main,
+                        opacity: 0.08,
+                        height: "100%",
+                        borderRadius: "8px",
+                      },
+                    }}
+                  >
+                    {tabOptions.map((tab) => (
+                      <CustomTab
+                        key={`config-${tab.value}`}
+                        label={tab.label}
+                        value={tab.value}
+                        disabled={tab.disabled}
+                      />
+                    ))}
+                  </CustomTabs>
+                </TabWrapper>
+
+                <InstructionCodeCopy
+                  ariaLabel="Copy install command"
+                  text={getCodeBySection("installationGuide")}
+                  language={languageTab}
+                  // onCopy={() => trackEvent(Events.installDependenciesCopied)}
+                />
+
+                {/* API Keys */}
+                <Box sx={{ mt: 1.5 }}>
+                  <InstructionTitle
+                    title="Load API keys"
+                    description="load your API keys"
+                  />
+                </Box>
+
+                <InstructionCodeCopy
+                  ariaLabel="Copy API keys"
+                  text={getCodeBySection("keys")}
+                  language={languageTab}
+                  onCopy={() => trackEvent(Events.apikeys)}
+                />
+              </Box>
+
+              {/* Telemetry Section with its own tab control */}
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <InstructionTitle
+                  title="Setup Telemetry"
+                  description="Register your application to send traces to this project. The code should be added BEFORE any code execution."
+                />
+
+                {/* Separate tab selector for telemetry */}
+                <TabWrapper sx={tabWrapperStyles}>
+                  <CustomTabs
+                    textColor="primary"
+                    value={languageTab}
+                    onChange={(e, value) => setLanguageTab(value)}
+                    TabIndicatorProps={{
+                      style: {
+                        backgroundColor: theme.palette.primary.main,
+                        opacity: 0.08,
+                        height: "100%",
+                        borderRadius: "8px",
+                      },
+                    }}
+                  >
+                    {tabOptions.map((tab) => (
+                      <CustomTab
+                        key={`telemetry-${tab.value}`}
+                        label={tab.label}
+                        value={tab.value}
+                        disabled={tab.disabled}
+                      />
+                    ))}
+                  </CustomTabs>
+                </TabWrapper>
+
+                <InstructionCodeCopy
+                  ariaLabel="Copy telemetry setup"
+                  text={getCodeBySection("projectAddCode")}
+                  language={languageTab}
+                  // onCopy={() => trackEvent(Events.setupTelemetryCopied)}
+                />
+              </Box>
+
+              {/* Instruments Section */}
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <InstructionTitle
+                  title="Setup Instrumentation"
+                  description="Add tracing instrumentation to give you observability into your application."
+                />
+
+                <ObserveInstruments
+                  data={keysData?.instruments}
+                  isLoading={isLoading}
+                  isSuccess={isSuccess}
+                  error={error}
+                  languageTab={languageTab}
+                  onLanguageChange={setLanguageTab}
+                />
+              </Box>
+            </>
           ) : null}
-
-          {/* Installation & Keys Section */}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <InstructionTitle
-              title="Install Dependencies"
-              description="For more instructions, checkout our "
-              url="https://docs.futureagi.com/docs/observe"
-              urltext="Docs"
-              onUrlClick={() => handleOnDocsClicked("observe_page")}
-            />
-
-            <InstructionTitle description="Configure your application to send traces to Future AGI" />
-
-            {/* Tab selector for installation */}
-            <TabWrapper sx={tabWrapperStyles}>
-              <CustomTabs
-                textColor="primary"
-                value={languageTab}
-                onChange={(e, value) => setLanguageTab(value)}
-                TabIndicatorProps={{
-                  style: {
-                    backgroundColor: theme.palette.primary.main,
-                    opacity: 0.08,
-                    height: "100%",
-                    borderRadius: "8px",
-                  },
-                }}
-              >
-                {tabOptions.map((tab) => (
-                  <CustomTab
-                    key={`config-${tab.value}`}
-                    label={tab.label}
-                    value={tab.value}
-                    disabled={tab.disabled}
-                  />
-                ))}
-              </CustomTabs>
-            </TabWrapper>
-
-            <InstructionCodeCopy
-              ariaLabel="Copy install command"
-              text={getCodeBySection("installationGuide")}
-              language={languageTab}
-              // onCopy={() => trackEvent(Events.installDependenciesCopied)}
-            />
-
-            {/* API Keys */}
-            <Box sx={{ mt: 1.5 }}>
-              <InstructionTitle
-                title="Load API keys"
-                description="load your API keys"
-              />
-            </Box>
-
-            <InstructionCodeCopy
-              ariaLabel="Copy API keys"
-              text={getCodeBySection("keys")}
-              language={languageTab}
-              onCopy={() => trackEvent(Events.apikeys)}
-            />
-          </Box>
-
-          {/* Telemetry Section with its own tab control */}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <InstructionTitle
-              title="Setup Telemetry"
-              description="Register your application to send traces to this project. The code should be added BEFORE any code execution."
-            />
-
-            {/* Separate tab selector for telemetry */}
-            <TabWrapper sx={tabWrapperStyles}>
-              <CustomTabs
-                textColor="primary"
-                value={languageTab}
-                onChange={(e, value) => setLanguageTab(value)}
-                TabIndicatorProps={{
-                  style: {
-                    backgroundColor: theme.palette.primary.main,
-                    opacity: 0.08,
-                    height: "100%",
-                    borderRadius: "8px",
-                  },
-                }}
-              >
-                {tabOptions.map((tab) => (
-                  <CustomTab
-                    key={`telemetry-${tab.value}`}
-                    label={tab.label}
-                    value={tab.value}
-                    disabled={tab.disabled}
-                  />
-                ))}
-              </CustomTabs>
-            </TabWrapper>
-
-            <InstructionCodeCopy
-              ariaLabel="Copy telemetry setup"
-              text={getCodeBySection("projectAddCode")}
-              language={languageTab}
-              // onCopy={() => trackEvent(Events.setupTelemetryCopied)}
-            />
-          </Box>
-
-          {/* Instruments Section */}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-            <InstructionTitle
-              title="Setup Instrumentation"
-              description="Add tracing instrumentation to give you observability into your application."
-            />
-
-            <ObserveInstruments
-              data={keysData?.instruments}
-              isLoading={isLoading}
-              isSuccess={isSuccess}
-              error={error}
-              languageTab={languageTab}
-              onLanguageChange={setLanguageTab}
-            />
-          </Box>
         </>
       ) : null}
     </Box>
