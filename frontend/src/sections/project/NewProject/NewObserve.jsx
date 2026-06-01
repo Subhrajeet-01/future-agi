@@ -555,8 +555,8 @@ const FirstTraceSetupGuide = ({
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Use this smoke test if you do not have a local request ready. The
-              next screen waits for the trace, opens it, then points you to eval
-              setup.
+              next screen waits for the trace, opens it, then points you to
+              evaluator setup.
             </Typography>
             <InstructionCodeCopy
               ariaLabel="Copy package smoke test"

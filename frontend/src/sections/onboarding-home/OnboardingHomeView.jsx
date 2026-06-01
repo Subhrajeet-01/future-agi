@@ -127,6 +127,45 @@ const actionWithSetupQuickStartAttribution = (action, context) => {
   return href === action.href ? action : { ...action, href };
 };
 
+const OBSERVE_SETUP_PROVIDERS = new Set([
+  "anthropic",
+  "bedrock",
+  "langchain",
+  "llamaindex",
+  "mcp",
+  "openai",
+  "openai_agents",
+]);
+const OBSERVE_SETUP_PROVIDER_ALIASES = {
+  "llama-index": "llamaindex",
+  llama_index: "llamaindex",
+  "openai-agents": "openai_agents",
+  openaiagents: "openai_agents",
+};
+const OBSERVE_SETUP_LANGUAGES = new Set(["python", "typescript"]);
+const OBSERVE_SETUP_ACTION_IDS = new Set([
+  "create_observe_project",
+  "open_observe_setup_fallback",
+  "review_first_trace",
+  "send_first_trace",
+  "create_trace_evaluator",
+]);
+
+const normalizeObserveSetupValue = (value) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const normalizeObserveSetupProvider = (value) => {
+  const normalizedValue = normalizeObserveSetupValue(value);
+  const canonicalValue =
+    OBSERVE_SETUP_PROVIDER_ALIASES[normalizedValue] || normalizedValue;
+  return OBSERVE_SETUP_PROVIDERS.has(canonicalValue) ? canonicalValue : null;
+};
+
+const normalizeObserveSetupLanguage = (value) => {
+  const normalizedValue = normalizeObserveSetupValue(value);
+  return OBSERVE_SETUP_LANGUAGES.has(normalizedValue) ? normalizedValue : null;
+};
+
 const SETUP_QUICK_START_ERROR_FALLBACKS = {
   agent: {
     description: "Create one agent, run a scenario, and review the result.",
@@ -269,6 +308,52 @@ const hrefWithParams = (href, values = {}) => {
   }`;
 };
 
+const actionTargetsObserveSetup = (action) => {
+  if (!action?.href) return false;
+
+  const targetPath =
+    action.analytics?.targetPath || action.analytics?.target_path || null;
+  if (targetPath === "observe") return true;
+  if (OBSERVE_SETUP_ACTION_IDS.has(action.id)) return true;
+  if (action.href.startsWith("/dashboard/observe")) return true;
+
+  try {
+    const url = new URL(action.href, "https://futureagi.local");
+    return (
+      url.pathname === "/dashboard/evaluations/create" &&
+      url.searchParams.get("source_type") === "trace_project"
+    );
+  } catch {
+    return false;
+  }
+};
+
+const actionWithSetupContext = (action, context) => {
+  const attributedAction = actionWithSetupQuickStartAttribution(
+    action,
+    context,
+  );
+  if (!attributedAction?.href || !actionTargetsObserveSetup(attributedAction)) {
+    return attributedAction;
+  }
+
+  const setupProvider = normalizeObserveSetupProvider(
+    context?.setupProvider || context?.setup_provider,
+  );
+  const setupLanguage = normalizeObserveSetupLanguage(
+    context?.setupLanguage || context?.setup_language,
+  );
+  if (!setupProvider && !setupLanguage) return attributedAction;
+
+  const href = hrefWithParams(attributedAction.href, {
+    ...(setupProvider ? { provider: setupProvider } : {}),
+    ...(setupLanguage ? { language: setupLanguage } : {}),
+  });
+  return href === attributedAction.href
+    ? attributedAction
+    : { ...attributedAction, href };
+};
+
 const sampleConnectRealDataHref = (href) =>
   hrefWithJourneyGuide(
     hrefWithParams(href || "/dashboard/observe", {
@@ -355,6 +440,14 @@ export default function OnboardingHomeView() {
       staleReason: params.get("stale_reason"),
       contextStatus: params.get("context_status"),
       mode: params.get("mode"),
+      setupProvider: normalizeObserveSetupProvider(
+        params.get("provider") ||
+          params.get("package") ||
+          params.get("instrument"),
+      ),
+      setupLanguage: normalizeObserveSetupLanguage(
+        params.get("language") || params.get("lang"),
+      ),
       ...quickStartAttribution,
     };
   }, [location.search]);
@@ -446,6 +539,8 @@ export default function OnboardingHomeView() {
       link_issued_at: searchContext.linkIssuedAt,
       stale_reason: searchContext.staleReason,
       context_status: searchContext.contextStatus,
+      setup_provider: searchContext.setupProvider,
+      setup_language: searchContext.setupLanguage,
       quick_start_goal: searchContext.quickStartGoal,
       quick_start_id: searchContext.quickStartId,
       quick_start_primary_path: searchContext.quickStartPrimaryPath,
@@ -467,6 +562,8 @@ export default function OnboardingHomeView() {
     searchContext.emailKey,
     searchContext.emailStatus,
     searchContext.linkIssuedAt,
+    searchContext.setupLanguage,
+    searchContext.setupProvider,
     searchContext.quickStartGoal,
     searchContext.quickStartId,
     searchContext.quickStartPrimaryPath,
@@ -1118,11 +1215,11 @@ export default function OnboardingHomeView() {
     ) : null;
 
   const observePanelProps = {
-    action: actionWithSetupQuickStartAttribution(
+    action: actionWithSetupContext(
       renderedState.recommendedAction,
       trackContext,
     ),
-    fallbackAction: actionWithSetupQuickStartAttribution(
+    fallbackAction: actionWithSetupContext(
       hideSetupQuickStartFallback ? null : renderedState.fallbackAction,
       trackContext,
     ),
@@ -1155,6 +1252,8 @@ export default function OnboardingHomeView() {
         {renderedState.stage === "connect_observability" ? (
           <ObserveSetupPanel
             {...observePanelProps}
+            initialLanguage={searchContext.setupLanguage}
+            initialProvider={searchContext.setupProvider}
             journeyPlan={renderedState.journeyPlan}
             stage={renderedState.stage}
           />
@@ -1207,6 +1306,8 @@ export default function OnboardingHomeView() {
           {...observePanelProps}
           action={quickStartMismatchAction}
           fallbackAction={null}
+          initialLanguage={searchContext.setupLanguage}
+          initialProvider={searchContext.setupProvider}
           journeyPlan={null}
           singleActionFocus
           stage={quickStartFallbackStage || "connect_observability"}

@@ -470,7 +470,7 @@ describe("OnboardingHomeView", () => {
     });
 
     renderView(
-      "/dashboard/home?source=onboarding_email&campaign_key=observe_waiting_for_first_trace&email_key=observe_waiting_v1&target_stage=waiting_for_first_trace&target_event=trace_received&send_log_id=send-123&status=stale&stale_reason=target_complete",
+      "/dashboard/home?source=onboarding_email&campaign_key=observe_waiting_for_first_trace&email_key=observe_waiting_v1&target_stage=waiting_for_first_trace&target_event=trace_received&send_log_id=send-123&status=stale&stale_reason=target_complete&provider=anthropic&language=typescript",
     );
 
     expect(mocks.useActivationState).toHaveBeenCalledWith(
@@ -483,6 +483,8 @@ describe("OnboardingHomeView", () => {
         sendLogId: "send-123",
         emailStatus: "stale",
         staleReason: "target_complete",
+        setupProvider: "anthropic",
+        setupLanguage: "typescript",
       }),
     );
     await waitFor(() =>
@@ -497,9 +499,25 @@ describe("OnboardingHomeView", () => {
           send_log_id: "send-123",
           email_status: "stale",
           stale_reason: "target_complete",
+          setup_provider: "anthropic",
+          setup_language: "typescript",
         }),
       ),
     );
+
+    const setupUrl = new URL(
+      screen
+        .getByRole("link", { name: /create observe project/i })
+        .getAttribute("href"),
+      "https://futureagi.test",
+    );
+    expectRouteParams({
+      params: setupUrl.searchParams,
+      values: {
+        provider: "anthropic",
+        language: "typescript",
+      },
+    });
 
     await userEvent.click(
       screen.getByRole("link", { name: /create observe project/i }),
@@ -516,6 +534,8 @@ describe("OnboardingHomeView", () => {
         send_log_id: "send-123",
         email_status: "stale",
         stale_reason: "target_complete",
+        setup_provider: "anthropic",
+        setup_language: "typescript",
       }),
     );
   });
@@ -1969,7 +1989,7 @@ describe("OnboardingHomeView", () => {
       refetch: vi.fn(),
     });
 
-    renderView();
+    renderView("/dashboard/home?provider=anthropic&language=typescript");
 
     const panel = screen.getByTestId("first-signal-panel");
     expect(panel).toBeVisible();
@@ -1980,7 +2000,7 @@ describe("OnboardingHomeView", () => {
       within(panel).getByRole("link", { name: /review trace/i }),
     ).toHaveAttribute(
       "href",
-      "/dashboard/observe/observe-1/trace/trace-1?tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
+      "/dashboard/observe/observe-1/trace/trace-1?provider=anthropic&language=typescript&tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
     );
   });
 

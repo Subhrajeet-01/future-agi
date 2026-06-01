@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -31,6 +31,34 @@ const LANGUAGE_OPTIONS = [
   { id: "python", label: "Python" },
   { id: "typescript", label: "TypeScript" },
 ];
+
+const PROVIDER_ALIASES = {
+  "llama-index": "llamaindex",
+  llama_index: "llamaindex",
+  "openai-agents": "openai_agents",
+  openaiagents: "openai_agents",
+};
+
+const normalizeSetupValue = (value) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const normalizeProvider = (provider) => {
+  const normalizedValue = normalizeSetupValue(provider);
+  const canonicalValue = PROVIDER_ALIASES[normalizedValue] || normalizedValue;
+  return OBSERVE_PACKAGE_OPTIONS.some((option) => option.id === canonicalValue)
+    ? canonicalValue
+    : "openai";
+};
+
+const normalizeLanguage = ({ language, provider }) => {
+  const selectedPackage =
+    OBSERVE_PACKAGE_OPTIONS.find((option) => option.id === provider) ||
+    OBSERVE_PACKAGE_OPTIONS[0];
+  const normalizedLanguage = normalizeSetupValue(language);
+  return selectedPackage.languages.includes(normalizedLanguage)
+    ? normalizedLanguage
+    : selectedPackage.languages[0];
+};
 
 const hrefWithObservePackage = (href, { language, provider } = {}) => {
   if (!href || !href.startsWith("/") || href.startsWith("//")) return href;
@@ -128,6 +156,8 @@ ObservePackagePicker.propTypes = {
 export default function ObserveSetupPanel({
   action,
   fallbackAction,
+  initialLanguage,
+  initialProvider,
   journeyPlan,
   onPrimaryClick,
   onFallbackClick,
@@ -136,8 +166,17 @@ export default function ObserveSetupPanel({
   singleActionFocus = false,
   stage = "connect_observability",
 }) {
-  const [selectedProvider, setSelectedProvider] = useState("openai");
-  const [selectedLanguage, setSelectedLanguage] = useState("python");
+  const normalizedInitialProvider = normalizeProvider(initialProvider);
+  const normalizedInitialLanguage = normalizeLanguage({
+    language: initialLanguage,
+    provider: normalizedInitialProvider,
+  });
+  const [selectedProvider, setSelectedProvider] = useState(
+    normalizedInitialProvider,
+  );
+  const [selectedLanguage, setSelectedLanguage] = useState(
+    normalizedInitialLanguage,
+  );
   const effectiveJourneyPlan = journeyPlan || observeFallbackJourneyPlan(stage);
   const currentStep = journeyCurrentStep(effectiveJourneyPlan, stage);
   const steps = effectiveJourneyPlan?.steps || [];
@@ -152,6 +191,12 @@ export default function ObserveSetupPanel({
     tourAnchor: "observe_create_project_button",
   };
   const shouldShowPackagePicker = stage === "connect_observability";
+
+  useEffect(() => {
+    setSelectedProvider(normalizedInitialProvider);
+    setSelectedLanguage(normalizedInitialLanguage);
+  }, [normalizedInitialLanguage, normalizedInitialProvider]);
+
   const packageAwareAction = useMemo(() => {
     if (!shouldShowPackagePicker || !action?.href) return action;
     return {
@@ -243,6 +288,8 @@ export default function ObserveSetupPanel({
 ObserveSetupPanel.propTypes = {
   action: PropTypes.object,
   fallbackAction: PropTypes.object,
+  initialLanguage: PropTypes.string,
+  initialProvider: PropTypes.string,
   isChecking: PropTypes.bool,
   journeyPlan: PropTypes.object,
   onCheckAgain: PropTypes.func,

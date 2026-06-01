@@ -675,7 +675,13 @@ const ObservePage = React.memo(() => {
 
   const handleObservePrimaryAction = useCallback(() => {
     if (firstTraceReviewTarget) {
-      navigate(buildObserveTraceReviewHref(firstTraceReviewTarget));
+      navigate(
+        buildObserveTraceReviewHref({
+          ...firstTraceReviewTarget,
+          setupLanguage: observeOnboardingParams.setupLanguage,
+          setupProvider: observeOnboardingParams.setupProvider,
+        }),
+      );
       return;
     }
 
