@@ -133,7 +133,11 @@ class SessionListQueryBuilder(BaseQueryBuilder):
             dateDiff('second', min(start_time), max(end_time)) AS duration,
             sum(cost) AS total_cost,
             sum(total_tokens) AS total_tokens,
-            uniq(trace_id) AS traces_count
+            uniq(trace_id) AS traces_count,
+            anyIf(
+                end_user_id,
+                end_user_id IS NOT NULL AND end_user_id != toUUID('{NIL_UUID}')
+            ) AS end_user_id
         FROM {self.TABLE}
         {self.project_where()}
           AND trace_session_id IS NOT NULL
@@ -370,6 +374,13 @@ class SessionListQueryBuilder(BaseQueryBuilder):
                     "total_traces_count": int(_get(row, "traces_count", 6, 0) or 0),
                     "first_message": _get(row, "first_message", 7, "") or "",
                     "last_message": _get(row, "last_message", 8, "") or "",
+                    # Carried for view-side EndUser resolution; the actual
+                    # user_id/type/hash are stitched on in the view (and
+                    # end_user_id is popped before the response is returned).
+                    "end_user_id": _get(row, "end_user_id", 9),
+                    "user_id": None,
+                    "user_id_type": None,
+                    "user_id_hash": None,
                 }
             )
         return results

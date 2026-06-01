@@ -206,9 +206,13 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
     def get_queryset(self):
         trace_session_id = self.kwargs.get("pk")
         # Get base queryset with automatic filtering from mixin
-        queryset = super().get_queryset().filter(
-            _project_workspace_scope_q(self.request),
-            project__deleted=False,
+        queryset = (
+            super()
+            .get_queryset()
+            .filter(
+                _project_workspace_scope_q(self.request),
+                project__deleted=False,
+            )
         )
 
         if trace_session_id:
@@ -777,7 +781,11 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
 
             query_params = query_serializer.validated_data
             project_id = str(query_params["project_id"])
-            if not _project_queryset_for_request(request).filter(id=project_id).exists():
+            if (
+                not _project_queryset_for_request(request)
+                .filter(id=project_id)
+                .exists()
+            ):
                 return self._gm.bad_request("Project not found")
             column = query_params["column"]
             search = query_params.get("search", "")
@@ -960,9 +968,7 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
                             "CH session time-series failed",
                             error=str(e),
                         )
-                        session_logger.warning(
-                            "Falling back to Postgres session graph"
-                        )
+                        session_logger.warning("Falling back to Postgres session graph")
 
             # --- EVAL / ANNOTATION: delegate to shared helpers ---
             # Filter traces to only those belonging to sessions
@@ -997,9 +1003,7 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
                             "ClickHouse session eval graph failed",
                             error=str(e),
                         )
-                        session_logger.warning(
-                            "Falling back to Postgres session graph"
-                        )
+                        session_logger.warning("Falling back to Postgres session graph")
 
                 if metric_type == "ANNOTATION" and analytics.should_use_clickhouse(
                     QueryType.ANNOTATION_GRAPH
@@ -1020,9 +1024,7 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
                             "ClickHouse session annotation graph failed",
                             error=str(e),
                         )
-                        session_logger.warning(
-                            "Falling back to Postgres session graph"
-                        )
+                        session_logger.warning("Falling back to Postgres session graph")
 
                 from tracer.utils.graphs_optimized import (
                     get_annotation_graph_data,
@@ -1116,9 +1118,8 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
 
             analytics = AnalyticsQueryService()
             bookmarked = validated_data.get("bookmarked")
-            if (
-                bookmarked is None
-                and analytics.should_use_clickhouse(QueryType.SESSION_LIST)
+            if bookmarked is None and analytics.should_use_clickhouse(
+                QueryType.SESSION_LIST
             ):
                 try:
                     return self._list_sessions_clickhouse(
@@ -1554,6 +1555,13 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
         """
         from tracer.services.clickhouse.query_builders import SessionListQueryBuilder
 
+        # Resolve `org` once at the top — referenced both when injecting the
+        # synthetic end_user_id filter (for the user_id query param) and when
+        # decorating the formatted output with EndUser info (later). Without
+        # this the earlier reference NameError'd whenever ``user_id_raw`` was
+        # truthy and silently fell through to the Postgres path.
+        org = getattr(request, "organization", None) or request.user.organization
+
         org_scope = bool(org_project_ids)
         filters = list(validated_data.get("filters", []) or [])
         sort_params = validated_data.get("sort_params", [])
@@ -1678,6 +1686,38 @@ class TraceSessionView(BaseModelViewSetMixin, ModelViewSet):
                     entry["session_name"] = _name_map.get(_UUID(sid))
                 except (ValueError, TypeError):
                     entry["session_name"] = None
+
+        # Resolve end_user_id -> EndUser system fields (user_id, type, hash).
+        # build() carries one end_user_id per session via
+        # anyIf(end_user_id, ...) — verified to be present on the root spans
+        # the query aggregates whenever a session has a linked user, and never
+        # ambiguous (at most one distinct end_user per session). Resolution is
+        # one batched query (no extra CH round-trip, no N+1). Mirrors the
+        # Postgres _fetch_end_user_info path so both backends return the same
+        # shape.
+        eu_ids = {
+            str(e["end_user_id"])
+            for e in formatted
+            if e.get("end_user_id") and str(e["end_user_id"]) not in ("", NIL_UUID)
+        }
+        if eu_ids:
+            eu_map = {
+                str(r["id"]): r
+                for r in EndUser.objects.filter(
+                    id__in=eu_ids, organization=org, deleted=False
+                ).values("id", "user_id", "user_id_type", "user_id_hash")
+            }
+            for entry in formatted:
+                info = eu_map.get(str(entry.get("end_user_id") or ""))
+                if info:
+                    entry["user_id"] = info["user_id"]
+                    entry["user_id_type"] = info["user_id_type"]
+                    entry["user_id_hash"] = info["user_id_hash"]
+
+        # Drop the internal UUID before returning — keeps response/CSV parity
+        # with the Postgres _build_row shape, which exposes only user_id.
+        for entry in formatted:
+            entry.pop("end_user_id", None)
 
         # Phase 2: Aggregated span attributes for custom columns
         _SKIP_ATTR_PREFIXES = (

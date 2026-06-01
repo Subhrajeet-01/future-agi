@@ -370,3 +370,84 @@ class TestQueryTimeoutBudget:
         assert "LIMIT 500" in query
         assert "parent_span_id IS NULL OR parent_span_id = ''" in query
         assert "PREWHERE" in query
+
+
+@pytest.mark.unit
+class TestSessionListUserId:
+    """Unit tests for end-user (`user_id`) resolution in the session list.
+
+    Regression: the ClickHouse session-list path never selected the
+    end-user, so the response had no ``user_id`` key and the frontend
+    "User ID" column rendered blank (the Postgres fallback populated it).
+    See ``_list_sessions_clickhouse`` in ``tracer.views.trace_session``.
+    """
+
+    def _builder(self):
+        from tracer.services.clickhouse.query_builders import SessionListQueryBuilder
+
+        return SessionListQueryBuilder(
+            project_id=str(uuid.uuid4()),
+            filters=[],
+            page_number=0,
+            page_size=30,
+        )
+
+    def test_build_selects_end_user_id(self):
+        """build() must surface one end_user_id per session via anyIf()."""
+        query, _ = self._builder().build()
+        assert "anyIf(" in query
+        assert "AS end_user_id" in query
+        # Aggregate column — must not change the grouping granularity.
+        assert "GROUP BY trace_session_id" in query
+        assert "GROUP BY trace_session_id, end_user_id" not in query
+        # No extra session-list query was introduced for resolution.
+        assert not hasattr(self._builder(), "build_end_user_query")
+
+    def test_format_sessions_emits_user_id_keys(self):
+        """format_sessions() always emits the user_id keys (never undefined)."""
+        from tracer.services.clickhouse.query_builders import SessionListQueryBuilder
+
+        sid = str(uuid.uuid4())
+        euid = str(uuid.uuid4())
+        columns = [
+            "session_id",
+            "session_start",
+            "session_end",
+            "duration",
+            "total_cost",
+            "total_tokens",
+            "traces_count",
+            "end_user_id",
+        ]
+        rows = [
+            (sid, datetime.utcnow(), datetime.utcnow(), 5, 1.0, 10, 2, euid),
+        ]
+        out = SessionListQueryBuilder.format_sessions(rows, columns)
+        assert len(out) == 1
+        assert out[0]["end_user_id"] == euid
+        # Placeholders present so the view can stitch resolved values on.
+        assert out[0]["user_id"] is None
+        assert out[0]["user_id_type"] is None
+        assert out[0]["user_id_hash"] is None
+
+    def test_format_sessions_user_id_keys_present_without_end_user(self):
+        """Rows with no end_user_id still carry the user_id keys (as None)."""
+        from tracer.services.clickhouse.query_builders import SessionListQueryBuilder
+
+        sid = str(uuid.uuid4())
+        columns = [
+            "session_id",
+            "session_start",
+            "session_end",
+            "duration",
+            "total_cost",
+            "total_tokens",
+            "traces_count",
+            "end_user_id",
+        ]
+        rows = [(sid, datetime.utcnow(), datetime.utcnow(), 5, 1.0, 10, 2, None)]
+        out = SessionListQueryBuilder.format_sessions(rows, columns)
+        assert out[0]["user_id"] is None
+        assert "user_id" in out[0]
+        assert "user_id_type" in out[0]
+        assert "user_id_hash" in out[0]
