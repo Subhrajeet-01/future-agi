@@ -127,7 +127,6 @@ const ViewTabButton = ({
   isActive,
   onClick,
   disabled = false,
-  disabledTooltip,
 }) => {
   const button = (
     <ButtonBase
@@ -180,14 +179,14 @@ const ViewTabButton = ({
     </ButtonBase>
   );
 
-  if (!disabled || !disabledTooltip) return button;
+  if (!disabled) return button;
   return (
     <CustomTooltip
       show
       arrow
       size="small"
       type="black"
-      title={disabledTooltip}
+      title="Not available for voice projects"
     >
       <Box sx={{ flex: 1, display: "flex", cursor: "not-allowed" }}>
         {button}
@@ -202,7 +201,6 @@ ViewTabButton.propTypes = {
   isActive: PropTypes.bool,
   onClick: PropTypes.func,
   disabled: PropTypes.bool,
-  disabledTooltip: PropTypes.string,
 };
 
 // ---------------------------------------------------------------------------
@@ -308,11 +306,6 @@ const DisplayPanel = ({
                     isActive={viewMode === vm.key}
                     onClick={() => onViewModeChange?.(vm.key)}
                     disabled={isDisabled}
-                    disabledTooltip={
-                      isDisabled
-                        ? "Not available for voice projects"
-                        : undefined
-                    }
                   />
                 );
               })}
