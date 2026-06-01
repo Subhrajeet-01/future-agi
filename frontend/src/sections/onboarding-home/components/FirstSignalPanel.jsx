@@ -10,6 +10,7 @@ import {
 } from "./observe-panel-utils";
 import { observeFallbackJourneyPlan } from "./observe-fallback-journey-plan";
 import { journeyCurrentStep } from "./journey-guide-utils";
+import { getObserveSetupPackageLabel } from "src/sections/projects/observeOnboardingRoute";
 
 export default function FirstSignalPanel({
   action,
@@ -22,10 +23,17 @@ export default function FirstSignalPanel({
   onCheckAgain,
   isChecking = false,
   singleActionFocus = false,
+  setupLanguage,
+  setupProvider,
 }) {
   const isImprovement = stage === "create_trace_evaluator";
   const effectiveJourneyPlan = journeyPlan || observeFallbackJourneyPlan(stage);
   const currentStep = journeyCurrentStep(effectiveJourneyPlan, stage);
+  const setupPackageLabel = getObserveSetupPackageLabel({
+    setupLanguage,
+    setupProvider,
+  });
+  const traceLabel = setupPackageLabel ? `${setupPackageLabel} trace` : "trace";
   const actionSlot = currentStep ? (
     <ObservePanelActions
       action={action}
@@ -55,13 +63,19 @@ export default function FirstSignalPanel({
           eyebrow={isImprovement ? "First improvement" : "First trace"}
           title={
             isImprovement
-              ? "Turn the reviewed trace into an evaluator"
-              : "First trace received"
+              ? `Create an evaluator from this ${traceLabel}`
+              : setupPackageLabel
+                ? `${setupPackageLabel} trace received`
+                : "First trace received"
           }
           description={
             isImprovement
-              ? "The first trace has been reviewed. Create a repeatable evaluator next."
-              : "Review the trace to inspect inputs, outputs, latency, cost, and errors."
+              ? setupPackageLabel
+                ? `The ${setupPackageLabel} trace has been reviewed. Create a repeatable evaluator next.`
+                : "The first trace has been reviewed. Create a repeatable evaluator next."
+              : setupPackageLabel
+                ? `Review the ${setupPackageLabel} trace to inspect inputs, outputs, latency, cost, and errors.`
+                : "Review the trace to inspect inputs, outputs, latency, cost, and errors."
           }
           chips={["observe", isImprovement ? "improve" : "review"]}
         />
@@ -86,7 +100,9 @@ export default function FirstSignalPanel({
               p: 1.5,
             }}
           >
-            <Typography variant="subtitle2">Trace</Typography>
+            <Typography variant="subtitle2">
+              {setupPackageLabel ? `${setupPackageLabel} trace` : "Trace"}
+            </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {signals?.firstTraceId || "Waiting for trace id"}
             </Typography>
@@ -131,6 +147,8 @@ FirstSignalPanel.propTypes = {
   onFallbackClick: PropTypes.func,
   onPrimaryClick: PropTypes.func,
   singleActionFocus: PropTypes.bool,
+  setupLanguage: PropTypes.string,
+  setupProvider: PropTypes.string,
   signals: PropTypes.object,
   stage: PropTypes.string,
 };

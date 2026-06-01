@@ -437,9 +437,20 @@ describe("OnboardingHomeView", () => {
       refetch: vi.fn(),
     });
 
-    renderView();
+    renderView("/dashboard/home?provider=anthropic&language=python");
 
     const panel = screen.getByTestId("waiting-for-signal-panel");
+    expect(
+      within(panel).getByText("Send one Anthropic Python trace"),
+    ).toBeVisible();
+    expect(
+      within(panel).getByText(
+        "The Observe project exists. Keep this page open, run one Anthropic Python request, and we will open the trace when it appears.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(panel).getByText("Anthropic Python trace status"),
+    ).toBeVisible();
     const currentStep = within(panel).getByTestId(
       "observe-journey-step-send_first_trace",
     );
@@ -455,7 +466,7 @@ describe("OnboardingHomeView", () => {
       within(panel).getByRole("link", { name: /send trace/i }),
     ).toHaveAttribute(
       "href",
-      "/dashboard/observe/observe-1?tour_anchor=observe_send_trace_button&journey_step=send_first_trace",
+      "/dashboard/observe/observe-1?provider=anthropic&language=python&tour_anchor=observe_send_trace_button&journey_step=send_first_trace",
     );
   });
 
@@ -2083,7 +2094,15 @@ describe("OnboardingHomeView", () => {
 
     const panel = screen.getByTestId("first-signal-panel");
     expect(panel).toBeVisible();
-    expect(within(panel).getByText("First trace received")).toBeVisible();
+    expect(
+      within(panel).getByText("Anthropic TypeScript trace received"),
+    ).toBeVisible();
+    expect(
+      within(panel).getByText(
+        "Review the Anthropic TypeScript trace to inspect inputs, outputs, latency, cost, and errors.",
+      ),
+    ).toBeVisible();
+    expect(within(panel).getByText("Anthropic TypeScript trace")).toBeVisible();
     expect(within(panel).getByText("trace-1")).toBeVisible();
     expect(within(panel).getByText("Not reviewed")).toBeVisible();
     expect(
@@ -2091,6 +2110,37 @@ describe("OnboardingHomeView", () => {
     ).toHaveAttribute(
       "href",
       "/dashboard/observe/observe-1/trace/trace-1?provider=anthropic&language=typescript&tour_anchor=observe_trace_review_link&journey_step=review_first_trace",
+    );
+  });
+
+  it("keeps the package context when the first trace is ready for evaluator setup", () => {
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeNeedsEvaluator"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView("/dashboard/home?provider=anthropic&language=python");
+
+    const panel = screen.getByTestId("first-signal-panel");
+    expect(
+      within(panel).getByText(
+        "Create an evaluator from this Anthropic Python trace",
+      ),
+    ).toBeVisible();
+    expect(
+      within(panel).getByText(
+        "The Anthropic Python trace has been reviewed. Create a repeatable evaluator next.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(panel).getByRole("link", { name: /create evaluator/i }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/observe/observe-1?provider=anthropic&language=python&tour_anchor=observe_evaluator_button&journey_step=create_trace_evaluator",
     );
   });
 

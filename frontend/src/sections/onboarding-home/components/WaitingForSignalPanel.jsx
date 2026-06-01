@@ -10,6 +10,7 @@ import {
 } from "./observe-panel-utils";
 import { observeFallbackJourneyPlan } from "./observe-fallback-journey-plan";
 import { journeyCurrentStep } from "./journey-guide-utils";
+import { getObserveSetupPackageLabel } from "src/sections/projects/observeOnboardingRoute";
 
 export default function WaitingForSignalPanel({
   action,
@@ -22,9 +23,21 @@ export default function WaitingForSignalPanel({
   onCheckAgain,
   isChecking = false,
   singleActionFocus = false,
+  setupLanguage,
+  setupProvider,
 }) {
   const effectiveJourneyPlan = journeyPlan || observeFallbackJourneyPlan(stage);
   const currentStep = journeyCurrentStep(effectiveJourneyPlan, stage);
+  const setupPackageLabel = getObserveSetupPackageLabel({
+    setupLanguage,
+    setupProvider,
+  });
+  const traceLabel = setupPackageLabel
+    ? `${setupPackageLabel} trace`
+    : "first trace";
+  const requestLabel = setupPackageLabel
+    ? `${setupPackageLabel} request`
+    : "request";
   const actionSlot = currentStep ? (
     <ObservePanelActions
       action={action}
@@ -52,8 +65,8 @@ export default function WaitingForSignalPanel({
       <Stack spacing={2}>
         <ObservePanelHeader
           eyebrow="Waiting for trace"
-          title="Send one real trace"
-          description="The Observe project exists. Keep this page open, run one request, and we will open the trace when it appears."
+          title={`Send one ${traceLabel}`}
+          description={`The Observe project exists. Keep this page open, run one ${requestLabel}, and we will open the trace when it appears.`}
           chips={["observe", "waiting"]}
         />
         <ObserveJourneyProgress
@@ -70,7 +83,11 @@ export default function WaitingForSignalPanel({
             p: 1.5,
           }}
         >
-          <Typography variant="subtitle2">Trace status</Typography>
+          <Typography variant="subtitle2">
+            {setupPackageLabel
+              ? `${setupPackageLabel} trace status`
+              : "Trace status"}
+          </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             Projects: {signals?.observeProjects || 0} · Traces:{" "}
             {signals?.traces || 0}
@@ -102,6 +119,8 @@ WaitingForSignalPanel.propTypes = {
   onFallbackClick: PropTypes.func,
   onPrimaryClick: PropTypes.func,
   singleActionFocus: PropTypes.bool,
+  setupLanguage: PropTypes.string,
+  setupProvider: PropTypes.string,
   signals: PropTypes.object,
   stage: PropTypes.string,
 };

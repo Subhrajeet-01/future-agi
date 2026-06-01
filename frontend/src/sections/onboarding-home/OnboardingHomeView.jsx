@@ -1265,6 +1265,8 @@ export default function OnboardingHomeView() {
           <WaitingForSignalPanel
             {...observePanelProps}
             journeyPlan={renderedState.journeyPlan}
+            setupLanguage={searchContext.setupLanguage}
+            setupProvider={searchContext.setupProvider}
             signals={renderedState.signals}
             stage={renderedState.stage}
           />
@@ -1275,6 +1277,8 @@ export default function OnboardingHomeView() {
           <FirstSignalPanel
             {...observePanelProps}
             journeyPlan={renderedState.journeyPlan}
+            setupLanguage={searchContext.setupLanguage}
+            setupProvider={searchContext.setupProvider}
             signals={renderedState.signals}
             stage={renderedState.stage}
           />
