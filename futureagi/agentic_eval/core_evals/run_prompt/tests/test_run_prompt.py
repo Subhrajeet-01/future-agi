@@ -1119,6 +1119,42 @@ class TestAvailableModels:
         assert AVAILABLE_MODELS is not None
         assert len(AVAILABLE_MODELS) > 0
 
+    def test_oss_catalog_excludes_ee_only_models(self):
+        """Test that OSS metadata does not expose private EE-only model aliases."""
+        from agentic_eval.core_evals.run_prompt.available_models import OSS_AVAILABLE_MODELS
+
+        model_names = {m["model_name"] for m in OSS_AVAILABLE_MODELS}
+
+        assert "turing_large" not in model_names
+        assert "protect_toxicity" not in model_names
+        assert not any(
+            name.startswith("bedrock/arn:aws:bedrock:")
+            for name in model_names
+        )
+
+    def test_oss_public_catalog_keeps_pricing_metadata(self):
+        """Test that public model pricing stays with the OSS catalog."""
+        from agentic_eval.core_evals.run_prompt.available_models import OSS_AVAILABLE_MODELS
+
+        gpt4o = next(
+            model for model in OSS_AVAILABLE_MODELS
+            if model["model_name"] == "gpt-4o"
+        )
+
+        assert gpt4o["pricing"] == {
+            "input_per_1M_tokens": 5,
+            "output_per_1M_tokens": 15,
+        }
+
+    def test_runtime_catalog_appends_ee_only_models_when_available(self):
+        """Test that EE installs still expose private evaluator models at runtime."""
+        from agentic_eval.core_evals.run_prompt.available_models import AVAILABLE_MODELS
+
+        model_names = {m["model_name"] for m in AVAILABLE_MODELS}
+
+        assert "turing_large" in model_names
+        assert "protect_toxicity" in model_names
+
     def test_openai_models_present(self):
         """Test that OpenAI models are present."""
         from agentic_eval.core_evals.run_prompt.available_models import AVAILABLE_MODELS
@@ -1138,7 +1174,7 @@ class TestAvailableModels:
         """Test that reasoning models have fields_not_allowed configured."""
         from agentic_eval.core_evals.run_prompt.available_models import AVAILABLE_MODELS
 
-        reasoning_model_names = ["o1", "o1-mini", "o3-mini", "o3"]
+        reasoning_model_names = ["o1", "o3-mini", "o3", "o4-mini"]
         for model in AVAILABLE_MODELS:
             if model["model_name"] in reasoning_model_names:
                 assert "fields_not_allowed" in model, f"Model {model['model_name']} should have fields_not_allowed"
@@ -1148,7 +1184,7 @@ class TestAvailableModels:
         from agentic_eval.core_evals.run_prompt.available_models import AVAILABLE_MODELS
 
         model_names = [m["model_name"] for m in AVAILABLE_MODELS]
-        azure_reasoning_models = ["azure/o1", "azure/o1-mini", "azure/o3-mini"]
+        azure_reasoning_models = ["azure/o1", "azure/o3-mini"]
 
         for model in azure_reasoning_models:
             assert model in model_names, f"Azure model {model} should be present"
