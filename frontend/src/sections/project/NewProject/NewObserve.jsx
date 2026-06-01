@@ -33,6 +33,7 @@ import {
   CustomTabs,
   TabWrapper,
 } from "src/sections/develop/AddDatasetDrawer/AddDatasetStyle";
+import { persistObserveSetupIntent } from "src/sections/projects/observeOnboardingRoute";
 
 const CODE_SECTION_ALIASES = {
   installationGuide: "installation_guide",
@@ -141,6 +142,207 @@ const INSTRUMENT_INSTALL_COMMANDS = {
     openai_agents:
       "npm install @traceai/fi-core @traceai/openai-agents @opentelemetry/instrumentation",
   },
+};
+
+const FALLBACK_INSTRUMENT_SNIPPETS = {
+  anthropic: {
+    name: "Anthropic",
+    Python: {
+      code: `from traceai_anthropic import AnthropicInstrumentor
+
+AnthropicInstrumentor().instrument()`,
+      sample_request_code: `import os
+import anthropic
+
+client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+message = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=256,
+    messages=[{"role": "user", "content": "Say hello in one sentence."}],
+)
+
+print(message.content)`,
+    },
+    TypeScript: {
+      code: `import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { AnthropicInstrumentation } from "@traceai/anthropic";
+
+registerInstrumentations({
+  instrumentations: [new AnthropicInstrumentation({})],
+});`,
+      sample_request_code: `import Anthropic from "@anthropic-ai/sdk";
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const message = await anthropic.messages.create({
+  model: "claude-sonnet-4-20250514",
+  max_tokens: 256,
+  messages: [{ role: "user", content: "Say hello in one sentence." }],
+});
+
+console.log(message.content);`,
+    },
+  },
+  bedrock: {
+    name: "Bedrock",
+    Python: {
+      code: `from traceai_bedrock import BedrockInstrumentor
+
+BedrockInstrumentor().instrument()`,
+      sample_request_code: `import json
+import os
+import boto3
+
+client = boto3.client("bedrock-runtime", region_name=os.environ["AWS_REGION"])
+
+response = client.invoke_model(
+    modelId=os.environ["BEDROCK_MODEL_ID"],
+    body=json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 256,
+        "messages": [{"role": "user", "content": "Say hello in one sentence."}],
+    }),
+)
+
+print(response["body"].read().decode("utf-8"))`,
+    },
+  },
+  langchain: {
+    name: "LangChain",
+    Python: {
+      code: `from traceai_langchain import LangChainInstrumentor
+
+LangChainInstrumentor().instrument()`,
+      sample_request_code: `from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o-mini")
+response = llm.invoke("Say hello in one sentence.")
+
+print(response.content)`,
+    },
+  },
+  llama_index: {
+    name: "LlamaIndex",
+    Python: {
+      code: `from traceai_llamaindex import LlamaIndexInstrumentor
+
+LlamaIndexInstrumentor().instrument()`,
+      sample_request_code: `from llama_index.core import Document, VectorStoreIndex
+
+index = VectorStoreIndex.from_documents([
+    Document(text="Future AGI helps teams observe, test, and improve AI systems.")
+])
+query_engine = index.as_query_engine()
+
+print(query_engine.query("What does Future AGI help teams do?"))`,
+    },
+  },
+  mcp: {
+    name: "MCP",
+    Python: {
+      code: `from traceai_mcp import MCPInstrumentor
+from traceai_openai_agents import OpenAIAgentsInstrumentor
+
+MCPInstrumentor().instrument()
+OpenAIAgentsInstrumentor().instrument()`,
+      sample_request_code: `import os
+from agents import Agent, Runner
+from agents.mcp import MCPServerStreamableHttp
+
+mcp_server = MCPServerStreamableHttp(
+    params={
+        "url": os.environ["MCP_SERVER_URL"],
+        "headers": {"Authorization": f"Bearer {os.environ['MCP_SERVER_TOKEN']}"},
+    },
+)
+
+agent = Agent(
+    name="MCP smoke test",
+    instructions="Call a safe tool if one is available, then summarize the result.",
+    mcp_servers=[mcp_server],
+)
+
+result = Runner.run_sync(agent, "List one available tool.")
+print(result.final_output)`,
+    },
+  },
+  openai: {
+    name: "OpenAI",
+    Python: {
+      code: `from traceai_openai import OpenAIInstrumentor
+
+OpenAIInstrumentor().instrument()`,
+      sample_request_code: `import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+response = client.responses.create(
+    model="gpt-4o-mini",
+    input="Say hello in one sentence.",
+)
+
+print(response.output_text)`,
+    },
+    TypeScript: {
+      code: `import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { OpenAIInstrumentation } from "@traceai/openai";
+
+registerInstrumentations({
+  instrumentations: [new OpenAIInstrumentation({})],
+});`,
+      sample_request_code: `import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const response = await openai.responses.create({
+  model: "gpt-4o-mini",
+  input: "Say hello in one sentence.",
+});
+
+console.log(response.output_text);`,
+    },
+  },
+  openai_agents: {
+    name: "OpenAI Agents",
+    Python: {
+      code: `from traceai_openai_agents import OpenAIAgentsInstrumentor
+
+OpenAIAgentsInstrumentor().instrument()`,
+      sample_request_code: `from agents import Agent, Runner
+
+agent = Agent(
+    name="Smoke test",
+    instructions="Answer in one short sentence.",
+)
+
+result = Runner.run_sync(agent, "Say hello.")
+print(result.final_output)`,
+    },
+  },
+};
+
+const mergeInstrumentDefinition = (id, instrument = {}) => {
+  const fallback = FALLBACK_INSTRUMENT_SNIPPETS[id] || {};
+  return {
+    ...fallback,
+    ...instrument,
+    id,
+    name: instrument.name || fallback.name || id,
+    Python: {
+      ...(fallback.Python || {}),
+      ...(instrument.Python || {}),
+    },
+    TypeScript: {
+      ...(fallback.TypeScript || {}),
+      ...(instrument.TypeScript || {}),
+    },
+  };
 };
 
 const defaultSampleRequestCode = ({ instrumentName, language }) => {
@@ -309,6 +511,7 @@ const FirstTraceSetupGuide = ({
   languageTab,
   onLanguageChange,
   onInstrumentChange,
+  requestedInstrumentMissing,
   selectedInstrument,
   selectedInstrumentLanguage,
   setupVerification,
@@ -433,6 +636,15 @@ const FirstTraceSetupGuide = ({
               })}
             </Stack>
           </Stack>
+        ) : null}
+
+        {requestedInstrumentMissing ? (
+          <Alert severity="warning" sx={{ alignItems: "center" }}>
+            <Typography variant="body2">
+              The requested package is not available in this setup response.
+              Showing the default package setup instead.
+            </Typography>
+          </Alert>
         ) : null}
 
         <Box
@@ -609,6 +821,7 @@ FirstTraceSetupGuide.propTypes = {
   languageTab: PropTypes.string.isRequired,
   onLanguageChange: PropTypes.func.isRequired,
   onInstrumentChange: PropTypes.func.isRequired,
+  requestedInstrumentMissing: PropTypes.bool,
   selectedInstrument: PropTypes.object,
   selectedInstrumentLanguage: PropTypes.string.isRequired,
   setupVerification: VerificationAlert.propTypes.setupVerification,
@@ -685,21 +898,39 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
     return cleanCode(sectionData?.[languageKey]);
   };
 
-  const instrumentOptions = useMemo(
-    () =>
-      Object.entries(keysData?.instruments || {})
-        .map(([id, instrument]) => ({
-          id,
-          ...instrument,
-        }))
-        .filter((instrument) => availableInstrumentLanguages(instrument).length)
-        .sort((left, right) => {
-          const rankDiff =
-            instrumentSortRank(left.id) - instrumentSortRank(right.id);
-          if (rankDiff !== 0) return rankDiff;
-          return String(left.name).localeCompare(String(right.name));
-        }),
-    [keysData?.instruments],
+  const instrumentOptions = useMemo(() => {
+    const mergedInstruments = new Map(
+      Object.keys(FALLBACK_INSTRUMENT_SNIPPETS).map((id) => [
+        id,
+        mergeInstrumentDefinition(id),
+      ]),
+    );
+    Object.entries(keysData?.instruments || {}).forEach(([id, instrument]) => {
+      const normalizedId = normalizeInstrumentId(id);
+      if (!normalizedId || !instrument || typeof instrument !== "object") {
+        return;
+      }
+      mergedInstruments.set(
+        normalizedId,
+        mergeInstrumentDefinition(normalizedId, instrument),
+      );
+    });
+
+    return Array.from(mergedInstruments.values())
+      .filter((instrument) => availableInstrumentLanguages(instrument).length)
+      .sort((left, right) => {
+        const rankDiff =
+          instrumentSortRank(left.id) - instrumentSortRank(right.id);
+        if (rankDiff !== 0) return rankDiff;
+        return String(left.name).localeCompare(String(right.name));
+      });
+  }, [keysData?.instruments]);
+  const requestedInstrumentMissing = Boolean(
+    requestedInstrumentId &&
+      instrumentOptions.length &&
+      !instrumentOptions.some(
+        (instrument) => instrument.id === requestedInstrumentId,
+      ),
   );
   const selectedInstrument = useMemo(() => {
     if (!instrumentOptions.length) return null;
@@ -802,6 +1033,14 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
     });
   }, [selectedInstrument, selectedInstrumentLanguage, syncSetupIntentToUrl]);
 
+  useEffect(() => {
+    if (!showFirstTraceGuide || !selectedInstrument) return;
+    persistObserveSetupIntent({
+      setupLanguage: selectedInstrumentLanguage,
+      setupProvider: selectedInstrument.id,
+    });
+  }, [selectedInstrument, selectedInstrumentLanguage, showFirstTraceGuide]);
+
   const handleInstrumentChange = (instrumentId) => {
     const nextInstrument = instrumentOptions.find(
       (instrument) => instrument.id === instrumentId,
@@ -855,6 +1094,7 @@ const NewObserve = ({ setupVerification, showFirstTraceGuide = false }) => {
               languageTab={languageTab}
               onLanguageChange={handleLanguageChange}
               onInstrumentChange={handleInstrumentChange}
+              requestedInstrumentMissing={requestedInstrumentMissing}
               selectedInstrument={selectedInstrument}
               selectedInstrumentLanguage={selectedInstrumentLanguage}
               setupVerification={setupVerification}

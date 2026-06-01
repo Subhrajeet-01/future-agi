@@ -161,13 +161,15 @@ describe("NewObserve onboarding setup", () => {
     expect(guide).toBeVisible();
     expect(within(guide).getByText("Setup guide")).toBeVisible();
     expect(
-      within(guide).getByText("Connect your package, then send one trace"),
+      within(guide).getByText("Connect OpenAI, then send one trace"),
     ).toBeVisible();
     expect(within(guide).getByText("Pick package")).toBeVisible();
     expect(within(guide).getByText("Paste setup")).toBeVisible();
     expect(within(guide).getByText("Run package request")).toBeVisible();
     expect(within(guide).getByText("Review and add evaluator")).toBeVisible();
-    expect(within(guide).getByText("pip install futureagi")).toBeVisible();
+    expect(
+      within(guide).getByText("pip install traceAI-openai openai"),
+    ).toBeVisible();
     expect(
       within(guide).getByText("export FUTUREAGI_API_KEY=test"),
     ).toBeVisible();
@@ -182,7 +184,7 @@ describe("NewObserve onboarding setup", () => {
     expect(apiKeysLink).toBeVisible();
     expect(apiKeysLink).toHaveAttribute(
       "href",
-      "/dashboard/settings/api_keys?source=onboarding&target=observe_first_trace&action=create&key_name=Observe+first+trace&return_to=%2Fdashboard%2Fobserve%3Fsetup%3Dtrue%26source%3Donboarding%26credential_step%3Ddone",
+      "/dashboard/settings/api_keys?source=onboarding&target=observe_first_trace&action=create&key_name=Observe+first+trace&return_to=%2Fdashboard%2Fobserve%3Fsetup%3Dtrue%26source%3Donboarding%26credential_step%3Ddone%26provider%3Dopenai%26language%3Dpython",
     );
     expect(within(guide).getByLabelText("Copy install command")).toBeVisible();
     expect(within(guide).getByLabelText("Copy project keys")).toBeVisible();
@@ -194,13 +196,44 @@ describe("NewObserve onboarding setup", () => {
     ).toBeVisible();
     expect(
       within(guide).getByLabelText("Copy package smoke test"),
-    ).toHaveTextContent("run_your_existing_your_package_request()");
+    ).toHaveTextContent("client.responses.create");
     expect(
       within(guide).getByTestId("observe-setup-verification"),
     ).toHaveTextContent("Checking for your first trace");
     expect(screen.queryByText("Full setup reference")).not.toBeInTheDocument();
     expect(
       screen.queryByText("Instrumentation options"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses built-in package snippets when the code-block response omits the requested package", () => {
+    mocks.useQuery.mockReturnValue({
+      data: codeBlockFixture,
+      error: null,
+      isLoading: false,
+      isSuccess: true,
+    });
+
+    renderWithRouter(<NewObserve showFirstTraceGuide />, {
+      route:
+        "/dashboard/observe?setup=true&source=onboarding&provider=anthropic&language=python",
+    });
+
+    const guide = screen.getByTestId("observe-first-trace-guide");
+    expect(
+      within(guide).getByText("Connect Anthropic, then send one trace"),
+    ).toBeVisible();
+    expect(
+      within(guide).getByText("pip install traceAI-anthropic anthropic"),
+    ).toBeVisible();
+    expect(
+      within(guide).getByLabelText("Copy package instrumentation"),
+    ).toHaveTextContent("AnthropicInstrumentor");
+    expect(
+      within(guide).getByLabelText("Copy package smoke test"),
+    ).toHaveTextContent("client.messages.create");
+    expect(
+      screen.queryByText(/requested package is not available/i),
     ).not.toBeInTheDocument();
   });
 

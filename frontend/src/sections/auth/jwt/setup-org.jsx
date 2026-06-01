@@ -589,6 +589,24 @@ const SetupOrganization = ({ getStarted = false }) => {
   const quickStartLoading = (option) =>
     isSavingUserData && quickStartOptionRef.current?.id === option.id;
 
+  const renderQuickStartSequencePreview = (option) => {
+    const sequence = option.sequencePreview;
+    if (!sequence?.length) return null;
+
+    return (
+      <Typography
+        component="span"
+        variant="caption"
+        sx={{
+          color: "text.secondary",
+          lineHeight: 1.35,
+        }}
+      >
+        Flow: {sequence.join(" -> ")}
+      </Typography>
+    );
+  };
+
   const renderFeaturedProductLoopQuickStart = (option) => {
     return (
       <LoadingButton
@@ -672,18 +690,7 @@ const SetupOrganization = ({ getStarted = false }) => {
           >
             Step 1: {option.firstActionLabel}
           </Typography>
-          {option.sequencePreview?.length ? (
-            <Typography
-              component="span"
-              variant="caption"
-              sx={{
-                color: "text.secondary",
-                lineHeight: 1.35,
-              }}
-            >
-              Then: {option.sequencePreview.slice(1, 4).join(" -> ")}
-            </Typography>
-          ) : null}
+          {renderQuickStartSequencePreview(option)}
           <Typography
             component="span"
             variant="button"
@@ -708,7 +715,7 @@ const SetupOrganization = ({ getStarted = false }) => {
         data-testid={`setup-org-quick-start-${option.id}`}
         sx={{
           borderRadius: 0.5,
-          minHeight: 86,
+          minHeight: 118,
           height: "auto",
           alignItems: "flex-start",
           justifyContent: "flex-start",
@@ -759,6 +766,7 @@ const SetupOrganization = ({ getStarted = false }) => {
           >
             Step 1: {option.firstActionLabel}
           </Typography>
+          {renderQuickStartSequencePreview(option)}
           <Typography
             component="span"
             variant="caption"

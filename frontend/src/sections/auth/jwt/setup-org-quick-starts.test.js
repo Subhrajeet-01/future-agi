@@ -59,11 +59,35 @@ describe("setup org product-loop quick starts", () => {
     expect(observeQuickStart).toMatchObject({
       buttonLabel: "Connect your agent",
       featured: true,
-      firstActionLabel: "Open package setup",
-      pathPreview: "Send first trace, review first trace, create evaluator.",
+      firstActionLabel: "Choose package",
+      pathPreview:
+        "Choose package, copy setup code, send trace, review trace, create evaluator.",
       primaryPath: "observe",
+      sequencePreview: [
+        "Choose package",
+        "Copy setup code",
+        "Send trace",
+        "Review trace",
+        "Create evaluator",
+      ],
     });
     expect(observeQuickStart.sample).toBeUndefined();
+  });
+
+  it("gives every first setup path a visible sequence preview", () => {
+    const firstSetupQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
+      isSetupOrgFirstSetupQuickStart,
+    );
+
+    expect(firstSetupQuickStarts).toHaveLength(
+      SETUP_ORG_FIRST_SETUP_QUICK_START_IDS.length,
+    );
+    firstSetupQuickStarts.forEach((option) => {
+      expect(option.sequencePreview).toEqual(
+        expect.arrayContaining([option.firstActionLabel]),
+      );
+      expect(option.sequencePreview.length).toBeGreaterThanOrEqual(4);
+    });
   });
 
   it("keeps the signup picker to the first setup paths", () => {

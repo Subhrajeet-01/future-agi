@@ -27,6 +27,10 @@ import { useRecordActivationEvent } from "./hooks/useRecordActivationEvent";
 import { useSaveOnboardingGoal } from "./hooks/useSaveOnboardingGoal";
 import { useSampleProject } from "./hooks/useSampleProject";
 import {
+  persistObserveSetupIntent,
+  readPersistedObserveSetupIntent,
+} from "src/sections/projects/observeOnboardingRoute";
+import {
   getGoalOptionsForState,
   getStageCopy,
   readablePath,
@@ -411,6 +415,15 @@ export default function OnboardingHomeView() {
   const searchContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const source = params.get("source") || "home";
+    const persistedObserveSetupIntent = readPersistedObserveSetupIntent();
+    const querySetupProvider = normalizeObserveSetupProvider(
+      params.get("provider") ||
+        params.get("package") ||
+        params.get("instrument"),
+    );
+    const querySetupLanguage = normalizeObserveSetupLanguage(
+      params.get("language") || params.get("lang"),
+    );
     const hasQuickStartQuery =
       params.has("quick_start_goal") ||
       params.has("quick_start_id") ||
@@ -440,14 +453,10 @@ export default function OnboardingHomeView() {
       staleReason: params.get("stale_reason"),
       contextStatus: params.get("context_status"),
       mode: params.get("mode"),
-      setupProvider: normalizeObserveSetupProvider(
-        params.get("provider") ||
-          params.get("package") ||
-          params.get("instrument"),
-      ),
-      setupLanguage: normalizeObserveSetupLanguage(
-        params.get("language") || params.get("lang"),
-      ),
+      setupProvider:
+        querySetupProvider || persistedObserveSetupIntent.setupProvider,
+      setupLanguage:
+        querySetupLanguage || persistedObserveSetupIntent.setupLanguage,
       ...quickStartAttribution,
     };
   }, [location.search]);
@@ -482,6 +491,14 @@ export default function OnboardingHomeView() {
       ...searchActivationEmailContext,
     };
   }, [searchActivationEmailContext]);
+
+  useEffect(() => {
+    if (!searchContext.setupLanguage && !searchContext.setupProvider) return;
+    persistObserveSetupIntent({
+      setupLanguage: searchContext.setupLanguage,
+      setupProvider: searchContext.setupProvider,
+    });
+  }, [searchContext.setupLanguage, searchContext.setupProvider]);
 
   const activationEmailContextFor = useCallback(
     (context) =>

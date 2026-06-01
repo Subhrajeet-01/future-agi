@@ -10,6 +10,7 @@ import {
   readPersistedSetupQuickStartAttribution,
   SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS,
 } from "src/sections/auth/jwt/setup-org-quick-starts";
+import { persistObserveSetupIntent } from "src/sections/projects/observeOnboardingRoute";
 
 const mocks = vi.hoisted(() => ({
   useActivationState: vi.fn(),
@@ -468,6 +469,38 @@ describe("OnboardingHomeView", () => {
       "href",
       "/dashboard/observe/observe-1?provider=anthropic&language=python&tour_anchor=observe_send_trace_button&journey_step=send_first_trace",
     );
+  });
+
+  it("keeps package-specific trace wait copy when Home is opened without setup params", () => {
+    persistObserveSetupIntent({
+      setupLanguage: "python",
+      setupProvider: "anthropic",
+    });
+    mocks.useActivationState.mockReturnValue({
+      state: {
+        ...normalizedFixture("observeWaitingForTrace"),
+        journeyPlan: observeJourneyPlan({ currentStepIndex: 1 }),
+      },
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView("/dashboard/home");
+
+    expect(mocks.useActivationState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setupLanguage: "python",
+        setupProvider: "anthropic",
+      }),
+    );
+    expect(
+      within(screen.getByTestId("waiting-for-signal-panel")).getByText(
+        "Send one Anthropic Python trace",
+      ),
+    ).toBeVisible();
   });
 
   it("tracks lifecycle email attribution on Home views and CTA clicks", async () => {

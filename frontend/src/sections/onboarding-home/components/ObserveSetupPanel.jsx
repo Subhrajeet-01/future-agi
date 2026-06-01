@@ -12,6 +12,7 @@ import {
 } from "./observe-panel-utils";
 import { observeFallbackJourneyPlan } from "./observe-fallback-journey-plan";
 import { journeyCurrentStep } from "./journey-guide-utils";
+import { persistObserveSetupIntent } from "src/sections/projects/observeOnboardingRoute";
 
 const OBSERVE_PACKAGE_OPTIONS = [
   { id: "openai", label: "OpenAI", languages: ["python", "typescript"] },
@@ -206,6 +207,14 @@ export default function ObserveSetupPanel({
     setSelectedProvider(normalizedInitialProvider);
     setSelectedLanguage(normalizedInitialLanguage);
   }, [normalizedInitialLanguage, normalizedInitialProvider]);
+
+  useEffect(() => {
+    if (!shouldShowPackagePicker) return;
+    persistObserveSetupIntent({
+      setupLanguage: selectedLanguage,
+      setupProvider: selectedProvider,
+    });
+  }, [selectedLanguage, selectedProvider, shouldShowPackagePicker]);
 
   const packageAwareAction = useMemo(() => {
     if (!shouldShowPackagePicker || !action?.href) return action;

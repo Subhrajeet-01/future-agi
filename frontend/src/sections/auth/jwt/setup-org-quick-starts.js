@@ -41,11 +41,13 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     surfaceLabel: "Observe",
     buttonLabel: "Connect your agent",
     shortDescription:
-      "Send traces from your AI app and turn one trace into an evaluator.",
-    firstActionLabel: "Open package setup",
-    pathPreview: "Send first trace, review first trace, create evaluator.",
+      "Choose your package, copy matching setup code, and turn one trace into an evaluator.",
+    firstActionLabel: "Choose package",
+    pathPreview:
+      "Choose package, copy setup code, send trace, review trace, create evaluator.",
     sequencePreview: [
-      "Open package setup",
+      "Choose package",
+      "Copy setup code",
       "Send trace",
       "Review trace",
       "Create evaluator",

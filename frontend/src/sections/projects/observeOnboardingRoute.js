@@ -1,6 +1,8 @@
 const DEFAULT_ARTIFACT_ID = "observe-onboarding";
 
 export const OBSERVE_FIRST_TRACE_LOADED_EVENT = "observe-first-trace-loaded";
+export const OBSERVE_SETUP_INTENT_STORAGE_KEY =
+  "futureagi.observe_setup_intent";
 
 export const OBSERVE_ONBOARDING_MODES = {
   CREATE_EVALUATOR: "create-evaluator",
@@ -124,6 +126,53 @@ export const getObserveSetupPackageLabel = ({
 
 const getObserveSetupProviderLabel = (setupProvider) =>
   observeSetupProviderLabels[safeSetupProvider(setupProvider)] || "";
+
+export const normalizeObserveSetupIntent = ({
+  setupLanguage,
+  setupProvider,
+} = {}) => ({
+  setupLanguage: safeSetupLanguage(setupLanguage),
+  setupProvider: safeSetupProvider(setupProvider),
+});
+
+export const persistObserveSetupIntent = (input = {}) => {
+  const intent = normalizeObserveSetupIntent(input);
+  if (!intent.setupLanguage && !intent.setupProvider) return {};
+
+  try {
+    window.sessionStorage?.setItem(
+      OBSERVE_SETUP_INTENT_STORAGE_KEY,
+      JSON.stringify(intent),
+    );
+  } catch {
+    // Setup should continue even if browser storage is unavailable.
+  }
+  return intent;
+};
+
+export const readPersistedObserveSetupIntent = () => {
+  try {
+    const rawValue = window.sessionStorage?.getItem(
+      OBSERVE_SETUP_INTENT_STORAGE_KEY,
+    );
+    if (!rawValue) return {};
+
+    const parsedValue = JSON.parse(rawValue);
+    const intent = normalizeObserveSetupIntent(parsedValue);
+    if (!intent.setupLanguage && !intent.setupProvider) {
+      window.sessionStorage?.removeItem(OBSERVE_SETUP_INTENT_STORAGE_KEY);
+      return {};
+    }
+    return intent;
+  } catch {
+    try {
+      window.sessionStorage?.removeItem(OBSERVE_SETUP_INTENT_STORAGE_KEY);
+    } catch {
+      // Ignore cleanup failures.
+    }
+    return {};
+  }
+};
 
 export const getObserveOnboardingParams = (search = "") => {
   const params = new URLSearchParams(search);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildObserveEvaluatorCreateHref,
   buildObserveProjectOnboardingHref,
@@ -12,12 +12,19 @@ import {
   getObserveSetupPackageLabel,
   getObserveSetupOnboardingParams,
   getObserveTraceReviewOnboardingParams,
+  persistObserveSetupIntent,
+  readPersistedObserveSetupIntent,
   observeOnboardingStage,
+  OBSERVE_SETUP_INTENT_STORAGE_KEY,
   OBSERVE_ONBOARDING_MODES,
   OBSERVE_ONBOARDING_SOURCES,
 } from "./observeOnboardingRoute";
 
 describe("observeOnboardingRoute", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
   it("reads supported observe route params", () => {
     expect(
       getObserveOnboardingParams(
@@ -471,6 +478,28 @@ describe("observeOnboardingRoute", () => {
         "Paste both copied values into the Anthropic TypeScript setup snippet, then run one request.",
       primaryLabel: "Run Anthropic request",
     });
+  });
+
+  it("persists sanitized Observe setup package intent", () => {
+    expect(
+      persistObserveSetupIntent({
+        setupLanguage: "TypeScript",
+        setupProvider: "Anthropic",
+      }),
+    ).toEqual({
+      setupLanguage: "typescript",
+      setupProvider: "anthropic",
+    });
+    expect(readPersistedObserveSetupIntent()).toEqual({
+      setupLanguage: "typescript",
+      setupProvider: "anthropic",
+    });
+
+    window.sessionStorage.setItem(OBSERVE_SETUP_INTENT_STORAGE_KEY, "{");
+    expect(readPersistedObserveSetupIntent()).toEqual({});
+    expect(
+      window.sessionStorage.getItem(OBSERVE_SETUP_INTENT_STORAGE_KEY),
+    ).toBeNull();
   });
 
   it("builds a safe route-focus payload", () => {
