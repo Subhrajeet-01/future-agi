@@ -42,6 +42,12 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     shortDescription: "Send traces from your AI app and review quality.",
     firstActionLabel: "Create Observe project",
     pathPreview: "Send first trace, review first signal, add quality check.",
+    sequencePreview: [
+      "Create project",
+      "Send trace",
+      "Review signal",
+      "Add quality check",
+    ],
     featured: true,
     icon: "mdi:connection",
   }),
@@ -53,6 +59,7 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     shortDescription: "Create a prompt, run a test, and compare versions.",
     firstActionLabel: "Create prompt",
     pathPreview: "Run test, save version, compare versions, improve.",
+    sequencePreview: ["Create prompt", "Run test", "Save version", "Compare"],
     icon: "mdi:message-processing-outline",
   }),
   quickStart("build_or_prototype_agent", {
@@ -63,6 +70,12 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     shortDescription: "Create an agent and run one scenario.",
     firstActionLabel: "Create agent",
     pathPreview: "Run scenario, review run, save coverage.",
+    sequencePreview: [
+      "Create agent",
+      "Run scenario",
+      "Review run",
+      "Save coverage",
+    ],
     icon: "mdi:graph-outline",
   }),
   quickStart("route_llm_traffic_safely", {
@@ -73,6 +86,12 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     shortDescription: "Add a provider, create a key, and send a request.",
     firstActionLabel: "Add provider",
     pathPreview: "Create key, send request, review log, add policy.",
+    sequencePreview: [
+      "Add provider",
+      "Create key",
+      "Send request",
+      "Add policy",
+    ],
     icon: "mdi:transit-connection-variant",
   }),
   quickStart("evaluate_quality", {
@@ -83,6 +102,7 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     shortDescription: "Create a small eval or simulation and review failures.",
     firstActionLabel: "Create dataset",
     pathPreview: "Add scorer, run eval, review failure, improve.",
+    sequencePreview: ["Create dataset", "Add scorer", "Run eval", "Review"],
     icon: "mdi:check-decagram-outline",
   }),
   quickStart("connect_voice_ai_agent", {
@@ -93,6 +113,12 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     shortDescription: "Run a test call and review the transcript.",
     firstActionLabel: "Create agent",
     pathPreview: "Run call, review call, add success criteria.",
+    sequencePreview: [
+      "Create agent",
+      "Run call",
+      "Review call",
+      "Add criteria",
+    ],
     icon: "mdi:phone-in-talk-outline",
   }),
   quickStart("explore_sample_data", {

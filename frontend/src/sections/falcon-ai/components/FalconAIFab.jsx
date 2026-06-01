@@ -60,7 +60,7 @@ function FalconIcon(props) {
 }
 
 export default function FalconAIFab() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { isOSS } = useDeploymentMode();
   const isSidebarOpen = useFalconStore((s) => s.isSidebarOpen);
   const toggleSidebar = useFalconStore((s) => s.toggleSidebar);
@@ -82,6 +82,12 @@ export default function FalconAIFab() {
 
   // Hide FAB on Falcon AI full-page view
   if (pathname.startsWith("/dashboard/falcon-ai")) return null;
+  if (
+    pathname === "/dashboard/home" &&
+    new URLSearchParams(search).get("source") === "setup_org"
+  ) {
+    return null;
+  }
 
   // Hide FAB when sidebar is open
   if (isSidebarOpen) return null;

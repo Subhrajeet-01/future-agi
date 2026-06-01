@@ -110,9 +110,9 @@ async function main() {
       await waitForVisibleText(page, "Test prompts or agent prompts", {
         exact: true,
       });
-      await waitForVisibleText(page, "Start with Create prompt.");
+      await waitForVisibleText(page, "Do this first: Create prompt.");
       await waitForVisibleText(page, "Step 1 of 6", { exact: true });
-      await waitForVisibleText(page, "What happens next", { exact: true });
+      await waitForVisibleText(page, "Setup sequence", { exact: true });
       await waitForVisibleText(page, "Create prompt", { exact: true });
       evidence.home_route = await currentRelativeUrl(page);
       assertPromptQuickStartParams(evidence.home_route, "Home route");

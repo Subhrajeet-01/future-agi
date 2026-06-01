@@ -805,7 +805,7 @@ export default function OnboardingHomeView() {
         : {
             eyebrow: "First setup",
             title: selectedSetupQuickStart.buttonLabel,
-            description: `Start with ${firstRunCurrentStepLabel}. The steps below show what comes next, one action at a time.`,
+            description: `Do this first: ${firstRunCurrentStepLabel}. Finish that action, then this page will guide the next step.`,
             surfaceLabel: selectedSetupQuickStart.surfaceLabel,
           }
       : quickStartMismatchAction

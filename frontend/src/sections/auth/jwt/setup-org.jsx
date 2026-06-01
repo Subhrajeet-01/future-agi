@@ -49,7 +49,6 @@ import {
   isSetupOrgFirstSetupQuickStart,
   persistSetupQuickStartAttribution,
   SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS,
-  SETUP_ORG_SAMPLE_PREVIEW_QUICK_START_ID,
 } from "./setup-org-quick-starts";
 
 const QUICK_START_ROLE = "AI Builder";
@@ -57,18 +56,19 @@ const QUICK_START_ROLE = "AI Builder";
 const SETUP_SIDE_PANEL_STEPS = [
   {
     icon: "mdi:cursor-default-click-outline",
-    label: "Choose one product task",
-    description: "Pick the area you want to set up first.",
+    label: "Choose one setup task",
+    description: "Pick the job this workspace should finish first.",
   },
   {
     icon: "mdi:clipboard-check-outline",
-    label: "Start with one action",
-    description: "The next screen highlights exactly where to begin.",
+    label: "Do the first action",
+    description: "The workspace opens on the right screen with one clear step.",
   },
   {
     icon: "mdi:database-eye-outline",
-    label: "Use sample data only as a preview",
-    description: "Sample screens stay available, but they do not finish setup.",
+    label: "Use samples after setup starts",
+    description:
+      "Sample screens stay available, but they do not replace setup.",
   },
 ];
 
@@ -267,10 +267,10 @@ const SetupOrgSidePanel = () => (
         <Typography variant="overline" color="text.secondary">
           First setup
         </Typography>
-        <Typography variant="h4">Choose what to set up first</Typography>
+        <Typography variant="h4">One choice, then one action</Typography>
         <Typography variant="body1" color="text.secondary">
-          Pick the product area you want to use first. The workspace will open
-          with the first action highlighted.
+          Choose the product job you want to finish first. We will save it and
+          open the exact screen where setup begins.
         </Typography>
       </Stack>
 
@@ -297,8 +297,8 @@ const SetupOrgSidePanel = () => (
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                bgcolor: "primary.main",
-                color: "primary.contrastText",
+                bgcolor: "common.white",
+                color: "common.black",
                 flexShrink: 0,
               }}
             >
@@ -549,7 +549,9 @@ const SetupOrganization = ({ getStarted = false }) => {
 
     quickStartsViewedRef.current = true;
     trackSetupOrgQuickStartsViewed({
-      quickStarts: SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS,
+      quickStarts: SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
+        isSetupOrgFirstSetupQuickStart,
+      ),
     });
   }, [activeStep]);
 
@@ -586,27 +588,6 @@ const SetupOrganization = ({ getStarted = false }) => {
     },
     [handleProductLoopQuickStart],
   );
-  const handleSamplePreviewQuickStart = useCallback(
-    (option) => {
-      if (isSavingUserData || quickStartOptionRef.current) {
-        return;
-      }
-
-      persistSetupQuickStartAttribution({
-        quickStartGoal: option.goal,
-        quickStartId: option.id,
-        quickStartPrimaryPath: option.primaryPath,
-      });
-      trackSetupOrgQuickStartClicked({
-        quickStartGoal: option.goal,
-        quickStartId: option.id,
-        quickStartPrimaryPath: option.primaryPath,
-      });
-      finishSetup(option);
-    },
-    [finishSetup, isSavingUserData],
-  );
-
   const renderProductLoopQuickStart = (option) => {
     const ButtonComponent = option.featured ? LoadingButton : Button;
     return (
@@ -615,7 +596,7 @@ const SetupOrganization = ({ getStarted = false }) => {
         fullWidth
         sx={{
           borderRadius: 0.5,
-          minHeight: { xs: 204, sm: 148 },
+          minHeight: { xs: 164, sm: 138 },
           height: "auto",
           alignItems: "flex-start",
           justifyContent: "flex-start",
@@ -766,7 +747,7 @@ const SetupOrganization = ({ getStarted = false }) => {
                   textTransform: "uppercase",
                 }}
               >
-                Start here
+                First action
               </Typography>
               <Typography
                 component="span"
@@ -780,80 +761,53 @@ const SetupOrganization = ({ getStarted = false }) => {
               >
                 {option.firstActionLabel}
               </Typography>
-              <Typography
-                component="span"
-                variant="caption"
-                sx={{
-                  color: option.featured
-                    ? "primary.contrastText"
-                    : "text.secondary",
-                  opacity: option.featured ? 0.88 : 1,
-                  lineHeight: 1.25,
-                }}
-              >
-                Then: {option.pathPreview}
-              </Typography>
+              {option.sequencePreview?.length ? (
+                <Stack
+                  component="span"
+                  direction="row"
+                  spacing={0.5}
+                  flexWrap="wrap"
+                  useFlexGap
+                  sx={{ display: "flex", pt: 0.25 }}
+                >
+                  {option.sequencePreview.map((step) => (
+                    <Chip
+                      key={step}
+                      component="span"
+                      size="small"
+                      label={step}
+                      variant="outlined"
+                      sx={{
+                        color: option.featured
+                          ? "primary.contrastText"
+                          : "text.secondary",
+                        borderColor: option.featured
+                          ? "rgba(255,255,255,0.36)"
+                          : "divider",
+                      }}
+                    />
+                  ))}
+                </Stack>
+              ) : null}
             </Stack>
           </Box>
+          <Typography
+            component="span"
+            variant="button"
+            sx={{
+              alignSelf: "flex-start",
+              color: option.featured ? "primary.contrastText" : "primary.main",
+              mt: 0.25,
+            }}
+          >
+            Choose
+          </Typography>
         </Stack>
       </ButtonComponent>
     );
   };
 
-  const renderSampleQuickStart = (option) => (
-    <Box
-      data-testid="setup-org-sample-quick-start"
-      sx={{
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 1,
-        p: 1.5,
-        bgcolor: "background.paper",
-      }}
-    >
-      <Stack spacing={1.25}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Iconify icon={option.icon} width={20} />
-          <Typography variant="subtitle2">Preview sample data</Typography>
-        </Stack>
-        <Typography variant="body2" color="text.secondary">
-          Optional preview only. This does not complete setup; choose one
-          product task above to set up your workspace with real data.
-        </Typography>
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 0.5,
-            px: 1,
-            py: 0.75,
-            bgcolor: "background.neutral",
-          }}
-        >
-          <Typography variant="caption" color="text.secondary">
-            Preview: {option.firstActionLabel}. {option.pathPreview}
-          </Typography>
-        </Box>
-        <Button
-          fullWidth
-          sx={{ borderRadius: 0.5, minHeight: 48 }}
-          variant="text"
-          disabled={isSavingUserData}
-          aria-label={option.previewButtonLabel || option.buttonLabel}
-          onClick={() => handleSamplePreviewQuickStart(option)}
-          color="primary"
-          startIcon={<Iconify icon="mdi:chart-timeline-variant" width={18} />}
-        >
-          {option.previewButtonLabel || option.buttonLabel}
-        </Button>
-      </Stack>
-    </Box>
-  );
-
   const renderProductLoopQuickStarts = () => {
-    const sampleQuickStart = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.find(
-      (option) => option.id === SETUP_ORG_SAMPLE_PREVIEW_QUICK_START_ID,
-    );
     const productQuickStarts = SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS.filter(
       (option) => isSetupOrgFirstSetupQuickStart(option),
     );
@@ -862,12 +816,12 @@ const SetupOrganization = ({ getStarted = false }) => {
       <Stack spacing={1.5}>
         <Stack spacing={0.5}>
           <Typography variant="body2" color="text.secondary">
-            Choose the first product task for this workspace. The next screen
-            opens the right product area and highlights where to begin.
+            The next screen saves this choice, opens the right product screen,
+            and points to the first action.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Sample data is available for preview, but it will not finish setup.
-            Team invites can wait.
+            Sample data stays available after setup starts. Team invites can
+            wait.
           </Typography>
         </Stack>
 
@@ -882,7 +836,24 @@ const SetupOrganization = ({ getStarted = false }) => {
           {productQuickStarts.map(renderProductLoopQuickStart)}
         </Box>
 
-        {sampleQuickStart ? renderSampleQuickStart(sampleQuickStart) : null}
+        <Box
+          data-testid="setup-org-sample-note"
+          sx={{
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
+            p: 1.25,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="flex-start">
+            <Iconify icon="mdi:database-eye-outline" width={20} />
+            <Typography variant="body2" color="text.secondary">
+              Sample screens are preloaded for preview after the workspace setup
+              begins. First choose the real product task you want to complete.
+            </Typography>
+          </Stack>
+        </Box>
       </Stack>
     );
   };
@@ -1249,8 +1220,8 @@ const SetupOrganization = ({ getStarted = false }) => {
                   maxWidth: 520,
                 }}
               >
-                Pick the product area you want to use first. You will see the
-                first action and the next steps after it.
+                Choose one real setup task. We will open the right screen and
+                point to the first action.
               </Typography>
             </Box>
 

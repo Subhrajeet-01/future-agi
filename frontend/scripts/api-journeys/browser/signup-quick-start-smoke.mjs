@@ -19,7 +19,8 @@ const SCREENSHOT_PATH =
   }.png`;
 const REQUIRE_REAL_SIGNUP = envFlag("ONBOARDING_REAL_SIGNUP");
 const ALLOW_REMOTE = envFlag("ONBOARDING_REAL_SIGNUP_ALLOW_REMOTE");
-const SAMPLE_ONLY = envFlag("ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY");
+const SAMPLE_GATE_ONLY = envFlag("ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY");
+const SAMPLE_ONLY = false;
 const EXPECT_DAILY_QUALITY = envFlag("ONBOARDING_SMOKE_EXPECT_DAILY_QUALITY");
 const REPORT_OUTPUT = process.env.ONBOARDING_SMOKE_REPORT_OUTPUT || "";
 const OBSERVE_QUICK_START_PARAMS = {
@@ -50,7 +51,9 @@ async function main() {
   assert(REQUIRE_REAL_SIGNUP, "Set ONBOARDING_REAL_SIGNUP=1 for this smoke.");
   assertLocalUrl(APP_BASE, "APP_BASE");
   assertLocalUrl(API_BASE, "API_BASE");
-  const smokeMode = SAMPLE_ONLY ? "sample_open" : "full_quality_loop";
+  const smokeMode = SAMPLE_GATE_ONLY
+    ? "sample_preview_guard"
+    : "full_quality_loop";
 
   const runId = `${Date.now().toString(36)}-${Math.random()
     .toString(36)
@@ -327,14 +330,21 @@ async function main() {
     });
     await expectVisibleText(
       page,
-      "Pick the product area you want to use first. You will see the first action and the next steps after it.",
+      "Choose one real setup task. We will open the right screen and point to the first action.",
       { timeout: 90000 },
     );
+    if (SAMPLE_GATE_ONLY) {
+      await expectNoVisibleText(page, "Preview sample screens", {
+        timeout: 90000,
+      });
+      await expectVisibleText(
+        page,
+        "Sample screens are preloaded for preview after the workspace setup begins.",
+        { timeout: 90000 },
+      );
+    }
     await waitForBrowserFrame();
-    await clickVisibleButtonText(
-      page,
-      SAMPLE_ONLY ? "Preview sample screens" : "Connect your agent",
-    );
+    await clickVisibleButtonText(page, "Connect your agent");
 
     let setupOrgHomeUrl = null;
     let setupOrgEntryUrl = null;
@@ -371,10 +381,10 @@ async function main() {
         exact: true,
         timeout: 45000,
       });
-      await expectVisibleText(page, "Start with Create Observe project.", {
+      await expectVisibleText(page, "Do this first: Create Observe project.", {
         timeout: 45000,
       });
-      await expectVisibleText(page, "What happens next", {
+      await expectVisibleText(page, "Setup sequence", {
         exact: true,
         timeout: 45000,
       });

@@ -95,12 +95,17 @@ const QUICK_STARTS = {
   },
 };
 
-const QUICK_START = QUICK_STARTS[QUICK_START_KEY];
+const REQUESTED_QUICK_START = QUICK_STARTS[QUICK_START_KEY];
+const SAMPLE_PREVIEW_GUARD = QUICK_START_KEY === "sample_preview";
+const EXPECT_SAMPLE_HANDOFF = false;
+const QUICK_START = SAMPLE_PREVIEW_GUARD
+  ? QUICK_STARTS.observe
+  : REQUESTED_QUICK_START;
 
 async function main() {
   assert(STUB_AUTH, "Set ONBOARDING_SMOKE_STUB_AUTH=1 for this smoke.");
   assert(
-    QUICK_START,
+    REQUESTED_QUICK_START,
     `Unsupported ONBOARDING_SMOKE_SETUP_QUICK_START=${QUICK_START_KEY}`,
   );
 
@@ -193,8 +198,22 @@ async function main() {
     await expectVisibleText(page, "What do you want to set up first?");
     await expectVisibleText(
       page,
-      "Pick the product area you want to use first. You will see the first action and the next steps after it.",
+      "Choose one real setup task. We will open the right screen and point to the first action.",
     );
+    if (SAMPLE_PREVIEW_GUARD) {
+      const samplePreviewVisible = await isVisibleButtonText(
+        page,
+        QUICK_STARTS.sample_preview.buttonText,
+      );
+      assert(
+        !samplePreviewVisible,
+        "Sample preview must not be selectable before a real setup task.",
+      );
+      await expectVisibleText(
+        page,
+        "Sample screens are preloaded for preview after the workspace setup begins.",
+      );
+    }
     const quickStartInitiallyVisible = await isVisibleButtonText(
       page,
       QUICK_START.buttonText,
@@ -225,7 +244,7 @@ async function main() {
     });
 
     await expectVisibleTestId(page, "onboarding-home-view");
-    if (QUICK_START_KEY === "sample_preview") {
+    if (EXPECT_SAMPLE_HANDOFF) {
       await expectVisibleText(page, "Preview sample data", { exact: true });
       await expectVisibleText(page, "Sample data is a preview");
       await expectVisibleText(page, "Open sample trace");
@@ -245,9 +264,10 @@ async function main() {
       });
       await expectVisibleText(
         page,
-        `Start with ${QUICK_START.expectedActionText}.`,
+        `Do this first: ${QUICK_START.expectedActionText}.`,
       );
-      await expectVisibleText(page, "What happens next", { exact: true });
+      await expectVisibleText(page, "Do this first", { exact: true });
+      await expectVisibleText(page, "Setup sequence", { exact: true });
       await expectVisibleText(page, "Step 1 of");
       await expectVisibleText(page, QUICK_START.expectedActionText, {
         exact: true,
@@ -278,7 +298,7 @@ async function main() {
       browserState.redirectUrl === null,
       `Expected redirectUrl to be cleared, got ${browserState.redirectUrl}`,
     );
-    if (QUICK_START_KEY === "sample_preview") {
+    if (EXPECT_SAMPLE_HANDOFF) {
       assert(
         onboardingPosts.length === 0,
         "Sample preview must not save onboarding or complete setup.",
@@ -300,7 +320,7 @@ async function main() {
       setupPosts.length === 0,
       "Expected no setup organization POST on product-loop quick start.",
     );
-    if (QUICK_START_KEY === "sample_preview") {
+    if (EXPECT_SAMPLE_HANDOFF) {
       await waitForCondition(
         () => sampleProjectPosts.length === 1,
         "Expected one setup-org sample-project POST.",
@@ -381,21 +401,22 @@ async function main() {
             sample_trace_activation_event: activationEventPosts.find(
               (payload) => payload?.event_name === "sample_trace_detail_opened",
             ),
-            sample_trace_entry:
-              QUICK_START_KEY === "sample_preview"
-                ? {
-                    clicks_after_quick_start: 1,
-                    quick_start_goal: "explore_sample_data",
-                    quick_start_id: "sample_preview",
-                    quick_start_primary_path: "sample",
-                    source: "setup_org",
-                  }
-                : null,
+            sample_trace_entry: EXPECT_SAMPLE_HANDOFF
+              ? {
+                  clicks_after_quick_start: 1,
+                  quick_start_goal: "explore_sample_data",
+                  quick_start_id: "sample_preview",
+                  quick_start_primary_path: "sample",
+                  source: "setup_org",
+                }
+              : null,
             sample_trace_url: sampleTraceUrl,
             screenshot: SCREENSHOT_PATH,
             setup_org_home_url: setupOrgHomeUrl,
             setup_posts: setupPosts,
-            setup_quick_start: QUICK_START_KEY,
+            setup_quick_start: SAMPLE_PREVIEW_GUARD
+              ? "sample_preview_guarded_to_observe"
+              : QUICK_START_KEY,
             trace_detail_requests: traceDetailRequests,
             viewport: VIEWPORT_NAME,
           },

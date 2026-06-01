@@ -87,11 +87,11 @@ async function main() {
     await waitForVisibleText(page, "Test AI using simulation", {
       exact: true,
     });
-    await waitForVisibleText(page, "Start with Create dataset.");
-    await waitForVisibleText(page, "Start here", { exact: true });
+    await waitForVisibleText(page, "Do this first: Create dataset.");
+    await waitForVisibleText(page, "Do this first", { exact: true });
     await waitForVisibleText(page, "Step 1 of 5", { exact: true });
     await waitForVisibleText(page, "Create dataset", { exact: true });
-    await waitForVisibleText(page, "What happens next", { exact: true });
+    await waitForVisibleText(page, "Setup sequence", { exact: true });
     evidence.home_route = await currentRelativeUrl(page);
     assertEvalQuickStartParams(evidence.home_route, "Home route");
     evidence.home_cta_href = await visibleLinkHref(page, "Create dataset", {

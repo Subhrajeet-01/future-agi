@@ -24,7 +24,7 @@ const SMOKES = [
     mode: "controlled",
     file: "setup-org-completion-smoke.mjs",
     description:
-      "Stubbed auth proof for setup-org sample preview quick start into the sample Aha panel.",
+      "Stubbed auth proof that setup-org does not expose sample preview before real setup.",
     env: {
       ONBOARDING_SMOKE_SETUP_SAMPLE_PREVIEW: "1",
       ONBOARDING_SMOKE_STUB_AUTH: "1",
@@ -345,7 +345,7 @@ const SMOKES = [
     mode: "real-signup",
     file: "signup-quick-start-smoke.mjs",
     description:
-      "Disposable-account proof that sample trace opens and stays non-activating.",
+      "Disposable-account proof that signup no longer exposes sample preview before real setup.",
     env: {
       ONBOARDING_REAL_SIGNUP: "1",
       ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY: "1",
@@ -356,7 +356,7 @@ const SMOKES = [
     mode: "real-signup",
     file: "signup-quick-start-smoke.mjs",
     description:
-      "Mobile disposable-account proof that sample trace opens and stays non-activating.",
+      "Mobile disposable-account proof that signup no longer exposes sample preview before real setup.",
     env: {
       ONBOARDING_REAL_SIGNUP: "1",
       ONBOARDING_REAL_SIGNUP_SAMPLE_ONLY: "1",
@@ -375,7 +375,7 @@ const SMOKES = [
       "signup-quick-start-mobile-real",
     ],
     description:
-      "Disposable-account desktop and mobile proof pack for sample Aha and first quality loop.",
+      "Disposable-account desktop and mobile proof pack for setup gating and first quality loop.",
   },
 ];
 

@@ -87,11 +87,11 @@ async function main() {
       { waitUntil: "domcontentloaded" },
     );
     await waitForVisibleText(page, "Set up gateway", { exact: true });
-    await waitForVisibleText(page, "Start with Send request.");
-    await waitForVisibleText(page, "Start here", { exact: true });
+    await waitForVisibleText(page, "Do this first: Send request.");
+    await waitForVisibleText(page, "Do this first", { exact: true });
     await waitForVisibleText(page, "Step 3 of 6", { exact: true });
     await waitForVisibleText(page, "Send request", { exact: true });
-    await waitForVisibleText(page, "What happens next", { exact: true });
+    await waitForVisibleText(page, "Setup sequence", { exact: true });
     evidence.home_route = await currentRelativeUrl(page);
     assertGatewayQuickStartParams(evidence.home_route, "Home route");
     evidence.home_cta_href = await visibleLinkHref(page, "Send request", {

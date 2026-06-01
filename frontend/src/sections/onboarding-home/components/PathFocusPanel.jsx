@@ -118,7 +118,7 @@ export default function PathFocusPanel({
           justifyContent="space-between"
         >
           <Typography variant="subtitle2">
-            {singleActionFocus ? "What happens next" : "Setup checklist"}
+            {singleActionFocus ? "Setup sequence" : "Setup checklist"}
           </Typography>
           {singleActionFocus && currentIndex !== null ? (
             <Chip
