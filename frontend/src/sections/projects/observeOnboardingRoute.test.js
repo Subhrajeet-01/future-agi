@@ -405,7 +405,9 @@ describe("observeOnboardingRoute", () => {
     expect(
       getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.SETUP_OBSERVE),
     ).toMatchObject({
-      currentStep: "Setup",
+      currentStep: "Choose package",
+      description:
+        "Choose the package your app uses, paste the matching setup, run one request, wait for the trace, review it, then create the first quality check.",
       primaryLabel: "Choose package",
       title: "Connect Observe to your app",
     });
@@ -413,8 +415,8 @@ describe("observeOnboardingRoute", () => {
       getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE),
     ).toMatchObject({
       currentStep: "First trace",
-      primaryLabel: "Refresh traces",
-      secondaryLabel: "Open setup",
+      primaryLabel: "Check for trace",
+      secondaryLabel: "Open package setup",
       title: "Send the first trace",
     });
     expect(
@@ -504,10 +506,33 @@ describe("observeOnboardingRoute", () => {
     ).toMatchObject({
       currentStep: "Anthropic trace",
       description:
-        "Keep this page open, run one Anthropic TypeScript request from your app, and we will open the trace when it appears. After review, Home will show the first quality check.",
-      primaryLabel: "Refresh Anthropic traces",
+        "Keep this page open, run one Anthropic TypeScript request from your app, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.",
+      primaryLabel: "Check for Anthropic trace",
       secondaryLabel: "Open Anthropic setup",
       title: "Send the first trace",
+    });
+
+    expect(
+      getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE, {
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
+      }),
+    ).toMatchObject({
+      currentStep: "Anthropic trace",
+      description:
+        "Review this Anthropic TypeScript trace to inspect inputs, outputs, latency, cost, and errors. Next, create a quality check from it.",
+      primaryLabel: "Review trace",
+    });
+
+    expect(
+      getObserveOnboardingCopy(OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR, {
+        setupLanguage: "typescript",
+        setupProvider: "anthropic",
+      }),
+    ).toMatchObject({
+      description:
+        "Turn the reviewed Anthropic TypeScript trace into a repeatable quality check for future runs.",
+      primaryLabel: "Create quality check",
     });
 
     expect(

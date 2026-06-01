@@ -296,7 +296,7 @@ export default function ObserveSetupPanel({
   const nextStep = steps[currentStepIndex + 1] || null;
   const actionStep = currentStep || {
     stage,
-    label: action?.title || "Connect your agent",
+    label: action?.title || "Choose package and send one trace",
     description:
       action?.description ||
       "Choose the package your app uses, create an Observe project, and send one trace.",
@@ -371,7 +371,7 @@ export default function ObserveSetupPanel({
     return {
       ...action,
       ctaLabel: `Open ${selectedSetupLabel} setup`,
-      description: `Open setup with ${selectedSetupLabel} install, provider key setup, package setup code, a ready-to-run request, and trace checks.`,
+      description: `Open package setup with ${selectedSetupLabel} install, provider key setup, package setup code, and a ready-to-run request. Future AGI waits for the trace, opens review, then guides the first quality check.`,
       href: hrefWithObservePackage(action.href, {
         language: selectedLanguage,
         provider: selectedProvider,
@@ -413,7 +413,9 @@ export default function ObserveSetupPanel({
         {!singleActionFocus ? (
           <ObservePanelHeader
             eyebrow={effectiveJourneyPlan.eyebrow || "Observe setup"}
-            title={effectiveJourneyPlan.title || "Connect your agent"}
+            title={
+              effectiveJourneyPlan.title || "Choose package and send one trace"
+            }
             description={
               effectiveJourneyPlan.description ||
               "Create the project, send one trace, then return here for the first review."

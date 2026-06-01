@@ -1158,7 +1158,7 @@ const EvalCreatePage = () => {
         label: autoSavingOnboardingStarter
           ? "Preparing first run"
           : onboardingParams.sourceType === "trace_project"
-            ? "Create evaluator"
+            ? "Create quality check"
             : "Save starter scorer",
         onClick: mode === "single" ? handleSaveSingle : handleSaveComposite,
       };
@@ -1172,7 +1172,7 @@ const EvalCreatePage = () => {
         : isTesting
           ? "Running first eval"
           : onboardingParams.sourceType === "trace_project"
-            ? "Run evaluator"
+            ? "Run quality check"
             : "Run first eval";
       return {
         disabled: !draftId || isTesting || !isPlaygroundReady,
@@ -1315,7 +1315,7 @@ const EvalCreatePage = () => {
                     size="small"
                     color="primary"
                     variant="outlined"
-                    label="Trace evaluator"
+                    label="Trace quality check"
                   />
                 ) : (
                   <Tabs

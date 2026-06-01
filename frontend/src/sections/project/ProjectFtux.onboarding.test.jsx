@@ -32,9 +32,9 @@ describe("ProjectFtux observe onboarding", () => {
     renderWithRouter(
       <ProjectFtux
         observeSetupCopy={{
-          currentStep: "Setup",
+          currentStep: "Choose package",
           description:
-            "Install tracing, load your keys, and send one real or test request.",
+            "Choose the package your app uses, paste the matching setup, run one request, wait for the trace, review it, then create the first quality check.",
           primaryLabel: "Review setup",
           steps: [
             { label: "Install", complete: false },
@@ -65,9 +65,10 @@ describe("ProjectFtux observe onboarding", () => {
     expect(screen.getByText("Connect your app")).toBeVisible();
     expect(
       screen.getByText(
-        "Choose the package your app uses, paste the matching setup, then run one request. We wait for the trace and move you to evaluator setup after review.",
+        "Choose the package your app uses, paste the matching setup, then run one request. Future AGI waits for the trace, opens review, then guides the first quality check.",
       ),
     ).toBeVisible();
+    expect(screen.queryByText(/evaluator setup/i)).not.toBeInTheDocument();
     expect(screen.getByText("Install")).toBeVisible();
     expect(screen.getByText("Trace")).toBeVisible();
     expect(screen.getByText("Review")).toBeVisible();
@@ -87,9 +88,9 @@ describe("ProjectFtux observe onboarding", () => {
     renderWithRouter(
       <ProjectFtux
         observeSetupCopy={{
-          currentStep: "Setup",
+          currentStep: "Choose package",
           description:
-            "Install tracing, load your keys, and send one real or test request.",
+            "Choose the package your app uses, paste the matching setup, run one request, wait for the trace, review it, then create the first quality check.",
           steps: [],
           title: "Connect Observe to your app",
         }}

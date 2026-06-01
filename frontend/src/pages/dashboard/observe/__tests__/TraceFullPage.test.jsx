@@ -138,7 +138,7 @@ describe("TraceFullPage", () => {
     expect(mocks.navigate).toHaveBeenCalledWith(realSetupHref);
   });
 
-  it("routes onboarding trace reviews directly to evaluator creation", async () => {
+  it("routes onboarding trace reviews directly to quality check creation", async () => {
     mocks.locationSearch = "?source=onboarding&onboarding=review-first-trace";
 
     const { getByRole, getByText } = render(<TraceFullPage />);
@@ -146,18 +146,18 @@ describe("TraceFullPage", () => {
     expect(getByText("First trace received")).toBeVisible();
     expect(
       getByText(
-        "Review spans, latency, cost, inputs, outputs, and errors here. Next, create an evaluator from this trace.",
+        "Review spans, latency, cost, inputs, outputs, and errors here. Next, create a quality check from this trace.",
       ),
     ).toBeVisible();
 
-    getByRole("button", { name: /create evaluator/i }).click();
+    getByRole("button", { name: /create quality check/i }).click();
 
     expect(mocks.navigate).toHaveBeenCalledWith(
       "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&trace_id=trace-1",
     );
   });
 
-  it("keeps package intent through trace review and evaluator creation", async () => {
+  it("keeps package intent through trace review and quality check creation", async () => {
     mocks.locationSearch =
       "?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=python";
 
@@ -166,7 +166,7 @@ describe("TraceFullPage", () => {
     expect(getByText("Anthropic Python trace received")).toBeVisible();
     expect(
       getByText(
-        "Review this Anthropic Python trace for spans, latency, cost, inputs, outputs, and errors. Next, create an evaluator from it.",
+        "Review this Anthropic Python trace for spans, latency, cost, inputs, outputs, and errors. Next, create a quality check from it.",
       ),
     ).toBeVisible();
 
@@ -183,7 +183,7 @@ describe("TraceFullPage", () => {
       ),
     );
 
-    getByRole("button", { name: /create evaluator/i }).click();
+    getByRole("button", { name: /create quality check/i }).click();
 
     expect(mocks.navigate).toHaveBeenCalledWith(
       "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&trace_id=trace-1&provider=anthropic&language=python",
@@ -199,7 +199,7 @@ describe("TraceFullPage", () => {
     expect(getByText("First trace received")).toBeVisible();
     expect(
       getByText(
-        "Review spans, latency, cost, inputs, outputs, and errors here. Next, create an evaluator from this trace.",
+        "Review spans, latency, cost, inputs, outputs, and errors here. Next, create a quality check from this trace.",
       ),
     ).toBeVisible();
   });

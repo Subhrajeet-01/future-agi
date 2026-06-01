@@ -319,7 +319,7 @@ export const ONBOARDING_STAGE_COPY = {
     eyebrow: "Waiting",
     title: "Waiting for the first trace",
     description:
-      "Keep the trace page open, run one request, and we will open the trace when it appears.",
+      "Keep the trace page open, run one request, and Future AGI will open the trace when it appears.",
   },
   waiting_for_first_trace_sample_available: {
     eyebrow: "Waiting",

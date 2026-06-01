@@ -343,13 +343,13 @@ describe("evalCreateOnboarding", () => {
         step: EVAL_CREATE_ONBOARDING_STEPS.SCORER,
       }),
     ).toMatchObject({
-      currentStep: "First evaluator",
+      currentStep: "First quality check",
       description:
-        "A starter evaluator is loaded for Anthropic Python traces. Create it, then run it once.",
-      title: "Create Anthropic Python evaluator",
+        "A starter quality check is loaded for Anthropic Python traces. Create it, then run it once.",
+      title: "Create Anthropic Python quality check",
       steps: [
         { label: "Trace source", complete: true },
-        { label: "Evaluator", complete: false },
+        { label: "Quality check", complete: false },
         { label: "Run", complete: false },
       ],
     });
@@ -361,10 +361,10 @@ describe("evalCreateOnboarding", () => {
         step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
       }),
     ).toMatchObject({
-      currentStep: "Run evaluator",
+      currentStep: "Run quality check",
       description:
-        "Run the saved evaluator on OpenAI TypeScript traces so the first result is reviewable.",
-      title: "Run OpenAI TypeScript evaluator",
+        "Run the saved quality check on OpenAI TypeScript traces so the first result is reviewable.",
+      title: "Run OpenAI TypeScript quality check",
     });
   });
 
@@ -542,7 +542,7 @@ describe("evalCreateOnboarding", () => {
       }),
     ).toEqual({
       description:
-        "Starter scorer is loaded for OpenAI TypeScript traces. Create the evaluator, then run it once.",
+        "Starter scorer is loaded for OpenAI TypeScript traces. Create the quality check, then run it once.",
       label: "OpenAI TypeScript trace project locked",
     });
 
@@ -556,7 +556,7 @@ describe("evalCreateOnboarding", () => {
         step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
       }),
     ).toEqual({
-      description: "Run the saved evaluator on LlamaIndex Python traces.",
+      description: "Run the saved quality check on LlamaIndex Python traces.",
       label: "LlamaIndex Python trace project ready",
     });
 
@@ -568,7 +568,7 @@ describe("evalCreateOnboarding", () => {
         step: EVAL_CREATE_ONBOARDING_STEPS.RUN,
       }),
     ).toEqual({
-      description: "Run the saved evaluator on this trace project.",
+      description: "Run the saved quality check on this trace project.",
       label: "Trace project ready",
     });
   });
@@ -950,12 +950,12 @@ describe("evalCreateOnboarding", () => {
     ).toMatchObject({
       currentStep: "Review result",
       sourceSummary: {
-        label: "Anthropic Python trace evaluator run",
+        label: "Anthropic Python trace quality check run",
       },
-      title: "Review trace evaluator result",
+      title: "Review trace quality-check result",
       steps: [
         { label: "Trace source", complete: true },
-        { label: "Evaluator", complete: true },
+        { label: "Quality check", complete: true },
         { label: "Run", complete: true },
         { label: "Review", complete: false },
       ],

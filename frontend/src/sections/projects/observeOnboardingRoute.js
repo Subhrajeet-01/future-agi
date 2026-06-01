@@ -318,10 +318,12 @@ export const getObserveOnboardingCopy = (
     }
 
     return {
-      currentStep: setupProviderLabel ? `${setupProviderLabel} setup` : "Setup",
+      currentStep: setupProviderLabel
+        ? `${setupProviderLabel} setup`
+        : "Choose package",
       description:
         packageSetupDescription ||
-        "Install tracing, load your keys, and send one real or test request.",
+        "Choose the package your app uses, paste the matching setup, run one request, wait for the trace, review it, then create the first quality check.",
       primaryLabel: setupProviderLabel
         ? `Open ${setupProviderLabel} setup`
         : "Choose package",
@@ -343,14 +345,14 @@ export const getObserveOnboardingCopy = (
         ? `${setupProviderLabel} trace`
         : "First trace",
       description: setupPackageLabel
-        ? `Keep this page open, run one ${setupPackageLabel} request from your app, and we will open the trace when it appears. After review, Home will show the first quality check.`
-        : "Keep this page open, run one production or test request, and we will open the trace when it appears. After review, Home will show the first quality check.",
+        ? `Keep this page open, run one ${setupPackageLabel} request from your app, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.`
+        : "Keep this page open, run one production or test request, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.",
       primaryLabel: setupProviderLabel
-        ? `Refresh ${setupProviderLabel} traces`
-        : "Refresh traces",
+        ? `Check for ${setupProviderLabel} trace`
+        : "Check for trace",
       secondaryLabel: setupProviderLabel
         ? `Open ${setupProviderLabel} setup`
-        : "Open setup",
+        : "Open package setup",
       steps: [
         { label: "Project", complete: true },
         { label: "Trace", complete: false },
@@ -363,10 +365,11 @@ export const getObserveOnboardingCopy = (
   if (mode === OBSERVE_ONBOARDING_MODES.CREATE_EVALUATOR) {
     return {
       currentStep: "Quality check",
-      description:
-        "Turn the reviewed trace into a repeatable quality check for future runs.",
+      description: setupPackageLabel
+        ? `Turn the reviewed ${setupPackageLabel} trace into a repeatable quality check for future runs.`
+        : "Turn the reviewed trace into a repeatable quality check for future runs.",
       primaryLabel: "Create quality check",
-      secondaryLabel: "Refresh traces",
+      secondaryLabel: "Check traces",
       steps: [
         { label: "Project", complete: true },
         { label: "Trace review", complete: true },
@@ -378,11 +381,14 @@ export const getObserveOnboardingCopy = (
 
   if (mode === OBSERVE_ONBOARDING_MODES.REVIEW_FIRST_TRACE) {
     return {
-      currentStep: "Trace received",
-      description:
-        "Review this trace to inspect inputs, outputs, latency, cost, and errors. Next, create a quality check from it.",
+      currentStep: setupProviderLabel
+        ? `${setupProviderLabel} trace`
+        : "Trace received",
+      description: setupPackageLabel
+        ? `Review this ${setupPackageLabel} trace to inspect inputs, outputs, latency, cost, and errors. Next, create a quality check from it.`
+        : "Review this trace to inspect inputs, outputs, latency, cost, and errors. Next, create a quality check from it.",
       primaryLabel: "Review trace",
-      secondaryLabel: "Refresh traces",
+      secondaryLabel: "Check traces",
       steps: [
         { label: "Project", complete: true },
         { label: "Trace", complete: true },

@@ -59,7 +59,7 @@ const ProjectFtux = ({
           maxWidth={620}
         >
           {showObserveOnboarding
-            ? "Choose the package your app uses, paste the matching setup, then run one request. We wait for the trace and move you to evaluator setup after review."
+            ? "Choose the package your app uses, paste the matching setup, then run one request. Future AGI waits for the trace, opens review, then guides the first quality check."
             : "Create a project to experiment on your model"}
         </Typography>
         <Box sx={{ height: "20px" }} />

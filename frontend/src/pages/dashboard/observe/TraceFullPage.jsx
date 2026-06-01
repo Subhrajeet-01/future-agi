@@ -178,10 +178,10 @@ export default function TraceFullPage() {
           ? `${traceReviewPackageLabel} trace received`
           : "First trace received",
         description: traceReviewPackageLabel
-          ? `Review this ${traceReviewPackageLabel} trace for spans, latency, cost, inputs, outputs, and errors. Next, create an evaluator from it.`
-          : "Review spans, latency, cost, inputs, outputs, and errors here. Next, create an evaluator from this trace.",
+          ? `Review this ${traceReviewPackageLabel} trace for spans, latency, cost, inputs, outputs, and errors. Next, create a quality check from it.`
+          : "Review spans, latency, cost, inputs, outputs, and errors here. Next, create a quality check from this trace.",
         primaryAction: {
-          label: "Create evaluator",
+          label: "Create quality check",
           onClick: handleCreateEvaluator,
           tourAnchor: "observe_evaluator_button",
         },

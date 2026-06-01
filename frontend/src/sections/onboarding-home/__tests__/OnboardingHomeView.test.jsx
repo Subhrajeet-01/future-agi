@@ -466,7 +466,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
     expect(
       within(panel).getByText(
-        "The Observe project exists. Keep this page open, run one Anthropic Python request, and we will open the trace when it appears. After review, Home will show the first quality check.",
+        "The Observe project exists. Keep this page open, run one Anthropic Python request, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.",
       ),
     ).toBeVisible();
     expect(

@@ -270,7 +270,7 @@ describe("EvalCreatePage onboarding source handoff", () => {
     });
 
     expect(
-      await screen.findByText("Run Anthropic TypeScript evaluator"),
+      await screen.findByText("Run Anthropic TypeScript quality check"),
     ).toBeVisible();
     expect(
       screen.queryByRole("tab", { name: "Composite" }),
@@ -286,7 +286,7 @@ describe("EvalCreatePage onboarding source handoff", () => {
     });
 
     const runButton = await screen.findByRole("button", {
-      name: "Run evaluator",
+      name: "Run quality check",
     });
     await waitFor(() => expect(runButton).toBeEnabled());
 
@@ -331,7 +331,7 @@ describe("EvalCreatePage onboarding source handoff", () => {
     });
 
     const runButton = await screen.findByRole("button", {
-      name: "Run evaluator",
+      name: "Run quality check",
     });
     await waitFor(() => expect(runButton).toBeEnabled());
 

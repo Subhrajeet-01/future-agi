@@ -64,7 +64,7 @@ export default function WaitingForSignalPanel({
         <ObservePanelHeader
           eyebrow="Waiting for trace"
           title={`Send one ${traceLabel}`}
-          description={`The Observe project exists. Keep this page open, run one ${requestLabel}, and we will open the trace when it appears. After review, Home will show the first quality check.`}
+          description={`The Observe project exists. Keep this page open, run one ${requestLabel}, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.`}
           chips={["observe", "waiting"]}
         />
         <ObserveJourneyProgress

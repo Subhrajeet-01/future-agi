@@ -143,29 +143,29 @@ const TRACE_PROJECT_STEP_COPY = {
     title: "Use reviewed trace project",
     steps: [
       { label: "Trace source", complete: false },
-      { label: "Evaluator", complete: false },
+      { label: "Quality check", complete: false },
       { label: "Run", complete: false },
     ],
   },
   [EVAL_CREATE_ONBOARDING_STEPS.SCORER]: {
-    currentStep: "First evaluator",
+    currentStep: "First quality check",
     description:
-      "A safe output-quality scorer is loaded for this trace project. Create it, then run it once.",
-    title: "Create the first trace evaluator",
+      "A safe output-quality scorer is loaded for this trace project. Create the quality check, then run it once.",
+    title: "Create the first trace quality check",
     steps: [
       { label: "Trace source", complete: true },
-      { label: "Evaluator", complete: false },
+      { label: "Quality check", complete: false },
       { label: "Run", complete: false },
     ],
   },
   [EVAL_CREATE_ONBOARDING_STEPS.RUN]: {
-    currentStep: "Run evaluator",
+    currentStep: "Run quality check",
     description:
-      "Run the saved scorer once so the first trace-project eval result is reviewable.",
-    title: "Run evaluator on trace project",
+      "Run the saved quality check once so the first trace-project result is reviewable.",
+    title: "Run quality check on trace project",
     steps: [
       { label: "Trace source", complete: true },
-      { label: "Evaluator", complete: true },
+      { label: "Quality check", complete: true },
       { label: "Run", complete: false },
     ],
   },
@@ -218,24 +218,24 @@ const traceProjectReviewCopy = ({ setupLanguage, setupProvider } = {}) => {
     setupLanguage,
     setupProvider,
   });
-  const traceEvaluatorLabel = setupPackageLabel
-    ? `${setupPackageLabel} trace evaluator`
-    : "Trace evaluator";
+  const traceQualityCheckLabel = setupPackageLabel
+    ? `${setupPackageLabel} trace quality check`
+    : "Trace quality check";
 
   return {
     currentStep: "Review result",
     description: setupPackageLabel
-      ? `Review the first ${setupPackageLabel} evaluator result. A healthy result completes setup; a weak or failed result points back to the trace source.`
-      : "Review the first trace evaluator result. A healthy result completes setup; a weak or failed result points back to the trace source.",
+      ? `Review the first ${setupPackageLabel} quality-check result. A healthy result completes setup; a weak or failed result points back to the trace source.`
+      : "Review the first trace quality-check result. A healthy result completes setup; a weak or failed result points back to the trace source.",
     sourceSummary: {
       description:
-        "The evaluator is tied to the trace project you reviewed during setup.",
-      label: `${traceEvaluatorLabel} run`,
+        "The quality check is tied to the trace project you reviewed during setup.",
+      label: `${traceQualityCheckLabel} run`,
     },
-    title: "Review trace evaluator result",
+    title: "Review trace quality-check result",
     steps: [
       { label: "Trace source", complete: true },
-      { label: "Evaluator", complete: true },
+      { label: "Quality check", complete: true },
       { label: "Run", complete: true },
       { label: "Review", complete: false },
     ],
@@ -515,7 +515,7 @@ export const getEvalCreateOnboardingCopy = ({
     if (step === EVAL_CREATE_ONBOARDING_STEPS.DATA) {
       return {
         ...fallbackCopy,
-        description: `${setupPackageLabel} trace source is selected. Next, create an evaluator from that trace source.`,
+        description: `${setupPackageLabel} trace source is selected. Next, create a quality check from that trace source.`,
         title: `Use ${setupPackageLabel} trace source`,
       };
     }
@@ -523,15 +523,15 @@ export const getEvalCreateOnboardingCopy = ({
     if (step === EVAL_CREATE_ONBOARDING_STEPS.RUN) {
       return {
         ...fallbackCopy,
-        description: `Run the saved evaluator on ${setupPackageLabel} traces so the first result is reviewable.`,
-        title: `Run ${setupPackageLabel} evaluator`,
+        description: `Run the saved quality check on ${setupPackageLabel} traces so the first result is reviewable.`,
+        title: `Run ${setupPackageLabel} quality check`,
       };
     }
 
     return {
       ...fallbackCopy,
-      description: `A starter evaluator is loaded for ${setupPackageLabel} traces. Create it, then run it once.`,
-      title: `Create ${setupPackageLabel} evaluator`,
+      description: `A starter quality check is loaded for ${setupPackageLabel} traces. Create it, then run it once.`,
+      title: `Create ${setupPackageLabel} quality check`,
     };
   }
   return STEP_COPY[step] || STEP_COPY[EVAL_CREATE_ONBOARDING_STEPS.SCORER];
@@ -599,9 +599,9 @@ export const getEvalOnboardingSourceSummary = ({
   if (step === EVAL_CREATE_ONBOARDING_STEPS.SCORER) {
     return {
       description: setupPackageLabel
-        ? `Starter scorer is loaded for ${setupPackageLabel} traces. Create the evaluator, then run it once.`
+        ? `Starter scorer is loaded for ${setupPackageLabel} traces. Create the quality check, then run it once.`
         : sourceType === "trace_project"
-          ? "Starter scorer is loaded for this trace project. Create the evaluator, then run it once."
+          ? "Starter scorer is loaded for this trace project. Create the quality check, then run it once."
           : "Starter scorer is ready. Edit it or save to run this source.",
       label:
         sourceType === "trace_project"
@@ -612,9 +612,9 @@ export const getEvalOnboardingSourceSummary = ({
 
   return {
     description: setupPackageLabel
-      ? `Run the saved evaluator on ${setupPackageLabel} traces.`
+      ? `Run the saved quality check on ${setupPackageLabel} traces.`
       : sourceType === "trace_project"
-        ? "Run the saved evaluator on this trace project."
+        ? "Run the saved quality check on this trace project."
         : "Run the saved scorer on this source.",
     label: `${summaryLabel} ready`,
   };

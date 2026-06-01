@@ -93,7 +93,10 @@ vi.mock("./NewProject/NewProjectDrawer", () => ({
       <div>
         <div>Observe setup drawer</div>
         {props.observeSetupVerification ? (
-          <div>{props.observeSetupVerification.title}</div>
+          <div>
+            <div>{props.observeSetupVerification.title}</div>
+            <div>{props.observeSetupVerification.description}</div>
+          </div>
         ) : null}
       </div>
     ) : null,
@@ -195,6 +198,12 @@ describe("ProjectWrapperView observe setup onboarding", () => {
     expect(screen.getByText("Observe list")).toBeVisible();
     expect(screen.getByText("Observe setup drawer")).toBeVisible();
     expect(screen.getByText("Waiting for first trace")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Run one request after pasting the setup. Keep this setup open; Future AGI opens review when the trace arrives, then guides the first quality check.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/evaluator setup/i)).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(mocks.recordActivationEvent).toHaveBeenCalledWith(
