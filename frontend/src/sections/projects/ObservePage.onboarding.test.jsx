@@ -307,7 +307,9 @@ describe("ObservePage onboarding first-trace handoff", () => {
       "run one Anthropic Python request",
     );
     expect(
-      screen.getByRole("button", { name: /check for anthropic trace/i }),
+      screen.getByRole("button", {
+        name: /check for anthropic python trace/i,
+      }),
     ).toBeEnabled();
     expect(
       screen.getByRole("button", { name: /open anthropic setup/i }),

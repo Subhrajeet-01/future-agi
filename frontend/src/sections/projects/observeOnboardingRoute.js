@@ -347,8 +347,8 @@ export const getObserveOnboardingCopy = (
       description: setupPackageLabel
         ? `Keep this page open, run one ${setupPackageLabel} request from your app, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.`
         : "Keep this page open, run one production or test request, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.",
-      primaryLabel: setupProviderLabel
-        ? `Check for ${setupProviderLabel} trace`
+      primaryLabel: setupPackageLabel
+        ? `Check for ${setupPackageLabel} trace`
         : "Check for trace",
       secondaryLabel: setupProviderLabel
         ? `Open ${setupProviderLabel} setup`

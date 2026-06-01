@@ -42,7 +42,7 @@ describe("NewProjectDrawer onboarding", () => {
           description:
             "Run one Anthropic TypeScript request after pasting the setup.",
           primaryAction: {
-            label: "Wait for Anthropic TypeScript trace",
+            label: "Check for Anthropic TypeScript trace",
             onClick: onWait,
           },
           status: "waiting",
@@ -70,7 +70,7 @@ describe("NewProjectDrawer onboarding", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /wait for anthropic typescript trace/i,
+        name: /check for anthropic typescript trace/i,
       }),
     );
 

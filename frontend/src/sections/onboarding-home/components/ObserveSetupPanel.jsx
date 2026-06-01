@@ -277,7 +277,8 @@ export default function ObserveSetupPanel({
   singleActionFocus = false,
   stage = "connect_observability",
 }) {
-  const normalizedInitialProvider = normalizeProvider(initialProvider);
+  const normalizedInitialProvider =
+    normalizeProvider(initialProvider) || "openai";
   const normalizedInitialLanguage = normalizeLanguage({
     language: initialLanguage,
     provider: normalizedInitialProvider,

@@ -220,7 +220,7 @@ async function main() {
     );
     await expectSelector(page, '[data-testid="eval-onboarding-focus"]');
     await expectVisibleText(page, "Eval setup", { exact: true });
-    await expectVisibleText(page, "Run evaluator on trace project", {
+    await expectVisibleText(page, "Run quality check on trace project", {
       exact: true,
     });
     await expectVisibleText(
@@ -233,8 +233,8 @@ async function main() {
     await expectVisibleText(
       page,
       SETUP_PACKAGE_LABEL
-        ? `Run the saved evaluator on ${SETUP_PACKAGE_LABEL} traces.`
-        : "Run the saved evaluator on this trace project.",
+        ? `Run the saved quality check on ${SETUP_PACKAGE_LABEL} traces.`
+        : "Run the saved quality check on this trace project.",
       { exact: true },
     );
     await waitForCondition(

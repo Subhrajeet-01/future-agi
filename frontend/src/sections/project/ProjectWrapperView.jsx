@@ -449,6 +449,9 @@ const ProjectWrapperView = () => {
     observeSetupOnboardingParams.setupProvider,
     resolveCurrentTraceBaselineId,
   ]);
+  const handleOpenObserveSetupDrawer = useCallback(() => {
+    setSetupDrawerOpen(true);
+  }, []);
 
   const handleOpenSampleTrace = useCallback(async () => {
     try {
@@ -486,8 +489,8 @@ const ProjectWrapperView = () => {
     return {
       label: firstObserveProjectId
         ? observeSetupPackageLabel
-          ? `Wait for ${observeSetupPackageLabel} trace`
-          : "Wait for first trace"
+          ? `Check for ${observeSetupPackageLabel} trace`
+          : "Check for trace"
         : isProjectCount
           ? "Open package setup"
           : observeSetupCopy.primaryLabel,
@@ -518,6 +521,12 @@ const ProjectWrapperView = () => {
   const observeSetupPrimaryAction = reviewObserveSetupAction;
 
   const observeSetupSecondaryAction = useMemo(() => {
+    if (observeSetupCopy && showObserveSetupFocus && firstObserveProjectId) {
+      return {
+        label: observeSetupCopy.primaryLabel || "Open package setup",
+        onClick: handleOpenObserveSetupDrawer,
+      };
+    }
     if (
       !observeSetupCopy ||
       !showObserveSetupFocus ||
@@ -529,6 +538,8 @@ const ProjectWrapperView = () => {
     return openSampleTraceAction;
   }, [
     canOpenObserveSetupSample,
+    firstObserveProjectId,
+    handleOpenObserveSetupDrawer,
     observeSetupCopy,
     openSampleTraceAction,
     showObserveSetupFocus,
@@ -540,8 +551,8 @@ const ProjectWrapperView = () => {
     }
     const hasObserveProject = Boolean(firstObserveProjectId);
     const waitLabel = observeSetupPackageLabel
-      ? `Wait for ${observeSetupPackageLabel} trace`
-      : "Wait for first trace";
+      ? `Check for ${observeSetupPackageLabel} trace`
+      : "Check for trace";
     return {
       description: hasObserveProject
         ? observeSetupPackageLabel
@@ -688,7 +699,6 @@ const ProjectWrapperView = () => {
               description={observeSetupCopy.description}
               primaryAction={observeSetupPrimaryAction}
               secondaryAction={observeSetupSecondaryAction}
-              singleActionFocus
               steps={observeSetupCopy.steps}
               sx={{ mb: 0 }}
               title={observeSetupCopy.title}

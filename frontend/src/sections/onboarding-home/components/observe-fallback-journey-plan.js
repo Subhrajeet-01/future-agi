@@ -30,7 +30,7 @@ const OBSERVE_FALLBACK_STEPS = [
   {
     id: "create_trace_evaluator",
     stage: "create_trace_evaluator",
-    label: "Add quality check",
+    label: "Create quality check",
     description: "Turn the reviewed trace into a repeatable check.",
     tourAnchor: "observe_evaluator_button",
   },

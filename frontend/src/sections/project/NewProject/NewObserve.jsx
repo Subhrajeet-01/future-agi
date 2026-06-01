@@ -130,7 +130,7 @@ const FIRST_TRACE_STEPS = [
   },
   {
     id: "evaluator",
-    label: "Add quality check",
+    label: "Create quality check",
     description: "Turn the reviewed trace into a repeatable check.",
   },
 ];

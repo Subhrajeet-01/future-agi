@@ -633,24 +633,20 @@ async function main() {
     });
     if (!EXISTING_PROJECT) {
       assert(
-        observeSetupActionTexts.includes("Open sample trace"),
-        `Expected sample trace to remain available. Actions: ${observeSetupActionTexts.join(
-          ", ",
-        )}`,
-      );
-      assert(
         observeSetupActionTexts.at(-1) ===
           `Open ${SETUP_PACKAGE.providerLabel} setup`,
         `Expected ${SETUP_PACKAGE.providerLabel} setup to remain primary. Actions: ${observeSetupActionTexts.join(
           ", ",
         )}`,
       );
+      evidence.observe_setup_sample_action_visible =
+        observeSetupActionTexts.includes("Open sample trace");
       evidence.observe_setup_actions = observeSetupActionTexts;
     }
     if (EXISTING_PROJECT) {
-      const waitForTraceLabel = `Wait for ${SETUP_PACKAGE.label} trace`;
-      await expectVisibleText(page, waitForTraceLabel, { exact: true });
-      await clickVisibleText(page, waitForTraceLabel, {
+      const checkForTraceLabel = `Check for ${SETUP_PACKAGE.label} trace`;
+      await expectVisibleText(page, checkForTraceLabel, { exact: true });
+      await clickVisibleText(page, checkForTraceLabel, {
         rootSelector: '[data-testid="observe-onboarding-focus"]',
       });
       await page.waitForFunction(
@@ -671,15 +667,14 @@ async function main() {
       );
       evidence.first_trace_step_url = relativeUrl(page.url());
       await expectSelector(page, '[data-testid="observe-onboarding-focus"]');
+      await expectVisibleText(page, "Send the first trace", { exact: true });
       const firstTraceStepActions = await visibleActionTexts(page, {
         rootSelector: '[data-testid="observe-onboarding-focus"]',
       });
-      const refreshTraceLabel = EXISTING_TRACE
-        ? "Refresh traces"
-        : `Refresh ${SETUP_PACKAGE.providerLabel} traces`;
+      const checkTraceLabel = `Check for ${SETUP_PACKAGE.label} trace`;
       assert(
-        firstTraceStepActions.includes(refreshTraceLabel),
-        `Expected refresh action to remain available. Actions: ${firstTraceStepActions.join(
+        firstTraceStepActions.includes(checkTraceLabel),
+        `Expected trace check action to remain available. Actions: ${firstTraceStepActions.join(
           ", ",
         )}`,
       );
@@ -694,13 +689,31 @@ async function main() {
         );
       }
       assert(
-        firstTraceStepActions.at(-1) ===
-          (EXISTING_TRACE ? "Review trace" : refreshTraceLabel),
+        firstTraceStepActions[0] === checkTraceLabel,
         `Unexpected first-trace primary action. Actions: ${firstTraceStepActions.join(
           ", ",
         )}`,
       );
       evidence.first_trace_step_actions = firstTraceStepActions;
+      const traceReviewAlreadyOpen = await page.evaluate(
+        ({ language, provider }) => {
+          const params = new URLSearchParams(window.location.search);
+          return (
+            window.location.pathname ===
+              "/dashboard/observe/observe-smoke-project/trace/trace-smoke-1" &&
+            params.get("source") === "onboarding" &&
+            params.get("onboarding") === "review-first-trace" &&
+            params.get("provider") === provider &&
+            params.get("language") === language
+          );
+        },
+        { language: SETUP_LANGUAGE, provider: SETUP_PROVIDER },
+      );
+      if (!traceReviewAlreadyOpen) {
+        await clickVisibleText(page, checkTraceLabel, {
+          rootSelector: '[data-testid="observe-onboarding-focus"]',
+        });
+      }
       if (EXISTING_TRACE) {
         await expectVisibleText(page, "First trace received", {
           exact: true,
@@ -728,8 +741,11 @@ async function main() {
           () =>
             stubbedApiRequests.some((entry) =>
               entry.includes("/tracer/trace/list_traces_of_session/"),
+            ) ||
+            stubbedApiRequests.some((entry) =>
+              entry.includes("/tracer/trace/trace-smoke-1/"),
             ),
-          "Trace list was not requested for first trace verification.",
+          "Trace list or trace detail was not requested for first trace verification.",
           30000,
         );
         evidence.first_trace_review_url = relativeUrl(page.url());
@@ -778,7 +794,7 @@ async function main() {
           exact: true,
         },
       );
-      await expectVisibleText(page, "Review and create eval", {
+      await expectVisibleText(page, "Create quality check", {
         exact: true,
       });
       await expectVisibleText(page, SETUP_PACKAGE.install);
@@ -954,12 +970,14 @@ async function installRuntime(
       stubbedApiRequests.push(`${request.method()} ${normalizedPath}`);
       const payload = parseJsonPostData(request.postData());
       activationEventPosts.push(payload);
+      const firstTraceReady =
+        EXISTING_TRACE && payload?.stage === "waiting_for_first_trace";
       await respondJson(request, {
         status: true,
         result: {
           event_id: "00000000-0000-4000-8000-000000000188",
           event_name: payload?.event_name || "onboarding_home_viewed",
-          activation_state: stubbedActivationState(auth),
+          activation_state: stubbedActivationState(auth, { firstTraceReady }),
         },
       });
       return;

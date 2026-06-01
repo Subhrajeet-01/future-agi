@@ -401,15 +401,7 @@ describe("OnboardingHomeView", () => {
     ).toBeVisible();
     expect(within(currentStep).getByText("Current")).toBeVisible();
     expect(within(panel).getByTestId("current-step-guide")).toHaveTextContent(
-      "Select the SDK package that sends your model call.",
-    );
-    expect(
-      within(panel).getByRole("button", {
-        name: /choose package to continue/i,
-      }),
-    ).toBeDisabled();
-    await userEvent.click(
-      within(panel).getByRole("button", { name: "OpenAI" }),
+      "Open OpenAI Python setup",
     );
     expect(
       within(panel).getByTestId("observe-package-code-preview"),
@@ -646,18 +638,20 @@ describe("OnboardingHomeView", () => {
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
     expect(screen.getAllByText("Connect your agent").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Step 1 of 4").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Open package setup").length).toBeGreaterThan(0);
     expect(
-      screen.getByText("Select the SDK package before opening setup."),
-    ).toBeVisible();
-    await userEvent.click(
-      within(screen.getByTestId("observe-setup-panel")).getByRole("button", {
-        name: "OpenAI",
-      }),
-    );
+      screen.getAllByText("Open OpenAI Python setup").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByText("Select the SDK package before opening setup."),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /open openai python setup/i }),
     ).toBeVisible();
+    expect(
+      within(screen.getByTestId("observe-setup-panel")).getByTestId(
+        "observe-selected-package-handoff",
+      ),
+    ).toHaveTextContent("OpenAI Python path selected");
     expect(screen.getByText("Send first trace")).toBeVisible();
     expect(screen.getByText("Review first trace")).toBeVisible();
   });
@@ -1233,16 +1227,6 @@ describe("OnboardingHomeView", () => {
       );
       expect(within(panel).getByText("Later steps")).toBeVisible();
       expect(within(panel).queryByText("Show full path")).toBeNull();
-      if (quickStartPrimaryPath === "observe") {
-        expect(
-          within(panel).getByRole("button", {
-            name: /choose package to continue/i,
-          }),
-        ).toBeDisabled();
-        await userEvent.click(
-          within(panel).getByRole("button", { name: "OpenAI" }),
-        );
-      }
       const primaryLinkName =
         quickStartPrimaryPath === "observe"
           ? /open openai python setup/i
@@ -1335,7 +1319,7 @@ describe("OnboardingHomeView", () => {
       within(panel).queryByRole("heading", { name: "Connect your agent" }),
     ).not.toBeInTheDocument();
     expect(
-      within(panel).getAllByText("Choose SDK package").length,
+      within(panel).getAllByText("Open OpenAI Python setup").length,
     ).toBeGreaterThan(0);
     expect(within(panel).getAllByText("Step 1 of 4").length).toBeGreaterThan(0);
     expect(within(panel).getByText("Later steps")).toBeVisible();

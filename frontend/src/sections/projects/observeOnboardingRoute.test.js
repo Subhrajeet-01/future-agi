@@ -507,7 +507,7 @@ describe("observeOnboardingRoute", () => {
       currentStep: "Anthropic trace",
       description:
         "Keep this page open, run one Anthropic TypeScript request from your app, and Future AGI will open the trace when it appears. After review, the next step is the first quality check.",
-      primaryLabel: "Check for Anthropic trace",
+      primaryLabel: "Check for Anthropic TypeScript trace",
       secondaryLabel: "Open Anthropic setup",
       title: "Send the first trace",
     });

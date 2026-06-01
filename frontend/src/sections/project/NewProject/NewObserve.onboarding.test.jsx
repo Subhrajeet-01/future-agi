@@ -178,7 +178,7 @@ describe("NewObserve onboarding setup", () => {
     expect(within(guide).getByText("Create keys")).toBeVisible();
     expect(within(guide).getByText("Run one request")).toBeVisible();
     expect(within(guide).getByText("Review trace")).toBeVisible();
-    expect(within(guide).getByText("Add quality check")).toBeVisible();
+    expect(within(guide).getByText("Create quality check")).toBeVisible();
     expect(
       within(guide).getByTestId("observe-current-setup-task"),
     ).toHaveTextContent("Next: create a Future AGI API key");

@@ -173,9 +173,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       route: "/dashboard/observe?setup=true&source=onboarding",
     });
 
-    await user.click(
-      screen.getByRole("button", { name: /wait for first trace/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /check for trace/i }));
 
     await waitFor(() => {
       expect(window.location.pathname).toBe(
@@ -220,9 +218,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       );
     });
 
-    await user.click(
-      screen.getByRole("button", { name: /wait for first trace/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /check for trace/i }));
 
     await waitFor(() => {
       expect(window.location.pathname).toBe(
