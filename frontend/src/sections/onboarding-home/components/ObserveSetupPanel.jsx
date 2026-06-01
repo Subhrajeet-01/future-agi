@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -230,6 +230,7 @@ export default function ObserveSetupPanel({
   onPrimaryClick,
   onFallbackClick,
   onCheckAgain,
+  onPackageSelection,
   isChecking = false,
   singleActionFocus = false,
   stage = "connect_observability",
@@ -245,6 +246,7 @@ export default function ObserveSetupPanel({
   const [selectedLanguage, setSelectedLanguage] = useState(
     normalizedInitialLanguage,
   );
+  const recordedPackageSelectionRef = useRef(null);
   const effectiveJourneyPlan = journeyPlan || observeFallbackJourneyPlan(stage);
   const currentStep = journeyCurrentStep(effectiveJourneyPlan, stage);
   const steps = effectiveJourneyPlan?.steps || [];
@@ -292,7 +294,22 @@ export default function ObserveSetupPanel({
       setupLanguage: selectedLanguage,
       setupProvider: selectedProvider,
     });
-  }, [selectedLanguage, selectedProvider, shouldShowPackagePicker]);
+    if (!selectedProvider) return;
+    const recordKey = `${selectedProvider}:${selectedLanguage}`;
+    if (recordedPackageSelectionRef.current === recordKey) return;
+    recordedPackageSelectionRef.current = recordKey;
+    onPackageSelection?.({
+      setupLanguage: selectedLanguage,
+      setupProvider: selectedProvider,
+      setupLabel: selectedSetupLabel,
+    });
+  }, [
+    onPackageSelection,
+    selectedLanguage,
+    selectedProvider,
+    selectedSetupLabel,
+    shouldShowPackagePicker,
+  ]);
 
   const packageAwareAction = useMemo(() => {
     if (!shouldShowPackagePicker || !action?.href) return action;
@@ -437,6 +454,7 @@ ObserveSetupPanel.propTypes = {
   journeyPlan: PropTypes.object,
   onCheckAgain: PropTypes.func,
   onFallbackClick: PropTypes.func,
+  onPackageSelection: PropTypes.func,
   onPrimaryClick: PropTypes.func,
   singleActionFocus: PropTypes.bool,
   stage: PropTypes.string,

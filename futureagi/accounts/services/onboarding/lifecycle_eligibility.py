@@ -25,6 +25,7 @@ from tracer.models.project import Project
 from tracer.models.trace import Trace
 
 OBSERVE_CREDENTIAL_READY_EVENT = "onboarding_observe_route_focus_viewed"
+OBSERVE_PACKAGE_SELECTED_EVENT = "onboarding_observe_package_selected"
 OBSERVE_CREDENTIAL_READY_ROUTE_MODE = "setup-observe"
 OBSERVE_CREDENTIAL_READY_STEP = "done"
 OBSERVE_SETUP_PROVIDER_LABELS = {
@@ -205,7 +206,10 @@ def _latest_observe_setup_intent_event(organization, workspace):
     events = OnboardingActivationEvent.no_workspace_objects.filter(
         organization=organization,
         workspace=workspace,
-        event_name=OBSERVE_CREDENTIAL_READY_EVENT,
+        event_name__in=[
+            OBSERVE_CREDENTIAL_READY_EVENT,
+            OBSERVE_PACKAGE_SELECTED_EVENT,
+        ],
         product_path="observe",
         is_sample=False,
     ).order_by("-occurred_at", "-created_at")[:30]
@@ -889,7 +893,9 @@ def _observe_credentials_ready_metadata(
 
     def event_applies(event):
         return bool(event) and (
-            not project_created_at or event.occurred_at >= project_created_at
+            event.event_name == OBSERVE_PACKAGE_SELECTED_EVENT
+            or not project_created_at
+            or event.occurred_at >= project_created_at
         )
 
     intent = (

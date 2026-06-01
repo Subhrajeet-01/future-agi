@@ -352,6 +352,66 @@ def test_observe_waiting_email_uses_latest_setup_intent_without_credentials(
 
 
 @pytest.mark.django_db
+def test_observe_waiting_email_uses_home_package_selection_before_project(
+    organization,
+    workspace,
+    user,
+):
+    now = timezone.now()
+    OnboardingGoal.no_workspace_objects.create(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        goal="monitor_production_ai_app",
+        primary_path="observe",
+        selected_at=now - timedelta(hours=8),
+    )
+    record_event(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        event_name="onboarding_observe_package_selected",
+        source="onboarding_home",
+        product_path="observe",
+        activation_stage="connect_observability",
+        metadata={
+            "setup_language": "python",
+            "setup_provider": "anthropic",
+        },
+        idempotency_key="observe:home:package:selected",
+        occurred_at=now - timedelta(hours=7, minutes=30),
+    )
+    project = create_observe_project(
+        organization=organization,
+        workspace=workspace,
+        user=user,
+    )
+    project.created_at = now - timedelta(hours=7)
+    project.save(update_fields=["created_at"])
+    flags = _flags()
+    activation_state = _activation_state(user, organization, workspace, flags=flags)
+
+    decision = evaluate_lifecycle_decision(
+        user=user,
+        organization=organization,
+        workspace=workspace,
+        activation_state=activation_state,
+        flags=flags,
+        now=now,
+    )
+
+    assert activation_state["stage"] == "waiting_for_first_trace"
+    assert decision.campaign["campaign_key"] == "observe_waiting_for_first_trace"
+    assert decision.status == OnboardingLifecycleEvaluationLog.STATUS_ELIGIBLE
+    assert decision.metadata["observe_setup_language"] == "python"
+    assert decision.metadata["observe_setup_language_label"] == "Python"
+    assert decision.metadata["observe_setup_provider"] == "anthropic"
+    assert decision.metadata["observe_setup_provider_label"] == "Anthropic"
+    assert "provider=anthropic" in decision.target_url
+    assert "language=python" in decision.target_url
+
+
+@pytest.mark.django_db
 def test_completed_target_event_suppresses_campaign(
     organization,
     workspace,

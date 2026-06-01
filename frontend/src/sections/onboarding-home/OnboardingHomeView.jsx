@@ -1074,6 +1074,43 @@ export default function OnboardingHomeView() {
     });
   };
 
+  const handleObservePackageSelection = ({
+    setupLanguage,
+    setupProvider,
+    setupLabel,
+  } = {}) => {
+    if (!renderedState || !setupProvider) return;
+    const action = renderedState.recommendedAction || {};
+    const workspaceKey =
+      renderedState.workspaceId || workspaceId || "workspace";
+    recordActivationEvent.mutate?.({
+      eventName: "onboarding_observe_package_selected",
+      primaryPath: "observe",
+      stage: renderedState.stage || "connect_observability",
+      source: "onboarding_home",
+      ...activationEmailContextFor(trackContext),
+      artifactType: "observe_setup",
+      artifactId: "observe-package",
+      isSample: false,
+      metadata: compactEventMetadata({
+        action_id: action.id,
+        route: action.href,
+        route_available: action.routeAvailable,
+        setup_language: setupLanguage,
+        setup_label: setupLabel,
+        setup_provider: setupProvider,
+      }),
+      idempotencyKey: [
+        "onboarding_observe_package_selected",
+        workspaceKey,
+        setupProvider,
+        setupLanguage,
+      ]
+        .filter(Boolean)
+        .join(":"),
+    });
+  };
+
   const handleDailyActionClick = (action, dailyAction) => {
     handleActionClick(action);
     trackOnboardingHomeEvent(OnboardingHomeEvents.dailyQualityActionOpened, {
@@ -1305,6 +1342,7 @@ export default function OnboardingHomeView() {
             initialLanguage={searchContext.setupLanguage}
             initialProvider={searchContext.setupProvider}
             journeyPlan={renderedState.journeyPlan}
+            onPackageSelection={handleObservePackageSelection}
             stage={renderedState.stage}
           />
         ) : null}
@@ -1363,6 +1401,7 @@ export default function OnboardingHomeView() {
           initialLanguage={searchContext.setupLanguage}
           initialProvider={searchContext.setupProvider}
           journeyPlan={null}
+          onPackageSelection={handleObservePackageSelection}
           singleActionFocus
           stage={quickStartFallbackStage || "connect_observability"}
         />

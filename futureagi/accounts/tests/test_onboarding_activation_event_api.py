@@ -194,6 +194,50 @@ def test_observe_setup_route_focus_records_event(auth_client, workspace, user):
 
 @pytest.mark.django_db
 @override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
+def test_observe_package_selection_records_event(auth_client, workspace, user):
+    user.goals = ["monitor_production_ai_app"]
+    user.save(update_fields=["goals"])
+
+    response = auth_client.post(
+        "/accounts/activation-events/",
+        {
+            "event_name": "onboarding_observe_package_selected",
+            "primary_path": "observe",
+            "stage": "connect_observability",
+            "source": "onboarding_home",
+            "artifact_type": "observe_setup",
+            "artifact_id": "observe-package",
+            "metadata": {
+                "action_id": "create_observe_project",
+                "setup_language": "python",
+                "setup_provider": "anthropic",
+            },
+            "idempotency_key": "observe:package:selected:anthropic:python",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    result = response.json()["result"]
+    assert result["event_name"] == "onboarding_observe_package_selected"
+    event = OnboardingActivationEvent.no_workspace_objects.get(
+        workspace=workspace,
+        event_name="onboarding_observe_package_selected",
+    )
+    assert event.activation_stage == "connect_observability"
+    assert event.product_path == "observe"
+    assert event.metadata == {
+        "action_id": "create_observe_project",
+        "artifact_id": "observe-package",
+        "artifact_type": "observe_setup",
+        "project_id": None,
+        "setup_language": "python",
+        "setup_provider": "anthropic",
+    }
+
+
+@pytest.mark.django_db
+@override_settings(ONBOARDING_FEATURE_FLAGS={"onboarding_activation_state_api": True})
 def test_observe_project_route_focus_records_event(
     auth_client,
     organization,

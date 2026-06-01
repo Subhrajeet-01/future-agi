@@ -1468,6 +1468,57 @@ describe("OnboardingHomeView", () => {
     });
   });
 
+  it("records Observe package selection so lifecycle emails keep package context", async () => {
+    const recordPackageSelection = vi.fn();
+    mocks.useRecordActivationEvent.mockReturnValue({
+      mutate: recordPackageSelection,
+      isLoading: false,
+      isPending: false,
+    });
+    mocks.useActivationState.mockReturnValue({
+      state: normalizedFixture("observeNoSetup"),
+      isLoading: false,
+      isRefetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderView(
+      setupQuickStartRoute({
+        goal: "monitor_production_ai_app",
+        id: "observe",
+        primaryPath: "observe",
+      }),
+    );
+
+    const panel = screen.getByTestId("observe-setup-panel");
+    await userEvent.click(
+      within(panel).getByRole("button", { name: /anthropic/i }),
+    );
+
+    await waitFor(() =>
+      expect(recordPackageSelection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artifactId: "observe-package",
+          artifactType: "observe_setup",
+          eventName: "onboarding_observe_package_selected",
+          idempotencyKey:
+            "onboarding_observe_package_selected:wrk_onboarding:anthropic:python",
+          isSample: false,
+          primaryPath: "observe",
+          source: "onboarding_home",
+          stage: "connect_observability",
+          metadata: expect.objectContaining({
+            setup_language: "python",
+            setup_label: "Anthropic Python",
+            setup_provider: "anthropic",
+          }),
+        }),
+      ),
+    );
+  });
+
   it("shows the selected setup checklist when saved state points at another path", () => {
     mocks.useActivationState.mockReturnValue({
       state: normalizedFixture("observeNoSetup"),
