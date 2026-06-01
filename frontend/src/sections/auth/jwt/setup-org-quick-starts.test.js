@@ -59,7 +59,7 @@ describe("setup org product-loop quick starts", () => {
     expect(observeQuickStart).toMatchObject({
       buttonLabel: "Connect your agent",
       featured: true,
-      firstActionLabel: "Create Observe project",
+      firstActionLabel: "Open package setup",
       pathPreview: "Send first trace, review first trace, create evaluator.",
       primaryPath: "observe",
     });

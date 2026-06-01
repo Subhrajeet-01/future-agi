@@ -233,7 +233,7 @@ describe("ObservePage onboarding first-trace handoff", () => {
 
   it("keeps package intent while waiting for and opening the first trace", async () => {
     mocks.search =
-      "?source=onboarding&onboarding=send-first-trace&selectedTab=trace&provider=anthropic&language=typescript";
+      "?source=onboarding&onboarding=send-first-trace&selectedTab=trace&provider=anthropic&language=python";
 
     render(<ObservePage />);
 
@@ -243,7 +243,7 @@ describe("ObservePage onboarding first-trace handoff", () => {
       ),
     );
     expect(screen.getByTestId("observe-focus")).toHaveTextContent(
-      "run one Anthropic TypeScript request",
+      "run one Anthropic Python request",
     );
     expect(
       screen.getByRole("button", { name: /open anthropic setup/i }),
@@ -254,7 +254,7 @@ describe("ObservePage onboarding first-trace handoff", () => {
         expect.objectContaining({
           metadata: expect.objectContaining({
             route_mode: "send-first-trace",
-            setup_language: "typescript",
+            setup_language: "python",
             setup_provider: "anthropic",
           }),
         }),
@@ -276,7 +276,7 @@ describe("ObservePage onboarding first-trace handoff", () => {
       expect(mocks.navigate).toHaveBeenCalledWith(
         buildObserveTraceReviewHref({
           observeId: "observe-1",
-          setupLanguage: "typescript",
+          setupLanguage: "python",
           setupProvider: "anthropic",
           traceId: "trace-2",
         }),

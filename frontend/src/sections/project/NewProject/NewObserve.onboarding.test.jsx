@@ -75,7 +75,8 @@ const codeBlockWithInstrumentsFixture = {
       name: "Anthropic",
       Python: {
         code: "from traceai_anthropic import AnthropicInstrumentor",
-        sample_request_code: "anthropic python smoke",
+        sample_request_code:
+          'import os\nimport anthropic\n\nclient = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])\n\nmessage = client.messages.create(\n    model="claude-sonnet-4-20250514",\n    max_tokens=256,\n    messages=[{"role": "user", "content": "Say hello in one sentence."}],\n)\n\nprint(message.content)',
       },
       TypeScript: {
         code: 'import { AnthropicInstrumentation } from "@traceai/anthropic";',
@@ -291,7 +292,12 @@ describe("NewObserve onboarding setup", () => {
     expect(
       within(guide).getByText("4. Run one Anthropic request"),
     ).toBeVisible();
-    expect(within(guide).getByText("anthropic python smoke")).toBeVisible();
+    expect(
+      within(guide).getAllByText(/ANTHROPIC_API_KEY/).length,
+    ).toBeGreaterThan(0);
+    expect(
+      within(guide).getAllByText(/client\.messages\.create/).length,
+    ).toBeGreaterThan(0);
     expect(
       within(guide).getByText("If the Anthropic trace does not arrive"),
     ).toBeVisible();

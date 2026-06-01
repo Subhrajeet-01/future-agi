@@ -42,10 +42,10 @@ export const SETUP_ORG_PRODUCT_LOOP_QUICK_STARTS = [
     buttonLabel: "Connect your agent",
     shortDescription:
       "Send traces from your AI app and turn one trace into an evaluator.",
-    firstActionLabel: "Create Observe project",
+    firstActionLabel: "Open package setup",
     pathPreview: "Send first trace, review first trace, create evaluator.",
     sequencePreview: [
-      "Create project",
+      "Open package setup",
       "Send trace",
       "Review trace",
       "Create evaluator",

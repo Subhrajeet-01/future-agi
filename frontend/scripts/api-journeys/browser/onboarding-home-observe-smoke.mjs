@@ -15,6 +15,120 @@ import { ONBOARDING_STAGE_COPY } from "../../../src/sections/onboarding-home/onb
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
 
+const SETUP_PACKAGE_PROFILES = {
+  anthropic: {
+    providerLabel: "Anthropic",
+    languages: {
+      python: {
+        languageKey: "Python",
+        languageLabel: "Python",
+        install: "pip install traceAI-anthropic anthropic",
+        code: `from traceai_anthropic import AnthropicInstrumentor
+
+AnthropicInstrumentor().instrument(tracer_provider=trace_provider)`,
+        instrumentSnippet: "AnthropicInstrumentor",
+        sampleRequestCode: `import os
+import anthropic
+
+client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+message = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=256,
+    messages=[{"role": "user", "content": "Say hello in one sentence."}],
+)
+
+print(message.content)`,
+        smokeSnippet: "client.messages.create",
+      },
+      typescript: {
+        languageKey: "TypeScript",
+        languageLabel: "TypeScript",
+        install:
+          "npm install @traceai/fi-core @traceai/anthropic @opentelemetry/instrumentation @anthropic-ai/sdk",
+        code: `import { AnthropicInstrumentation } from "@traceai/anthropic";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+
+const anthropicInstrumentation = new AnthropicInstrumentation({});
+
+registerInstrumentations({
+  instrumentations: [anthropicInstrumentation],
+  tracerProvider,
+});`,
+        instrumentSnippet: "AnthropicInstrumentation",
+        sampleRequestCode: `import Anthropic from "@anthropic-ai/sdk";
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const message = await anthropic.messages.create({
+  model: "claude-sonnet-4-20250514",
+  max_tokens: 256,
+  messages: [{ role: "user", content: "Say hello in one sentence." }],
+});
+
+console.log(message.content);`,
+        smokeSnippet: "anthropic.messages.create",
+      },
+    },
+  },
+  openai: {
+    providerLabel: "OpenAI",
+    languages: {
+      python: {
+        languageKey: "Python",
+        languageLabel: "Python",
+        install: "pip install traceAI-openai openai",
+        code: `from traceai_openai import OpenAIInstrumentor
+
+OpenAIInstrumentor().instrument(tracer_provider=trace_provider)`,
+        instrumentSnippet: "OpenAIInstrumentor",
+        sampleRequestCode: `from openai import OpenAI
+
+client = OpenAI()
+
+response = client.responses.create(
+    model="gpt-4.1-mini",
+    input="Say hello in one sentence.",
+)
+
+print(response.output_text)`,
+        smokeSnippet: "client.responses.create",
+      },
+      typescript: {
+        languageKey: "TypeScript",
+        languageLabel: "TypeScript",
+        install:
+          "npm install @traceai/fi-core @traceai/openai @opentelemetry/instrumentation openai",
+        code: `import { OpenAIInstrumentation } from "@traceai/openai";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+
+const openaiInstrumentation = new OpenAIInstrumentation({});
+
+registerInstrumentations({
+  instrumentations: [openaiInstrumentation],
+  tracerProvider,
+});`,
+        instrumentSnippet: "OpenAIInstrumentation",
+        sampleRequestCode: `import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const response = await openai.responses.create({
+  model: "gpt-4.1-mini",
+  input: "Say hello in one sentence.",
+});
+
+console.log(response.output_text);`,
+        smokeSnippet: "openai.responses.create",
+      },
+    },
+  },
+};
+
 const APP_BASE = process.env.APP_BASE || "http://127.0.0.1:3032";
 const VIEWPORT_NAME = process.env.ONBOARDING_SMOKE_VIEWPORT || "desktop";
 const EXISTING_PROJECT = envFlag("ONBOARDING_SMOKE_EXISTING_PROJECT");
@@ -24,9 +138,21 @@ const OPEN_SAMPLE_HOME = envFlag("ONBOARDING_SMOKE_OPEN_SAMPLE");
 const POST_AHA_HOME = envFlag("ONBOARDING_SMOKE_POST_AHA_HOME");
 const FEATURE_DISABLED_HOME = envFlag("ONBOARDING_SMOKE_FEATURE_DISABLED_HOME");
 const PATH_FOCUS = process.env.ONBOARDING_SMOKE_PATH_FOCUS || "";
+const SETUP_PROVIDER = normalizeSetupProvider(
+  process.env.ONBOARDING_SMOKE_SETUP_PROVIDER || "openai",
+);
+const SETUP_LANGUAGE = normalizeSetupLanguage(
+  process.env.ONBOARDING_SMOKE_SETUP_LANGUAGE || "python",
+  SETUP_PROVIDER,
+);
+const SETUP_PACKAGE = setupPackageProfile(SETUP_PROVIDER, SETUP_LANGUAGE);
+const SETUP_PACKAGE_SUFFIX =
+  SETUP_PROVIDER === "openai" && SETUP_LANGUAGE === "python"
+    ? ""
+    : `-${SETUP_PROVIDER}-${SETUP_LANGUAGE}`;
 const SCREENSHOT_PATH =
   process.env.ONBOARDING_HOME_OBSERVE_SCREENSHOT ||
-  `/tmp/onboarding-home-observe-smoke-${VIEWPORT_NAME}${
+  `/tmp/onboarding-home-observe-smoke-${VIEWPORT_NAME}${SETUP_PACKAGE_SUFFIX}${
     EXISTING_PROJECT ? "-existing-project" : ""
   }${EXISTING_TRACE ? "-first-trace" : ""}${
     OPEN_SAMPLE_HOME ? "-sample-open" : ""
@@ -61,6 +187,8 @@ async function main() {
     viewport: VIEWPORT_NAME,
     existing_project: EXISTING_PROJECT,
     existing_trace: EXISTING_TRACE,
+    setup_provider: SETUP_PROVIDER,
+    setup_language: SETUP_LANGUAGE,
     open_sample_home: OPEN_SAMPLE_HOME,
     post_aha_home: POST_AHA_HOME,
     feature_disabled_home: FEATURE_DISABLED_HOME,
@@ -359,13 +487,26 @@ async function main() {
 
     await expectSelector(page, '[data-testid="observe-setup-panel"]');
     await expectSelector(page, '[data-testid="sample-project-panel"]');
-    await expectVisibleText(page, "Connect observability", { exact: true });
-    await expectVisibleText(page, "Preview sample data", { exact: true });
+    await expectVisibleText(page, "Observe", { exact: true });
+    await expectVisibleText(page, "Preview sample trace", { exact: true });
     await expectVisibleText(page, "Connect your agent", { exact: true });
-    await expectVisibleText(page, "Create Observe project", { exact: true });
+    await expectVisibleText(page, "Open package setup", { exact: true });
+    if (SETUP_PROVIDER !== "openai") {
+      await clickVisibleText(page, SETUP_PACKAGE.providerLabel, {
+        rootSelector: '[data-testid="observe-package-picker"]',
+      });
+    }
+    if (SETUP_LANGUAGE !== "python") {
+      await clickVisibleText(page, SETUP_PACKAGE.languageLabel, {
+        rootSelector: '[data-testid="observe-package-picker"]',
+      });
+    }
+    await expectVisibleText(page, `Open ${SETUP_PACKAGE.label} setup`, {
+      exact: true,
+    });
     await expectVisibleText(page, "Send first trace", { exact: true });
-    await expectVisibleText(page, "Review first signal", { exact: true });
-    await expectVisibleText(page, "Add quality check", { exact: true });
+    await expectVisibleText(page, "Review first trace", { exact: true });
+    await expectVisibleText(page, "Create evaluator", { exact: true });
     await page.screenshot({ path: HOME_SCREENSHOT_PATH, fullPage: true });
     evidence.home_screenshot = HOME_SCREENSHOT_PATH;
 
@@ -457,17 +598,20 @@ async function main() {
 
     const homeCtaHref = await visibleLinkHrefByText(
       page,
-      "Create Observe project",
+      `Open ${SETUP_PACKAGE.label} setup`,
       { rootSelector: '[data-testid="observe-setup-panel"]' },
     );
     assert(
       homeCtaHref ===
-        "/dashboard/observe?setup=true&source=onboarding&tour_anchor=observe_create_project_button&journey_step=connect_observability",
+        expectedObserveSetupHref({
+          language: SETUP_LANGUAGE,
+          provider: SETUP_PROVIDER,
+        }),
       `Unexpected Home CTA href: ${homeCtaHref}`,
     );
     evidence.home_cta_href = homeCtaHref;
 
-    await clickVisibleText(page, "Create Observe project", {
+    await clickVisibleText(page, `Open ${SETUP_PACKAGE.label} setup`, {
       rootSelector: '[data-testid="observe-setup-panel"]',
     });
     await page.waitForFunction(
@@ -480,8 +624,8 @@ async function main() {
     );
 
     await expectSelector(page, '[data-testid="observe-onboarding-focus"]');
-    await expectVisibleText(page, "Observe onboarding", { exact: true });
-    await expectVisibleText(page, "Connect Observe to your app", {
+    await expectVisibleText(page, "Observe setup", { exact: true });
+    await expectVisibleText(page, `Connect ${SETUP_PACKAGE.label}`, {
       exact: true,
     });
     const observeSetupActionTexts = await visibleActionTexts(page, {
@@ -495,30 +639,35 @@ async function main() {
         )}`,
       );
       assert(
-        observeSetupActionTexts.at(-1) === "Review setup",
-        `Expected real setup to remain primary. Actions: ${observeSetupActionTexts.join(
+        observeSetupActionTexts.at(-1) ===
+          `Open ${SETUP_PACKAGE.providerLabel} setup`,
+        `Expected ${SETUP_PACKAGE.providerLabel} setup to remain primary. Actions: ${observeSetupActionTexts.join(
           ", ",
         )}`,
       );
       evidence.observe_setup_actions = observeSetupActionTexts;
     }
     if (EXISTING_PROJECT) {
-      await expectVisibleText(page, "Open first trace step", { exact: true });
-      await clickVisibleText(page, "Open first trace step", {
+      const waitForTraceLabel = `Wait for ${SETUP_PACKAGE.label} trace`;
+      await expectVisibleText(page, waitForTraceLabel, { exact: true });
+      await clickVisibleText(page, waitForTraceLabel, {
         rootSelector: '[data-testid="observe-onboarding-focus"]',
       });
       await page.waitForFunction(
-        () => {
+        ({ language, provider }) => {
           const params = new URLSearchParams(window.location.search);
           return (
             window.location.pathname ===
               "/dashboard/observe/observe-smoke-project/llm-tracing" &&
             params.get("source") === "onboarding" &&
             params.get("onboarding") === "send-first-trace" &&
-            params.get("selectedTab") === "trace"
+            params.get("selectedTab") === "trace" &&
+            params.get("provider") === provider &&
+            params.get("language") === language
           );
         },
         { timeout: 30000 },
+        { language: SETUP_LANGUAGE, provider: SETUP_PROVIDER },
       );
       evidence.first_trace_step_url = relativeUrl(page.url());
       await expectSelector(page, '[data-testid="observe-onboarding-focus"]');
@@ -533,7 +682,9 @@ async function main() {
       );
       assert(
         firstTraceStepActions.at(-1) ===
-          (EXISTING_TRACE ? "Review trace" : "Open setup"),
+          (EXISTING_TRACE
+            ? "Review trace"
+            : `Open ${SETUP_PACKAGE.providerLabel} setup`),
         `Unexpected first-trace primary action. Actions: ${firstTraceStepActions.join(
           ", ",
         )}`,
@@ -548,16 +699,19 @@ async function main() {
           rootSelector: '[data-testid="observe-onboarding-focus"]',
         });
         await page.waitForFunction(
-          () => {
+          ({ language, provider }) => {
             const params = new URLSearchParams(window.location.search);
             return (
               window.location.pathname ===
                 "/dashboard/observe/observe-smoke-project/trace/trace-smoke-1" &&
               params.get("source") === "onboarding" &&
-              params.get("onboarding") === "review-first-trace"
+              params.get("onboarding") === "review-first-trace" &&
+              params.get("provider") === provider &&
+              params.get("language") === language
             );
           },
           { timeout: 30000 },
+          { language: SETUP_LANGUAGE, provider: SETUP_PROVIDER },
         );
         await waitForCondition(
           () =>
@@ -568,6 +722,7 @@ async function main() {
           30000,
         );
         evidence.first_trace_review_url = relativeUrl(page.url());
+        await expectVisibleText(page, "Create evaluator", { exact: true });
       } else {
         await expectVisibleText(page, "Send the first trace", { exact: true });
       }
@@ -579,18 +734,45 @@ async function main() {
               payload?.primary_path === "observe" &&
               payload?.stage === "waiting_for_first_trace" &&
               payload?.project_id === "observe-smoke-project" &&
-              payload?.metadata?.route_mode === "send-first-trace",
+              payload?.metadata?.route_mode === "send-first-trace" &&
+              payload?.metadata?.setup_provider === SETUP_PROVIDER &&
+              payload?.metadata?.setup_language === SETUP_LANGUAGE,
           ),
         "Observe first trace step activation event was not posted.",
         30000,
       );
     } else {
-      await expectVisibleText(page, "Checking for your first trace", {
+      await expectVisibleText(page, "Checking for trace", {
         exact: true,
       });
-      await expectVisibleText(page, "Install Dependencies", { exact: true });
-      await expectVisibleText(page, "Setup Telemetry", { exact: true });
-      await expectVisibleText(page, "Setup Instrumentation", { exact: true });
+      await expectVisibleText(
+        page,
+        `1. Install ${SETUP_PACKAGE.providerLabel}`,
+        {
+          exact: true,
+        },
+      );
+      await expectVisibleText(page, "2. Load keys and register project", {
+        exact: true,
+      });
+      await expectVisibleText(
+        page,
+        `3. Instrument ${SETUP_PACKAGE.providerLabel}`,
+        { exact: true },
+      );
+      await expectVisibleText(
+        page,
+        `4. Run one ${SETUP_PACKAGE.providerLabel} request`,
+        {
+          exact: true,
+        },
+      );
+      await expectVisibleText(page, "Review and add evaluator", {
+        exact: true,
+      });
+      await expectVisibleText(page, SETUP_PACKAGE.install);
+      await expectVisibleText(page, SETUP_PACKAGE.instrumentSnippet);
+      await expectVisibleText(page, SETUP_PACKAGE.smokeSnippet);
     }
     await waitForNoVisibleText(page, "Invalid Date");
 
@@ -1220,6 +1402,57 @@ function pathFocusActivationState(auth, pathFocus) {
   };
 }
 
+function normalizeSetupProvider(value) {
+  const normalizedValue = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("-", "_");
+  assert(
+    SETUP_PACKAGE_PROFILES[normalizedValue],
+    `Unsupported ONBOARDING_SMOKE_SETUP_PROVIDER=${value}`,
+  );
+  return normalizedValue;
+}
+
+function normalizeSetupLanguage(value, provider) {
+  const normalizedValue = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("-", "_");
+  const profile = SETUP_PACKAGE_PROFILES[provider];
+  assert(profile, `Unsupported setup provider ${provider}`);
+  if (profile.languages[normalizedValue]) return normalizedValue;
+  return "python";
+}
+
+function setupPackageProfile(provider, language) {
+  const providerProfile = SETUP_PACKAGE_PROFILES[provider];
+  const languageProfile = providerProfile?.languages?.[language];
+  assert(
+    providerProfile && languageProfile,
+    `Unsupported setup package ${provider}/${language}`,
+  );
+  return {
+    ...languageProfile,
+    provider,
+    language,
+    providerLabel: providerProfile.providerLabel,
+    label: `${providerProfile.providerLabel} ${languageProfile.languageLabel}`,
+  };
+}
+
+function expectedObserveSetupHref({ language, provider }) {
+  const params = new URLSearchParams({
+    setup: "true",
+    source: "onboarding",
+    provider,
+    language,
+    tour_anchor: "observe_create_project_button",
+    journey_step: "connect_observability",
+  });
+  return `/dashboard/observe?${params.toString()}`;
+}
+
 function sampleProjectOpenResponse(auth) {
   const activationState = getActivationStateFixture("observeWaitingWithSample");
   const entryRoute =
@@ -1262,6 +1495,28 @@ function sampleProjectOpenResponse(auth) {
 }
 
 function observeSetupCodeBlock() {
+  const instruments = Object.fromEntries(
+    Object.entries(SETUP_PACKAGE_PROFILES).map(
+      ([provider, providerProfile]) => [
+        provider,
+        {
+          name: providerProfile.providerLabel,
+          logo: "/favicon/logo.svg",
+          ...Object.fromEntries(
+            Object.values(providerProfile.languages).map((languageProfile) => [
+              languageProfile.languageKey,
+              {
+                code: languageProfile.code,
+                github: "https://github.com/future-agi",
+                sample_request_code: languageProfile.sampleRequestCode,
+              },
+            ]),
+          ),
+        },
+      ],
+    ),
+  );
+
   return {
     installationGuide: {
       Python: "pip install futureagi",
@@ -1275,20 +1530,7 @@ function observeSetupCodeBlock() {
       Python: "from futureagi import trace\ntrace('first-request')",
       TypeScript: "import { trace } from 'futureagi';\ntrace('first-request');",
     },
-    instruments: {
-      openai: {
-        name: "OpenAI",
-        logo: "/favicon/logo.svg",
-        Python: {
-          code: "from futureagi import instrument_openai\ninstrument_openai()",
-          github: "https://github.com/future-agi",
-        },
-        TypeScript: {
-          code: "import { instrumentOpenAI } from 'futureagi';\ninstrumentOpenAI();",
-          github: "https://github.com/future-agi",
-        },
-      },
-    },
+    instruments,
   };
 }
 

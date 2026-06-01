@@ -250,11 +250,11 @@ describe("observeOnboardingRoute", () => {
     expect(
       buildObserveSetupHref({
         credentialStep: "done",
-        setupLanguage: "typescript",
+        setupLanguage: "python",
         setupProvider: "anthropic",
       }),
     ).toBe(
-      "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=typescript",
+      "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=python",
     );
   });
 
@@ -274,11 +274,11 @@ describe("observeOnboardingRoute", () => {
       buildObserveProjectOnboardingHref({
         observeId: "project-1",
         mode: OBSERVE_ONBOARDING_MODES.SEND_FIRST_TRACE,
-        setupLanguage: "typescript",
+        setupLanguage: "python",
         setupProvider: "anthropic",
       }),
     ).toBe(
-      "/dashboard/observe/project-1/llm-tracing?source=onboarding&onboarding=send-first-trace&selectedTab=trace&provider=anthropic&language=typescript",
+      "/dashboard/observe/project-1/llm-tracing?source=onboarding&onboarding=send-first-trace&selectedTab=trace&provider=anthropic&language=python",
     );
   });
 
@@ -286,12 +286,12 @@ describe("observeOnboardingRoute", () => {
     expect(
       buildObserveTraceReviewHref({
         observeId: "project-1",
-        setupLanguage: "typescript",
+        setupLanguage: "python",
         setupProvider: "anthropic",
         traceId: "trace-1",
       }),
     ).toBe(
-      "/dashboard/observe/project-1/trace/trace-1?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=typescript",
+      "/dashboard/observe/project-1/trace/trace-1?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=python",
     );
   });
 
@@ -299,11 +299,11 @@ describe("observeOnboardingRoute", () => {
     expect(
       buildObserveEvaluatorCreateHref({
         observeId: "project-1",
-        setupLanguage: "typescript",
+        setupLanguage: "python",
         setupProvider: "anthropic",
       }),
     ).toBe(
-      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=project-1&provider=anthropic&language=typescript",
+      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=project-1&provider=anthropic&language=python",
     );
   });
 

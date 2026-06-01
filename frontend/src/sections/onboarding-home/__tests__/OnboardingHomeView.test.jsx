@@ -582,9 +582,10 @@ describe("OnboardingHomeView", () => {
     expect(screen.getByTestId("sample-project-panel")).toBeVisible();
     expect(screen.getAllByText("Connect your agent").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Step 1 of 4").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Open package setup").length).toBeGreaterThan(0);
     expect(
-      screen.getAllByText("Create Observe project").length,
-    ).toBeGreaterThan(0);
+      screen.getByRole("link", { name: /open openai python setup/i }),
+    ).toBeVisible();
     expect(screen.getByText("Send first trace")).toBeVisible();
     expect(screen.getByText("Review first trace")).toBeVisible();
   });
@@ -934,7 +935,7 @@ describe("OnboardingHomeView", () => {
       quickStartId: "observe",
       quickStartPrimaryPath: "observe",
       pathname: "/dashboard/observe",
-      primaryLabel: "Create Observe project",
+      primaryLabel: "Open package setup",
       stage: "connect_observability",
       routeParams: {
         setup: "true",
@@ -1183,11 +1184,11 @@ describe("OnboardingHomeView", () => {
       });
       if (quickStartPrimaryPath === "observe") {
         expect(
-          within(panel).getAllByText("Create Observe project").length,
+          within(panel).getAllByText("Open package setup").length,
         ).toBeGreaterThan(0);
         expect(
           within(panel).getByTestId("current-step-guide"),
-        ).toHaveTextContent("Create Observe project");
+        ).toHaveTextContent("Open package setup");
         expect(
           screen.getByTestId("observe-journey-step-send_first_trace"),
         ).toBeVisible();
@@ -1249,7 +1250,7 @@ describe("OnboardingHomeView", () => {
       within(panel).queryByRole("heading", { name: "Connect your agent" }),
     ).not.toBeInTheDocument();
     expect(
-      within(panel).getAllByText("Create Observe project").length,
+      within(panel).getAllByText("Open package setup").length,
     ).toBeGreaterThan(0);
     expect(within(panel).getAllByText("Step 1 of 4").length).toBeGreaterThan(0);
     expect(within(panel).getByText("Later steps")).toBeVisible();
@@ -1258,6 +1259,27 @@ describe("OnboardingHomeView", () => {
     await userEvent.click(
       within(panel).getByRole("button", { name: /anthropic/i }),
     );
+    const pythonSetupUrl = new URL(
+      screen
+        .getByRole("link", { name: /open anthropic python setup/i })
+        .getAttribute("href"),
+      "https://futureagi.test",
+    );
+    expect(pythonSetupUrl.pathname).toBe("/dashboard/observe");
+    expectRouteParams({
+      params: pythonSetupUrl.searchParams,
+      values: {
+        setup: "true",
+        source: "onboarding",
+        tour_anchor: "observe_create_project_button",
+        journey_step: "connect_observability",
+        quick_start_goal: "monitor_production_ai_app",
+        quick_start_id: "observe",
+        quick_start_primary_path: "observe",
+        provider: "anthropic",
+        language: "python",
+      },
+    });
     await userEvent.click(
       within(panel).getByRole("button", { name: /typescript/i }),
     );

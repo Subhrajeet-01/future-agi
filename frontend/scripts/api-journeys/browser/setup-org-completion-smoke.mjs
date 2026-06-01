@@ -30,7 +30,8 @@ const QUICK_STARTS = {
   observe: {
     buttonText: "Connect your agent",
     expectedTitleText: "Connect your agent",
-    expectedActionText: "Create Observe project",
+    expectedActionText: "Open OpenAI Python setup",
+    expectedStepText: "Open package setup",
     expectedAttribution: {
       quick_start_goal: "monitor_production_ai_app",
       quick_start_id: "observe",
@@ -38,6 +39,15 @@ const QUICK_STARTS = {
     },
     expectedGoal: "monitor_production_ai_app",
     fixture: "newWorkspaceNoGoal",
+    expectedPathname: "/dashboard/observe",
+    expectedRouteParams: {
+      setup: "true",
+      source: "onboarding",
+      provider: "openai",
+      language: "python",
+      tour_anchor: "observe_create_project_button",
+      journey_step: "connect_observability",
+    },
   },
   sample_preview: {
     buttonText: "Preview sample trace",
@@ -231,7 +241,7 @@ async function main() {
     await expectVisibleText(page, "Set up FutureAGI");
     await expectVisibleText(
       page,
-      "Choose one workflow. We will open step 1, then Home will keep showing the next setup action.",
+      "Choose what you want to set up first. We will open step 1, then Home will keep showing the next setup action.",
     );
     if (SAMPLE_PREVIEW_GUARD) {
       const samplePreviewVisible = await isVisibleButtonText(
@@ -297,7 +307,9 @@ async function main() {
       });
       await expectVisibleText(
         page,
-        `Current step: ${QUICK_START.expectedActionText}`,
+        `Current step: ${
+          QUICK_START.expectedStepText || QUICK_START.expectedActionText
+        }`,
       );
       await expectVisibleText(page, "Current step", { exact: true });
       await expectVisibleText(page, "Later steps", { exact: true });

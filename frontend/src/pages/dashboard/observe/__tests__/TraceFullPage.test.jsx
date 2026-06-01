@@ -159,14 +159,14 @@ describe("TraceFullPage", () => {
 
   it("keeps package intent through trace review and evaluator creation", async () => {
     mocks.locationSearch =
-      "?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=typescript";
+      "?source=onboarding&onboarding=review-first-trace&provider=anthropic&language=python";
 
     const { getByRole, getByText } = render(<TraceFullPage />);
 
-    expect(getByText("Anthropic TypeScript trace received")).toBeVisible();
+    expect(getByText("Anthropic Python trace received")).toBeVisible();
     expect(
       getByText(
-        "Review this Anthropic TypeScript trace for spans, latency, cost, inputs, outputs, and errors. Next, create an evaluator from it.",
+        "Review this Anthropic Python trace for spans, latency, cost, inputs, outputs, and errors. Next, create an evaluator from it.",
       ),
     ).toBeVisible();
 
@@ -176,7 +176,7 @@ describe("TraceFullPage", () => {
           metadata: {
             entry: "trace_full_page",
             is_sample_route: false,
-            setup_language: "typescript",
+            setup_language: "python",
             setup_provider: "anthropic",
           },
         }),
@@ -186,7 +186,7 @@ describe("TraceFullPage", () => {
     getByRole("button", { name: /create evaluator/i }).click();
 
     expect(mocks.navigate).toHaveBeenCalledWith(
-      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&provider=anthropic&language=typescript",
+      "/dashboard/evaluations/create?source=onboarding&step=data&source_type=trace_project&source_id=observe-1&provider=anthropic&language=python",
     );
   });
 

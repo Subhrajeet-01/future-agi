@@ -222,16 +222,16 @@ describe("ProjectWrapperView observe setup onboarding", () => {
 
     renderWithRouter(<ProjectWrapperView />, {
       route:
-        "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=typescript",
+        "/dashboard/observe?setup=true&source=onboarding&credential_step=done&provider=anthropic&language=python",
     });
 
     expect(screen.getByText("Credentials copied")).toBeVisible();
     expect(
-      screen.getByText("Waiting for Anthropic TypeScript trace"),
+      screen.getByText("Waiting for Anthropic Python trace"),
     ).toBeVisible();
     expect(
       screen.getByText(
-        "Paste both copied values into the Anthropic TypeScript setup snippet, then run one request.",
+        "Paste both copied values into the Anthropic Python setup snippet, then run one request.",
       ),
     ).toBeVisible();
     expect(screen.getByText("Keys")).toBeVisible();
@@ -244,7 +244,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
           metadata: {
             credential_step: "done",
             route_mode: "setup-observe",
-            setup_language: "typescript",
+            setup_language: "python",
             setup_provider: "anthropic",
             setup: true,
           },
@@ -256,7 +256,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /wait for anthropic typescript trace/i,
+        name: /wait for anthropic python trace/i,
       }),
     );
 
@@ -269,7 +269,7 @@ describe("ProjectWrapperView observe setup onboarding", () => {
       expect(params.get("onboarding")).toBe("send-first-trace");
       expect(params.get("selectedTab")).toBe("trace");
       expect(params.get("provider")).toBe("anthropic");
-      expect(params.get("language")).toBe("typescript");
+      expect(params.get("language")).toBe("python");
     });
   });
 

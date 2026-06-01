@@ -8,8 +8,9 @@ const OBSERVE_FALLBACK_STEPS = [
   {
     id: "connect_observability",
     stage: "connect_observability",
-    label: "Create Observe project",
-    description: "Create the project where the first trace will land.",
+    label: "Open package setup",
+    description:
+      "Choose the SDK package, create the project, and run one request.",
     tourAnchor: "observe_create_project_button",
   },
   {

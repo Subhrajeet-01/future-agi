@@ -383,7 +383,7 @@ async function main() {
       });
       await expectVisibleText(
         page,
-        "Start with: Create Observe project. Then: Send first trace.",
+        "Start with: Open package setup. Then: Send first trace.",
         { timeout: 45000 },
       );
       await expectVisibleText(page, "Next steps", {
@@ -391,7 +391,7 @@ async function main() {
         timeout: 45000,
       });
       await expectVisibleText(page, "Step 1 of 4", { timeout: 45000 });
-      await clickVisibleButtonText(page, "Create Observe project", 45000);
+      await clickVisibleButtonText(page, "Open OpenAI Python setup", 45000);
       await page.waitForFunction(
         () => {
           const params = new URLSearchParams(window.location.search);
@@ -399,6 +399,8 @@ async function main() {
             window.location.pathname === "/dashboard/observe" &&
             params.get("setup") === "true" &&
             params.get("source") === "onboarding" &&
+            params.get("provider") === "openai" &&
+            params.get("language") === "python" &&
             params.get("tour_anchor") === "observe_create_project_button" &&
             params.get("journey_step") === "connect_observability" &&
             params.get("quick_start_id") === "observe" &&
