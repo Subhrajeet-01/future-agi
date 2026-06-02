@@ -10,9 +10,8 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import PropTypes from "prop-types";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DataTable, DataTablePagination } from "src/components/data-table";
@@ -20,17 +19,26 @@ import FormSearchField from "src/components/FormSearchField/FormSearchField";
 import Iconify from "src/components/iconify";
 import CustomTooltip from "src/components/tooltip";
 import { useDebounce } from "src/hooks/use-debounce";
-import axios, { endpoints } from "src/utils/axios";
 import DateTimeRangePicker from "src/sections/projects/DateTimeRangePicker";
 import AddEvalsFeedbackDrawer from "src/sections/evals/EvalDetails/EvalsFeedback/AddEvalsFeedbackDrawer";
 
-import PartialInputWarningDetails, {
-  PARTIAL_INPUT_WARNING_TYPE,
-} from "src/sections/common/EvalsTasks/PartialInputWarningDetails";
+import PartialInputWarningDetails from "src/sections/common/EvalsTasks/PartialInputWarningDetails";
 
-import { useEvalUsageChart, useEvalUsageLogs } from "../hooks/useEvalUsage";
+import {
+  useEvalUsageChart,
+  useEvalUsageLogs,
+  useUpdateEvalUsageColumnConfig,
+} from "../hooks/useEvalUsage";
 import { isEditableElement } from "src/utils/keyboardUtils";
 import UsageChart from "./UsageChart";
+import SvgColor from "src/components/svg-color";
+import ColumnDropdown from "src/components/ColumnDropdown/ColumnDropdown";
+import {
+  DEFAULT_COLUMN_CONFIG,
+  ScoreCell,
+  normalizeRow,
+  useColumns,
+} from "./evalUsageColumns";
 
 // ── Inline stat ──
 const StatPill = ({ label, value, color }) => (
@@ -67,317 +75,6 @@ const DATE_OPTION_TO_PERIOD = {
   Custom: "30d",
 };
 
-// ── Score chip ──
-const ScoreCell = ({ value }) => {
-  if (value == null)
-    return (
-      <Typography
-        variant="body2"
-        color="text.disabled"
-        sx={{ fontSize: "12px" }}
-      >
-        —
-      </Typography>
-    );
-  if (typeof value === "number")
-    return (
-      <Chip
-        label={value.toFixed(2)}
-        size="small"
-        color={value >= 0.7 ? "success" : value >= 0.3 ? "warning" : "error"}
-        sx={{ fontSize: "11px", height: 20, fontWeight: 600 }}
-      />
-    );
-  return (
-    <Chip
-      label={String(value)}
-      size="small"
-      color="default"
-      sx={{ fontSize: "11px", height: 20 }}
-    />
-  );
-};
-
-// ── Columns ──
-const useColumns = () =>
-  useMemo(
-    () => [
-      {
-        id: "indicator",
-        accessorKey: "score",
-        header: "",
-        size: 4,
-        enableSorting: false,
-        cell: ({ getValue }) => {
-          const v = getValue();
-          const color =
-            v == null
-              ? "transparent"
-              : typeof v === "number"
-                ? v >= 0.7
-                  ? "success.main"
-                  : v >= 0.3
-                    ? "warning.main"
-                    : "error.main"
-                : v === 1
-                  ? "success.main"
-                  : v === 0
-                    ? "error.main"
-                    : "text.disabled";
-          return (
-            <Box
-              sx={{
-                width: 3,
-                height: 28,
-                borderRadius: 1,
-                backgroundColor: color,
-              }}
-            />
-          );
-        },
-      },
-      {
-        id: "score",
-        accessorKey: "score",
-        header: "Score",
-        size: 80,
-        cell: ({ getValue }) => <ScoreCell value={getValue()} />,
-      },
-      {
-        id: "result",
-        accessorKey: "result",
-        header: "Result",
-        size: 130,
-        cell: ({ getValue, row: tableRow }) => {
-          const v = getValue();
-          const warnings = tableRow.original?.warnings || [];
-          const partial = warnings.find?.(
-            (w) => w?.type === PARTIAL_INPUT_WARNING_TYPE,
-          );
-          const partialBadge = partial ? (
-            <CustomTooltip
-              show
-              arrow
-              title={
-                partial.message ||
-                `Eval ran with some inputs empty: ${(partial.empty_keys || []).join(", ")}`
-              }
-            >
-              <Box
-                sx={(theme) => ({
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 18,
-                  height: 18,
-                  borderRadius: "50%",
-                  backgroundColor: alpha(
-                    theme.palette.warning.main,
-                    theme.palette.mode === "dark" ? 0.24 : 0.16,
-                  ),
-                  color:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.warning.light
-                      : theme.palette.warning.dark,
-                  cursor: "help",
-                })}
-                data-testid="usage-partial-input-warning"
-              >
-                <Iconify
-                  icon="material-symbols:warning-rounded"
-                  width="14px"
-                  height="14px"
-                />
-              </Box>
-            </CustomTooltip>
-          ) : null;
-
-          if (!v) {
-            if (tableRow.original?.status === "error") {
-              return (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Chip
-                    label="Error"
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    sx={{ fontSize: "11px", height: 20 }}
-                  />
-                  {partialBadge}
-                </Box>
-              );
-            }
-            return partialBadge;
-          }
-          const isPassed = v === "Passed" || v === "Pass";
-          const isFailed = v === "Failed" || v === "Fail";
-          return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Chip
-                label={v}
-                size="small"
-                color={isPassed ? "success" : isFailed ? "error" : "default"}
-                variant="outlined"
-                sx={{ fontSize: "11px", height: 20 }}
-              />
-              {partialBadge}
-            </Box>
-          );
-        },
-      },
-      {
-        id: "input",
-        accessorKey: "input",
-        header: "Input",
-        meta: { flex: 2 },
-        minSize: 200,
-        cell: ({ getValue }) => {
-          const v = getValue();
-          return (
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{
-                fontSize: "12px",
-                color: v ? "text.secondary" : "text.disabled",
-                fontStyle: v ? "normal" : "italic",
-              }}
-            >
-              {v || "No input"}
-            </Typography>
-          );
-        },
-      },
-      {
-        id: "reason",
-        accessorKey: "reason",
-        header: "Reason",
-        meta: { flex: 1.5 },
-        minSize: 150,
-        cell: ({ getValue }) => (
-          <Typography
-            variant="body2"
-            noWrap
-            sx={{
-              fontSize: "12px",
-              color: "text.secondary",
-              fontStyle: "italic",
-            }}
-          >
-            {getValue() || "—"}
-          </Typography>
-        ),
-      },
-      {
-        id: "source",
-        accessorKey: "source",
-        header: "Source",
-        size: 100,
-        cell: ({ getValue }) => {
-          const v = getValue();
-          if (!v) return null;
-          const label =
-            v === "eval_playground" || v === "composite_eval"
-              ? "Playground"
-              : v === "dataset_evaluation" || v === "composite_eval_dataset"
-                ? "Dataset"
-                : v === "tracer_composite"
-                  ? "Tracer"
-                  : v;
-          return (
-            <Chip
-              label={label}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: "10px", height: 18 }}
-            />
-          );
-        },
-      },
-      {
-        id: "feedback",
-        accessorKey: "feedback",
-        header: "",
-        size: 50,
-        enableSorting: false,
-        cell: ({ row: tableRow }) => {
-          const original = tableRow.original;
-          // Composite logs: show children count instead of feedback
-          if (original.composite) {
-            const childCount =
-              original.detail?.total_children ??
-              original.detail?.children?.length ??
-              0;
-            return (
-              <Tooltip title={`${childCount} child evaluators`}>
-                <Chip
-                  label={`${childCount}`}
-                  size="small"
-                  icon={
-                    <Iconify
-                      icon="mingcute:grid-2-line"
-                      width={12}
-                      sx={{ ml: "4px !important" }}
-                    />
-                  }
-                  variant="outlined"
-                  sx={{ fontSize: "10px", height: 18, fontWeight: 600 }}
-                />
-              </Tooltip>
-            );
-          }
-          // Single evals: show feedback icon
-          const fb = original.feedback;
-          if (!fb) return null;
-          return (
-            <Tooltip title={`Feedback: ${fb.value}`}>
-              <Iconify
-                icon={
-                  fb.value === "passed"
-                    ? "mingcute:thumb-up-2-fill"
-                    : "mingcute:thumb-down-2-fill"
-                }
-                width={14}
-                sx={{
-                  color: fb.value === "passed" ? "success.main" : "error.main",
-                }}
-              />
-            </Tooltip>
-          );
-        },
-      },
-      {
-        id: "createdAt",
-        accessorKey: "created_at",
-        header: "Ran at",
-        size: 140,
-        cell: ({ getValue }) => {
-          const v = getValue();
-          if (!v) return null;
-          const d = new Date(v);
-          return (
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{ fontSize: "11px", color: "text.disabled" }}
-            >
-              {d.toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-              })}
-              ,{" "}
-              {d.toLocaleTimeString(undefined, {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Typography>
-          );
-        },
-      },
-    ],
-    [],
-  );
-
 // ── Main ──
 const EvalUsageTab = ({
   templateId,
@@ -395,6 +92,9 @@ const EvalUsageTab = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [detailIndex, setDetailIndex] = useState(null); // index in filteredLogs
   const debouncedSearch = useDebounce(searchQuery.trim(), 400);
+  const columnConfigureRef = useRef(null);
+
+  const [openColumnConfigure, setOpenColumnConfigure] = useState(false);
 
   const period = DATE_OPTION_TO_PERIOD[dateOption] || "30d";
 
@@ -411,22 +111,85 @@ const EvalUsageTab = ({
 
   const stats = chartData?.stats || {};
   const chart = chartData?.chart || [];
-  const logItems = logsData?.items || [];
-  const totalLogs = logsData?.total || 0;
+  const columnConfig = logsData?.columnConfig;
+  const totalLogs = logsData?.pagination?.total || 0;
+
+  const logItems = useMemo(
+    () => (logsData?.table || []).map(normalizeRow),
+    [logsData?.table],
+  );
+
+  const currentColumnConfig = useMemo(
+    () =>
+      columnConfig && columnConfig.length ? columnConfig : DEFAULT_COLUMN_CONFIG,
+    [columnConfig],
+  );
+
+  const columnDropdownItems = useMemo(
+    () =>
+      [...currentColumnConfig]
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((c) => ({
+          id: c.value,
+          name: c.label,
+          isVisible: !!(c.enabled && c.is_visible),
+        })),
+    [currentColumnConfig],
+  );
+
+  const { mutate: persistColumnConfig } =
+    useUpdateEvalUsageColumnConfig(templateId);
+
+  const applyColumnConfig = useCallback(
+    (nextColumns) => {
+      queryClient.setQueryData(
+        ["evals", "usage-logs", templateId, period, page, pageSize],
+        (old) => (old ? { ...old, columnConfig: nextColumns } : old),
+      );
+      persistColumnConfig(nextColumns);
+    },
+    [queryClient, templateId, period, page, pageSize, persistColumnConfig],
+  );
+
+  const handleColumnVisibilityChange = useCallback(
+    (columnId) => {
+      const next = currentColumnConfig.map((c) => {
+        if (c.value !== columnId) return c;
+        const nextVisible = !(c.enabled && c.is_visible);
+        return { ...c, enabled: nextVisible, is_visible: nextVisible };
+      });
+      applyColumnConfig(next);
+    },
+    [currentColumnConfig, applyColumnConfig],
+  );
+
+  const handleColumnReorder = useCallback(
+    (reordered) => {
+      const byValue = new Map(currentColumnConfig.map((c) => [c.value, c]));
+      const next = reordered
+        .map((item, idx) => {
+          const orig = byValue.get(item.id);
+          return orig ? { ...orig, order_index: idx } : null;
+        })
+        .filter(Boolean);
+      applyColumnConfig(next);
+    },
+    [currentColumnConfig, applyColumnConfig],
+  );
 
   const filteredLogs = useMemo(() => {
     if (!debouncedSearch) return logItems;
     const q = debouncedSearch.toLowerCase();
     return logItems.filter(
       (l) =>
-        l.id?.toLowerCase().includes(q) ||
-        l.input?.toLowerCase().includes(q) ||
-        l.result?.toLowerCase().includes(q) ||
-        l.reason?.toLowerCase().includes(q),
+        l.id?.toLowerCase?.().includes(q) ||
+        l.input?.toLowerCase?.().includes(q) ||
+        l.result?.toLowerCase?.().includes(q) ||
+        l.reason?.toLowerCase?.().includes(q),
     );
   }, [logItems, debouncedSearch]);
 
-  const columns = useColumns();
+  const columns = useColumns(columnConfig);
   const handleRowClick = useCallback(
     (row) => {
       const idx = filteredLogs.findIndex((l) => l.id === row.id);
@@ -617,16 +380,48 @@ const EvalUsageTab = ({
                 </Typography>
               )}
             </Typography>
-            <Box sx={{ width: 200 }}>
+            <Box sx={{ width: 200, display: "flex", alignItems: "center", gap: 1, }}>
+              <CustomTooltip
+
+                show={true}
+                title={"View Column"}
+                placement="bottom"
+                arrow
+                size="small"
+              >
+                <IconButton
+                  ref={columnConfigureRef}
+                  onClick={() => setOpenColumnConfigure((prev) => !prev)}
+                  size="small"
+                  sx={{ color: "text.secondary" }}
+                >
+                  <SvgColor
+                    src="/assets/icons/action_buttons/ic_column.svg"
+                    sx={{ width: 16, height: 16, color: "text.primary" }}
+                  />
+                </IconButton>
+              </CustomTooltip>
               <FormSearchField
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
                 size="small"
+                sx={{
+                  minWidth: "120px",
+                  "& .MuiOutlinedInput-root": { height: "30px" },
+                }}
+
               />
             </Box>
           </Box>
-          <Box sx={{ flex: 1,overflowY: "auto", minHeight: 0 }}>
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <DataTable
               columns={columns}
               data={filteredLogs}
@@ -784,6 +579,15 @@ const EvalUsageTab = ({
           )}
         </Box>
       </Slide>
+
+      <ColumnDropdown
+        open={openColumnConfigure}
+        onClose={() => setOpenColumnConfigure(false)}
+        anchorEl={columnConfigureRef?.current}
+        columns={columnDropdownItems}
+        onColumnVisibilityChange={handleColumnVisibilityChange}
+        setColumns={handleColumnReorder}
+      />
     </Box>
   );
 };
@@ -836,9 +640,9 @@ const DetailPanelContent = ({
               backgroundColor:
                 viewMode === m
                   ? (t) =>
-                      t.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.08)"
-                        : "action.hover"
+                    t.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.08)"
+                      : "action.hover"
                   : "transparent",
               "&:hover": {
                 backgroundColor: (t) =>
@@ -967,6 +771,17 @@ const DetailPanelContent = ({
                             : row.source || "—"
                 }
               />
+              {row.version != null && row.version !== "" && (
+                <DetailRow
+                  label="Version"
+                  value={
+                    typeof row.version === "number" ||
+                      !String(row.version).startsWith("v")
+                      ? `v${row.version}`
+                      : String(row.version)
+                  }
+                />
+              )}
               {row.created_at && (
                 <DetailRow
                   label="Ran at"
@@ -1368,7 +1183,7 @@ const CompositeChildrenSection = ({ row }) => {
   );
 };
 
-// ── Detail row ──
+
 const DetailRow = ({ label, value, color, chip, chipColor, mono }) => (
   <Box
     sx={{

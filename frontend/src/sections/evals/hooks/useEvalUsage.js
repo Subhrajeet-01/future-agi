@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios, { endpoints } from "src/utils/axios";
 
 /**
@@ -34,9 +34,29 @@ export function useEvalUsageLogs(
         endpoints.develop.eval.getEvalUsage(templateId),
         { params: { page, page_size: pageSize, period } },
       );
-      return data?.result?.logs;
+      const result = data?.result || {};
+      return {
+        table: result.table || result.logs?.items || [],
+        columnConfig: result.column_config || [],
+        pagination: result.logs || {},
+      };
     },
     enabled: !!templateId,
     keepPreviousData: true,
+  });
+}
+
+export function useUpdateEvalUsageColumnConfig(templateId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (columns) =>
+      axios.post(endpoints.develop.eval.getEvalUsageColumnConfig(templateId), {
+        columns,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["evals", "usage-logs", templateId],
+      });
+    },
   });
 }
