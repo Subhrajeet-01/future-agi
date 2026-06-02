@@ -273,17 +273,13 @@ class CHSpanReader:
     def _resolve_session_ids_to_canonical(
         self, session_ids: list[str]
     ) -> dict[str, str]:
-        """Map ``{input trace_session_id (str) -> canonical (old) id (str)}``.
+        """Map ``{input trace_session_id -> survivor (canonical old) id}``.
 
-        P3b step1.5 (DESIGN §3 / id_remap_sql): resolve each caller id to its
-        consolidation group's **survivor** via the SAME survivor map the span side
-        uses (``survivor_map_subquery``), so the input side can never disagree with
-        the span side. A NEW (deterministic) id, a NON-survivor old id of a
-        many-old→one-new group, and the survivor itself ALL map to the survivor;
-        an id absent from the map (1:1 / net-new) maps to ITSELF. (The earlier
-        ``new_id -> old_id`` last-wins dict picked an ARBITRARY old for a
-        consolidation group, contradicting the span-side survivor and dropping the
-        session.) Pre-flip every id maps to itself (gate-B no-op).
+        Resolve each caller id to its consolidation group's survivor via the SAME
+        survivor map the span side uses (``survivor_map_subquery``), so the input
+        side can't disagree: a new id, a non-survivor old, and the survivor all map
+        to the survivor; an unmapped id (1:1 / net-new) maps to itself. Pre-flip a
+        no-op (gate B). See id_remap_sql.
         """
         from tracer.services.clickhouse.v2.id_remap_sql import survivor_map_subquery
 
