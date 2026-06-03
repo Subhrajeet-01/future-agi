@@ -27,6 +27,7 @@ import React, {
 import { useNavigate, useParams } from "react-router";
 import { useSearchParams } from "react-router-dom";
 import { useSnackbar } from "notistack";
+import { format } from "date-fns";
 import { useDeploymentMode } from "src/hooks/useDeploymentMode";
 import Iconify from "src/components/iconify";
 import CustomTooltip from "src/components/tooltip/CustomTooltip";
@@ -1055,7 +1056,10 @@ const EvalDetailPage = () => {
     try {
       const { data } = await axios.post(
         endpoints.develop.eval.duplicateEvalsTemplate,
-        { eval_template_id: evalId, name: `${evalData?.name}_copy_${Date.now()}` },
+        {
+          eval_template_id: evalId,
+          name: `${evalData?.name}_copy_${format(new Date(), "dd-MM-yyyy_HH-mm-ss")}`,
+        },
       );
       enqueueSnackbar("Evaluation duplicated", { variant: "success" });
       if (data?.result?.eval_template_id)
@@ -1203,37 +1207,38 @@ const EvalDetailPage = () => {
           </Box>
         </Box>
         <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          {isSystemEval && (
+          {isSystemEval ? (
             <Typography variant="caption" color="text.disabled">
               Read-only (system eval)
             </Typography>
+          ) : (
+            <>
+              <IconButton
+                size="small"
+                onClick={(e) => setMenuAnchor(e.currentTarget)}
+              >
+                <Iconify icon="solar:menu-dots-bold" width={18} />
+              </IconButton>
+              <Menu
+                anchorEl={menuAnchor}
+                open={Boolean(menuAnchor)}
+                onClose={() => setMenuAnchor(null)}
+              >
+                <MenuItem onClick={handleDuplicate}>
+                  <Iconify icon="solar:copy-bold" width={16} sx={{ mr: 1 }} />{" "}
+                  Duplicate
+                </MenuItem>
+                <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
+                  <Iconify
+                    icon="solar:trash-bin-trash-bold"
+                    width={16}
+                    sx={{ mr: 1 }}
+                  />{" "}
+                  Delete
+                </MenuItem>
+              </Menu>
+            </>
           )}
-          <IconButton
-            size="small"
-            onClick={(e) => setMenuAnchor(e.currentTarget)}
-          >
-            <Iconify icon="solar:menu-dots-bold" width={18} />
-          </IconButton>
-          <Menu
-            anchorEl={menuAnchor}
-            open={Boolean(menuAnchor)}
-            onClose={() => setMenuAnchor(null)}
-          >
-            <MenuItem onClick={handleDuplicate}>
-              <Iconify icon="solar:copy-bold" width={16} sx={{ mr: 1 }} />{" "}
-              Duplicate
-            </MenuItem>
-            {!isSystemEval && (
-              <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
-                <Iconify
-                  icon="solar:trash-bin-trash-bold"
-                  width={16}
-                  sx={{ mr: 1 }}
-                />{" "}
-                Delete
-              </MenuItem>
-            )}
-          </Menu>
         </Box>
       </Box>
 
