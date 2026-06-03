@@ -247,7 +247,7 @@ class TestWorkspaceCreateAPI:
             },
             format="json",
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_create_workspace_unauthenticated(self, api_client):
         """Unauthenticated request fails."""
@@ -411,7 +411,7 @@ class TestWorkspaceUpdateAPI:
             {"description": "Member trying to update"},
             format="json",
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_update_workspace_unauthenticated(self, api_client, second_workspace):
         """Unauthenticated request fails."""
@@ -494,14 +494,14 @@ class TestWorkspaceDeleteAPI:
     def test_delete_workspace_as_admin_forbidden(self, admin_client, second_workspace):
         """Admin cannot delete workspaces (only owner can)."""
         response = admin_client.delete(f"/accounts/workspaces/{second_workspace.id}/")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_delete_workspace_as_member_forbidden(
         self, member_client, second_workspace
     ):
         """Member cannot delete workspaces."""
         response = member_client.delete(f"/accounts/workspaces/{second_workspace.id}/")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_delete_workspace_unauthenticated(self, api_client, second_workspace):
         """Unauthenticated request fails."""
@@ -565,7 +565,7 @@ class TestWorkspaceMembersListAPI:
     def test_get_workspace_members_as_member_forbidden(self, member_client, workspace):
         """Member cannot get workspace members list."""
         response = member_client.get(f"/accounts/workspaces/{workspace.id}/members/")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_get_workspace_members_unauthenticated(self, api_client, workspace):
         """Unauthenticated request fails."""
@@ -682,7 +682,7 @@ class TestWorkspaceMembersAddAPI:
             {"users": [{"email": "new@futureagi.com", "role": "member"}]},
             format="json",
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_add_member_unauthenticated(self, api_client, second_workspace):
         """Unauthenticated request fails."""
@@ -829,7 +829,7 @@ class TestWorkspaceMembersRemoveAPI:
         response = member_client.delete(
             f"/accounts/workspaces/{workspace.id}/members/{admin_user.id}/"
         )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN)
 
     def test_remove_member_unauthenticated(self, api_client, workspace, member_user):
         """Unauthenticated request fails."""

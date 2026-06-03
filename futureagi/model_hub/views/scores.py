@@ -688,23 +688,33 @@ class ScoreViewSet(viewsets.ModelViewSet):
             # parent trace is semantically a "note on this span" for the
             # purposes of the trace-detail panel.
             from model_hub.models.annotation_queues import QueueItemNote
-            from tracer.models.observation_span import ObservationSpan
+            from tracer.models.project import Project
+            from tracer.services.clickhouse.v2 import get_reader
 
             # Resolve the parent trace, scoped to the requester's organization
             # so a direct call with another org's span id can't surface this
             # org's queue notes via the trace-level filter branch. If the
             # span doesn't belong to this org, ``span_belongs_to_org`` stays
             # False and we skip note enrichment entirely.
-            span_row = (
-                ObservationSpan.objects.filter(
-                    id=source_id,
-                    project__organization=request.organization,
-                )
-                .values_list("trace_id", flat=True)
-                .first()
-            )
-            span_belongs_to_org = span_row is not None
-            trace_id = span_row
+            #
+            # CH read replaces the PG path
+            #   ObservationSpan.objects.filter(id=, project__organization=)
+            #     .values_list("trace_id", flat=True).first()
+            # Org-tenant scope is verified by checking the span's project_id
+            # against the requesting org via Project (the only side of the
+            # FK that's still in PG).
+            with get_reader() as reader:
+                span = reader.get(str(source_id))
+            span_belongs_to_org = False
+            trace_id = None
+            if (
+                span is not None
+                and Project.objects.filter(
+                    id=span.project_id, organization=request.organization
+                ).exists()
+            ):
+                span_belongs_to_org = True
+                trace_id = span.trace_id or None
 
             queue_note_filter = Q(queue_item__observation_span_id=source_id)
             if trace_id:

@@ -321,6 +321,8 @@ class TestTraceAnnotationAPI:
     def test_bulk_annotation_sets_score_workspace_and_values_are_readable(
         self, auth_client, user, organization, workspace, observation_span, star_label
     ):
+        from tracer.tests._ch_seed import seed_ch_score
+
         response = auth_client.post(
             BULK_ANNOTATION_URL,
             {
@@ -351,6 +353,8 @@ class TestTraceAnnotationAPI:
         assert score.organization == organization
         assert score.workspace == workspace
         assert score.value == {"rating": 4.0}
+
+        seed_ch_score(score)
 
         values_response = auth_client.get(
             f"{TRACE_ANNOTATION_URL}get_annotation_values/",

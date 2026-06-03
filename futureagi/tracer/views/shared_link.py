@@ -259,8 +259,8 @@ def _resolve_resource(link):
     """
     try:
         if link.resource_type == "trace":
-            from tracer.models.observation_span import ObservationSpan
-            from tracer.serializers.observation_span import ObservationSpanSerializer
+            from tracer.services.clickhouse.v2 import get_reader
+            from tracer.services.clickhouse.v2.span_reader import CHSpanReader
 
             trace = _get_shared_trace(
                 link.resource_id,
@@ -270,12 +270,12 @@ def _resolve_resource(link):
             if not trace:
                 return None
 
-            # Get spans for this trace and build a flat list
-            spans_qs = ObservationSpan.objects.filter(
-                trace_id=str(trace.id),
-                project=trace.project,
-            ).order_by("start_time")
-            spans_data = ObservationSpanSerializer(spans_qs, many=True).data
+            # Spans read from CH 25.3. The reader returns CHSpan dataclasses;
+            # `to_django_dict()` shapes them like ObservationSpanSerializer
+            # output so the tree-building below stays unchanged.
+            with get_reader() as reader:
+                ch_spans = reader.list_by_trace(str(trace.id))
+            spans_data = [CHSpanReader.to_django_dict(s) for s in ch_spans]
 
             # Build tree structure (parent→children)
             span_map = {}

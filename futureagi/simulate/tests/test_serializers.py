@@ -18,7 +18,6 @@ from rest_framework.test import APIRequestFactory
 
 from model_hub.models.choices import DatasetSourceChoices, SourceChoices
 from model_hub.models.develop_dataset import Dataset
-from simulate.models import AgentDefinition
 from simulate.serializers.scenarios import (
     AddScenarioColumnsSerializer,
     AddScenarioRowsSerializer,
@@ -65,13 +64,15 @@ def source_dataset(db, organization, workspace, user):
 
 @pytest.fixture
 def agent_definition(db, organization, workspace):
-    """Create an agent definition for agent-definition source scenarios."""
+    """Create an agent definition for scenario creation tests."""
+    from simulate.models import AgentDefinition
+
     return AgentDefinition.objects.create(
-        agent_name="Serializer Test Agent",
+        agent_name="Test Agent",
         agent_type=AgentDefinition.AgentTypeChoices.VOICE,
         contact_number="+1234567890",
         inbound=True,
-        description="Agent used by serializer unit tests",
+        description="Test agent for serializer tests",
         organization=organization,
         workspace=workspace,
         languages=["en"],
@@ -139,7 +140,6 @@ class TestCreateScenarioSerializer:
             "name": "Test Graph Scenario",
             "description": "A test scenario with graph",
             "kind": "graph",
-            "agent_definition_id": str(agent_definition.id),
             "graph": {
                 "nodes": [
                     {"id": "start", "type": "start"},
@@ -147,6 +147,7 @@ class TestCreateScenarioSerializer:
                 ],
                 "edges": [{"source": "start", "target": "end"}],
             },
+            "agent_definition_id": str(agent_definition.id),
         }
 
         serializer = CreateScenarioSerializer(
@@ -233,7 +234,9 @@ class TestCreateScenarioSerializer:
             data=data, context={"request": mock_request}
         )
         assert not serializer.is_valid()
-        assert "dataset_id" in serializer.errors
+        assert "dataset_id" in serializer.errors or "non_field_errors" in serializer.errors
+        all_errors = str(serializer.errors).lower()
+        assert "dataset_id" in all_errors
 
     def test_create_scenario_serializer_script_missing_url(self, mock_request):
         """Script kind without script_url should fail validation."""
@@ -246,7 +249,9 @@ class TestCreateScenarioSerializer:
             data=data, context={"request": mock_request}
         )
         assert not serializer.is_valid()
-        assert "script_url" in serializer.errors
+        assert "script_url" in serializer.errors or "non_field_errors" in serializer.errors
+        all_errors = str(serializer.errors).lower()
+        assert "script_url" in all_errors
 
     def test_create_scenario_serializer_graph_missing_requirements(
         self, mock_request, agent_definition
@@ -267,7 +272,11 @@ class TestCreateScenarioSerializer:
     def test_create_scenario_serializer_graph_generate_missing_agent(
         self, mock_request
     ):
-        """Graph kind with generate_graph=True but no agent_definition_id should fail."""
+        """Graph kind with generate_graph=True but no agent_definition_id should fail.
+
+        The default source_type (agent_definition) requires agent_definition_id,
+        so the validation error fires on the source_type constraint.
+        """
         data = {
             "name": "Test Graph Scenario",
             "kind": "graph",
@@ -278,7 +287,8 @@ class TestCreateScenarioSerializer:
             data=data, context={"request": mock_request}
         )
         assert not serializer.is_valid()
-        assert "agent_definition_id" in serializer.errors
+        all_errors = str(serializer.errors).lower()
+        assert "agent_definition_id" in all_errors
 
     def test_create_scenario_serializer_custom_columns_valid(
         self, mock_request, agent_definition

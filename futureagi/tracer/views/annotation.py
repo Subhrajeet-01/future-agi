@@ -34,12 +34,11 @@ from tracer.serializers.annotation import (
     BulkAnnotationResponseSerializer,
     GetAnnotationLabelsQuerySerializer,
     GetAnnotationLabelsResponseSerializer,
-    GetTraceAnnotationValuesResponseSerializer,
     GetTraceAnnotationSerializer,
+    GetTraceAnnotationValuesResponseSerializer,
 )
 from tracer.services.clickhouse.query_service import (
     AnalyticsQueryService,
-    QueryType,
 )
 
 logger = structlog.get_logger(__name__)
@@ -326,6 +325,64 @@ class TraceAnnotationView(ModelViewSet):
 
         return annotations
 
+    def _get_annotations_from_postgres(
+        self,
+        request,
+        observation_span_id,
+        trace_id,
+        annotators_list,
+        exclude_annotators_list,
+    ):
+        query_params = {
+            "deleted": False,
+            "organization": _get_request_organization(request),
+        }
+        if observation_span_id:
+            query_params["observation_span_id"] = observation_span_id
+        elif trace_id:
+            query_params["observation_span__trace_id"] = trace_id
+            query_params["observation_span__parent_span_id__isnull"] = True
+        else:
+            return []
+
+        queryset = Score.objects.filter(
+            _project_workspace_scope_q(request, "observation_span__project__"),
+            **query_params,
+        )
+
+        if annotators_list:
+            queryset = queryset.filter(annotator__in=annotators_list)
+
+        if exclude_annotators_list:
+            queryset = queryset.exclude(annotator__in=exclude_annotators_list)
+
+        queryset = queryset.select_related("annotator", "label").order_by(
+            "-created_at"
+        )[:500]
+        result = []
+
+        for score in queryset:
+            final_annotation_value = self._extract_display_value(score)
+
+            result.append(
+                {
+                    "id": str(score.id),
+                    "annotation_label_name": score.label.name,
+                    "annotation_value": final_annotation_value,
+                    "annotation_label_id": str(score.label.id),
+                    "annotator": score.annotator.email if score.annotator else None,
+                    "annotator_id": str(score.annotator.id)
+                    if score.annotator
+                    else None,
+                    "updated_by": str(score.annotator.id) if score.annotator else None,
+                    "updated_at": score.updated_at,
+                    "annotation_type": score.label.type,
+                    "settings": score.label.settings,
+                }
+            )
+
+        return result
+
     # ------------------------------------------------------------------
     # Main endpoint
     # ------------------------------------------------------------------
@@ -352,82 +409,24 @@ class TraceAnnotationView(ModelViewSet):
             )
             trace_id = str(trace_id) if trace_id else None
 
-            # ClickHouse dispatch for annotation data
-            analytics = AnalyticsQueryService()
-            if analytics.should_use_clickhouse(QueryType.ANNOTATION_DETAIL):
-                try:
-                    ch_annotations = self._get_annotations_from_clickhouse(
-                        request,
-                        observation_span_id,
-                        trace_id,
-                        annotators_list,
-                        exclude_annotators_list,
-                    )
-                    # Notes are always fetched from PG (not replicated to CH)
-                    notes_details = self._get_notes_from_pg(
-                        request, observation_span_id
-                    )
-                    return self._gm.success_response(
-                        {"annotations": ch_annotations, "notes": notes_details}
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "ClickHouse annotation-detail failed, falling back to PG",
-                        error=str(e),
-                    )
-                    # Fall through to existing PG code
-
-            query_params = {
-                "deleted": False,
-                "organization": _get_request_organization(request),
-            }
-            if observation_span_id:
-                query_params["observation_span_id"] = observation_span_id
-            elif trace_id:
-                query_params["observation_span__trace_id"] = trace_id
-                query_params["observation_span__parent_span_id__isnull"] = True
-
-            queryset = Score.objects.filter(
-                _project_workspace_scope_q(request, "observation_span__project__"),
-                **query_params,
+            ch_annotations = self._get_annotations_from_clickhouse(
+                request,
+                observation_span_id,
+                trace_id,
+                annotators_list,
+                exclude_annotators_list,
             )
-
-            if annotators_list:  # Include only these annotators
-                queryset = queryset.filter(annotator__in=annotators_list)
-
-            if exclude_annotators_list:  # Exclude these annotators
-                queryset = queryset.exclude(annotator__in=exclude_annotators_list)
-
-            queryset = queryset.select_related("annotator", "label").order_by(
-                "-created_at"
-            )[:500]
-            result = []
-
-            for score in queryset:
-                final_annotation_value = self._extract_display_value(score)
-
-                result.append(
-                    {
-                        "id": str(score.id),
-                        "annotation_label_name": score.label.name,
-                        "annotation_value": final_annotation_value,
-                        "annotation_label_id": str(score.label.id),
-                        "annotator": score.annotator.email if score.annotator else None,
-                        "annotator_id": (
-                            str(score.annotator.id) if score.annotator else None
-                        ),
-                        "updated_by": (
-                            str(score.annotator.id) if score.annotator else None
-                        ),
-                        "updated_at": score.updated_at,
-                        "annotation_type": score.label.type,
-                        "settings": score.label.settings,
-                    }
+            if not ch_annotations:
+                ch_annotations = self._get_annotations_from_postgres(
+                    request,
+                    observation_span_id,
+                    trace_id,
+                    annotators_list,
+                    exclude_annotators_list,
                 )
-
             notes_details = self._get_notes_from_pg(request, observation_span_id)
             return self._gm.success_response(
-                {"annotations": result, "notes": notes_details}
+                {"annotations": ch_annotations, "notes": notes_details}
             )
         except Exception as e:
             logger.exception(f"Error in getting annotation values: {str(e)}")
