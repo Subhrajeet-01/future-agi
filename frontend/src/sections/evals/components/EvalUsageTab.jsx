@@ -542,7 +542,7 @@ const EvalUsageTab = ({
                 sx={{ width: "1px", height: 14, backgroundColor: "divider" }}
               />
               <StatPill
-                label="Pass Rate"
+                label="Task Completion Rate"
                 value={`${stats.pass_rate ?? 0}%`}
                 color="info.main"
               />
