@@ -376,8 +376,18 @@ const TurnRow = React.forwardRef(
                   alignItems: "center",
                   gap: "2px",
                   px: 0.5,
-                  bgcolor: "error.lighter",
-                  color: "error.dark",
+                  // Theme-aware so the chip stays legible on both dark
+                  // and light backgrounds — same `lighter`/`darker` ↔
+                  // `darker`/`main` swap we use for diff highlights and
+                  // the KPI delta chips elsewhere in this drawer.
+                  bgcolor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? theme.palette.error.darker
+                      : theme.palette.error.lighter,
+                  color: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? theme.palette.error.main
+                      : theme.palette.error.darker,
                   borderRadius: "2px",
                   fontSize: 9,
                   fontWeight: 600,
