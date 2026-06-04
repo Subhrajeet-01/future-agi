@@ -580,7 +580,7 @@ const EvalUsageTab = ({
               }}
             >
               <Typography variant="caption" color="text.disabled">
-                No data for this period
+              No data to show for selected period, update filters to view graph/data when no data is available.
               </Typography>
             </Box>
           )}
