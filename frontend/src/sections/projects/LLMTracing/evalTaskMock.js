@@ -43,10 +43,8 @@ const NEUTRAL_TASK = {
 // (trace / span) so BOTH source glyphs ("T" / "S") show up. Swap-to-backend:
 // once setEvalTaskRegistry() is fed real data, REGISTRY.populated becomes true
 // and resolveEvalTask() never reaches this path.
-const EVALS_PER_DUMMY_TASK = 3;
+const DUMMY_TASK_COUNT = 3;
 const DUMMY_LEVELS = [TASK_LEVEL.TRACE, TASK_LEVEL.SPAN];
-const dummyTaskByEvalKey = new Map();
-let dummyDistinctEvals = 0;
 
 function dummyEvalKey(col) {
   return (
@@ -57,25 +55,27 @@ function dummyEvalKey(col) {
   );
 }
 
+// Stable string hash (djb2) — used to bucket evals into dummy tasks.
+function dummyHash(s) {
+  let h = 5381;
+  const str = String(s || "");
+  for (let i = 0; i < str.length; i += 1) h = (h * 33) ^ str.charCodeAt(i);
+  return Math.abs(h);
+}
+
+// A dummy task is a PURE function of the eval's key — the bucket is derived by
+// hashing the key, never by insertion order or a running counter. This keeps
+// each eval's task name stable when other evals are added/removed on a project
+// (previously a new eval could shift everyone's bucket and rename tasks).
 function dummyTaskFor(col) {
-  const key = dummyEvalKey(col);
-  let info = dummyTaskByEvalKey.get(key);
-  if (!info) {
-    const bucket = Math.floor(dummyDistinctEvals / EVALS_PER_DUMMY_TASK);
-    dummyDistinctEvals += 1;
-    info = {
-      taskId: `__dummy_task_${bucket + 1}__`,
-      taskName: `evaltaskname${bucket + 1}`,
-      level: DUMMY_LEVELS[bucket % DUMMY_LEVELS.length],
-      // Earlier buckets sort first under the newest-first ordering used by
-      // groupEvalColumnsByTask (so evaltaskname1 leads).
-      createdAt: new Date(
-        Date.UTC(2030, 0, 1) - bucket * 86400000,
-      ).toISOString(),
-    };
-    dummyTaskByEvalKey.set(key, info);
-  }
-  return info;
+  const bucket = dummyHash(dummyEvalKey(col)) % DUMMY_TASK_COUNT;
+  return {
+    taskId: `__dummy_task_${bucket + 1}__`,
+    taskName: `evaltaskname${bucket + 1}`,
+    level: DUMMY_LEVELS[bucket % DUMMY_LEVELS.length],
+    // Lower buckets sort first under groupEvalColumnsByTask's newest-first order.
+    createdAt: new Date(Date.UTC(2030, 0, 1) - bucket * 86400000).toISOString(),
+  };
 }
 
 const norm = (s) =>

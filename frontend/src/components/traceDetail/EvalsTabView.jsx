@@ -927,15 +927,30 @@ const EvalsTabView = ({
                   evalCount={task.evals.length}
                   level={task.level}
                 />
-                {task.evals.map((group) => (
-                  <EvalGroupRow
-                    key={group.evalName}
-                    group={group}
-                    onSelectSpan={onSelectSpan}
-                    showSpanColumn={showSpanColumn}
-                    onFixWithFalcon={onFixWithFalcon}
-                  />
-                ))}
+                {task.evals.map((group) =>
+                  // Nest only when there are sub-evals to roll up (the eval ran
+                  // across >1 span). A single eval (e.g. a trace-level eval, or
+                  // one that ran on a single span) renders as a flat row — no
+                  // pointless "Trace average" nesting — straight to its output
+                  // + explanation dropdown.
+                  group.rows.length > 1 ? (
+                    <EvalGroupRow
+                      key={group.evalName}
+                      group={group}
+                      onSelectSpan={onSelectSpan}
+                      showSpanColumn={showSpanColumn}
+                      onFixWithFalcon={onFixWithFalcon}
+                    />
+                  ) : (
+                    <EvalTableRow
+                      key={group.evalName}
+                      ev={group.rows[0]}
+                      onSelectSpan={onSelectSpan}
+                      showSpanColumn={showSpanColumn}
+                      onFixWithFalcon={onFixWithFalcon}
+                    />
+                  ),
+                )}
               </React.Fragment>
             ))
           : filtered.map((ev) => (

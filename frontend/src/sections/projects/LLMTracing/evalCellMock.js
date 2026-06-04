@@ -58,14 +58,32 @@ export function isPassValue(value) {
   return passRate(value) >= 50;
 }
 
-/** Mock "Pass X / Fail Y" rollup across child spans (§4.5). */
+/**
+ * Mock pass/fail rollup across child spans (§4.5). Returns counts for each
+ * bucket so the cell can render chips: Fail / Errored / Pass + "+N not
+ * evaluated" — mirroring the trace-detail rollup. Deterministic per cell.
+ */
 export function mockPassFailRollup(value, column) {
   const seed = seedFor(value, column);
   const rate = passRate(value);
-  const total = 5 + (seed % 10); // 5..14 spans
-  const pass = Math.max(0, Math.min(total, Math.round((rate / 100) * total)));
-  const fail = total - pass;
-  return { pass, fail, total, pct: Math.round((pass / total) * 100) };
+  const evaluated = 3 + (seed % 6); // 3..8 spans actually scored
+  const pass = Math.max(
+    0,
+    Math.min(evaluated, Math.round((rate / 100) * evaluated)),
+  );
+  const fail = evaluated - pass;
+  const errored = (seed >> 3) % 3; // 0..2 errored spans
+  const notEvaluated = (seed >> 5) % 4; // 0..3 not-evaluated spans
+  const total = evaluated + errored + notEvaluated;
+  return {
+    pass,
+    fail,
+    errored,
+    notEvaluated,
+    evaluated,
+    total,
+    pct: evaluated ? Math.round((pass / evaluated) * 100) : 0,
+  };
 }
 
 /** Choice label(s) present in the value. */

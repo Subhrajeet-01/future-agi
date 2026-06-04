@@ -139,36 +139,46 @@ const EvaluationCell = ({ value, column }) => {
       );
     }
 
-    // Trace row, rolled up from span evals → "Pass X / Fail Y" count (§4.5).
+    // Trace row, rolled up from span evals → Fail / Errored / Pass tone chips
+    // plus a muted "+N not evaluated" tail (§4.5), matching the trace-detail
+    // rollup and the FAGI outlined-chip pattern.
     if (rollup) {
-      const { pass, fail, total, pct } = mockPassFailRollup(value, column);
+      const { pass, fail, errored, notEvaluated } = mockPassFailRollup(
+        value,
+        column,
+      );
       return (
-        <Tooltip arrow title={`${pass} of ${total} spans passed — ${pct}%`}>
-          <Box
-            sx={{
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              gap: 0.75,
-              px: 1.5,
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            <Box component="span" sx={{ color: "success.dark" }}>
-              Pass {pass}
-            </Box>
+        <Box
+          sx={{
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            px: 1.5,
+            flexWrap: "wrap",
+          }}
+        >
+          {fail > 0 && (
+            <ChoiceChip label={`Fail ${fail}`} tone={CHOICE_TONE.BAD} />
+          )}
+          {errored > 0 && (
+            <ChoiceChip
+              label={`Errored ${errored}`}
+              tone={CHOICE_TONE.PARTIAL}
+            />
+          )}
+          {pass > 0 && (
+            <ChoiceChip label={`Pass ${pass}`} tone={CHOICE_TONE.GOOD} />
+          )}
+          {notEvaluated > 0 && (
             <Box
               component="span"
-              sx={{ color: "text.disabled", fontWeight: 400 }}
+              sx={{ fontSize: 11, color: "text.disabled", flexShrink: 0 }}
             >
-              /
+              + {notEvaluated} not evaluated
             </Box>
-            <Box component="span" sx={{ color: "error.main" }}>
-              Fail {fail}
-            </Box>
-          </Box>
-        </Tooltip>
+          )}
+        </Box>
       );
     }
 

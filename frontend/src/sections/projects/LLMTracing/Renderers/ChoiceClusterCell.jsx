@@ -97,7 +97,7 @@ const ChoiceClusterCell = (params) => {
       {shown.map((it) => (
         <ToneChip
           key={it.label}
-          label={it.label}
+          label={`${it.label} ${Math.round(it.pct)}%`}
           tone={classifyChoice(it.label)}
         />
       ))}
