@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
   apiPath,
@@ -17,9 +17,16 @@ import {
 import { queuePath } from "../lib/fixtures.mjs";
 
 const execFileAsync = promisify(execFile);
-const backendRoot = fileURLToPath(
-  new URL("../../../../futureagi/", import.meta.url),
-);
+const backendRoot = resolveBackendRoot();
+
+function resolveBackendRoot() {
+  if (process.env.API_JOURNEY_BACKEND_DIR) {
+    return process.env.API_JOURNEY_BACKEND_DIR;
+  }
+  const cwd = process.cwd();
+  const repoRoot = path.basename(cwd) === "frontend" ? path.dirname(cwd) : cwd;
+  return path.join(repoRoot, "futureagi");
+}
 
 export const datasetEvalJourneys = [
   {
