@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -59,7 +61,11 @@ def emit_span_ingestion_usage(
         try:
             from ee.usage.deployment import DeploymentMode
         except ImportError:
-            return
+            # ee absent means OSS; ee present but failing to import means
+            # billing would silently turn off — surface that instead.
+            if importlib.util.find_spec("ee") is None:
+                return
+            raise
 
         if DeploymentMode.is_oss():
             return
@@ -115,4 +121,4 @@ def emit_span_ingestion_usage(
                 )
             )
     except Exception:
-        logger.exception("usage_metering_skipped", exc_info=True)
+        logger.exception("usage_metering_skipped")
