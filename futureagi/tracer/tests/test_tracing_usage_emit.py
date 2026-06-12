@@ -10,9 +10,8 @@ metered nothing).
 """
 
 from __future__ import annotations
-
 import pytest
-
+pytest.importorskip("ee.usage.schemas.event_types")
 from ee.usage.schemas.event_types import BillingEventType
 
 ORG_ID = "11111111-1111-1111-1111-111111111111"

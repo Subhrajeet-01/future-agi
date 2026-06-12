@@ -12,7 +12,7 @@ def _tracing_billing_mode(org_id_str: str) -> str:
     """Resolve the org's tracing billing mode (``events`` or ``storage``).
 
     Mirrors ee.usage.services.billing_engine: the dimension we fill must be the
-    one we bill, so the ``or "events"`` fallback has to stay in sync with it.
+    one we bill, so the ``or "storage"`` fallback has to stay in sync with it.
     Cached in Redis (5 min TTL) — span ingest runs hot and the mode rarely
     changes; a stale read at month boundary at worst delays a single emit's
     dimension switch.
@@ -35,7 +35,7 @@ def _tracing_billing_mode(org_id_str: str) -> str:
         )
         .values_list("tracing_billing_mode", flat=True)
         .first()
-    ) or "events"
+    ) or "storage"
 
     try:
         from ee.usage.services.emitter import get_redis
@@ -115,4 +115,4 @@ def emit_span_ingestion_usage(
                 )
             )
     except Exception:
-        logger.debug("usage_metering_skipped", exc_info=True)
+        logger.exception("usage_metering_skipped", exc_info=True)
