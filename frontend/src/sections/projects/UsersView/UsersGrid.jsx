@@ -443,6 +443,8 @@ const UsersGrid = React.memo(
     const onColumnMoved = useCallback(
       (params) => {
         if (!params.finished) return;
+        // User drags only; programmatic moves would feed back into setColumns.
+        if (params.source !== "uiColumnMoved") return;
 
         const newOrder = params.api
           .getColumnState()

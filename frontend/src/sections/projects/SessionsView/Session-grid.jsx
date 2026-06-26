@@ -400,6 +400,8 @@ const SessionGrid = React.forwardRef(
     const onColumnMoved = useCallback(
       (params) => {
         if (!params.finished) return;
+        // User drags only; programmatic moves would loop with the order re-apply.
+        if (params.source !== "uiColumnMoved") return;
 
         const newOrder = params.api
           .getColumnState()
